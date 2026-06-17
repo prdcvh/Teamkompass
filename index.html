@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TeamKompass | Team, Events und Spielerprofile</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Hauptnavigation">
+        <div class="brand">
+          <img class="club-logo" src="./assets/club-logo.svg" alt="1. FC TSG Königstein Logo" />
+          <div>
+            <strong>1. FC TSG Königstein</strong>
+            <span>TeamKompass</span>
+          </div>
+        </div>
+        <nav class="nav-tabs" aria-label="Ansichten">
+          <button class="nav-tab active" data-view="dashboard">Dashboard</button>
+          <button class="nav-tab" data-view="squad">Kader</button>
+          <button class="nav-tab" data-view="events">Events</button>
+          <button class="nav-tab" data-view="profiles">Profile</button>
+          <button class="nav-tab" data-view="teamAnalysis">Team</button>
+        </nav>
+        <div class="season-card">
+          <span>Saison</span>
+          <strong>2026/27</strong>
+          <small id="storageState">Lokal gespeichert</small>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Mannschaftsverwaltung</p>
+            <h1 id="pageTitle">Dashboard</h1>
+          </div>
+          <div class="top-actions">
+            <button class="theme-toggle" id="themeToggle" type="button" aria-pressed="false" title="Darkmode umschalten">
+              <span class="theme-toggle-icon" aria-hidden="true">◐</span>
+              <span id="themeToggleText">Darkmode</span>
+            </button>
+            <details class="action-menu">
+              <summary>Aktionen</summary>
+              <div class="action-menu-list">
+                <button class="ghost-button" id="exportBtn" type="button">Daten exportieren</button>
+                <button class="primary-button" id="addPlayerTop" type="button">Spieler anlegen</button>
+              </div>
+            </details>
+          </div>
+        </header>
+
+        <section class="view active" id="dashboardView">
+          <section class="welcome-panel">
+            <div>
+              <span class="welcome-kicker">1. FC TSG Königstein</span>
+              <h2>Alles rund um dein Team auf einen Blick</h2>
+              <p>Plane Events, bewerte Spieler, behalte Belastung im Blick und erkenne Entwicklungen direkt aus den Teamdaten.</p>
+            </div>
+            <div class="welcome-actions">
+              <button class="primary-button" id="heroEventBtn">Event anlegen</button>
+              <button class="ghost-button" id="heroAnalysisBtn">Team analysieren</button>
+            </div>
+          </section>
+          <div class="metrics-grid" id="metricsGrid"></div>
+          <div class="dashboard-layout">
+            <section class="panel pitch-panel">
+              <div class="panel-head">
+                <h2>Startelf nach Notenschnitt</h2>
+                <select id="formationSelect" aria-label="Formation">
+                  <option value="4-3-3">4-3-3</option>
+                  <option value="4-2-3-1">4-2-3-1</option>
+                  <option value="3-5-2">3-5-2</option>
+                </select>
+              </div>
+              <div class="pitch" id="pitch"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-head">
+                <h2>Formkurve</h2>
+                <span class="muted">beste Schnitte</span>
+              </div>
+              <div class="leader-list" id="leaderList"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="squadView">
+          <details class="control-disclosure" open>
+            <summary>Kader filtern</summary>
+            <div class="toolbar">
+              <label class="search-box">
+                <span>Suche</span>
+                <input id="searchInput" type="search" placeholder="Name, Position, Status" />
+              </label>
+              <select id="positionFilter" aria-label="Position filtern">
+                <option value="all">Alle Positionen</option>
+              </select>
+            </div>
+          </details>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Pos.</th>
+                  <th>Geburtsdatum</th>
+                  <th>Status</th>
+                  <th>Events</th>
+                  <th>Note</th>
+                  <th>Risiko</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="playerTable"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="view" id="eventsView">
+          <div class="split-layout events-layout">
+            <section class="panel">
+              <div class="panel-head">
+                <h2>Events</h2>
+                <button class="primary-button" id="newEventBtn">Event anlegen</button>
+              </div>
+              <div class="event-list" id="eventList"></div>
+            </section>
+            <section class="panel event-editor">
+              <div class="panel-head">
+                <div>
+                  <h2 id="eventEditorTitle">Event bewerten</h2>
+                  <span class="muted" id="eventEditorMeta">Training oder Spiel auswählen</span>
+                </div>
+                <button class="ghost-button" id="deleteEventBtn">Event löschen</button>
+              </div>
+              <details class="control-disclosure event-controls" open>
+                <summary>Eventdetails und Filter</summary>
+                <div class="rating-toolbar">
+                  <label>
+                    Event
+                    <select id="eventSelect"></select>
+                  </label>
+                  <label>
+                    Ansicht
+                    <select id="ratingFilter">
+                      <option value="all">Alle Spieler</option>
+                      <option value="present">Nur anwesend</option>
+                      <option value="missing">Nur fehlend</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="event-meta-editor">
+                  <label>Intensität
+                  <select id="selectedEventIntensity">
+                    <option value="1">1 · niedrig</option>
+                    <option value="2">2 · mittel</option>
+                    <option value="3">3 · hoch</option>
+                  </select>
+                </label>
+                <label>Spieldauer <input id="selectedMatchDuration" type="number" min="1" max="150" /></label>
+                <label>Trainingsfokus
+                  <select id="selectedTrainingFocus">
+                    <option value="Eigener Ballbesitz">Eigener Ballbesitz</option>
+                    <option value="Gegnerischer Ballbesitz">Gegnerischer Ballbesitz</option>
+                    <option value="Umschalten">Umschalten</option>
+                  </select>
+                </label>
+                <label>Eigene Tore <input id="selectedGoalsFor" type="number" min="0" max="99" /></label>
+                <label>Gegentore <input id="selectedGoalsAgainst" type="number" min="0" max="99" /></label>
+                </div>
+              </details>
+              <div class="table-wrap rating-table-wrap">
+                <table>
+                  <thead>
+                    <tr id="ratingTableHead"></tr>
+                  </thead>
+                  <tbody id="ratingTable"></tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="profilesView">
+          <div class="profile-layout">
+            <section class="panel profile-summary">
+              <div class="panel-head">
+                <h2>Spielerprofil</h2>
+                <div class="panel-actions">
+                  <select id="profilePlayer" aria-label="Spieler auswählen"></select>
+                  <button class="ghost-button" id="profilePdfBtn" type="button">PDF herunterladen</button>
+                </div>
+              </div>
+              <div id="profileHeader"></div>
+              <canvas id="trendChart" width="980" height="360" aria-label="Notenentwicklung"></canvas>
+            </section>
+            <section class="panel">
+              <div class="panel-head">
+                <h2>Eventhistorie</h2>
+                <span class="muted">Schulnoten 1 bis 6</span>
+              </div>
+              <div class="record-list" id="profileHistory"></div>
+            </section>
+          </div>
+          <div class="profile-deep-grid">
+            <section class="panel">
+              <div class="panel-head">
+                <h2>Kompetenzprofil</h2>
+                <span class="muted">Ø Teilnoten</span>
+              </div>
+              <div class="analysis-bars" id="profileSkillBars"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-head">
+                <h2>Verfügbarkeit</h2>
+                <span class="muted">Anwesenheit und Belastung</span>
+              </div>
+              <div class="analysis-bars" id="profileAvailabilityBars"></div>
+            </section>
+          </div>
+          <div class="analytics-grid" id="analyticsCards"></div>
+        </section>
+
+        <section class="view" id="teamAnalysisView">
+          <div class="team-analysis-layout">
+            <section class="panel">
+              <div class="panel-head">
+                <h2>Teamform</h2>
+                <span class="muted">aus allen bewerteten Events</span>
+              </div>
+              <canvas id="teamTrendChart" width="980" height="360" aria-label="Teamtrend"></canvas>
+            </section>
+            <section class="panel">
+              <div class="panel-head">
+                <h2>Nützliche Kennzahlen</h2>
+                <span class="muted">aktuelle Saison</span>
+              </div>
+              <div class="team-insight-list" id="teamInsightList"></div>
+            </section>
+          </div>
+          <div class="team-chart-grid">
+            <section class="panel">
+              <div class="panel-head">
+                <h2>Geburtsquartale</h2>
+                <span class="muted">Kaderstruktur</span>
+              </div>
+              <canvas id="birthQuarterChart" width="680" height="320" aria-label="Geburtsquartale"></canvas>
+            </section>
+            <section class="panel">
+              <div class="panel-head">
+                <h2>Positionsabdeckung</h2>
+                <span class="muted">Spieler je Position</span>
+              </div>
+              <canvas id="positionCoverageChart" width="680" height="320" aria-label="Positionsabdeckung"></canvas>
+            </section>
+            <section class="panel">
+              <div class="panel-head">
+                <h2>Trainingsfokus</h2>
+                <span class="muted">Verteilung der Spielphasen</span>
+              </div>
+              <canvas id="trainingFocusChart" width="680" height="320" aria-label="Trainingsfokus"></canvas>
+            </section>
+          </div>
+          <div class="analytics-grid" id="teamAnalysisCards"></div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="playerDialog">
+      <form class="player-form" id="playerForm">
+        <div class="dialog-head">
+          <h2 id="dialogTitle">Spieler anlegen</h2>
+          <button class="icon-button" type="button" id="closeDialogBtn" aria-label="Schließen">×</button>
+        </div>
+        <input type="hidden" id="playerId" />
+        <label>Name <input id="playerName" required maxlength="40" /></label>
+        <div class="form-grid">
+          <fieldset class="position-picker full-span">
+            <legend>Positionen</legend>
+            <div class="position-options" id="positionOptions"></div>
+            <label class="custom-position">Weitere Positionen
+              <input id="playerCustomPositions" placeholder="z.B. Hybrid-8, Libero" />
+            </label>
+          </fieldset>
+          <label>Rückennr. <input id="playerNumber" type="number" min="1" max="99" required /></label>
+          <label>Geburtsdatum <input id="playerBirthdate" type="date" required /></label>
+          <label>Status
+            <select id="playerStatus">
+              <option>Fit</option>
+              <option>Angeschlagen</option>
+              <option>Verletzt</option>
+              <option>Pause</option>
+            </select>
+          </label>
+        </div>
+        <menu>
+          <button class="ghost-button" type="button" id="cancelDialogBtn">Abbrechen</button>
+          <button class="primary-button" id="savePlayerBtn" type="submit">Speichern</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog id="eventDialog">
+      <form class="player-form" id="eventForm">
+        <div class="dialog-head">
+          <h2>Event anlegen</h2>
+          <button class="icon-button" type="button" id="closeEventDialogBtn" aria-label="Schließen">×</button>
+        </div>
+        <label>Titel <input id="eventTitle" required maxlength="60" placeholder="z.B. Training Dienstag oder Heimspiel U17" /></label>
+        <div class="form-grid">
+          <label>Typ
+            <select id="eventType">
+              <option>Training</option>
+              <option>Spiel</option>
+            </select>
+          </label>
+          <label>Datum <input id="eventDate" type="date" required /></label>
+          <label>Intensität
+            <select id="eventIntensity" required>
+              <option value="1">1 · niedrig</option>
+              <option value="2">2 · mittel</option>
+              <option value="3">3 · hoch</option>
+            </select>
+          </label>
+          <label>Ort <input id="eventLocation" maxlength="50" placeholder="Sportplatz, Halle, auswärts" /></label>
+          <label>Trainingsfokus
+            <select id="eventTrainingFocus">
+              <option value="Eigener Ballbesitz">Eigener Ballbesitz</option>
+              <option value="Gegnerischer Ballbesitz">Gegnerischer Ballbesitz</option>
+              <option value="Umschalten">Umschalten</option>
+            </select>
+          </label>
+          <label>Gegner <input id="eventOpponent" maxlength="50" placeholder="nur bei Spielen" /></label>
+          <label>Spieldauer <input id="eventMatchDuration" type="number" min="1" max="150" value="90" /></label>
+          <label>Eigene Tore <input id="eventGoalsFor" type="number" min="0" max="99" value="0" /></label>
+          <label>Gegentore <input id="eventGoalsAgainst" type="number" min="0" max="99" value="0" /></label>
+        </div>
+        <label>Notiz <textarea id="eventNotes" rows="3" placeholder="Schwerpunkt, Ergebnis, Belastung, Besonderheiten"></textarea></label>
+        <menu>
+          <button class="ghost-button" type="button" id="cancelEventDialogBtn">Abbrechen</button>
+          <button class="primary-button" type="submit">Event speichern</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <script src="./firebase-config.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
