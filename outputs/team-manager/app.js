@@ -60,6 +60,34 @@ const sampleData = {
       }
     }
   ],
+  developmentPlans: {
+    p7: [
+      {
+        id: "dp1",
+        focus: "Orientierung vor Ballannahme",
+        goal: "Vor dem ersten Kontakt konsequent Schulterblick einsetzen.",
+        actions: "In Rondos und Spielformen gezielt vororientieren lassen.",
+        status: "In Arbeit",
+        dueDate: "2026-08-31",
+        createdAt: "2026-06-02"
+      }
+    ]
+  },
+  opponents: [
+    {
+      id: "o1",
+      name: "SV Nord",
+      formation: "3-2-3",
+      style: "Umschaltspiel",
+      strengths: "Schnelle Angriffe ueber die Aussen.",
+      weaknesses: "Raum hinter den Aussenverteidigern.",
+      keyPlayers: "Nr. 9 sehr schnell, Nr. 6 verteilt viele Baelle.",
+      setPieces: "Ecken meist auf den ersten Pfosten.",
+      gamePlan: "Restverteidigung sichern, nach Ballgewinn schnell breit werden.",
+      notes: "Aus dem letzten Heimspiel uebernommen.",
+      updatedAt: "2026-06-06"
+    }
+  ],
   selectedEventId: "e2"
 };
 
@@ -75,6 +103,7 @@ const views = {
   squad: $("#squadView"),
   events: $("#eventsView"),
   profiles: $("#profilesView"),
+  opponents: $("#opponentsView"),
   teamAnalysis: $("#teamAnalysisView")
 };
 
@@ -95,6 +124,7 @@ const titles = {
   squad: "Kader",
   events: "Events und Bewertungen",
   profiles: "Spielerprofile",
+  opponents: "Gegneranalyse",
   teamAnalysis: "Teamanalyse"
 };
 
@@ -165,10 +195,54 @@ function loadState() {
 function normalizeState(data) {
   const events = Array.isArray(data.events) ? data.events : structuredClone(sampleData.events);
   const players = Array.isArray(data.players) ? data.players : structuredClone(sampleData.players);
+  const playerIds = new Set(players.map((player) => player.id));
+  const developmentPlans = normalizeDevelopmentPlans(data.developmentPlans, playerIds);
   return {
     players: players.map(normalizePlayer),
     events: events.map(normalizeEvent),
+    developmentPlans,
+    opponents: Array.isArray(data.opponents) ? data.opponents.map(normalizeOpponent) : structuredClone(sampleData.opponents),
     selectedEventId: data.selectedEventId || data.events?.[0]?.id || sampleData.selectedEventId
+  };
+}
+
+function normalizeDevelopmentPlans(plans = {}, playerIds = new Set()) {
+  const normalized = {};
+  Object.entries(plans || {}).forEach(([playerId, items]) => {
+    if (playerIds.size && !playerIds.has(playerId)) return;
+    normalized[playerId] = Array.isArray(items) ? items.map(normalizeDevelopmentPlan) : [];
+  });
+  playerIds.forEach((playerId) => {
+    normalized[playerId] ||= [];
+  });
+  return normalized;
+}
+
+function normalizeDevelopmentPlan(plan = {}) {
+  return {
+    id: plan.id || `dp${crypto.randomUUID()}`,
+    focus: plan.focus || "",
+    goal: plan.goal || "",
+    actions: plan.actions || "",
+    status: plan.status || "Offen",
+    dueDate: plan.dueDate || "",
+    createdAt: plan.createdAt || new Date().toISOString().slice(0, 10)
+  };
+}
+
+function normalizeOpponent(opponent = {}) {
+  return {
+    id: opponent.id || `o${crypto.randomUUID()}`,
+    name: opponent.name || "",
+    formation: opponent.formation || "",
+    style: opponent.style || "Unbekannt",
+    strengths: opponent.strengths || "",
+    weaknesses: opponent.weaknesses || "",
+    keyPlayers: opponent.keyPlayers || "",
+    setPieces: opponent.setPieces || "",
+    gamePlan: opponent.gamePlan || "",
+    notes: opponent.notes || "",
+    updatedAt: opponent.updatedAt || new Date().toISOString().slice(0, 10)
   };
 }
 
@@ -389,6 +463,7 @@ function setView(viewName) {
   document.querySelectorAll(".nav-tab").forEach((button) => button.classList.toggle("active", button.dataset.view === viewName));
   $("#pageTitle").textContent = titles[viewName];
   if (viewName === "profiles") drawProfile();
+  if (viewName === "opponents") renderOpponentAnalysis();
   if (viewName === "teamAnalysis") renderTeamAnalysis();
 }
 
@@ -1052,7 +1127,80 @@ function drawProfile() {
   renderProfileChart(player, ratings);
   renderProfileHistory(ratings);
   renderProfileDeepAnalysis(playerId, ratings);
+  renderDevelopmentPlans(playerId);
   renderAnalyticsCards(playerId, ratings);
+}
+
+function renderDevelopmentPlans(playerId) {
+  const plans = state.developmentPlans?.[playerId] || [];
+  $("#developmentPlanList").innerHTML = plans.map((plan) => `
+    <article class="development-item">
+      <div>
+        <span class="status-pill ${plan.status === "Erreicht" ? "success" : plan.status === "In Arbeit" ? "warning" : ""}">${escapeHtml(plan.status)}</span>
+        <strong>${escapeHtml(plan.focus)}</strong>
+        <p>${escapeHtml(plan.goal)}</p>
+        <small class="muted">${plan.dueDate ? `Ziel bis ${formatDate(plan.dueDate)} · ` : ""}${escapeHtml(plan.actions || "Keine Massnahmen notiert.")}</small>
+      </div>
+      <div class="row-actions">
+        <button class="ghost-button" data-action="edit-plan" data-id="${plan.id}" type="button">Bearbeiten</button>
+        <button class="ghost-button" data-action="delete-plan" data-id="${plan.id}" type="button">Loeschen</button>
+      </div>
+    </article>
+  `).join("") || `<p class="muted">Noch kein Foerderplan fuer diesen Spieler angelegt.</p>`;
+}
+
+function resetDevelopmentPlanForm() {
+  $("#developmentPlanId").value = "";
+  $("#developmentPlanFocus").value = "";
+  $("#developmentPlanGoal").value = "";
+  $("#developmentPlanActions").value = "";
+  $("#developmentPlanStatus").value = "Offen";
+  $("#developmentPlanDueDate").value = "";
+}
+
+function saveDevelopmentPlan(event) {
+  event.preventDefault();
+  const playerId = $("#profilePlayer").value || state.players[0]?.id;
+  if (!playerId) return;
+  state.developmentPlans ||= {};
+  state.developmentPlans[playerId] ||= [];
+  const id = $("#developmentPlanId").value || `dp${crypto.randomUUID()}`;
+  const plan = {
+    id,
+    focus: $("#developmentPlanFocus").value.trim(),
+    goal: $("#developmentPlanGoal").value.trim(),
+    actions: $("#developmentPlanActions").value.trim(),
+    status: $("#developmentPlanStatus").value,
+    dueDate: $("#developmentPlanDueDate").value,
+    createdAt: state.developmentPlans[playerId].find((item) => item.id === id)?.createdAt || new Date().toISOString().slice(0, 10)
+  };
+  const existingIndex = state.developmentPlans[playerId].findIndex((item) => item.id === id);
+  if (existingIndex >= 0) state.developmentPlans[playerId][existingIndex] = plan;
+  else state.developmentPlans[playerId].push(plan);
+  resetDevelopmentPlanForm();
+  persist();
+  drawProfile();
+}
+
+function editDevelopmentPlan(planId) {
+  const playerId = $("#profilePlayer").value || state.players[0]?.id;
+  const plan = state.developmentPlans?.[playerId]?.find((item) => item.id === planId);
+  if (!plan) return;
+  $("#developmentPlanId").value = plan.id;
+  $("#developmentPlanFocus").value = plan.focus;
+  $("#developmentPlanGoal").value = plan.goal;
+  $("#developmentPlanActions").value = plan.actions;
+  $("#developmentPlanStatus").value = plan.status;
+  $("#developmentPlanDueDate").value = plan.dueDate;
+}
+
+function deleteDevelopmentPlan(planId) {
+  const playerId = $("#profilePlayer").value || state.players[0]?.id;
+  if (!playerId) return;
+  state.developmentPlans ||= {};
+  state.developmentPlans[playerId] = (state.developmentPlans?.[playerId] || []).filter((plan) => plan.id !== planId);
+  persist();
+  drawProfile();
 }
 
 function renderProfileHeader(player, ratings) {
@@ -1340,7 +1488,6 @@ function averageOf(items) {
 function renderTeamAnalysis() {
   const stats = teamStats();
   const quarters = birthQuarterCounts();
-  const ageGroups = ageGroupCounts();
   const coverage = positionCoverage();
   const focusCounts = trainingFocusCounts();
   const thinPositions = coverage.filter(([, count]) => count <= 1).map(([position]) => position).slice(0, 6);
@@ -1364,7 +1511,6 @@ function renderTeamAnalysis() {
     ["Training Umschalten", focusCounts.Umschalten],
     ["Geburten Q1/Q2", `${quarters.Q1}/${quarters.Q2}`],
     ["Geburten Q3/Q4", `${quarters.Q3}/${quarters.Q4}`],
-    ["U21-Spieler", ageGroups.U21],
     ["Positionslücken", thinPositions.length || "-"]
   ];
   $("#teamAnalysisCards").innerHTML = cards.map(([label, value]) => `<article class="insight-card"><span class="muted">${label}</span><strong>${value}</strong></article>`).join("");
@@ -1390,7 +1536,7 @@ function renderTeamAnalysis() {
     </article>
     <article class="team-insight">
       <strong>Kaderstruktur</strong>
-      <span>Altersgruppen: U21 ${ageGroups.U21}, 21-23 ${ageGroups["21-23"]}, 24-27 ${ageGroups["24-27"]}, 28+ ${ageGroups["28+"]}</span>
+      <span>Geburtsquartale: Q1 ${quarters.Q1}, Q2 ${quarters.Q2}, Q3 ${quarters.Q3}, Q4 ${quarters.Q4}</span>
       <span>Knapp besetzt: ${thinPositions.join(", ") || "keine auffälligen Lücken"}</span>
     </article>
   `;
@@ -1560,6 +1706,98 @@ function exportData() {
   URL.revokeObjectURL(link.href);
 }
 
+function renderOpponentAnalysis() {
+  const opponents = [...(state.opponents || [])].sort((a, b) => a.name.localeCompare(b.name, "de"));
+  $("#opponentCount").textContent = `${opponents.length} Gegner`;
+  $("#opponentList").innerHTML = opponents.map((opponent) => `
+    <article class="opponent-card">
+      <div class="opponent-card-head">
+        <div>
+          <span class="event-type">${escapeHtml(opponent.style)}</span>
+          <strong>${escapeHtml(opponent.name)}</strong>
+          <small class="muted">${opponent.formation ? `Formation ${escapeHtml(opponent.formation)} · ` : ""}aktualisiert ${formatDate(opponent.updatedAt)}</small>
+        </div>
+        <div class="row-actions">
+          <button class="ghost-button" data-action="edit-opponent" data-id="${opponent.id}" type="button">Bearbeiten</button>
+          <button class="ghost-button" data-action="delete-opponent" data-id="${opponent.id}" type="button">Loeschen</button>
+        </div>
+      </div>
+      <div class="opponent-detail-grid">
+        ${opponent.strengths ? opponentDetail("Staerken", opponent.strengths) : ""}
+        ${opponent.weaknesses ? opponentDetail("Schwaechen", opponent.weaknesses) : ""}
+        ${opponent.keyPlayers ? opponentDetail("Schluesselspieler", opponent.keyPlayers) : ""}
+        ${opponent.setPieces ? opponentDetail("Standards", opponent.setPieces) : ""}
+        ${opponent.gamePlan ? opponentDetail("Matchplan", opponent.gamePlan) : ""}
+        ${opponent.notes ? opponentDetail("Notizen", opponent.notes) : ""}
+      </div>
+    </article>
+  `).join("") || `<p class="muted">Noch keine Gegneranalyse angelegt.</p>`;
+}
+
+function opponentDetail(label, value) {
+  return `<section><span>${label}</span><p>${escapeHtml(value)}</p></section>`;
+}
+
+function resetOpponentForm() {
+  $("#opponentId").value = "";
+  $("#opponentName").value = "";
+  $("#opponentFormation").value = "";
+  $("#opponentStyle").value = "Unbekannt";
+  $("#opponentStrengths").value = "";
+  $("#opponentWeaknesses").value = "";
+  $("#opponentKeyPlayers").value = "";
+  $("#opponentSetPieces").value = "";
+  $("#opponentGamePlan").value = "";
+  $("#opponentNotes").value = "";
+}
+
+function saveOpponent(event) {
+  event.preventDefault();
+  state.opponents ||= [];
+  const id = $("#opponentId").value || `o${crypto.randomUUID()}`;
+  const opponent = {
+    id,
+    name: $("#opponentName").value.trim(),
+    formation: $("#opponentFormation").value.trim(),
+    style: $("#opponentStyle").value,
+    strengths: $("#opponentStrengths").value.trim(),
+    weaknesses: $("#opponentWeaknesses").value.trim(),
+    keyPlayers: $("#opponentKeyPlayers").value.trim(),
+    setPieces: $("#opponentSetPieces").value.trim(),
+    gamePlan: $("#opponentGamePlan").value.trim(),
+    notes: $("#opponentNotes").value.trim(),
+    updatedAt: new Date().toISOString().slice(0, 10)
+  };
+  const existingIndex = state.opponents.findIndex((item) => item.id === id);
+  if (existingIndex >= 0) state.opponents[existingIndex] = opponent;
+  else state.opponents.push(opponent);
+  resetOpponentForm();
+  persist();
+  renderOpponentAnalysis();
+}
+
+function editOpponent(opponentId) {
+  const opponent = state.opponents?.find((item) => item.id === opponentId);
+  if (!opponent) return;
+  $("#opponentId").value = opponent.id;
+  $("#opponentName").value = opponent.name;
+  $("#opponentFormation").value = opponent.formation;
+  $("#opponentStyle").value = opponent.style || "Unbekannt";
+  $("#opponentStrengths").value = opponent.strengths;
+  $("#opponentWeaknesses").value = opponent.weaknesses;
+  $("#opponentKeyPlayers").value = opponent.keyPlayers;
+  $("#opponentSetPieces").value = opponent.setPieces;
+  $("#opponentGamePlan").value = opponent.gamePlan;
+  $("#opponentNotes").value = opponent.notes;
+  $("#opponentName").focus();
+}
+
+function deleteOpponent(opponentId) {
+  state.opponents = (state.opponents || []).filter((opponent) => opponent.id !== opponentId);
+  persist();
+  renderOpponentAnalysis();
+}
+
 function renderAll() {
   safeRender(renderMetrics, "Dashboard-Kennzahlen");
   safeRender(renderPitch, "Startelf");
@@ -1568,6 +1806,7 @@ function renderAll() {
   safeRender(renderSquad, "Kader");
   safeRender(renderEvents, "Events");
   safeRender(drawProfile, "Spielerprofile");
+  safeRender(renderOpponentAnalysis, "Gegneranalyse");
   safeRender(renderTeamAnalysis, "Teamanalyse");
 }
 
@@ -1612,8 +1851,29 @@ $("#selectedGoalsFor").addEventListener("change", (event) => updateSelectedEvent
 $("#selectedGoalsAgainst").addEventListener("change", (event) => updateSelectedEventMeta("goalsAgainst", event.target.value));
 $("#selectedMatchDuration").addEventListener("change", (event) => updateSelectedEventMeta("matchDuration", event.target.value));
 $("#selectedTrainingFocus").addEventListener("change", (event) => updateSelectedEventMeta("trainingFocus", event.target.value));
-$("#profilePlayer").addEventListener("change", drawProfile);
+$("#profilePlayer").addEventListener("change", () => {
+  resetDevelopmentPlanForm();
+  drawProfile();
+});
 $("#profilePdfBtn").addEventListener("click", downloadProfilePdf);
+$("#developmentPlanForm").addEventListener("submit", saveDevelopmentPlan);
+$("#cancelDevelopmentPlanBtn").addEventListener("click", resetDevelopmentPlanForm);
+$("#opponentForm").addEventListener("submit", saveOpponent);
+$("#cancelOpponentBtn").addEventListener("click", resetOpponentForm);
+
+$("#developmentPlanList").addEventListener("click", (event) => {
+  const button = event.target.closest("button");
+  if (!button) return;
+  if (button.dataset.action === "edit-plan") editDevelopmentPlan(button.dataset.id);
+  if (button.dataset.action === "delete-plan") deleteDevelopmentPlan(button.dataset.id);
+});
+
+$("#opponentList").addEventListener("click", (event) => {
+  const button = event.target.closest("button");
+  if (!button) return;
+  if (button.dataset.action === "edit-opponent") editOpponent(button.dataset.id);
+  if (button.dataset.action === "delete-opponent") deleteOpponent(button.dataset.id);
+});
 
 $("#playerTable").addEventListener("click", (event) => {
   const button = event.target.closest("button");
@@ -1628,6 +1888,7 @@ $("#playerTable").addEventListener("click", (event) => {
   if (button.dataset.action === "delete" && player) {
     state.players = state.players.filter((item) => item.id !== player.id);
     state.events.forEach((item) => delete item.ratings?.[player.id]);
+    delete state.developmentPlans?.[player.id];
     persist();
     renderAll();
   }

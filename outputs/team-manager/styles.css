@@ -465,6 +465,12 @@ menu {
   gap: 14px;
 }
 
+.opponent-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.42fr) minmax(0, 1fr);
+  gap: 14px;
+}
+
 .team-chart-grid,
 .profile-deep-grid {
   display: grid;
@@ -746,6 +752,10 @@ tr:last-child td {
   background: var(--soft-danger);
 }
 
+.status-pill.success {
+  background: var(--soft-green);
+}
+
 .risk-pill {
   display: inline-grid;
   min-width: 76px;
@@ -788,6 +798,10 @@ tr:last-child td {
 
 :root[data-theme="dark"] .status-pill {
   color: var(--ink);
+}
+
+:root[data-theme="dark"] .status-pill.success {
+  color: #98e7c1;
 }
 
 :root[data-theme="dark"] .attendance-row:hover td {
@@ -1022,6 +1036,81 @@ canvas {
   background: var(--green);
 }
 
+.development-panel {
+  margin-top: 14px;
+}
+
+.development-form,
+.opponent-form {
+  display: grid;
+  gap: 12px;
+}
+
+.development-list,
+.opponent-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.development-item,
+.opponent-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--field);
+}
+
+.development-item {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.development-item strong,
+.development-item p,
+.opponent-card strong,
+.opponent-card p {
+  display: block;
+  margin: 6px 0 0;
+}
+
+.development-item .status-pill {
+  width: fit-content;
+  margin-bottom: 6px;
+}
+
+.opponent-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.opponent-card strong {
+  font-size: 1.1rem;
+}
+
+.opponent-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.opponent-detail-grid section {
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--soft-panel);
+}
+
+.opponent-detail-grid span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
 .insight-card {
   padding: 16px;
   border: 1px solid var(--line);
@@ -1199,6 +1288,7 @@ menu {
   .split-layout,
   .analytics-grid,
   .profile-layout,
+  .opponent-layout,
   .team-analysis-layout,
   .team-chart-grid,
   .profile-deep-grid {
@@ -1278,6 +1368,7 @@ menu {
   .split-layout,
   .analytics-grid,
   .profile-layout,
+  .opponent-layout,
   .team-analysis-layout,
   .team-chart-grid,
   .profile-deep-grid,
@@ -1298,6 +1389,7 @@ menu {
 
   .welcome-actions,
   .panel-head,
+  .opponent-card-head,
   .row-actions {
     align-items: stretch;
     flex-direction: column;
@@ -1305,6 +1397,7 @@ menu {
 
   .welcome-actions button,
   .panel-head button,
+  .opponent-card-head button,
   .row-actions button,
   menu button {
     width: 100%;
@@ -1383,6 +1476,11 @@ menu {
 
   .profile-card {
     grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .development-item,
+  .opponent-detail-grid {
+    grid-template-columns: 1fr;
   }
 
   .profile-grade {

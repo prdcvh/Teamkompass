@@ -25,6 +25,7 @@
           <button class="nav-tab" data-view="squad">Kader</button>
           <button class="nav-tab" data-view="events">Events</button>
           <button class="nav-tab" data-view="profiles">Profile</button>
+          <button class="nav-tab" data-view="opponents">Gegneranalyse</button>
           <button class="nav-tab" data-view="teamAnalysis">Team</button>
         </nav>
         <div class="season-card">
@@ -224,7 +225,82 @@
               <div class="analysis-bars" id="profileAvailabilityBars"></div>
             </section>
           </div>
+          <section class="panel development-panel">
+            <div class="panel-head">
+              <div>
+                <h2>Foerderplan</h2>
+                <span class="muted">individuelle Ziele, Massnahmen und Status</span>
+              </div>
+            </div>
+            <form class="development-form" id="developmentPlanForm">
+              <input type="hidden" id="developmentPlanId" />
+              <label>Schwerpunkt <input id="developmentPlanFocus" maxlength="50" placeholder="z.B. erster Kontakt, Orientierung, Mut im 1 gegen 1" required /></label>
+              <label>Ziel <input id="developmentPlanGoal" maxlength="90" placeholder="konkret beobachtbares Ziel" required /></label>
+              <label>Massnahmen <textarea id="developmentPlanActions" rows="3" placeholder="Trainingsformen, Coachingpunkte, Heimaufgabe"></textarea></label>
+              <div class="form-grid">
+                <label>Status
+                  <select id="developmentPlanStatus">
+                    <option>Offen</option>
+                    <option>In Arbeit</option>
+                    <option>Erreicht</option>
+                  </select>
+                </label>
+                <label>Zieldatum <input id="developmentPlanDueDate" type="date" /></label>
+              </div>
+              <div class="panel-actions">
+                <button class="ghost-button" id="cancelDevelopmentPlanBtn" type="button">Zuruecksetzen</button>
+                <button class="primary-button" type="submit">Foerderplan speichern</button>
+              </div>
+            </form>
+            <div class="development-list" id="developmentPlanList"></div>
+          </section>
           <div class="analytics-grid" id="analyticsCards"></div>
+        </section>
+
+        <section class="view" id="opponentsView">
+          <div class="opponent-layout">
+            <section class="panel">
+              <div class="panel-head">
+                <div>
+                  <h2>Gegner erfassen</h2>
+                  <span class="muted">alles, was vor dem Spiel wichtig ist</span>
+                </div>
+              </div>
+              <form class="opponent-form" id="opponentForm">
+                <input type="hidden" id="opponentId" />
+                <label>Gegner <input id="opponentName" maxlength="60" required placeholder="z.B. JSG Taunus" /></label>
+                <div class="form-grid">
+                  <label>Formation <input id="opponentFormation" maxlength="30" placeholder="z.B. 3-2-3, 4-3-3" /></label>
+                  <label>Spielweise
+                    <select id="opponentStyle">
+                      <option>Ballbesitz</option>
+                      <option>Umschaltspiel</option>
+                      <option>Pressing</option>
+                      <option>Tief verteidigend</option>
+                      <option>Unbekannt</option>
+                    </select>
+                  </label>
+                </div>
+                <label>Staerken <textarea id="opponentStrengths" rows="3" placeholder="Was macht der Gegner gut?"></textarea></label>
+                <label>Schwaechen <textarea id="opponentWeaknesses" rows="3" placeholder="Wo koennen wir ansetzen?"></textarea></label>
+                <label>Schluesselspieler <textarea id="opponentKeyPlayers" rows="2" placeholder="Namen, Nummern, Rollen"></textarea></label>
+                <label>Standards <textarea id="opponentSetPieces" rows="2" placeholder="Ecken, Freistoesse, Einwuerfe"></textarea></label>
+                <label>Matchplan <textarea id="opponentGamePlan" rows="3" placeholder="Worauf stellen wir uns ein?"></textarea></label>
+                <label>Notizen <textarea id="opponentNotes" rows="3" placeholder="Quelle, Beobachtung, Besonderheiten"></textarea></label>
+                <div class="panel-actions">
+                  <button class="ghost-button" id="cancelOpponentBtn" type="button">Zuruecksetzen</button>
+                  <button class="primary-button" type="submit">Gegner speichern</button>
+                </div>
+              </form>
+            </section>
+            <section class="panel">
+              <div class="panel-head">
+                <h2>Gegnerprofile</h2>
+                <span class="muted" id="opponentCount">0 Gegner</span>
+              </div>
+              <div class="opponent-list" id="opponentList"></div>
+            </section>
+          </div>
         </section>
 
         <section class="view" id="teamAnalysisView">
