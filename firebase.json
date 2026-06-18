@@ -1,0 +1,10 @@
+{
+  "hosting": {
+    "public": "outputs/team-manager",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ]
+  }
+}
