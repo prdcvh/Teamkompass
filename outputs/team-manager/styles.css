@@ -1168,6 +1168,7 @@ menu {
   .sidebar {
     position: static;
     height: auto;
+    padding-bottom: 18px;
   }
 
   .season-card {
@@ -1176,7 +1177,21 @@ menu {
   }
 
   .nav-tabs {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  .nav-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav-tab {
+    flex: 0 0 auto;
+    width: auto;
+    white-space: nowrap;
   }
 
   .metrics-grid,
@@ -1196,9 +1211,37 @@ menu {
 }
 
 @media (max-width: 720px) {
+  body {
+    min-width: 320px;
+  }
+
   .main,
   .sidebar {
-    padding: 18px;
+    padding: 16px;
+  }
+
+  .sidebar {
+    border-radius: 0 0 16px 16px;
+  }
+
+  .brand {
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .club-logo {
+    width: 48px;
+    height: 48px;
+  }
+
+  .brand strong {
+    font-size: 0.96rem;
+    line-height: 1.15;
+  }
+
+  .season-card {
+    margin-top: 14px;
+    padding: 12px;
   }
 
   .topbar,
@@ -1208,9 +1251,28 @@ menu {
     flex-direction: column;
   }
 
-  .top-actions,
+  .topbar {
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+
+  h1 {
+    font-size: 2rem;
+  }
+
+  .top-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
+  .theme-toggle,
+  .action-menu summary {
+    width: 100%;
+    justify-content: center;
+  }
+
   .panel-actions,
-  .nav-tabs,
   .metrics-grid,
   .dashboard-layout,
   .split-layout,
@@ -1224,6 +1286,40 @@ menu {
   .position-options,
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .welcome-panel {
+    padding: 18px;
+  }
+
+  .welcome-panel h2 {
+    font-size: 1.45rem;
+  }
+
+  .welcome-actions,
+  .panel-head,
+  .row-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .welcome-actions button,
+  .panel-head button,
+  .row-actions button,
+  menu button {
+    width: 100%;
+  }
+
+  .panel {
+    padding: 14px;
+  }
+
+  .metric {
+    padding: 14px;
+  }
+
+  .metric strong {
+    font-size: 1.55rem;
   }
 
   .panel-actions {
@@ -1241,6 +1337,50 @@ menu {
     grid-column: span 1;
   }
 
+  .table-wrap {
+    margin-inline: -4px;
+    border-radius: 8px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table {
+    min-width: 680px;
+  }
+
+  .rating-table-wrap table {
+    min-width: 1180px;
+  }
+
+  th,
+  td {
+    padding: 10px 11px;
+  }
+
+  th:first-child,
+  td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: inherit;
+    box-shadow: 1px 0 0 var(--line);
+  }
+
+  th:first-child {
+    background: var(--panel);
+  }
+
+  .rating-input {
+    min-width: 88px;
+  }
+
+  .rating-input.small-number {
+    min-width: 64px;
+  }
+
+  .rating-note {
+    min-width: 170px;
+  }
+
   .profile-card {
     grid-template-columns: auto minmax(0, 1fr);
   }
@@ -1251,12 +1391,117 @@ menu {
   }
 
   .pitch {
-    min-height: 430px;
+    min-height: 410px;
+    margin-inline: -4px;
   }
 
   .pitch-player {
-    width: 78px;
-    min-height: 52px;
+    width: 72px;
+    min-height: 50px;
+    padding: 6px;
     font-size: 0.78rem;
+  }
+
+  .pitch-player em {
+    min-width: 28px;
+    min-height: 18px;
+    font-size: 0.68rem;
+  }
+
+  .pitch-player strong {
+    font-size: 0.78rem;
+  }
+
+  .pitch-player span {
+    font-size: 0.66rem;
+  }
+
+  .position-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  canvas {
+    max-height: 260px;
+    object-fit: contain;
+  }
+
+  dialog {
+    width: min(100vw - 18px, 560px);
+    max-height: calc(100dvh - 18px);
+    padding: 14px;
+  }
+
+  .dialog-head {
+    gap: 12px;
+  }
+
+  menu {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .main,
+  .sidebar {
+    padding: 12px;
+  }
+
+  .nav-tab {
+    min-height: 38px;
+    padding: 9px 12px;
+    font-size: 0.9rem;
+  }
+
+  .theme-toggle span:last-child {
+    display: none;
+  }
+
+  .theme-toggle {
+    padding-inline: 10px;
+  }
+
+  .action-menu-list {
+    gap: 6px;
+  }
+
+  .event-meta-editor,
+  .rating-toolbar {
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .pitch {
+    min-height: 360px;
+  }
+
+  .pitch-player {
+    width: 62px;
+    min-height: 46px;
+    font-size: 0.7rem;
+  }
+
+  .pitch-player strong {
+    font-size: 0.7rem;
+  }
+
+  .pitch-player span {
+    display: none;
+  }
+
+  .profile-card {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-grade {
+    min-width: 0;
+  }
+
+  .analytics-grid {
+    gap: 10px;
+  }
+
+  .insight-card strong {
+    font-size: 1.35rem;
   }
 }
