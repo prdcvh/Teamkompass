@@ -1835,6 +1835,13 @@ $("#heroEventBtn").addEventListener("click", () => {
   openEventDialog();
 });
 $("#heroAnalysisBtn").addEventListener("click", () => setView("teamAnalysis"));
+$("#quickEventBtn").addEventListener("click", () => {
+  setView("events");
+  openEventDialog();
+});
+$("#quickPlayerBtn").addEventListener("click", () => openPlayerDialog());
+$("#quickProfileBtn").addEventListener("click", () => setView("profiles"));
+$("#quickOpponentBtn").addEventListener("click", () => setView("opponents"));
 $("#eventForm").addEventListener("submit", saveEvent);
 $("#eventType").addEventListener("change", syncEventGameFields);
 $("#closeEventDialogBtn").addEventListener("click", () => $("#eventDialog").close());
