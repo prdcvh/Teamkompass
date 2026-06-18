@@ -822,14 +822,14 @@ function renderSquad() {
     const risk = playerInjuryRisk(player.id);
     return `
       <tr>
-        <td><div class="player-cell"><span class="number-badge">${player.number}</span><strong>${player.name}</strong></div></td>
-        <td>${positionChips(player)}</td>
-        <td>${formatDate(player.birthdate)}</td>
-        <td><span class="status-pill ${statusClass}">${player.status}</span></td>
-        <td>${playerAttendanceCount(player.id)}</td>
-        <td>${gradeLabel(playerAverageGrade(player.id))}</td>
-        <td><span class="risk-pill ${risk.level.toLowerCase()}">${risk.level}</span></td>
-        <td class="row-actions">
+        <td data-label="Spieler"><div class="player-cell"><span class="number-badge">${player.number}</span><strong>${player.name}</strong></div></td>
+        <td data-label="Positionen">${positionChips(player)}</td>
+        <td data-label="Geburtsdatum">${formatDate(player.birthdate)}</td>
+        <td data-label="Status"><span class="status-pill ${statusClass}">${player.status}</span></td>
+        <td data-label="Events">${playerAttendanceCount(player.id)}</td>
+        <td data-label="Note">${gradeLabel(playerAverageGrade(player.id))}</td>
+        <td data-label="Risiko"><span class="risk-pill ${risk.level.toLowerCase()}">${risk.level}</span></td>
+        <td class="row-actions" data-label="Aktionen">
           <button class="ghost-button" data-action="profile" data-id="${player.id}">Profil</button>
           <button class="ghost-button" data-action="edit" data-id="${player.id}">Bearbeiten</button>
           <button class="ghost-button" data-action="delete" data-id="${player.id}">Löschen</button>
@@ -920,26 +920,26 @@ function renderRatingTable() {
     const rating = event.ratings?.[player.id] || {};
     const attendance = rating.attendance || "open";
     const gameFields = event.type === "Spiel" ? `
-        <td><input class="rating-input small-number" data-player-id="${player.id}" data-field="minutes" type="number" min="0" max="${matchDuration || 90}" value="${rating.minutes ?? ""}" /></td>
-        <td><input class="rating-input small-number" data-player-id="${player.id}" data-field="goals" type="number" min="0" max="20" value="${rating.goals ?? ""}" /></td>
-        <td><input class="rating-input small-number" data-player-id="${player.id}" data-field="assists" type="number" min="0" max="20" value="${rating.assists ?? ""}" /></td>
+        <td data-label="Minuten"><input class="rating-input small-number" data-player-id="${player.id}" data-field="minutes" type="number" min="0" max="${matchDuration || 90}" value="${rating.minutes ?? ""}" /></td>
+        <td data-label="Tore"><input class="rating-input small-number" data-player-id="${player.id}" data-field="goals" type="number" min="0" max="20" value="${rating.goals ?? ""}" /></td>
+        <td data-label="Vorlagen"><input class="rating-input small-number" data-player-id="${player.id}" data-field="assists" type="number" min="0" max="20" value="${rating.assists ?? ""}" /></td>
     ` : "";
     return `
       <tr class="attendance-row attendance-${attendance}">
-        <td><div class="player-cell"><span class="number-badge">${player.number}</span><strong>${player.name}</strong></div></td>
-        <td>${selectHtml(player.id, "attendance", attendance, [
+        <td data-label="Spieler"><div class="player-cell"><span class="number-badge">${player.number}</span><strong>${player.name}</strong></div></td>
+        <td data-label="Anwesenheit">${selectHtml(player.id, "attendance", attendance, [
           ["open", "Offen"],
           ["present", "Anwesend"],
           ["limited", "Teilweise"],
           ["absent", "Fehlt"]
         ])}</td>
-        <td><span class="computed-grade">${gradeLabel(calculatedGrade(rating))}</span></td>
-        <td>${gradeSelectHtml(player.id, "effort", rating.effort)}</td>
-        <td>${gradeSelectHtml(player.id, "technique", rating.technique)}</td>
-        <td>${gradeSelectHtml(player.id, "tactics", rating.tactics)}</td>
-        <td>${gradeSelectHtml(player.id, "comprehension", rating.comprehension)}</td>
+        <td data-label="Gesamtnote"><span class="computed-grade">${gradeLabel(calculatedGrade(rating))}</span></td>
+        <td data-label="Einsatz">${gradeSelectHtml(player.id, "effort", rating.effort)}</td>
+        <td data-label="Technik">${gradeSelectHtml(player.id, "technique", rating.technique)}</td>
+        <td data-label="Taktik">${gradeSelectHtml(player.id, "tactics", rating.tactics)}</td>
+        <td data-label="Auffassung">${gradeSelectHtml(player.id, "comprehension", rating.comprehension)}</td>
         ${gameFields}
-        <td><input class="rating-note" data-player-id="${player.id}" data-field="note" value="${escapeHtml(rating.note || "")}" placeholder="Kurznotiz" /></td>
+        <td data-label="Notiz"><input class="rating-note" data-player-id="${player.id}" data-field="note" value="${escapeHtml(rating.note || "")}" placeholder="Kurznotiz" /></td>
       </tr>
     `;
   }).join("");
