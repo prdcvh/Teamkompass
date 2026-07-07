@@ -95,6 +95,7 @@ let state = loadState();
 let cloudStore = null;
 let cloudSaveTimer = null;
 let applyingRemoteSnapshot = false;
+let mobileAccordionsPrepared = false;
 const $ = (selector) => document.querySelector(selector);
 const standardPositions = ["TW", "IV", "LIB", "LV", "RV", "DM", "ZM", "OM", "LM", "RM", "LA", "RA", "HS", "ST"];
 
@@ -461,10 +462,24 @@ async function createFirebaseStore(config) {
 function setView(viewName) {
   Object.entries(views).forEach(([name, element]) => element.classList.toggle("active", name === viewName));
   document.querySelectorAll(".nav-tab").forEach((button) => button.classList.toggle("active", button.dataset.view === viewName));
+  if ($("#mobileViewSelect")) $("#mobileViewSelect").value = viewName;
   $("#pageTitle").textContent = titles[viewName];
   if (viewName === "profiles") drawProfile();
   if (viewName === "opponents") renderOpponentAnalysis();
   if (viewName === "teamAnalysis") renderTeamAnalysis();
+  prepareMobileAccordions();
+}
+
+function prepareMobileAccordions() {
+  const isMobile = window.matchMedia?.("(max-width: 720px)")?.matches;
+  if (!isMobile || mobileAccordionsPrepared) return;
+  document.querySelectorAll(".dashboard-section").forEach((section, index) => {
+    section.open = index === 0;
+  });
+  document.querySelectorAll(".control-disclosure").forEach((section) => {
+    section.open = false;
+  });
+  mobileAccordionsPrepared = true;
 }
 
 function selectedEvent() {
@@ -1820,6 +1835,11 @@ function safeRender(fn, label) {
 }
 
 document.querySelectorAll(".nav-tab").forEach((button) => button.addEventListener("click", () => setView(button.dataset.view)));
+$("#mobileViewSelect").addEventListener("change", (event) => setView(event.target.value));
+window.addEventListener("resize", () => {
+  if (!window.matchMedia?.("(max-width: 720px)")?.matches) mobileAccordionsPrepared = false;
+  prepareMobileAccordions();
+});
 $("#formationSelect").addEventListener("change", renderPitch);
 $("#searchInput").addEventListener("input", renderSquad);
 $("#positionFilter").addEventListener("change", renderSquad);
@@ -1922,5 +1942,6 @@ $("#ratingTable").addEventListener("input", (event) => {
 });
 
 initTheme();
+prepareMobileAccordions();
 renderAll();
 initDataStore();

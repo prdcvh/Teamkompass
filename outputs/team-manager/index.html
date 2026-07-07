@@ -29,6 +29,17 @@
           <button class="nav-tab" data-view="opponents">Gegneranalyse</button>
           <button class="nav-tab" data-view="teamAnalysis">Team</button>
         </nav>
+        <label class="mobile-view-switcher">
+          Bereich
+          <select id="mobileViewSelect" aria-label="Bereich auswÃ¤hlen">
+            <option value="dashboard">Dashboard</option>
+            <option value="squad">Kader</option>
+            <option value="events">Events</option>
+            <option value="profiles">Profile</option>
+            <option value="opponents">Gegneranalyse</option>
+            <option value="teamAnalysis">Team</option>
+          </select>
+        </label>
         <div class="season-card">
           <span>Saison</span>
           <strong>2026/27</strong>
@@ -69,30 +80,38 @@
               <button class="ghost-button" id="heroAnalysisBtn">Team analysieren</button>
             </div>
           </section>
-          <section class="quick-actions-grid" aria-label="Schnellzugriff">
-            <button class="quick-action" id="quickEventBtn" type="button">
-              <span>Bewerten</span>
-              <strong>Event anlegen</strong>
-              <small>Training oder Spiel direkt erfassen</small>
-            </button>
-            <button class="quick-action" id="quickPlayerBtn" type="button">
-              <span>Kader</span>
-              <strong>Spieler anlegen</strong>
-              <small>Profil, Positionen und Status pflegen</small>
-            </button>
-            <button class="quick-action" id="quickProfileBtn" type="button">
-              <span>Entwicklung</span>
-              <strong>Spielerprofil</strong>
-              <small>Leistung, Foerderplan und PDF ansehen</small>
-            </button>
-            <button class="quick-action" id="quickOpponentBtn" type="button">
-              <span>Vorbereitung</span>
-              <strong>Gegneranalyse</strong>
-              <small>Matchplan und Hinweise sammeln</small>
-            </button>
-          </section>
-          <div class="metrics-grid" id="metricsGrid"></div>
-          <div class="dashboard-layout">
+          <details class="mobile-accordion dashboard-section" open>
+            <summary>Schnellzugriff</summary>
+            <section class="quick-actions-grid" aria-label="Schnellzugriff">
+              <button class="quick-action" id="quickEventBtn" type="button">
+                <span>Bewerten</span>
+                <strong>Event anlegen</strong>
+                <small>Training oder Spiel direkt erfassen</small>
+              </button>
+              <button class="quick-action" id="quickPlayerBtn" type="button">
+                <span>Kader</span>
+                <strong>Spieler anlegen</strong>
+                <small>Profil, Positionen und Status pflegen</small>
+              </button>
+              <button class="quick-action" id="quickProfileBtn" type="button">
+                <span>Entwicklung</span>
+                <strong>Spielerprofil</strong>
+                <small>Leistung, Foerderplan und PDF ansehen</small>
+              </button>
+              <button class="quick-action" id="quickOpponentBtn" type="button">
+                <span>Vorbereitung</span>
+                <strong>Gegneranalyse</strong>
+                <small>Matchplan und Hinweise sammeln</small>
+              </button>
+            </section>
+          </details>
+          <details class="mobile-accordion dashboard-section" open>
+            <summary>Kennzahlen</summary>
+            <div class="metrics-grid" id="metricsGrid"></div>
+          </details>
+          <details class="mobile-accordion dashboard-section" open>
+            <summary>Startelf und Form</summary>
+            <div class="dashboard-layout">
             <section class="panel pitch-panel">
               <div class="panel-head">
                 <h2>Startelf nach Notenschnitt</h2>
@@ -111,7 +130,8 @@
               </div>
               <div class="leader-list" id="leaderList"></div>
             </section>
-          </div>
+            </div>
+          </details>
         </section>
 
         <section class="view" id="squadView">

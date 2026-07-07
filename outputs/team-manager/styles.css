@@ -143,6 +143,10 @@ summary:focus-visible {
   text-transform: uppercase;
 }
 
+.mobile-view-switcher {
+  display: none;
+}
+
 .nav-tab {
   position: relative;
   width: 100%;
@@ -396,6 +400,14 @@ menu {
 
 .view.active {
   display: block;
+}
+
+.mobile-accordion {
+  display: contents;
+}
+
+.mobile-accordion > summary {
+  display: none;
 }
 
 .metrics-grid {
@@ -1433,6 +1445,71 @@ menu {
 
   .season-card {
     margin-top: 14px;
+    padding: 12px;
+  }
+
+  .nav-label,
+  .nav-tabs {
+    display: none;
+  }
+
+  .mobile-view-switcher {
+    display: block;
+    margin-top: 12px;
+    color: rgba(255, 250, 250, 0.86);
+    font-size: 0.82rem;
+    font-weight: 900;
+  }
+
+  .mobile-view-switcher select {
+    min-height: 44px;
+    color: var(--ink);
+    background: rgba(255, 255, 255, 0.96);
+    border-color: rgba(255, 255, 255, 0.48);
+    font-weight: 850;
+  }
+
+  .mobile-accordion {
+    display: block;
+    margin-bottom: 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--panel);
+    box-shadow: 0 10px 22px rgba(36, 29, 31, 0.04);
+    overflow: hidden;
+  }
+
+  .mobile-accordion > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 46px;
+    padding: 0 14px;
+    color: var(--ink);
+    background: var(--soft-panel);
+    cursor: pointer;
+    font-weight: 900;
+    list-style: none;
+  }
+
+  .mobile-accordion > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .mobile-accordion > summary::after {
+    color: var(--red);
+    content: "⌄";
+    font-size: 1.1rem;
+    transition: transform 0.16s ease;
+  }
+
+  .mobile-accordion[open] > summary::after {
+    transform: rotate(180deg);
+  }
+
+  .mobile-accordion > .quick-actions-grid,
+  .mobile-accordion > .metrics-grid,
+  .mobile-accordion > .dashboard-layout {
     padding: 12px;
   }
 
