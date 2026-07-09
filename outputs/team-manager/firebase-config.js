@@ -18,7 +18,7 @@ responsiveStyles.href = "./responsive-enhancements.css?v=2";
 document.head.append(responsiveStyles);
 
 window.TEAMKOMPASS_VERSION = "responsive-v2";
-document.querySelector(".brand strong").textContent = "1. FC TSG Königstein U14";
+document.querySelector(".brand strong").textContent = "1. FC Königstein U14";
 
 window.addEventListener("load", () => {
   const criteria = ["Einsatz", "Taktisches Verständnis", "Zweikampfbereitschaft", "Fehlerquote"];

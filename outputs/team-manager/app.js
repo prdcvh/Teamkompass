@@ -1410,7 +1410,7 @@ function downloadProfilePdf() {
       <body>
         <header>
           <div>
-            <p class="muted">1. FC TSG Königstein · Spielerprofil</p>
+            <p class="muted">1. FC Königstein U14 · Spielerprofil</p>
             <h1>${escapeHtml(player.name)}</h1>
             <div class="muted">Nr. ${player.number} · ${escapeHtml(positionText(player))} · ${formatDate(player.birthdate)} · ${player.status}</div>
           </div>
