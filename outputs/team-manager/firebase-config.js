@@ -12,46 +12,60 @@ window.TEAMKOMPASS_CONFIG = {
   }
 };
 
+window.TEAMKOMPASS_VERSION = "criteria-v2";
 document.querySelector(".brand strong").textContent = "1. FC TSG Königstein U14";
 
 window.addEventListener("load", () => {
+  const criteria = ["Einsatz", "Taktisches Verständnis", "Zweikampfbereitschaft", "Fehlerquote"];
   const ratingLabels = {
-    Technik: "Taktisches Verständnis",
-    Taktik: "Zweikampfbereitschaft",
-    Auffassung: "Fehlerquote",
-    Auffassungsgabe: "Fehlerquote"
+    Technik: criteria[1],
+    Taktik: criteria[2],
+    Auffassung: criteria[3],
+    Auffassungsgabe: criteria[3]
   };
 
-  const applyRatingLabels = (root = document) => {
-    root.querySelectorAll("th, .analysis-bar-row strong").forEach((element) => {
+  const applyRatingLabels = () => {
+    const headers = document.querySelectorAll("#ratingTableHead th");
+    criteria.forEach((label, index) => {
+      if (headers[index + 3]) headers[index + 3].textContent = label;
+    });
+
+    document.querySelectorAll("#ratingTable tr").forEach((row) => {
+      const cells = row.querySelectorAll("td");
+      criteria.forEach((label, index) => {
+        if (cells[index + 3]) cells[index + 3].dataset.label = label;
+      });
+    });
+
+    document.querySelectorAll("th, .analysis-bar-row strong").forEach((element) => {
       const replacement = ratingLabels[element.textContent.trim()];
       if (replacement) element.textContent = replacement;
     });
-    root.querySelectorAll("[data-label]").forEach((element) => {
+    document.querySelectorAll("[data-label]").forEach((element) => {
       const replacement = ratingLabels[element.dataset.label];
       if (replacement) element.dataset.label = replacement;
     });
   };
 
-  if (typeof window.calculatedGrade === "function") {
-    window.calculatedGrade = (rating) => {
+  if (typeof calculatedGrade === "function") {
+    calculatedGrade = (rating) => {
       if (!rating || rating.attendance === "absent") return "";
       const fields = ["effort", "technique", "tactics", "comprehension"];
       if (!fields.every((field) => rating[field])) return "";
-      return window.roundGrade(fields.reduce((sum, field) => sum + Number(rating[field]), 0) / fields.length);
+      return roundGrade(fields.reduce((sum, field) => sum + Number(rating[field]), 0) / fields.length);
     };
   }
 
-  if (typeof window.profileSkillAverages === "function") {
-    const originalProfileSkillAverages = window.profileSkillAverages;
-    window.profileSkillAverages = (ratings) => originalProfileSkillAverages(ratings).map((item) => ({
+  if (typeof profileSkillAverages === "function") {
+    const originalProfileSkillAverages = profileSkillAverages;
+    profileSkillAverages = (ratings) => originalProfileSkillAverages(ratings).map((item) => ({
       ...item,
       label: ratingLabels[item.label] || item.label
     }));
   }
 
-  const observer = new MutationObserver(() => applyRatingLabels());
+  const observer = new MutationObserver(applyRatingLabels);
   observer.observe(document.body, { childList: true, subtree: true });
-  if (typeof window.renderAll === "function") window.renderAll();
+  if (typeof renderAll === "function") renderAll();
   applyRatingLabels();
 });
