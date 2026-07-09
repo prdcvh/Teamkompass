@@ -11,3 +11,5 @@ window.TEAMKOMPASS_CONFIG = {
     measurementId: "G-HSSGEM2KL7"
   }
 };
+
+document.querySelector(".brand strong").textContent = "1. FC TSG Königstein U14";
