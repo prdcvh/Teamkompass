@@ -14,10 +14,10 @@ window.TEAMKOMPASS_CONFIG = {
 
 const responsiveStyles = document.createElement("link");
 responsiveStyles.rel = "stylesheet";
-responsiveStyles.href = "./responsive-enhancements.css?v=1";
+responsiveStyles.href = "./responsive-enhancements.css?v=2";
 document.head.append(responsiveStyles);
 
-window.TEAMKOMPASS_VERSION = "responsive-v1";
+window.TEAMKOMPASS_VERSION = "responsive-v2";
 document.querySelector(".brand strong").textContent = "1. FC TSG Königstein U14";
 
 window.addEventListener("load", () => {
@@ -32,23 +32,25 @@ window.addEventListener("load", () => {
   const applyRatingLabels = () => {
     const headers = document.querySelectorAll("#ratingTableHead th");
     criteria.forEach((label, index) => {
-      if (headers[index + 3]) headers[index + 3].textContent = label;
+      const header = headers[index + 3];
+      if (header && header.textContent !== label) header.textContent = label;
     });
 
     document.querySelectorAll("#ratingTable tr").forEach((row) => {
       const cells = row.querySelectorAll("td");
       criteria.forEach((label, index) => {
-        if (cells[index + 3]) cells[index + 3].dataset.label = label;
+        const cell = cells[index + 3];
+        if (cell && cell.dataset.label !== label) cell.dataset.label = label;
       });
     });
 
     document.querySelectorAll("th, .analysis-bar-row strong").forEach((element) => {
       const replacement = ratingLabels[element.textContent.trim()];
-      if (replacement) element.textContent = replacement;
+      if (replacement && element.textContent !== replacement) element.textContent = replacement;
     });
     document.querySelectorAll("[data-label]").forEach((element) => {
       const replacement = ratingLabels[element.dataset.label];
-      if (replacement) element.dataset.label = replacement;
+      if (replacement && element.dataset.label !== replacement) element.dataset.label = replacement;
     });
   };
 
