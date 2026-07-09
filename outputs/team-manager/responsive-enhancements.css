@@ -1,0 +1,126 @@
+/* Responsive layer: desktop remains unchanged. */
+@media (max-width: 720px) {
+  html { scroll-behavior: smooth; }
+  body { font-size: 16px; overflow-x: hidden; }
+
+  .sidebar {
+    position: relative;
+    padding-bottom: 14px;
+    border-radius: 0 0 20px 20px;
+  }
+
+  .brand { align-items: center; }
+  .brand > div { min-width: 0; }
+  .brand strong { font-size: 1rem; overflow-wrap: anywhere; }
+  .brand span { font-size: .82rem; }
+
+  .mobile-view-switcher select,
+  input,
+  select,
+  textarea,
+  button,
+  summary { font-size: 16px; }
+
+  .season-card {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 2px 12px;
+  }
+  .season-card span,
+  .season-card small { grid-column: 1; }
+  .season-card strong { grid-column: 2; grid-row: 1 / 3; }
+
+  .main { padding-top: 14px; }
+  .topbar { padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+  .topbar h1 { font-size: clamp(1.75rem, 9vw, 2.25rem); }
+  .eyebrow { margin-bottom: 4px; }
+
+  .top-actions { gap: 8px; }
+  .top-actions button,
+  .top-actions summary,
+  .primary-button,
+  .ghost-button { min-height: 46px; }
+
+  .welcome-panel { gap: 16px; border-radius: 12px; }
+  .welcome-panel p { font-size: .96rem; line-height: 1.55; }
+  .welcome-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  .quick-actions-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .quick-action { min-height: 118px; padding: 14px; text-align: left; }
+  .quick-action strong { font-size: 1rem; line-height: 1.2; }
+  .quick-action small { font-size: .78rem; line-height: 1.35; }
+
+  .metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .metric { min-height: 105px; border-radius: 10px; }
+  .metric-wide { grid-column: 1 / -1; }
+
+  .mobile-accordion,
+  .control-disclosure { border-radius: 10px; }
+  .mobile-accordion > summary,
+  .control-disclosure > summary {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    min-height: 50px;
+  }
+
+  .panel { border-radius: 10px; }
+  .panel-head { gap: 10px; }
+  .panel-head h2 { font-size: 1.15rem; }
+  .muted { line-height: 1.4; }
+
+  .events-layout { gap: 14px; }
+  .event-list { display: grid; gap: 10px; }
+  .event-card,
+  .opponent-card,
+  .development-item { border-radius: 10px; }
+
+  .rating-toolbar,
+  .event-meta-editor {
+    padding: 12px;
+    border-radius: 10px;
+    background: var(--soft-panel);
+  }
+
+  .table-wrap tr { padding: 14px; border-radius: 10px; }
+  .table-wrap td { min-width: 0; }
+  .table-wrap td::before { letter-spacing: .035em; }
+  .table-wrap td:first-child { font-size: 1.05rem; font-weight: 900; }
+  .table-wrap input,
+  .table-wrap select { width: 100%; min-height: 44px; }
+
+  .profile-card { gap: 12px; padding: 14px; }
+  .profile-number { width: 52px; height: 52px; }
+  .analysis-bar-row { gap: 8px; }
+  canvas { width: 100% !important; height: auto !important; }
+
+  dialog {
+    width: 100vw;
+    max-width: none;
+    max-height: 92dvh;
+    margin: auto 0 0;
+    padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
+    border-radius: 18px 18px 0 0;
+  }
+  dialog::backdrop { background: rgba(20, 15, 17, .64); backdrop-filter: blur(3px); }
+  .dialog-head { position: sticky; top: -18px; z-index: 4; margin: -18px -16px 12px; padding: 14px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  dialog menu { position: sticky; bottom: calc(-18px - env(safe-area-inset-bottom)); z-index: 4; margin: 16px -16px calc(-18px - env(safe-area-inset-bottom)); padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); background: var(--panel); border-top: 1px solid var(--line); }
+
+  .pitch { min-height: 360px; }
+  .pitch-player { width: 68px; }
+}
+
+@media (max-width: 420px) {
+  .main, .sidebar { padding-inline: 10px; }
+  .welcome-panel p { display: none; }
+  .welcome-actions { grid-template-columns: 1fr; }
+  .quick-action small { display: none; }
+  .quick-action { min-height: 88px; }
+  .metrics-grid { grid-template-columns: 1fr 1fr; }
+  .metric { min-height: 92px; }
+  .metric strong { font-size: 1.35rem; }
+  .table-wrap tr { padding: 12px; }
+  .table-wrap td { grid-template-columns: 1fr; gap: 5px; }
+  .pitch { min-height: 330px; }
+}
