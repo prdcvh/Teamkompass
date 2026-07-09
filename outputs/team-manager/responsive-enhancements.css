@@ -36,11 +36,17 @@
   .topbar h1 { font-size: clamp(1.75rem, 9vw, 2.25rem); }
   .eyebrow { margin-bottom: 4px; }
 
-  .top-actions { gap: 8px; }
+  .top-actions { gap: 8px; grid-template-columns: auto 1fr; }
   .top-actions button,
   .top-actions summary,
   .primary-button,
   .ghost-button { min-height: 46px; }
+
+  .theme-toggle { width: 48px; padding-inline: 0; justify-content: center; }
+  .theme-toggle span:last-child { display: none; }
+
+  /* "Event anlegen" already appears in Schnellzugriff below; drop the duplicate hero button */
+  #heroEventBtn { display: none; }
 
   .welcome-panel { gap: 16px; border-radius: 12px; }
   .welcome-panel p { font-size: .96rem; line-height: 1.55; }
@@ -83,12 +89,79 @@
     background: var(--soft-panel);
   }
 
-  .table-wrap tr { padding: 14px; border-radius: 10px; }
-  .table-wrap td { min-width: 0; }
-  .table-wrap td::before { letter-spacing: .035em; }
+  .table-wrap tr { display: flex; flex-wrap: wrap; padding: 14px; border-radius: 10px; }
+  .table-wrap td { min-width: 0; flex: 1 1 100%; }
+  .table-wrap td::before { letter-spacing: .035em; overflow-wrap: anywhere; }
   .table-wrap td:first-child { font-size: 1.05rem; font-weight: 900; }
   .table-wrap input,
   .table-wrap select { width: 100%; min-height: 44px; }
+
+  /* Group short fields side by side instead of one full-width row each - keeps
+     the Kader/Bewertungs cards from turning into an endless scroll on mobile. */
+  .table-wrap td[data-label="Positionen"],
+  .table-wrap td[data-label="Geburtsdatum"],
+  .table-wrap td[data-label="Status"],
+  .table-wrap td[data-label="Events"],
+  .table-wrap td[data-label="Note"],
+  .table-wrap td[data-label="Risiko"],
+  .table-wrap td[data-label="Einsatz"],
+  .table-wrap td[data-label="Technik"],
+  .table-wrap td[data-label="Taktik"],
+  .table-wrap td[data-label="Auffassung"],
+  .table-wrap td[data-label="Minuten"],
+  .table-wrap td[data-label="Tore"],
+  .table-wrap td[data-label="Vorlagen"] {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    flex: 1 1 92px;
+    min-width: 0;
+  }
+
+  .table-wrap td[data-label="Anwesenheit"],
+  .table-wrap td[data-label="Gesamtnote"] {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    flex: 1 1 45%;
+    min-width: 0;
+  }
+
+  .table-wrap td[data-label="Positionen"]::before,
+  .table-wrap td[data-label="Geburtsdatum"]::before,
+  .table-wrap td[data-label="Status"]::before,
+  .table-wrap td[data-label="Events"]::before,
+  .table-wrap td[data-label="Note"]::before,
+  .table-wrap td[data-label="Risiko"]::before,
+  .table-wrap td[data-label="Einsatz"]::before,
+  .table-wrap td[data-label="Technik"]::before,
+  .table-wrap td[data-label="Taktik"]::before,
+  .table-wrap td[data-label="Auffassung"]::before,
+  .table-wrap td[data-label="Minuten"]::before,
+  .table-wrap td[data-label="Tore"]::before,
+  .table-wrap td[data-label="Vorlagen"]::before {
+    font-size: 0.68rem;
+  }
+
+  /* Action buttons side by side; keep destructive actions on their own row */
+  .table-wrap td.row-actions,
+  .row-actions {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .row-actions button {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 96px;
+  }
+  .row-actions button[data-action^="delete"] {
+    flex-basis: 100%;
+  }
 
   .profile-card { gap: 12px; padding: 14px; }
   .profile-number { width: 52px; height: 52px; }
