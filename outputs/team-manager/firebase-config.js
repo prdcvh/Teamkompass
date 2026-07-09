@@ -12,7 +12,12 @@ window.TEAMKOMPASS_CONFIG = {
   }
 };
 
-window.TEAMKOMPASS_VERSION = "criteria-v2";
+const responsiveStyles = document.createElement("link");
+responsiveStyles.rel = "stylesheet";
+responsiveStyles.href = "./responsive-enhancements.css?v=1";
+document.head.append(responsiveStyles);
+
+window.TEAMKOMPASS_VERSION = "responsive-v1";
 document.querySelector(".brand strong").textContent = "1. FC TSG Königstein U14";
 
 window.addEventListener("load", () => {
