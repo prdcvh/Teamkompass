@@ -30,8 +30,7 @@
           <button class="nav-tab" data-view="teamAnalysis">Team</button>
         </nav>
         <label class="mobile-view-switcher">
-          Bereich
-          <select id="mobileViewSelect" aria-label="Bereich auswÃ¤hlen">
+          <select id="mobileViewSelect" aria-label="Bereich auswählen">
             <option value="dashboard">Dashboard</option>
             <option value="squad">Kader</option>
             <option value="events">Events</option>
@@ -324,12 +323,22 @@
                     </select>
                   </label>
                 </div>
-                <label>Stärken <textarea id="opponentStrengths" rows="3" placeholder="Was macht der Gegner gut?"></textarea></label>
-                <label>Schwächen <textarea id="opponentWeaknesses" rows="3" placeholder="Wo können wir ansetzen?"></textarea></label>
-                <label>Schlüsselspieler <textarea id="opponentKeyPlayers" rows="2" placeholder="Namen, Nummern, Rollen"></textarea></label>
-                <label>Standards <textarea id="opponentSetPieces" rows="2" placeholder="Ecken, Freistöße, Einwürfe"></textarea></label>
-                <label>Matchplan <textarea id="opponentGamePlan" rows="3" placeholder="Worauf stellen wir uns ein?"></textarea></label>
-                <label>Notizen <textarea id="opponentNotes" rows="3" placeholder="Quelle, Beobachtung, Besonderheiten"></textarea></label>
+                <details class="control-disclosure" open>
+                  <summary>Stärken &amp; Schwächen</summary>
+                  <div class="disclosure-body">
+                    <label>Stärken <textarea id="opponentStrengths" rows="3" placeholder="Was macht der Gegner gut?"></textarea></label>
+                    <label>Schwächen <textarea id="opponentWeaknesses" rows="3" placeholder="Wo können wir ansetzen?"></textarea></label>
+                    <label>Schlüsselspieler <textarea id="opponentKeyPlayers" rows="2" placeholder="Namen, Nummern, Rollen"></textarea></label>
+                  </div>
+                </details>
+                <details class="control-disclosure">
+                  <summary>Standards &amp; Matchplan</summary>
+                  <div class="disclosure-body">
+                    <label>Standards <textarea id="opponentSetPieces" rows="2" placeholder="Ecken, Freistöße, Einwürfe"></textarea></label>
+                    <label>Matchplan <textarea id="opponentGamePlan" rows="3" placeholder="Worauf stellen wir uns ein?"></textarea></label>
+                    <label>Notizen <textarea id="opponentNotes" rows="3" placeholder="Quelle, Beobachtung, Besonderheiten"></textarea></label>
+                  </div>
+                </details>
                 <div class="panel-actions">
                   <button class="ghost-button" id="cancelOpponentBtn" type="button">Zurücksetzen</button>
                   <button class="primary-button" type="submit">Gegner speichern</button>
