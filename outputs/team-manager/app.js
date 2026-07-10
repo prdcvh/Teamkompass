@@ -736,13 +736,16 @@ async function handlePlayerLogin(event) {
   $("#authGateError").textContent = "";
   try {
     const inviteRef = teamDoc("invites", code);
+    // Erst anmelden (anonym), dann den Code pruefen: solange niemand angemeldet ist,
+    // duerfen Firestore-Regeln den Code gar nicht lesen lassen (siehe firestore.rules).
+    const credential = await authModule.signInAnonymously(authInstance);
     const inviteSnap = await firestoreModule.getDoc(inviteRef);
     if (!inviteSnap.exists() || inviteSnap.data().used) {
       $("#authGateError").textContent = "Dieser Code ist ungueltig oder wurde bereits verwendet.";
+      await authModule.signOut(authInstance);
       return;
     }
     const playerId = inviteSnap.data().playerId;
-    const credential = await authModule.signInAnonymously(authInstance);
     const memberRef = teamDoc("members", credential.user.uid);
     // Transaktion, damit "Code als benutzt markieren" und "Mitgliedschaft anlegen"
     // atomar zusammen gelingen oder beide unterbleiben - kein verbrannter Code ohne
