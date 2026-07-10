@@ -810,8 +810,11 @@ function authErrorMessage(error) {
   if (code.includes("user-not-found")) return "Kein Trainer-Konto mit dieser E-Mail gefunden.";
   if (code.includes("weak-password")) return "Das Passwort muss mindestens 6 Zeichen haben.";
   if (code.includes("operation-not-allowed")) return "Diese Anmeldemethode ist in der Firebase-Konsole noch nicht aktiviert.";
+  if (code.includes("permission-denied") || code.includes("insufficient-permissions")) {
+    return "Zugriff von den Firestore-Regeln verweigert (permission-denied). Pruefe, ob firestore.rules wirklich veroeffentlicht wurde.";
+  }
   console.error(error);
-  return "Etwas ist schiefgelaufen. Bitte erneut versuchen.";
+  return `Etwas ist schiefgelaufen${code ? ` (Code: ${code})` : ""}. Bitte erneut versuchen.`;
 }
 
 async function handleSignOut() {
