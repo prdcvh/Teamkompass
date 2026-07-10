@@ -5,7 +5,7 @@ window.TEAMKOMPASS_CONFIG = {
   // siehe firestore.rules) zu aktivieren. Vorher in der Firebase-Konsole unter
   // Authentication die Anmeldemethoden "E-Mail/Passwort" und "Anonym" aktivieren
   // und firestore.rules deployen - siehe FIREBASE_SETUP.md.
-  enableRoles: false,
+  enableRoles: true,
   firebase: {
     apiKey: "AIzaSyCJbajbFdiUFumwIGFN-UXxsg353Y4JgT0",
     authDomain: "teamkompass-b8aac.firebaseapp.com",
