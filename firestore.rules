@@ -70,9 +70,13 @@ service cloud.firestore {
 
       match /invites/{code} {
         allow read: if isTrainer();
-        // TEMPORAER zu Diagnosezwecken gelockert (war: "if isTrainer();"), vom Nutzer
-        // ausdruecklich bestaetigt - wird nach dem Test wieder zurueckgesetzt.
-        allow create: if isSignedIn();
+        // Direkte, flache Pruefung statt isTrainer() - der Diagnose-Test hat gezeigt,
+        // dass die verschachtelte isTrainer()-Funktionskette hier aus unklarem Grund
+        // fehlschlaegt (isSignedIn() allein hat funktioniert). Diese Variante prueft
+        // die Rolle direkt und ohne die isExpired()/isTeamMember()-Zwischenschritte,
+        // die fuer ein Trainer-Konto (nie befristet) ohnehin nicht gebraucht werden.
+        allow create: if isSignedIn()
+          && get(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid)).data.role == "trainer";
         // Einloesen: jede angemeldete Person darf einen unbenutzten Code genau einmal
         // als "benutzt" markieren (die Code-Weitergabe an den richtigen Spieler ist
         // Sache des Trainers, wie bei einem Einmal-Passwort - Codes vertraulich behandeln).
