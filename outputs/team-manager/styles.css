@@ -335,6 +335,12 @@ menu {
   border-left: 0;
 }
 
+.control-disclosure .disclosure-body {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+}
+
 .primary-button,
 .ghost-button,
 .icon-button {

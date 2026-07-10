@@ -464,6 +464,8 @@ function setView(viewName) {
   document.querySelectorAll(".nav-tab").forEach((button) => button.classList.toggle("active", button.dataset.view === viewName));
   if ($("#mobileViewSelect")) $("#mobileViewSelect").value = viewName;
   $("#pageTitle").textContent = titles[viewName];
+  if (viewName === "dashboard") { renderMetrics(); renderPitch(); renderLeaders(); }
+  if (viewName === "squad") renderSquad();
   if (viewName === "profiles") drawProfile();
   if (viewName === "opponents") renderOpponentAnalysis();
   if (viewName === "teamAnalysis") renderTeamAnalysis();
@@ -1019,11 +1021,18 @@ function savePlayer(event) {
     return;
   }
   $("#playerCustomPositions").setCustomValidity("");
+  const number = Number($("#playerNumber").value);
+  if (state.players.some((item) => item.id !== id && item.number === number)) {
+    $("#playerNumber").setCustomValidity(`Rückennummer ${number} ist bereits vergeben.`);
+    $("#playerNumber").reportValidity();
+    return;
+  }
+  $("#playerNumber").setCustomValidity("");
   const player = {
     id,
     name: $("#playerName").value.trim(),
     positions,
-    number: Number($("#playerNumber").value),
+    number,
     birthdate: $("#playerBirthdate").value,
     status: $("#playerStatus").value
   };
@@ -1110,7 +1119,7 @@ function updateRating(playerId, field, value, rerender = true) {
     event.ratings[playerId].grade = calculatedGrade(event.ratings[playerId]);
   }
   persist();
-  if (rerender) renderAll();
+  if (rerender) renderEvents();
 }
 
 function deleteSelectedEvent() {
@@ -1120,7 +1129,7 @@ function deleteSelectedEvent() {
   state.events = state.events.filter((item) => item.id !== event.id);
   state.selectedEventId = state.events[0]?.id || "";
   persist();
-  renderAll();
+  renderEvents();
 }
 
 function updateSelectedEventMeta(field, value) {
@@ -1132,7 +1141,7 @@ function updateSelectedEventMeta(field, value) {
   else if (field === "matchDuration") event[field] = event.type === "Spiel" ? Math.max(1, numericValue || 90) : "";
   else event[field] = event.type === "Spiel" ? numericValue : "";
   persist();
-  renderAll();
+  renderEvents();
 }
 
 function drawProfile() {
@@ -1851,6 +1860,9 @@ $("#addPlayerTop").addEventListener("click", () => openPlayerDialog());
 $("#closeDialogBtn").addEventListener("click", () => $("#playerDialog").close());
 $("#cancelDialogBtn").addEventListener("click", () => $("#playerDialog").close());
 $("#playerForm").addEventListener("submit", savePlayer);
+$("#positionOptions").addEventListener("change", () => $("#playerCustomPositions").setCustomValidity(""));
+$("#playerCustomPositions").addEventListener("input", () => $("#playerCustomPositions").setCustomValidity(""));
+$("#playerNumber").addEventListener("input", () => $("#playerNumber").setCustomValidity(""));
 $("#exportBtn").addEventListener("click", exportData);
 $("#themeToggle").addEventListener("click", toggleTheme);
 $("#newEventBtn").addEventListener("click", openEventDialog);
@@ -1873,7 +1885,7 @@ $("#cancelEventDialogBtn").addEventListener("click", () => $("#eventDialog").clo
 $("#eventSelect").addEventListener("change", (event) => {
   state.selectedEventId = event.target.value;
   persist();
-  renderAll();
+  renderEvents();
 });
 $("#ratingFilter").addEventListener("change", renderRatingTable);
 $("#deleteEventBtn").addEventListener("click", deleteSelectedEvent);
@@ -1931,7 +1943,7 @@ $("#eventList").addEventListener("click", (event) => {
   if (!card) return;
   state.selectedEventId = card.dataset.eventId;
   persist();
-  renderAll();
+  renderEvents();
 });
 
 $("#ratingTable").addEventListener("change", (event) => {
