@@ -96,7 +96,7 @@
               <button class="quick-action" id="quickProfileBtn" type="button">
                 <span>Entwicklung</span>
                 <strong>Spielerprofil</strong>
-                <small>Leistung, Foerderplan und PDF ansehen</small>
+                <small>Leistung, Förderplan und PDF ansehen</small>
               </button>
               <button class="quick-action" id="quickOpponentBtn" type="button">
                 <span>Vorbereitung</span>
@@ -271,15 +271,15 @@
           <section class="panel development-panel">
             <div class="panel-head">
               <div>
-                <h2>Foerderplan</h2>
-                <span class="muted">individuelle Ziele, Massnahmen und Status</span>
+                <h2>Förderplan</h2>
+                <span class="muted">individuelle Ziele, Maßnahmen und Status</span>
               </div>
             </div>
             <form class="development-form" id="developmentPlanForm">
               <input type="hidden" id="developmentPlanId" />
               <label>Schwerpunkt <input id="developmentPlanFocus" maxlength="50" placeholder="z.B. erster Kontakt, Orientierung, Mut im 1 gegen 1" required /></label>
               <label>Ziel <input id="developmentPlanGoal" maxlength="90" placeholder="konkret beobachtbares Ziel" required /></label>
-              <label>Massnahmen <textarea id="developmentPlanActions" rows="3" placeholder="Trainingsformen, Coachingpunkte, Heimaufgabe"></textarea></label>
+              <label>Maßnahmen <textarea id="developmentPlanActions" rows="3" placeholder="Trainingsformen, Coachingpunkte, Heimaufgabe"></textarea></label>
               <div class="form-grid">
                 <label>Status
                   <select id="developmentPlanStatus">
@@ -291,8 +291,8 @@
                 <label>Zieldatum <input id="developmentPlanDueDate" type="date" /></label>
               </div>
               <div class="panel-actions">
-                <button class="ghost-button" id="cancelDevelopmentPlanBtn" type="button">Zuruecksetzen</button>
-                <button class="primary-button" type="submit">Foerderplan speichern</button>
+                <button class="ghost-button" id="cancelDevelopmentPlanBtn" type="button">Zurücksetzen</button>
+                <button class="primary-button" type="submit">Förderplan speichern</button>
               </div>
             </form>
             <div class="development-list" id="developmentPlanList"></div>
@@ -324,14 +324,14 @@
                     </select>
                   </label>
                 </div>
-                <label>Staerken <textarea id="opponentStrengths" rows="3" placeholder="Was macht der Gegner gut?"></textarea></label>
-                <label>Schwaechen <textarea id="opponentWeaknesses" rows="3" placeholder="Wo koennen wir ansetzen?"></textarea></label>
-                <label>Schluesselspieler <textarea id="opponentKeyPlayers" rows="2" placeholder="Namen, Nummern, Rollen"></textarea></label>
-                <label>Standards <textarea id="opponentSetPieces" rows="2" placeholder="Ecken, Freistoesse, Einwuerfe"></textarea></label>
+                <label>Stärken <textarea id="opponentStrengths" rows="3" placeholder="Was macht der Gegner gut?"></textarea></label>
+                <label>Schwächen <textarea id="opponentWeaknesses" rows="3" placeholder="Wo können wir ansetzen?"></textarea></label>
+                <label>Schlüsselspieler <textarea id="opponentKeyPlayers" rows="2" placeholder="Namen, Nummern, Rollen"></textarea></label>
+                <label>Standards <textarea id="opponentSetPieces" rows="2" placeholder="Ecken, Freistöße, Einwürfe"></textarea></label>
                 <label>Matchplan <textarea id="opponentGamePlan" rows="3" placeholder="Worauf stellen wir uns ein?"></textarea></label>
                 <label>Notizen <textarea id="opponentNotes" rows="3" placeholder="Quelle, Beobachtung, Besonderheiten"></textarea></label>
                 <div class="panel-actions">
-                  <button class="ghost-button" id="cancelOpponentBtn" type="button">Zuruecksetzen</button>
+                  <button class="ghost-button" id="cancelOpponentBtn" type="button">Zurücksetzen</button>
                   <button class="primary-button" type="submit">Gegner speichern</button>
                 </div>
               </form>

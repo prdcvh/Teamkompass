@@ -79,12 +79,12 @@ const sampleData = {
       name: "SV Nord",
       formation: "3-2-3",
       style: "Umschaltspiel",
-      strengths: "Schnelle Angriffe ueber die Aussen.",
-      weaknesses: "Raum hinter den Aussenverteidigern.",
-      keyPlayers: "Nr. 9 sehr schnell, Nr. 6 verteilt viele Baelle.",
+      strengths: "Schnelle Angriffe über die Außen.",
+      weaknesses: "Raum hinter den Außenverteidigern.",
+      keyPlayers: "Nr. 9 sehr schnell, Nr. 6 verteilt viele Bälle.",
       setPieces: "Ecken meist auf den ersten Pfosten.",
       gamePlan: "Restverteidigung sichern, nach Ballgewinn schnell breit werden.",
-      notes: "Aus dem letzten Heimspiel uebernommen.",
+      notes: "Aus dem letzten Heimspiel übernommen.",
       updatedAt: "2026-06-06"
     }
   ],
@@ -1116,6 +1116,7 @@ function updateRating(playerId, field, value, rerender = true) {
 function deleteSelectedEvent() {
   const event = selectedEvent();
   if (!event) return;
+  if (!confirm(`"${event.title}" wirklich löschen? Alle Bewertungen dieses Events gehen verloren.`)) return;
   state.events = state.events.filter((item) => item.id !== event.id);
   state.selectedEventId = state.events[0]?.id || "";
   persist();
@@ -1154,14 +1155,14 @@ function renderDevelopmentPlans(playerId) {
         <span class="status-pill ${plan.status === "Erreicht" ? "success" : plan.status === "In Arbeit" ? "warning" : ""}">${escapeHtml(plan.status)}</span>
         <strong>${escapeHtml(plan.focus)}</strong>
         <p>${escapeHtml(plan.goal)}</p>
-        <small class="muted">${plan.dueDate ? `Ziel bis ${formatDate(plan.dueDate)} · ` : ""}${escapeHtml(plan.actions || "Keine Massnahmen notiert.")}</small>
+        <small class="muted">${plan.dueDate ? `Ziel bis ${formatDate(plan.dueDate)} · ` : ""}${escapeHtml(plan.actions || "Keine Maßnahmen notiert.")}</small>
       </div>
       <div class="row-actions">
         <button class="ghost-button" data-action="edit-plan" data-id="${plan.id}" type="button">Bearbeiten</button>
-        <button class="ghost-button" data-action="delete-plan" data-id="${plan.id}" type="button">Loeschen</button>
+        <button class="ghost-button" data-action="delete-plan" data-id="${plan.id}" type="button">Löschen</button>
       </div>
     </article>
-  `).join("") || `<p class="muted">Noch kein Foerderplan fuer diesen Spieler angelegt.</p>`;
+  `).join("") || `<p class="muted">Noch kein Förderplan für diesen Spieler angelegt.</p>`;
 }
 
 function resetDevelopmentPlanForm() {
@@ -1212,6 +1213,7 @@ function editDevelopmentPlan(planId) {
 function deleteDevelopmentPlan(planId) {
   const playerId = $("#profilePlayer").value || state.players[0]?.id;
   if (!playerId) return;
+  if (!confirm("Diesen Förderplan wirklich löschen?")) return;
   state.developmentPlans ||= {};
   state.developmentPlans[playerId] = (state.developmentPlans?.[playerId] || []).filter((plan) => plan.id !== planId);
   persist();
@@ -1734,13 +1736,13 @@ function renderOpponentAnalysis() {
         </div>
         <div class="row-actions">
           <button class="ghost-button" data-action="edit-opponent" data-id="${opponent.id}" type="button">Bearbeiten</button>
-          <button class="ghost-button" data-action="delete-opponent" data-id="${opponent.id}" type="button">Loeschen</button>
+          <button class="ghost-button" data-action="delete-opponent" data-id="${opponent.id}" type="button">Löschen</button>
         </div>
       </div>
       <div class="opponent-detail-grid">
-        ${opponent.strengths ? opponentDetail("Staerken", opponent.strengths) : ""}
-        ${opponent.weaknesses ? opponentDetail("Schwaechen", opponent.weaknesses) : ""}
-        ${opponent.keyPlayers ? opponentDetail("Schluesselspieler", opponent.keyPlayers) : ""}
+        ${opponent.strengths ? opponentDetail("Stärken", opponent.strengths) : ""}
+        ${opponent.weaknesses ? opponentDetail("Schwächen", opponent.weaknesses) : ""}
+        ${opponent.keyPlayers ? opponentDetail("Schlüsselspieler", opponent.keyPlayers) : ""}
         ${opponent.setPieces ? opponentDetail("Standards", opponent.setPieces) : ""}
         ${opponent.gamePlan ? opponentDetail("Matchplan", opponent.gamePlan) : ""}
         ${opponent.notes ? opponentDetail("Notizen", opponent.notes) : ""}
@@ -1808,6 +1810,8 @@ function editOpponent(opponentId) {
 }
 
 function deleteOpponent(opponentId) {
+  const opponent = (state.opponents || []).find((item) => item.id === opponentId);
+  if (!confirm(`Gegnerprofil "${opponent?.name || ""}" wirklich löschen?`)) return;
   state.opponents = (state.opponents || []).filter((opponent) => opponent.id !== opponentId);
   persist();
   renderOpponentAnalysis();
@@ -1913,6 +1917,7 @@ $("#playerTable").addEventListener("click", (event) => {
   }
   if (button.dataset.action === "edit") openPlayerDialog(player);
   if (button.dataset.action === "delete" && player) {
+    if (!confirm(`"${player.name}" wirklich löschen? Alle Bewertungen und der Förderplan dieses Spielers gehen verloren.`)) return;
     state.players = state.players.filter((item) => item.id !== player.id);
     state.events.forEach((item) => delete item.ratings?.[player.id]);
     delete state.developmentPlans?.[player.id];
