@@ -42,44 +42,26 @@ service cloud.firestore {
         return isTeamMember() && memberDoc().data.role == "player" && memberDoc().data.playerId == playerId;
       }
 
-      // Bootstrap-Flag: existiert erst, sobald der erste Trainer sich eingerichtet hat.
-      // Die Erstellung ist zusaetzlich an "meta/setupCode" gebunden (siehe unten), damit
-      // nicht irgendjemand, der die App-URL kennt, sich als erstes selbst zum Trainer
-      // macht.
-      match /meta/access {
-        allow read: if isSignedIn();
-        allow create: if isSignedIn()
-          && !exists(/databases/$(database)/documents/teams/$(teamId)/meta/access)
-          && request.resource.data.setupCode == get(/databases/$(database)/documents/teams/$(teamId)/meta/setupCode).data.value;
-        allow update, delete: if false;
-      }
-
-      // Einrichtungs-Code fuer den allerersten Trainer-Bootstrap. Wird NICHT ueber die
-      // App geschrieben, sondern einmalig manuell in der Firebase-Konsole angelegt
-      // (Dokument-ID "setupCode" in der Collection "meta", Feld "value" mit einem
-      // selbst gewaehlten Geheimtext). Fuer Clients weder lesbar noch schreibbar -
-      // wird ausschliesslich intern per get() fuer den Vergleich oben genutzt.
-      match /meta/setupCode {
-        allow read, write: if false;
-      }
-
       match /members/{uid} {
         // Trainer duerfen die ganze Liste sehen (Zugaenge verwalten); diese Regel
         // haengt nicht von resource-Daten ab und ist daher fuer Listenabfragen sicher.
         allow read: if isTrainer() || (isSignedIn() && request.auth.uid == uid);
-        allow create: if isSignedIn() && request.auth.uid == uid && (
-          // Erster Trainer: nur solange noch kein Trainer existiert (siehe meta/access).
-          (request.resource.data.role == "trainer" && !exists(/databases/$(database)/documents/teams/$(teamId)/meta/access)) ||
-          // Spieler: nur ueber einen zuvor selbst eingeloesten (als benutzt markierten) Einladungscode.
+        // Trainer-Mitgliedschaften ("role": "trainer") werden absichtlich NICHT ueber
+        // die App erstellt, sondern ausschliesslich manuell in der Firebase-Konsole
+        // (Authentication: Nutzer anlegen: Firestore: passendes members/{uid}-Dokument
+        // anlegen) - siehe FIREBASE_SETUP.md. Die Konsole ist von diesen Regeln ohnehin
+        // nicht betroffen, es braucht dafuer also keine eigene "allow create"-Regel.
+        // Ueber die App selbst kann sich ausschliesslich ein Spieler ueber einen zuvor
+        // eingeloesten (als benutzt markierten) Einladungscode eintragen.
+        allow create: if isSignedIn() && request.auth.uid == uid
+          && request.resource.data.role == "player"
+          && request.resource.data.playerId is string
+          && request.resource.data.claimedInviteCode is string
           // "expiresAt" wird 1:1 vom Einladungscode uebernommen (Ablaufdatum steht
           // schon beim Erzeugen des Codes fest, nicht erst bei der Einloesung).
-          (request.resource.data.role == "player"
-            && request.resource.data.playerId is string
-            && request.resource.data.claimedInviteCode is string
-            && get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.playerId == request.resource.data.playerId
-            && get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.used == true
-            && request.resource.data.expiresAt == get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.expiresAt)
-        );
+          && get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.playerId == request.resource.data.playerId
+          && get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.used == true
+          && request.resource.data.expiresAt == get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.expiresAt;
         // Kein Update: eine bestehende Mitgliedschaft wird nicht bearbeitet, sondern
         // vom Trainer geloescht (Zugang sperren) und bei Bedarf neu eingeladen.
         allow update: if false;
