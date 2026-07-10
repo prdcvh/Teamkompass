@@ -599,9 +599,10 @@ menu {
   overflow: hidden;
   border-radius: 8px;
   background:
-    linear-gradient(90deg, rgba(255,255,255,0.08) 50%, transparent 50%),
+    radial-gradient(circle at 50% 50%, transparent 0 52px, rgba(255, 255, 255, 0.8) 52px 54px, transparent 54px 100%),
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.9) 0 3px, transparent 3px 100%),
+    linear-gradient(to bottom, transparent calc(50% - 1px), rgba(255, 255, 255, 0.8) calc(50% - 1px) calc(50% + 1px), transparent calc(50% + 1px)),
     repeating-linear-gradient(0deg, #08714f 0 70px, #0b815a 70px 140px);
-  background-size: 100% 100%, 100% 100%;
   border: 3px solid rgba(255, 255, 255, 0.9);
 }
 
@@ -609,14 +610,22 @@ menu {
 .pitch::after {
   position: absolute;
   content: "";
-  inset: 18px;
+  left: 26%;
+  right: 26%;
+  height: 20%;
   border: 2px solid rgba(255, 255, 255, 0.78);
-  border-radius: 4px;
+}
+
+.pitch::before {
+  bottom: 0;
+  border-bottom: 0;
+  border-radius: 3px 3px 0 0;
 }
 
 .pitch::after {
-  inset: 42% 32%;
-  border-radius: 999px;
+  top: 0;
+  border-top: 0;
+  border-radius: 0 0 3px 3px;
 }
 
 .pitch-player {

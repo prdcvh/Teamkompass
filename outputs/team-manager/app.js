@@ -793,21 +793,89 @@ function renderPitch() {
       </div>
     `;
   }).join("");
+  const teamGradeEl = $("#pitchTeamGrade");
+  if (teamGradeEl) {
+    const startingGrades = assigned.map(({ player }) => player && playerAverageGrade(player.id)).filter(Boolean);
+    const teamGrade = startingGrades.length ? roundGrade(startingGrades.reduce((sum, value) => sum + value, 0) / startingGrades.length) : null;
+    teamGradeEl.textContent = teamGrade ? `Mannschaftsnote Ø ${gradeLabel(teamGrade)}` : "Mannschaftsnote noch ohne Bewertungen";
+  }
 }
 
+// Waehlt aus allen verfuegbaren Spielern die beste GESAMT-Elf fuer die Formation:
+// jeder Spieler besetzt hoechstens einen Slot und nur eine Position, die er laut
+// seinem Profil auch spielen kann (slot.matches). Optimiert wird per Bitmask-DP
+// (ein Slot pro Bit) zuerst auf moeglichst wenige offene Positionen, danach auf
+// den besten Notendurchschnitt der Elf - statt slot-fuer-slot naiv den jeweils
+// besten verfuegbaren Spieler zu nehmen, was einzelne Positionen unnoetig
+// freilassen oder eine schwaechere Gesamtelf ergeben kann.
 function assignFormationSlots(slots, candidates) {
-  const available = [...candidates];
-  return slots.map((slot) => {
-    const exactIndex = available.findIndex((player) => parsePositions(player.positions || player.position).includes(slot.label));
-    if (exactIndex < 0) return { slot, player: null };
-    const [player] = available.splice(exactIndex, 1);
-    return { slot, player };
+  const slotCount = slots.length;
+  const fullMask = (1 << slotCount) - 1;
+  const eligibility = candidates.map((player) => {
+    const positions = parsePositions(player.positions || player.position);
+    return slots.reduce((bits, slot, index) => (slot.matches.some((label) => positions.includes(label)) ? bits | (1 << index) : bits), 0);
   });
+
+  let dp = new Array(fullMask + 1).fill(Infinity);
+  let parent = new Array(fullMask + 1).fill(null);
+  dp[0] = 0;
+
+  candidates.forEach((player, playerIndex) => {
+    const bits = eligibility[playerIndex];
+    if (!bits) return;
+    const positions = parsePositions(player.positions || player.position);
+    const grade = playerAverageGrade(player.id) || 9;
+    const dpNext = dp.slice();
+    const parentNext = parent.slice();
+    for (let mask = 0; mask <= fullMask; mask++) {
+      if (!Number.isFinite(dp[mask])) continue;
+      for (let slotIndex = 0; slotIndex < slotCount; slotIndex++) {
+        const bit = 1 << slotIndex;
+        if (!(bits & bit) || (mask & bit)) continue;
+        // winziger Bonus fuer die exakt gelistete Position, damit bei gleicher
+        // Note die natuerlichere Position bevorzugt wird (Notenunterschiede sind
+        // immer mindestens 0.1, dieser Bonus veraendert also nie die echte Wahl)
+        const cost = grade + (positions.includes(slots[slotIndex].label) ? 0 : 0.01);
+        const newMask = mask | bit;
+        if (dp[mask] + cost < dpNext[newMask]) {
+          dpNext[newMask] = dp[mask] + cost;
+          parentNext[newMask] = { prevMask: mask, playerIndex, slotIndex };
+        }
+      }
+    }
+    dp = dpNext;
+    parent = parentNext;
+  });
+
+  let bestMask = 0;
+  for (let mask = 0; mask <= fullMask; mask++) {
+    if (!Number.isFinite(dp[mask])) continue;
+    if (popcount(mask) > popcount(bestMask) || (popcount(mask) === popcount(bestMask) && dp[mask] < dp[bestMask])) {
+      bestMask = mask;
+    }
+  }
+
+  const slotPlayer = new Array(slotCount).fill(null);
+  for (let mask = bestMask; mask; ) {
+    const step = parent[mask];
+    if (!step) break;
+    slotPlayer[step.slotIndex] = candidates[step.playerIndex];
+    mask = step.prevMask;
+  }
+
+  return slots.map((slot, index) => ({ slot, player: slotPlayer[index] || null }));
+}
+
+function popcount(mask) {
+  let count = 0;
+  for (let value = mask; value; value >>= 1) count += value & 1;
+  return count;
 }
 
 function bestMatchedPosition(player, slot) {
   const positions = parsePositions(player.positions || player.position);
-  return positions.includes(slot.label) ? slot.label : positions[0] || slot.label;
+  if (positions.includes(slot.label)) return slot.label;
+  return slot.matches.find((label) => positions.includes(label)) || positions[0] || slot.label;
 }
 
 function renderLeaders() {
