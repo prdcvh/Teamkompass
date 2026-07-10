@@ -71,11 +71,17 @@ bleibt, aendert sich am heutigen Verhalten nichts.
    - per Firebase-CLI: `firebase deploy --only firestore:rules`, oder
    - manuell: Inhalt von `firestore.rules` in Firebase Console -> Firestore Database
      -> Regeln einfuegen und veroeffentlichen.
-3. In `firebase-config.js` `enableRoles: true` setzen und deployen.
-4. Die App oeffnen - es erscheint ein Login-Bildschirm. Dort einmalig unter
-   "Trainer-Zugang einrichten" eine E-Mail-Adresse und ein Passwort fuer den Trainer
-   anlegen (das ist danach der normale Trainer-Login, auch von anderen Geraeten aus).
-5. Falls schon Daten im alten Format existieren (`teams/{teamId}/appState/current`):
+3. Einrichtungs-Code anlegen (verhindert, dass sich irgendjemand mit der App-URL als
+   erstes selbst zum Trainer macht, bevor du es tust): in Firebase Console -> Firestore
+   Database -> Daten -> Collection `teams/{teamId}/meta` -> Dokument mit der ID
+   `setupCode` anlegen, darin ein Feld `value` (Typ String) mit einem selbst gewaehlten
+   Geheimtext. Diesen Text brauchst du gleich beim Anlegen des Trainer-Kontos.
+4. In `firebase-config.js` `enableRoles: true` setzen und deployen.
+5. Die App oeffnen - es erscheint ein Login-Bildschirm. Dort einmalig unter
+   "Trainer-Zugang einrichten" eine E-Mail-Adresse, ein Passwort und den in Schritt 3
+   angelegten Einrichtungs-Code eingeben (das ist danach der normale Trainer-Login,
+   auch von anderen Geraeten aus - der Einrichtungs-Code wird nur einmalig gebraucht).
+6. Falls schon Daten im alten Format existieren (`teams/{teamId}/appState/current`):
    im Menue "Aktionen" auf "Alte Daten migrieren" klicken. Das ueberfuehrt Kader,
    Events, Bewertungen, Foerderplaene und Gegneranalysen einmalig in die neue Struktur.
    Das alte Dokument bleibt danach unveraendert liegen (kann spaeter manuell geloescht

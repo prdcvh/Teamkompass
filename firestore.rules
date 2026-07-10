@@ -43,10 +43,24 @@ service cloud.firestore {
       }
 
       // Bootstrap-Flag: existiert erst, sobald der erste Trainer sich eingerichtet hat.
+      // Die Erstellung ist zusaetzlich an "meta/setupCode" gebunden (siehe unten), damit
+      // nicht irgendjemand, der die App-URL kennt, sich als erstes selbst zum Trainer
+      // macht.
       match /meta/access {
         allow read: if isSignedIn();
-        allow create: if isSignedIn() && !exists(/databases/$(database)/documents/teams/$(teamId)/meta/access);
+        allow create: if isSignedIn()
+          && !exists(/databases/$(database)/documents/teams/$(teamId)/meta/access)
+          && request.resource.data.setupCode == get(/databases/$(database)/documents/teams/$(teamId)/meta/setupCode).data.value;
         allow update, delete: if false;
+      }
+
+      // Einrichtungs-Code fuer den allerersten Trainer-Bootstrap. Wird NICHT ueber die
+      // App geschrieben, sondern einmalig manuell in der Firebase-Konsole angelegt
+      // (Dokument-ID "setupCode" in der Collection "meta", Feld "value" mit einem
+      // selbst gewaehlten Geheimtext). Fuer Clients weder lesbar noch schreibbar -
+      // wird ausschliesslich intern per get() fuer den Vergleich oben genutzt.
+      match /meta/setupCode {
+        allow read, write: if false;
       }
 
       match /members/{uid} {
