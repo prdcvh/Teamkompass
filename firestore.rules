@@ -1,0 +1,111 @@
+rules_version = '2';
+
+// Datenmodell: teams/{teamId}/{meta,members,invites,players,events,opponents}
+// Siehe README/FIREBASE_SETUP.md fuer den Hintergrund. Kernidee:
+// - "members/{uid}" verknuepft eine angemeldete Firebase-Auth-Identitaet mit einer
+//   Rolle ("trainer" oder "player") und - fuer Spieler - der eigenen playerId.
+// - Ein Trainer darf alles lesen/schreiben. Ein Spieler darf nur sein eigenes
+//   Spielerprofil, seinen eigenen Foerderplan und seine eigenen Bewertungen lesen -
+//   nie die Daten anderer Spieler.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /teams/{teamId} {
+
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function memberExists() {
+        return exists(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid));
+      }
+
+      function memberDoc() {
+        return get(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid));
+      }
+
+      function isTeamMember() {
+        return isSignedIn() && memberExists();
+      }
+
+      function isTrainer() {
+        return isTeamMember() && memberDoc().data.role == "trainer";
+      }
+
+      function isPlayerFor(playerId) {
+        return isTeamMember() && memberDoc().data.role == "player" && memberDoc().data.playerId == playerId;
+      }
+
+      // Bootstrap-Flag: existiert erst, sobald der erste Trainer sich eingerichtet hat.
+      match /meta/access {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() && !exists(/databases/$(database)/documents/teams/$(teamId)/meta/access);
+        allow update, delete: if false;
+      }
+
+      match /members/{uid} {
+        allow read: if isSignedIn() && request.auth.uid == uid;
+        allow create: if isSignedIn() && request.auth.uid == uid && (
+          // Erster Trainer: nur solange noch kein Trainer existiert (siehe meta/access).
+          (request.resource.data.role == "trainer" && !exists(/databases/$(database)/documents/teams/$(teamId)/meta/access)) ||
+          // Spieler: nur ueber einen zuvor selbst eingeloesten (als benutzt markierten) Einladungscode.
+          (request.resource.data.role == "player"
+            && request.resource.data.playerId is string
+            && request.resource.data.claimedInviteCode is string
+            && get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.playerId == request.resource.data.playerId
+            && get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.used == true)
+        );
+        allow update, delete: if false;
+      }
+
+      match /invites/{code} {
+        allow read: if isTrainer();
+        allow create: if isTrainer();
+        // Einloesen: jede angemeldete Person darf einen unbenutzten Code genau einmal
+        // als "benutzt" markieren (die Code-Weitergabe an den richtigen Spieler ist
+        // Sache des Trainers, wie bei einem Einmal-Passwort - Codes vertraulich behandeln).
+        allow update: if isSignedIn()
+          && resource.data.used == false
+          && request.resource.data.used == true
+          && request.resource.data.playerId == resource.data.playerId;
+        allow delete: if isTrainer();
+      }
+
+      // "players/{playerId}" wird von Spielern immer per direktem Dokument-Get
+      // abgerufen (nie als Listenabfrage der ganzen Collection), deshalb reicht hier
+      // der Pfad-Vergleich. "ratings" und "developmentPlans" werden von Spielern dagegen
+      // per collectionGroup-Abfrage mit einem "where(playerId == ...)"-Filter gelesen -
+      // Firestore kann eine Listenabfrage nur zulassen, wenn die Regel selbst auf ein
+      // Datenfeld (nicht auf das Pfadsegment) prueft, das exakt zum Abfragefilter passt.
+      // Deshalb tragen diese beiden Dokumenttypen zusaetzlich ein eigenes "playerId"-Feld.
+      match /players/{playerId} {
+        allow read: if isTrainer() || isPlayerFor(playerId);
+        allow write: if isTrainer();
+
+        match /developmentPlans/{planId} {
+          allow read: if isTrainer() || (isTeamMember() && resource.data.playerId == memberDoc().data.playerId);
+          allow write: if isTrainer();
+        }
+      }
+
+      match /events/{eventId} {
+        allow read: if isTeamMember();
+        allow write: if isTrainer();
+
+        match /ratings/{playerId} {
+          allow read: if isTrainer() || (isTeamMember() && resource.data.playerId == memberDoc().data.playerId);
+          allow write: if isTrainer();
+        }
+      }
+
+      match /opponents/{opponentId} {
+        allow read, write: if isTrainer();
+      }
+
+      // Altes Einzeldokument aus dem Single-Blob-Modell - nur fuer die einmalige
+      // Migration in die neue Struktur, danach kann es geloescht werden.
+      match /appState/current {
+        allow read, write: if isTrainer();
+      }
+    }
+  }
+}

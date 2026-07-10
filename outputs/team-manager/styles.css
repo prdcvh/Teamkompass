@@ -1897,3 +1897,97 @@ menu {
     font-size: 1.35rem;
   }
 }
+
+/* ---- Rollen-Modus: Login-Gate und rollenbasierte Sichtbarkeit ---- */
+
+.auth-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: linear-gradient(160deg, rgba(216, 7, 46, 0.94), rgba(5, 89, 62, 0.94));
+  overflow-y: auto;
+}
+
+.auth-gate[hidden] {
+  display: none;
+}
+
+.auth-gate-card {
+  display: grid;
+  gap: 16px;
+  width: 100%;
+  max-width: 420px;
+  padding: 24px;
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.auth-gate-card .brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.auth-gate-card .brand strong {
+  display: block;
+  color: var(--ink);
+}
+
+.auth-gate-card .brand span {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.auth-gate-card hr {
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+.auth-gate-form {
+  display: grid;
+  gap: 10px;
+}
+
+.auth-gate-form h2 {
+  margin-bottom: 0;
+}
+
+.auth-gate-error {
+  margin: 0;
+  color: var(--red-dark);
+  font-weight: 800;
+}
+
+.auth-gate-error:empty {
+  display: none;
+}
+
+body.auth-locked .app-shell {
+  display: none;
+}
+
+/* Spieler-Rolle: nur die Profil-Ansicht darf erreichbar sein */
+body.role-player .nav-tab:not([data-view="profiles"]) {
+  display: none;
+}
+
+body.role-player #addPlayerTop,
+body.role-player #exportBtn,
+body.role-player .development-form,
+body.role-player #developmentPlanList .row-actions {
+  display: none;
+}
+
+/* Einladungscode je Spieler nur fuer den Trainer im Rollen-Modus sichtbar */
+[data-action="invite"] {
+  display: none;
+}
+
+body.role-trainer-cloud [data-action="invite"] {
+  display: inline-flex;
+}

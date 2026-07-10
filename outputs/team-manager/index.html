@@ -11,6 +11,43 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
+    <div class="auth-gate" id="authGate" hidden>
+      <div class="auth-gate-card">
+        <div class="brand">
+          <img class="club-logo" src="./assets/club-logo.svg" alt="1. FC Königstein U14 Logo" />
+          <div>
+            <strong>1. FC Königstein U14</strong>
+            <span>TeamKompass</span>
+          </div>
+        </div>
+        <p class="auth-gate-error" id="authGateError"></p>
+
+        <form class="auth-gate-form" id="trainerSetupForm">
+          <h2>Trainer-Zugang einrichten</h2>
+          <p class="muted">Noch kein Trainer-Konto vorhanden. Lege hier das erste (und einzige) Trainer-Konto an.</p>
+          <label>E-Mail <input id="trainerSetupEmail" type="email" required /></label>
+          <label>Passwort <input id="trainerSetupPassword" type="password" minlength="6" required /></label>
+          <button class="primary-button" type="submit">Trainer-Konto anlegen</button>
+        </form>
+
+        <form class="auth-gate-form" id="trainerLoginForm" hidden>
+          <h2>Trainer-Login</h2>
+          <label>E-Mail <input id="trainerLoginEmail" type="email" required /></label>
+          <label>Passwort <input id="trainerLoginPassword" type="password" required /></label>
+          <button class="primary-button" type="submit">Anmelden</button>
+        </form>
+
+        <hr />
+
+        <form class="auth-gate-form" id="playerLoginForm">
+          <h2>Ich bin Spieler</h2>
+          <p class="muted">Gib den Einladungscode ein, den du vom Trainer bekommen hast.</p>
+          <label>Einladungscode <input id="playerLoginCode" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" required /></label>
+          <button class="ghost-button" type="submit">Anmelden</button>
+        </form>
+      </div>
+    </div>
+
     <div class="app-shell">
       <aside class="sidebar" aria-label="Hauptnavigation">
         <div class="brand">
@@ -62,6 +99,8 @@
               <div class="action-menu-list">
                 <button class="ghost-button" id="exportBtn" type="button">Daten exportieren</button>
                 <button class="primary-button" id="addPlayerTop" type="button">Spieler anlegen</button>
+                <button class="ghost-button" id="migrateDataBtn" type="button" hidden>Alte Daten migrieren</button>
+                <button class="ghost-button" id="signOutBtn" type="button" hidden>Abmelden</button>
               </div>
             </details>
           </div>
