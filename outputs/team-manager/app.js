@@ -92,9 +92,6 @@ const sampleData = {
 };
 
 let state = loadState();
-let cloudStore = null;
-let cloudSaveTimer = null;
-let applyingRemoteSnapshot = false;
 let mobileAccordionsPrepared = false;
 const $ = (selector) => document.querySelector(selector);
 const standardPositions = ["TW", "IV", "LIB", "LV", "RV", "DM", "ZM", "OM", "LM", "RM", "LA", "RA", "HS", "ST"];
@@ -383,22 +380,48 @@ function scoreToGrade(record) {
 function persist() {
   state = normalizeState(state);
   localStorage.setItem(storageKey, JSON.stringify(state));
-  $("#storageState").textContent = `Gespeichert ${new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}`;
-  scheduleCloudSave();
+  if (legacyBlobMode) {
+    scheduleLegacyCloudSave();
+  } else if (!isCloudActive()) {
+    $("#storageState").textContent = `Gespeichert ${new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}`;
+  }
 }
 
-function scheduleCloudSave() {
-  if (!cloudStore || applyingRemoteSnapshot) return;
-  clearTimeout(cloudSaveTimer);
-  cloudSaveTimer = setTimeout(async () => {
-    try {
-      await cloudStore.save(state);
-      $("#storageState").textContent = `Cloud synchronisiert ${new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}`;
-    } catch (error) {
-      $("#storageState").textContent = "Cloud-Sync fehlgeschlagen";
-      console.error(error);
-    }
-  }, 350);
+// ---------------------------------------------------------------------------
+// Cloud-Sync. Zwei Modi:
+// - Legacy-Blob (Standard, unveraendert seit je her): ein gemeinsames Dokument,
+//   kein Login. So verhaelt sich die App weiterhin, solange "enableRoles" in
+//   firebase-config.js nicht auf true steht.
+// - Rollen-Modus (config.enableRoles === true): echte Anmeldung, Trainer sieht
+//   alles, Spieler nur das eigene Profil. Datenmodell + Zugriffsregeln siehe
+//   firestore.rules im Repo-Root.
+// ---------------------------------------------------------------------------
+let currentUser = null;
+let currentRole = null; // "trainer" | "player" | null
+let currentPlayerId = null;
+let authModule = null;
+let authInstance = null;
+let firestoreDb = null;
+let currentTeamId = null;
+let cloudUnsubscribers = [];
+let legacyBlobMode = false;
+let legacyCloudSaveTimer = null;
+const cloudCache = { players: [], events: [], ratings: {}, developmentPlans: {}, opponents: [] };
+
+function isCloudActive() {
+  return Boolean(firestoreDb);
+}
+
+function isCloudTrainer() {
+  return isCloudActive() && currentRole === "trainer";
+}
+
+function teamDoc(...segments) {
+  return firestoreModule.doc(firestoreDb, "teams", currentTeamId, ...segments);
+}
+
+function teamCollection(...segments) {
+  return firestoreModule.collection(firestoreDb, "teams", currentTeamId, ...segments);
 }
 
 async function initDataStore() {
@@ -407,56 +430,434 @@ async function initDataStore() {
     $("#storageState").textContent = "Lokal gespeichert";
     return;
   }
-
+  currentTeamId = config.teamId || "default-team";
   try {
-    cloudStore = await createFirebaseStore(config);
-    $("#storageState").textContent = "Cloud verbunden";
-    cloudStore.subscribe((remoteState) => {
-      applyingRemoteSnapshot = true;
-      state = normalizeState(remoteState);
-      localStorage.setItem(storageKey, JSON.stringify(state));
-      renderAll();
-      $("#storageState").textContent = "Cloud aktuell";
-      applyingRemoteSnapshot = false;
+    const appModule = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js");
+    firestoreModule = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js");
+    const app = appModule.initializeApp(config.firebase);
+    firestoreDb = firestoreModule.getFirestore(app);
+
+    if (!config.enableRoles) {
+      await initLegacyBlobSync();
+      return;
+    }
+
+    authModule = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js");
+    authInstance = authModule.getAuth(app);
+    authModule.onAuthStateChanged(authInstance, (user) => {
+      handleAuthStateChanged(user).catch((error) => console.error(error));
     });
-    await cloudStore.ensureSeeded(state);
   } catch (error) {
-    cloudStore = null;
+    firestoreDb = null;
     $("#storageState").textContent = "Cloud nicht erreichbar";
     console.error(error);
   }
 }
 
-async function createFirebaseStore(config) {
-  const teamId = config.teamId || "default-team";
-  const appModule = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js");
-  const firestoreModule = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js");
-  const app = appModule.initializeApp(config.firebase);
-  const db = firestoreModule.getFirestore(app);
-  const ref = firestoreModule.doc(db, "teams", teamId, "appState", "current");
-
-  return {
-    async ensureSeeded(initialState) {
-      const snapshot = await firestoreModule.getDoc(ref);
-      if (!snapshot.exists()) {
-        await firestoreModule.setDoc(ref, {
-          ...normalizeState(initialState),
-          updatedAt: firestoreModule.serverTimestamp()
-        });
-      }
-    },
-    async save(nextState) {
-      await firestoreModule.setDoc(ref, {
-        ...normalizeState(nextState),
-        updatedAt: firestoreModule.serverTimestamp()
-      });
-    },
-    subscribe(callback) {
-      return firestoreModule.onSnapshot(ref, (snapshot) => {
-        if (snapshot.exists()) callback(snapshot.data());
-      });
+// Unveraendertes Verhalten von frueher: ein Dokument, keine Rollen, kein Login.
+async function initLegacyBlobSync() {
+  legacyBlobMode = true;
+  const ref = teamDoc("appState", "current");
+  try {
+    const snapshot = await firestoreModule.getDoc(ref);
+    if (!snapshot.exists()) {
+      await firestoreModule.setDoc(ref, { ...normalizeState(state), updatedAt: firestoreModule.serverTimestamp() });
     }
-  };
+  } catch (error) {
+    console.error(error);
+  }
+  firestoreModule.onSnapshot(ref, (snapshot) => {
+    if (!snapshot.exists()) return;
+    state = normalizeState(snapshot.data());
+    localStorage.setItem(storageKey, JSON.stringify(state));
+    renderAll();
+    $("#storageState").textContent = "Cloud aktuell";
+  }, (error) => console.error(error));
+  $("#storageState").textContent = "Cloud verbunden";
+}
+
+function scheduleLegacyCloudSave() {
+  clearTimeout(legacyCloudSaveTimer);
+  legacyCloudSaveTimer = setTimeout(async () => {
+    try {
+      await firestoreModule.setDoc(teamDoc("appState", "current"), { ...state, updatedAt: firestoreModule.serverTimestamp() });
+      $("#storageState").textContent = `Cloud synchronisiert ${new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}`;
+    } catch (error) {
+      $("#storageState").textContent = "Cloud-Sync fehlgeschlagen";
+      console.error(error);
+    }
+  }, 350);
+}
+
+// ---- Rollen-Modus: Auth-Status, Ansicht je nach Rolle ----
+
+async function handleAuthStateChanged(user) {
+  currentUser = user;
+  stopCloudSync();
+  if (!user) {
+    currentRole = null;
+    currentPlayerId = null;
+    await showAuthGate();
+    return;
+  }
+  const memberSnap = await firestoreModule.getDoc(teamDoc("members", user.uid));
+  if (!memberSnap.exists()) {
+    await showAuthGate();
+    return;
+  }
+  const member = memberSnap.data();
+  currentRole = member.role;
+  currentPlayerId = member.playerId || null;
+  hideAuthGate();
+  applyRoleRestrictions();
+  startCloudSync();
+  $("#storageState").textContent = "Cloud verbunden";
+}
+
+function startCloudSync() {
+  cloudCache.players = [];
+  cloudCache.events = [];
+  cloudCache.ratings = {};
+  cloudCache.developmentPlans = {};
+  cloudCache.opponents = [];
+
+  // Event-Metadaten (Titel/Datum/Ergebnis, keine Noten) sind fuer alle Teammitglieder lesbar.
+  cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("events"), (snapshot) => {
+    cloudCache.events = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+    rebuildStateFromCloudCache();
+  }, (error) => console.error("events sync", error)));
+
+  if (currentRole === "trainer") {
+    cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("players"), (snapshot) => {
+      cloudCache.players = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+      rebuildStateFromCloudCache();
+    }, (error) => console.error("players sync", error)));
+
+    cloudUnsubscribers.push(firestoreModule.onSnapshot(
+      firestoreModule.collectionGroup(firestoreDb, "ratings"),
+      (snapshot) => {
+        cloudCache.ratings = groupRatingsByEvent(snapshot);
+        rebuildStateFromCloudCache();
+      },
+      (error) => console.error("ratings sync", error)
+    ));
+
+    cloudUnsubscribers.push(firestoreModule.onSnapshot(
+      firestoreModule.collectionGroup(firestoreDb, "developmentPlans"),
+      (snapshot) => {
+        cloudCache.developmentPlans = groupPlansByPlayer(snapshot);
+        rebuildStateFromCloudCache();
+      },
+      (error) => console.error("development plans sync", error)
+    ));
+
+    cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("opponents"), (snapshot) => {
+      cloudCache.opponents = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+      rebuildStateFromCloudCache();
+    }, (error) => console.error("opponents sync", error)));
+  } else if (currentRole === "player" && currentPlayerId) {
+    // Ein Spieler darf nie die ganze players-Collection auflisten (Firestore-Regeln
+    // erlauben Listenabfragen nur, wenn sie fuer JEDES moegliche Ergebnis gelten -
+    // deshalb gezielter Get auf das eigene Dokument statt einer Collection-Abfrage).
+    cloudUnsubscribers.push(firestoreModule.onSnapshot(teamDoc("players", currentPlayerId), (docSnap) => {
+      cloudCache.players = docSnap.exists() ? [{ id: docSnap.id, ...docSnap.data() }] : [];
+      rebuildStateFromCloudCache();
+    }, (error) => console.error("player sync", error)));
+
+    cloudUnsubscribers.push(firestoreModule.onSnapshot(
+      firestoreModule.query(firestoreModule.collectionGroup(firestoreDb, "ratings"), firestoreModule.where("playerId", "==", currentPlayerId)),
+      (snapshot) => {
+        cloudCache.ratings = groupRatingsByEvent(snapshot);
+        rebuildStateFromCloudCache();
+      },
+      (error) => console.error("ratings sync", error)
+    ));
+
+    cloudUnsubscribers.push(firestoreModule.onSnapshot(
+      firestoreModule.query(firestoreModule.collectionGroup(firestoreDb, "developmentPlans"), firestoreModule.where("playerId", "==", currentPlayerId)),
+      (snapshot) => {
+        cloudCache.developmentPlans = groupPlansByPlayer(snapshot);
+        rebuildStateFromCloudCache();
+      },
+      (error) => console.error("development plans sync", error)
+    ));
+  }
+}
+
+function groupRatingsByEvent(snapshot) {
+  const byEvent = {};
+  snapshot.forEach((docSnap) => {
+    const eventId = docSnap.ref.parent.parent?.id;
+    if (!eventId) return;
+    byEvent[eventId] ||= {};
+    byEvent[eventId][docSnap.id] = docSnap.data();
+  });
+  return byEvent;
+}
+
+function groupPlansByPlayer(snapshot) {
+  const byPlayer = {};
+  snapshot.forEach((docSnap) => {
+    const playerId = docSnap.ref.parent.parent?.id;
+    if (!playerId) return;
+    byPlayer[playerId] ||= [];
+    byPlayer[playerId].push({ id: docSnap.id, ...docSnap.data() });
+  });
+  return byPlayer;
+}
+
+function stopCloudSync() {
+  cloudUnsubscribers.forEach((unsubscribe) => unsubscribe());
+  cloudUnsubscribers = [];
+}
+
+function rebuildStateFromCloudCache() {
+  const events = cloudCache.events.map((event) => ({ ...event, ratings: cloudCache.ratings[event.id] || {} }));
+  state = normalizeState({
+    players: cloudCache.players,
+    events,
+    developmentPlans: cloudCache.developmentPlans,
+    opponents: cloudCache.opponents,
+    selectedEventId: state.selectedEventId
+  });
+  localStorage.setItem(storageKey, JSON.stringify(state));
+  renderAll();
+}
+
+// ---- Granulare Cloud-Schreibvorgaenge (greifen nur im Rollen-Modus als Trainer,
+// per Security Rules serverseitig erzwungen - in jedem anderen Modus ein No-Op) ----
+
+async function cloudSavePlayer(player) {
+  if (!isCloudTrainer()) return;
+  try { await firestoreModule.setDoc(teamDoc("players", player.id), player); } catch (error) { console.error(error); }
+}
+
+async function cloudDeletePlayer(playerId) {
+  if (!isCloudTrainer()) return;
+  try {
+    await firestoreModule.deleteDoc(teamDoc("players", playerId));
+    const plans = state.developmentPlans?.[playerId] || [];
+    await Promise.all(plans.map((plan) => firestoreModule.deleteDoc(teamDoc("players", playerId, "developmentPlans", plan.id))));
+    await Promise.all(state.events.map((event) => (
+      event.ratings?.[playerId] ? firestoreModule.deleteDoc(teamDoc("events", event.id, "ratings", playerId)) : Promise.resolve()
+    )));
+  } catch (error) { console.error(error); }
+}
+
+async function cloudSaveEvent(event) {
+  if (!isCloudTrainer()) return;
+  const { ratings, ...meta } = event;
+  try { await firestoreModule.setDoc(teamDoc("events", event.id), meta); } catch (error) { console.error(error); }
+}
+
+async function cloudDeleteEvent(event) {
+  if (!isCloudTrainer()) return;
+  try {
+    await firestoreModule.deleteDoc(teamDoc("events", event.id));
+    await Promise.all(Object.keys(event.ratings || {}).map((playerId) => firestoreModule.deleteDoc(teamDoc("events", event.id, "ratings", playerId))));
+  } catch (error) { console.error(error); }
+}
+
+async function cloudSaveRating(eventId, playerId, rating) {
+  if (!isCloudTrainer()) return;
+  try { await firestoreModule.setDoc(teamDoc("events", eventId, "ratings", playerId), { ...rating, playerId }); } catch (error) { console.error(error); }
+}
+
+async function cloudSaveDevelopmentPlan(playerId, plan) {
+  if (!isCloudTrainer()) return;
+  try { await firestoreModule.setDoc(teamDoc("players", playerId, "developmentPlans", plan.id), { ...plan, playerId }); } catch (error) { console.error(error); }
+}
+
+async function cloudDeleteDevelopmentPlan(playerId, planId) {
+  if (!isCloudTrainer()) return;
+  try { await firestoreModule.deleteDoc(teamDoc("players", playerId, "developmentPlans", planId)); } catch (error) { console.error(error); }
+}
+
+async function cloudSaveOpponent(opponent) {
+  if (!isCloudTrainer()) return;
+  try { await firestoreModule.setDoc(teamDoc("opponents", opponent.id), opponent); } catch (error) { console.error(error); }
+}
+
+async function cloudDeleteOpponent(opponentId) {
+  if (!isCloudTrainer()) return;
+  try { await firestoreModule.deleteDoc(teamDoc("opponents", opponentId)); } catch (error) { console.error(error); }
+}
+
+// ---- Auth-Gate (Login), Bootstrap, Einladungscodes ----
+
+async function showAuthGate() {
+  const gate = $("#authGate");
+  if (!gate) return;
+  gate.hidden = false;
+  document.body.classList.add("auth-locked");
+  let accessDoc = null;
+  try {
+    accessDoc = await firestoreModule.getDoc(teamDoc("meta", "access"));
+  } catch (error) {
+    console.error(error);
+  }
+  const trainerClaimed = Boolean(accessDoc?.exists());
+  $("#trainerSetupForm").hidden = trainerClaimed;
+  $("#trainerLoginForm").hidden = !trainerClaimed;
+  $("#authGateError").textContent = "";
+}
+
+function hideAuthGate() {
+  const gate = $("#authGate");
+  if (!gate) return;
+  gate.hidden = true;
+  document.body.classList.remove("auth-locked");
+}
+
+function applyRoleRestrictions() {
+  document.body.classList.toggle("role-player", currentRole === "player");
+  document.body.classList.toggle("role-trainer-cloud", isCloudTrainer());
+  $("#signOutBtn").hidden = !isCloudActive();
+  $("#migrateDataBtn").hidden = !isCloudTrainer();
+  if (currentRole === "player") {
+    $("#mobileViewSelect").innerHTML = '<option value="profiles">Profile</option>';
+    $("#profilePlayer").disabled = true;
+    setView("profiles");
+  } else {
+    $("#profilePlayer").disabled = false;
+  }
+}
+
+async function handleBootstrapTrainer(event) {
+  event.preventDefault();
+  const email = $("#trainerSetupEmail").value.trim();
+  const password = $("#trainerSetupPassword").value;
+  $("#authGateError").textContent = "";
+  try {
+    const credential = await authModule.createUserWithEmailAndPassword(authInstance, email, password);
+    const accessRef = teamDoc("meta", "access");
+    const memberRef = teamDoc("members", credential.user.uid);
+    await firestoreModule.runTransaction(firestoreDb, async (transaction) => {
+      const accessSnap = await transaction.get(accessRef);
+      if (accessSnap.exists()) {
+        throw new Error("trainer-already-claimed");
+      }
+      transaction.set(accessRef, { trainerClaimed: true, createdAt: firestoreModule.serverTimestamp() });
+      transaction.set(memberRef, { role: "trainer", createdAt: firestoreModule.serverTimestamp() });
+    });
+  } catch (error) {
+    if (error.message === "trainer-already-claimed") {
+      $("#authGateError").textContent = "Es gibt bereits ein Trainer-Konto. Bitte einloggen.";
+      await showAuthGate();
+    } else {
+      $("#authGateError").textContent = authErrorMessage(error);
+    }
+  }
+}
+
+async function handleTrainerLogin(event) {
+  event.preventDefault();
+  const email = $("#trainerLoginEmail").value.trim();
+  const password = $("#trainerLoginPassword").value;
+  $("#authGateError").textContent = "";
+  try {
+    await authModule.signInWithEmailAndPassword(authInstance, email, password);
+  } catch (error) {
+    $("#authGateError").textContent = authErrorMessage(error);
+  }
+}
+
+async function handlePlayerLogin(event) {
+  event.preventDefault();
+  const code = $("#playerLoginCode").value.trim();
+  $("#authGateError").textContent = "";
+  try {
+    const inviteRef = teamDoc("invites", code);
+    const inviteSnap = await firestoreModule.getDoc(inviteRef);
+    if (!inviteSnap.exists() || inviteSnap.data().used) {
+      $("#authGateError").textContent = "Dieser Code ist ungueltig oder wurde bereits verwendet.";
+      return;
+    }
+    const playerId = inviteSnap.data().playerId;
+    const credential = await authModule.signInAnonymously(authInstance);
+    const memberRef = teamDoc("members", credential.user.uid);
+    // Transaktion, damit "Code als benutzt markieren" und "Mitgliedschaft anlegen"
+    // atomar zusammen gelingen oder beide unterbleiben - kein verbrannter Code ohne
+    // zugehoerigen Zugang bei einem Netzwerkfehler zwischen den beiden Schreibvorgaengen.
+    await firestoreModule.runTransaction(firestoreDb, async (transaction) => {
+      const freshInvite = await transaction.get(inviteRef);
+      if (!freshInvite.exists() || freshInvite.data().used) {
+        throw new Error("invite-already-used");
+      }
+      transaction.update(inviteRef, { used: true, claimedBy: credential.user.uid, claimedAt: firestoreModule.serverTimestamp() });
+      transaction.set(memberRef, {
+        role: "player",
+        playerId,
+        claimedInviteCode: code,
+        createdAt: firestoreModule.serverTimestamp()
+      });
+    });
+  } catch (error) {
+    if (error.message === "invite-already-used") {
+      $("#authGateError").textContent = "Dieser Code wurde inzwischen bereits verwendet.";
+    } else {
+      $("#authGateError").textContent = authErrorMessage(error);
+    }
+  }
+}
+
+function authErrorMessage(error) {
+  const code = error?.code || "";
+  if (code.includes("email-already-in-use")) return "Diese E-Mail wird bereits verwendet.";
+  if (code.includes("wrong-password") || code.includes("invalid-credential")) return "E-Mail oder Passwort ist falsch.";
+  if (code.includes("user-not-found")) return "Kein Trainer-Konto mit dieser E-Mail gefunden.";
+  if (code.includes("weak-password")) return "Das Passwort muss mindestens 6 Zeichen haben.";
+  if (code.includes("operation-not-allowed")) return "Diese Anmeldemethode ist in der Firebase-Konsole noch nicht aktiviert.";
+  console.error(error);
+  return "Etwas ist schiefgelaufen. Bitte erneut versuchen.";
+}
+
+async function handleSignOut() {
+  if (!authInstance) return;
+  await authModule.signOut(authInstance);
+}
+
+async function createInviteCodeForPlayer(playerId) {
+  if (!isCloudTrainer()) return;
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  try {
+    await firestoreModule.setDoc(teamDoc("invites", code), {
+      playerId,
+      used: false,
+      createdAt: firestoreModule.serverTimestamp()
+    });
+    const player = state.players.find((item) => item.id === playerId);
+    alert(`Einladungscode fuer ${player?.name || "Spieler"}: ${code}\n\nGib diesen Code an den Spieler weiter - er gilt einmalig fuer die Anmeldung.`);
+  } catch (error) {
+    console.error(error);
+    alert("Einladungscode konnte nicht erstellt werden.");
+  }
+}
+
+async function migrateLegacyBlobToCollections() {
+  if (!isCloudTrainer()) return;
+  if (!confirm("Bestehende Cloud-Daten aus dem alten Format in die neue Struktur uebertragen?")) return;
+  try {
+    const legacySnap = await firestoreModule.getDoc(teamDoc("appState", "current"));
+    if (!legacySnap.exists()) {
+      alert("Keine alten Cloud-Daten gefunden.");
+      return;
+    }
+    const legacy = normalizeState(legacySnap.data());
+    await Promise.all(legacy.players.map((player) => cloudSavePlayer(player)));
+    await Promise.all(legacy.events.map(async (event) => {
+      await cloudSaveEvent(event);
+      await Promise.all(Object.entries(event.ratings || {}).map(([playerId, rating]) => cloudSaveRating(event.id, playerId, rating)));
+    }));
+    await Promise.all(Object.entries(legacy.developmentPlans || {}).flatMap(([playerId, plans]) =>
+      plans.map((plan) => cloudSaveDevelopmentPlan(playerId, plan))
+    ));
+    await Promise.all(legacy.opponents.map((opponent) => cloudSaveOpponent(opponent)));
+    alert("Migration abgeschlossen. Das alte Dokument bleibt vorerst unveraendert erhalten.");
+  } catch (error) {
+    console.error(error);
+    alert("Migration fehlgeschlagen: " + (error.message || error));
+  }
 }
 
 function setView(viewName) {
@@ -917,6 +1318,7 @@ function renderSquad() {
         <td class="row-actions" data-label="Aktionen">
           <button class="ghost-button" data-action="profile" data-id="${player.id}">Profil</button>
           <button class="ghost-button" data-action="edit" data-id="${player.id}">Bearbeiten</button>
+          <button class="ghost-button" data-action="invite" data-id="${player.id}">Einladen</button>
           <button class="ghost-button" data-action="delete" data-id="${player.id}">Löschen</button>
         </td>
       </tr>
@@ -1109,6 +1511,7 @@ function savePlayer(event) {
   else state.players.push(player);
   $("#playerDialog").close();
   persist();
+  cloudSavePlayer(player);
   renderAll();
 }
 
@@ -1161,6 +1564,7 @@ function saveEvent(event) {
   state.selectedEventId = newEvent.id;
   $("#eventDialog").close();
   persist();
+  cloudSaveEvent(newEvent);
   renderAll();
   setView("events");
 }
@@ -1187,6 +1591,7 @@ function updateRating(playerId, field, value, rerender = true) {
     event.ratings[playerId].grade = calculatedGrade(event.ratings[playerId]);
   }
   persist();
+  cloudSaveRating(event.id, playerId, event.ratings[playerId]);
   if (rerender) renderEvents();
 }
 
@@ -1197,6 +1602,7 @@ function deleteSelectedEvent() {
   state.events = state.events.filter((item) => item.id !== event.id);
   state.selectedEventId = state.events[0]?.id || "";
   persist();
+  cloudDeleteEvent(event);
   renderEvents();
 }
 
@@ -1209,6 +1615,7 @@ function updateSelectedEventMeta(field, value) {
   else if (field === "matchDuration") event[field] = event.type === "Spiel" ? Math.max(1, numericValue || 90) : "";
   else event[field] = event.type === "Spiel" ? numericValue : "";
   persist();
+  cloudSaveEvent(event);
   renderEvents();
 }
 
@@ -1272,6 +1679,7 @@ function saveDevelopmentPlan(event) {
   else state.developmentPlans[playerId].push(plan);
   resetDevelopmentPlanForm();
   persist();
+  cloudSaveDevelopmentPlan(playerId, plan);
   drawProfile();
 }
 
@@ -1294,6 +1702,7 @@ function deleteDevelopmentPlan(planId) {
   state.developmentPlans ||= {};
   state.developmentPlans[playerId] = (state.developmentPlans?.[playerId] || []).filter((plan) => plan.id !== planId);
   persist();
+  cloudDeleteDevelopmentPlan(playerId, planId);
   drawProfile();
 }
 
@@ -1867,6 +2276,7 @@ function saveOpponent(event) {
   else state.opponents.push(opponent);
   resetOpponentForm();
   persist();
+  cloudSaveOpponent(opponent);
   renderOpponentAnalysis();
 }
 
@@ -1891,6 +2301,7 @@ function deleteOpponent(opponentId) {
   if (!confirm(`Gegnerprofil "${opponent?.name || ""}" wirklich löschen?`)) return;
   state.opponents = (state.opponents || []).filter((opponent) => opponent.id !== opponentId);
   persist();
+  cloudDeleteOpponent(opponentId);
   renderOpponentAnalysis();
 }
 
@@ -1996,8 +2407,10 @@ $("#playerTable").addEventListener("click", (event) => {
     drawProfile();
   }
   if (button.dataset.action === "edit") openPlayerDialog(player);
+  if (button.dataset.action === "invite" && player) createInviteCodeForPlayer(player.id);
   if (button.dataset.action === "delete" && player) {
     if (!confirm(`"${player.name}" wirklich löschen? Alle Bewertungen und der Förderplan dieses Spielers gehen verloren.`)) return;
+    cloudDeletePlayer(player.id);
     state.players = state.players.filter((item) => item.id !== player.id);
     state.events.forEach((item) => delete item.ratings?.[player.id]);
     delete state.developmentPlans?.[player.id];
@@ -2025,6 +2438,12 @@ $("#ratingTable").addEventListener("input", (event) => {
   if (!input) return;
   updateRating(input.dataset.playerId, input.dataset.field, input.value, false);
 });
+
+$("#trainerSetupForm").addEventListener("submit", handleBootstrapTrainer);
+$("#trainerLoginForm").addEventListener("submit", handleTrainerLogin);
+$("#playerLoginForm").addEventListener("submit", handlePlayerLogin);
+$("#signOutBtn").addEventListener("click", handleSignOut);
+$("#migrateDataBtn").addEventListener("click", migrateLegacyBlobToCollections);
 
 initTheme();
 prepareMobileAccordions();
