@@ -1991,3 +1991,38 @@ body.role-player #developmentPlanList .row-actions {
 body.role-trainer-cloud [data-action="invite"] {
   display: inline-flex;
 }
+
+/* Zugaenge-Panel nur fuer den Trainer im Rollen-Modus sichtbar */
+#accessManagerPanel {
+  display: none;
+}
+
+body.role-trainer-cloud #accessManagerPanel {
+  display: block;
+}
+
+.access-manager {
+  display: grid;
+  gap: 8px;
+}
+
+.access-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.access-row strong {
+  display: block;
+}
+
+.access-row span {
+  color: var(--muted);
+  font-size: 0.85rem;
+}

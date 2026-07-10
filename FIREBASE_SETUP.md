@@ -84,7 +84,10 @@ bleibt, aendert sich am heutigen Verhalten nichts.
    6-stelligen Einladungscode. Den Code vertraulich an den jeweiligen Spieler weitergeben
    (wie ein Einmal-Passwort). Der Spieler gibt ihn einmalig auf dem Login-Bildschirm ein
    und ist danach auf diesem Geraet dauerhaft angemeldet - beschraenkt auf sein eigenes
-   Spielerprofil.
+   Spielerprofil. Beim Erzeugen des Codes laesst sich der Zugang optional befristen
+   (z.B. 30 Tage ab der Anmeldung); danach verliert der Zugriff automatisch die
+   Berechtigung. In der Kader-Ansicht unter "Spieler-Zugaenge verwalten" siehst du alle
+   vergebenen Zugaenge mit Ablaufdatum und kannst sie jederzeit vorzeitig sperren.
 
 **Datenmodell im Rollen-Modus:**
 

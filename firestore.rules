@@ -23,8 +23,15 @@ service cloud.firestore {
         return get(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid));
       }
 
+      // Spieler-Zugaenge koennen ein Ablaufdatum ("expiresAt", Timestamp) haben - fehlt
+      // das Feld oder ist es null, ist der Zugang unbefristet. Trainer haben nie ein
+      // Ablaufdatum.
+      function isExpired() {
+        return memberDoc().data.expiresAt != null && memberDoc().data.expiresAt < request.time;
+      }
+
       function isTeamMember() {
-        return isSignedIn() && memberExists();
+        return isSignedIn() && memberExists() && !isExpired();
       }
 
       function isTrainer() {
@@ -43,18 +50,26 @@ service cloud.firestore {
       }
 
       match /members/{uid} {
-        allow read: if isSignedIn() && request.auth.uid == uid;
+        // Trainer duerfen die ganze Liste sehen (Zugaenge verwalten); diese Regel
+        // haengt nicht von resource-Daten ab und ist daher fuer Listenabfragen sicher.
+        allow read: if isTrainer() || (isSignedIn() && request.auth.uid == uid);
         allow create: if isSignedIn() && request.auth.uid == uid && (
           // Erster Trainer: nur solange noch kein Trainer existiert (siehe meta/access).
           (request.resource.data.role == "trainer" && !exists(/databases/$(database)/documents/teams/$(teamId)/meta/access)) ||
           // Spieler: nur ueber einen zuvor selbst eingeloesten (als benutzt markierten) Einladungscode.
+          // "expiresAt" wird 1:1 vom Einladungscode uebernommen (Ablaufdatum steht
+          // schon beim Erzeugen des Codes fest, nicht erst bei der Einloesung).
           (request.resource.data.role == "player"
             && request.resource.data.playerId is string
             && request.resource.data.claimedInviteCode is string
             && get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.playerId == request.resource.data.playerId
-            && get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.used == true)
+            && get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.used == true
+            && request.resource.data.expiresAt == get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.expiresAt)
         );
-        allow update, delete: if false;
+        // Kein Update: eine bestehende Mitgliedschaft wird nicht bearbeitet, sondern
+        // vom Trainer geloescht (Zugang sperren) und bei Bedarf neu eingeladen.
+        allow update: if false;
+        allow delete: if isTrainer();
       }
 
       match /invites/{code} {
@@ -66,7 +81,8 @@ service cloud.firestore {
         allow update: if isSignedIn()
           && resource.data.used == false
           && request.resource.data.used == true
-          && request.resource.data.playerId == resource.data.playerId;
+          && request.resource.data.playerId == resource.data.playerId
+          && request.resource.data.expiresAt == resource.data.expiresAt;
         allow delete: if isTrainer();
       }
 

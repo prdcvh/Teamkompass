@@ -720,6 +720,7 @@ function applyRoleRestrictions() {
     setView("profiles");
   } else {
     $("#profilePlayer").disabled = false;
+    renderAccessManager();
   }
 }
 
@@ -789,6 +790,7 @@ async function handlePlayerLogin(event) {
         role: "player",
         playerId,
         claimedInviteCode: code,
+        expiresAt: freshInvite.data().expiresAt ?? null,
         createdAt: firestoreModule.serverTimestamp()
       });
     });
@@ -819,18 +821,69 @@ async function handleSignOut() {
 
 async function createInviteCodeForPlayer(playerId) {
   if (!isCloudTrainer()) return;
+  const daysInput = prompt("Zugang befristen? Anzahl Tage ab der Anmeldung eingeben, oder leer lassen fuer unbegrenzten Zugang:", "");
+  if (daysInput === null) return;
+  const days = Number(daysInput.trim());
+  const hasLimit = daysInput.trim() !== "" && Number.isFinite(days) && days > 0;
+  const expiresAt = hasLimit ? firestoreModule.Timestamp.fromDate(new Date(Date.now() + days * 24 * 60 * 60 * 1000)) : null;
   const code = String(Math.floor(100000 + Math.random() * 900000));
   try {
     await firestoreModule.setDoc(teamDoc("invites", code), {
       playerId,
       used: false,
+      expiresAt,
       createdAt: firestoreModule.serverTimestamp()
     });
     const player = state.players.find((item) => item.id === playerId);
-    alert(`Einladungscode fuer ${player?.name || "Spieler"}: ${code}\n\nGib diesen Code an den Spieler weiter - er gilt einmalig fuer die Anmeldung.`);
+    const validity = hasLimit ? `gueltig fuer ${days} Tage ab der Anmeldung` : "unbegrenzt gueltig";
+    alert(`Einladungscode fuer ${player?.name || "Spieler"}: ${code}\n\nGib diesen Code an den Spieler weiter - er gilt einmalig fuer die Anmeldung (${validity}).`);
+    renderAccessManager();
   } catch (error) {
     console.error(error);
     alert("Einladungscode konnte nicht erstellt werden.");
+  }
+}
+
+async function renderAccessManager() {
+  if (!isCloudTrainer()) return;
+  const list = $("#accessManagerList");
+  if (!list) return;
+  try {
+    const snapshot = await firestoreModule.getDocs(
+      firestoreModule.query(teamCollection("members"), firestoreModule.where("role", "==", "player"))
+    );
+    const now = new Date();
+    list.innerHTML = snapshot.docs.map((docSnap) => {
+      const data = docSnap.data();
+      const player = state.players.find((item) => item.id === data.playerId);
+      const expiresAtDate = data.expiresAt?.toDate ? data.expiresAt.toDate() : null;
+      let status = "Unbegrenzt gueltig";
+      if (expiresAtDate) {
+        status = expiresAtDate < now
+          ? `Abgelaufen seit ${formatDate(expiresAtDate.toISOString().slice(0, 10))}`
+          : `Gueltig bis ${formatDate(expiresAtDate.toISOString().slice(0, 10))}`;
+      }
+      return `
+        <div class="access-row">
+          <div><strong>${escapeHtml(player?.name || data.playerId)}</strong><span class="muted">${status}</span></div>
+          <button class="ghost-button" data-action="revoke-access" data-uid="${docSnap.id}" type="button">Zugang sperren</button>
+        </div>
+      `;
+    }).join("") || `<p class="muted">Noch keine Spieler-Zugaenge vergeben.</p>`;
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+async function revokeAccess(uid) {
+  if (!isCloudTrainer()) return;
+  if (!confirm("Zugang wirklich sperren? Der Spieler muesste sich danach mit einem neuen Code anmelden.")) return;
+  try {
+    await firestoreModule.deleteDoc(teamDoc("members", uid));
+    renderAccessManager();
+  } catch (error) {
+    console.error(error);
+    alert("Zugang konnte nicht gesperrt werden.");
   }
 }
 
@@ -866,7 +919,10 @@ function setView(viewName) {
   if ($("#mobileViewSelect")) $("#mobileViewSelect").value = viewName;
   $("#pageTitle").textContent = titles[viewName];
   if (viewName === "dashboard") { renderMetrics(); renderPitch(); renderLeaders(); }
-  if (viewName === "squad") renderSquad();
+  if (viewName === "squad") {
+    renderSquad();
+    if (isCloudTrainer()) renderAccessManager();
+  }
   if (viewName === "profiles") drawProfile();
   if (viewName === "opponents") renderOpponentAnalysis();
   if (viewName === "teamAnalysis") renderTeamAnalysis();
@@ -2444,6 +2500,11 @@ $("#trainerLoginForm").addEventListener("submit", handleTrainerLogin);
 $("#playerLoginForm").addEventListener("submit", handlePlayerLogin);
 $("#signOutBtn").addEventListener("click", handleSignOut);
 $("#migrateDataBtn").addEventListener("click", migrateLegacyBlobToCollections);
+$("#accessManagerList").addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-action='revoke-access']");
+  if (!button) return;
+  revokeAccess(button.dataset.uid);
+});
 
 initTheme();
 prepareMobileAccordions();
