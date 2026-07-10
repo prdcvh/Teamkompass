@@ -810,7 +810,11 @@ async function createInviteCodeForPlayer(playerId) {
     renderAccessManager();
   } catch (error) {
     console.error(error);
-    alert(`Einladungscode konnte nicht erstellt werden.${cloudErrorSuffix(error)}`);
+    if ((error.code || "").includes("permission-denied")) {
+      alert(`Einladungscode konnte nicht erstellt werden. (Code: permission-denied)\n\nDiagnose - teamId: "${currentTeamId}", eigene UID: "${currentUser?.uid}", erkannte Rolle: "${currentRole}".`);
+    } else {
+      alert(`Einladungscode konnte nicht erstellt werden.${cloudErrorSuffix(error)}`);
+    }
   }
 }
 
