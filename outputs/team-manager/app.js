@@ -728,6 +728,7 @@ async function handleBootstrapTrainer(event) {
   event.preventDefault();
   const email = $("#trainerSetupEmail").value.trim();
   const password = $("#trainerSetupPassword").value;
+  const setupCode = $("#trainerSetupCode").value.trim();
   $("#authGateError").textContent = "";
   try {
     const credential = await authModule.createUserWithEmailAndPassword(authInstance, email, password);
@@ -738,13 +739,15 @@ async function handleBootstrapTrainer(event) {
       if (accessSnap.exists()) {
         throw new Error("trainer-already-claimed");
       }
-      transaction.set(accessRef, { trainerClaimed: true, createdAt: firestoreModule.serverTimestamp() });
+      transaction.set(accessRef, { trainerClaimed: true, setupCode, createdAt: firestoreModule.serverTimestamp() });
       transaction.set(memberRef, { role: "trainer", createdAt: firestoreModule.serverTimestamp() });
     });
   } catch (error) {
     if (error.message === "trainer-already-claimed") {
       $("#authGateError").textContent = "Es gibt bereits ein Trainer-Konto. Bitte einloggen.";
       await showAuthGate();
+    } else if ((error.code || "").includes("permission-denied")) {
+      $("#authGateError").textContent = "Einrichtungs-Code ist falsch oder wurde noch nicht in der Firebase-Konsole angelegt.";
     } else {
       $("#authGateError").textContent = authErrorMessage(error);
     }
@@ -843,8 +846,13 @@ async function createInviteCodeForPlayer(playerId) {
     renderAccessManager();
   } catch (error) {
     console.error(error);
-    alert("Einladungscode konnte nicht erstellt werden.");
+    alert(`Einladungscode konnte nicht erstellt werden.${cloudErrorSuffix(error)}`);
   }
+}
+
+function cloudErrorSuffix(error) {
+  const code = error?.code || "";
+  return code ? ` (Code: ${code})` : "";
 }
 
 async function renderAccessManager() {
@@ -886,7 +894,7 @@ async function revokeAccess(uid) {
     renderAccessManager();
   } catch (error) {
     console.error(error);
-    alert("Zugang konnte nicht gesperrt werden.");
+    alert(`Zugang konnte nicht gesperrt werden.${cloudErrorSuffix(error)}`);
   }
 }
 
