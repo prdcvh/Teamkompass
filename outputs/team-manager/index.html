@@ -22,16 +22,7 @@
         </div>
         <p class="auth-gate-error" id="authGateError"></p>
 
-        <form class="auth-gate-form" id="trainerSetupForm">
-          <h2>Trainer-Zugang einrichten</h2>
-          <p class="muted">Noch kein Trainer-Konto vorhanden. Lege hier das erste (und einzige) Trainer-Konto an.</p>
-          <label>E-Mail <input id="trainerSetupEmail" type="email" required /></label>
-          <label>Passwort <input id="trainerSetupPassword" type="password" minlength="6" required /></label>
-          <label>Einrichtungs-Code <input id="trainerSetupCode" type="password" required /></label>
-          <button class="primary-button" type="submit">Trainer-Konto anlegen</button>
-        </form>
-
-        <form class="auth-gate-form" id="trainerLoginForm" hidden>
+        <form class="auth-gate-form" id="trainerLoginForm">
           <h2>Trainer-Login</h2>
           <label>E-Mail <input id="trainerLoginEmail" type="email" required /></label>
           <label>Passwort <input id="trainerLoginPassword" type="password" required /></label>

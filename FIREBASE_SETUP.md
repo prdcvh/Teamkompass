@@ -63,6 +63,10 @@ Die App unterstuetzt einen optionalen Rollen-Modus mit echtem Login. Datenmodell
 Zugriffsregeln liegen in `firestore.rules` im Repo-Root. Solange `enableRoles: false`
 bleibt, aendert sich am heutigen Verhalten nichts.
 
+Trainer-Konten entstehen **absichtlich nicht** ueber die App selbst (keine
+Selbstregistrierung), sondern ausschliesslich manuell in der Firebase-Konsole - so kann
+sich niemand, der die App-URL kennt, selbst zum Trainer machen.
+
 **Einmalige Einrichtung:**
 
 1. Firebase Console -> Authentication -> Sign-in-Methode: **E-Mail/Passwort** UND
@@ -71,22 +75,25 @@ bleibt, aendert sich am heutigen Verhalten nichts.
    - per Firebase-CLI: `firebase deploy --only firestore:rules`, oder
    - manuell: Inhalt von `firestore.rules` in Firebase Console -> Firestore Database
      -> Regeln einfuegen und veroeffentlichen.
-3. Einrichtungs-Code anlegen (verhindert, dass sich irgendjemand mit der App-URL als
-   erstes selbst zum Trainer macht, bevor du es tust): in Firebase Console -> Firestore
-   Database -> Daten -> Collection `teams/{teamId}/meta` -> Dokument mit der ID
-   `setupCode` anlegen, darin ein Feld `value` (Typ String) mit einem selbst gewaehlten
-   Geheimtext. Diesen Text brauchst du gleich beim Anlegen des Trainer-Kontos.
+3. Trainer-Konto manuell anlegen:
+   - Firebase Console -> Authentication -> Tab "Users" -> "Nutzer hinzufuegen" ->
+     E-Mail + Passwort eingeben. Firebase zeigt danach die generierte **Nutzer-ID (UID)**
+     an - die brauchst du im naechsten Schritt.
+   - Firebase Console -> Firestore Database -> Daten -> zur Collection
+     `teams/{teamId}/members` navigieren (bzw. neu anlegen) -> Dokument mit der
+     **Dokument-ID = die eben kopierte UID** anlegen, darin ein Feld `role` (Typ String,
+     Wert `trainer`) anlegen.
+   - Für weitere Trainer-Konten (z.B. Co-Trainer) diese beiden Schritte einfach
+     wiederholen.
 4. In `firebase-config.js` `enableRoles: true` setzen und deployen.
-5. Die App oeffnen - es erscheint ein Login-Bildschirm. Dort einmalig unter
-   "Trainer-Zugang einrichten" eine E-Mail-Adresse, ein Passwort und den in Schritt 3
-   angelegten Einrichtungs-Code eingeben (das ist danach der normale Trainer-Login,
-   auch von anderen Geraeten aus - der Einrichtungs-Code wird nur einmalig gebraucht).
+5. Die App oeffnen - es erscheint ein Login-Bildschirm mit dem Trainer-Login. Dort die
+   in Schritt 3 vergebene E-Mail/Passwort-Kombination eingeben.
 6. Falls schon Daten im alten Format existieren (`teams/{teamId}/appState/current`):
    im Menue "Aktionen" auf "Alte Daten migrieren" klicken. Das ueberfuehrt Kader,
    Events, Bewertungen, Foerderplaene und Gegneranalysen einmalig in die neue Struktur.
    Das alte Dokument bleibt danach unveraendert liegen (kann spaeter manuell geloescht
    werden).
-6. Fuer jeden Spieler in der Kader-Ansicht auf "Einladen" klicken - das erzeugt einen
+7. Fuer jeden Spieler in der Kader-Ansicht auf "Einladen" klicken - das erzeugt einen
    6-stelligen Einladungscode. Den Code vertraulich an den jeweiligen Spieler weitergeben
    (wie ein Einmal-Passwort). Der Spieler gibt ihn einmalig auf dem Login-Bildschirm ein
    und ist danach auf diesem Geraet dauerhaft angemeldet - beschraenkt auf sein eigenes
@@ -98,7 +105,6 @@ bleibt, aendert sich am heutigen Verhalten nichts.
 **Datenmodell im Rollen-Modus:**
 
 ```txt
-teams/{teamId}/meta/access                          # Bootstrap-Flag (erster Trainer)
 teams/{teamId}/members/{uid}                         # Rolle + ggf. playerId je Nutzer
 teams/{teamId}/invites/{code}                        # Einladungscodes fuer Spieler
 teams/{teamId}/players/{playerId}
@@ -108,6 +114,7 @@ teams/{teamId}/events/{eventId}/ratings/{playerId}   # individuelle Bewertung
 teams/{teamId}/opponents/{opponentId}
 ```
 
-**Grenzen dieser ersten Version:** aktuell ist nur ein Trainer-Konto vorgesehen (kein
-Co-Trainer-Flow); Spieler-Zugaenge sind an das jeweilige Geraet gebunden (anonyme
-Anmeldung, kein Passwort-Reset - bei Geraetewechsel muss neu eingeladen werden).
+**Grenzen dieser Version:** Trainer-Konten (auch weitere, z.B. Co-Trainer) muessen immer
+manuell in der Firebase-Konsole angelegt werden, es gibt keinen Einladungsweg dafuer;
+Spieler-Zugaenge sind an das jeweilige Geraet gebunden (anonyme Anmeldung, kein
+Passwort-Reset - bei Geraetewechsel muss neu eingeladen werden).

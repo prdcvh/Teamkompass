@@ -683,22 +683,16 @@ async function cloudDeleteOpponent(opponentId) {
   try { await firestoreModule.deleteDoc(teamDoc("opponents", opponentId)); } catch (error) { console.error(error); }
 }
 
-// ---- Auth-Gate (Login), Bootstrap, Einladungscodes ----
+// ---- Auth-Gate (Login), Einladungscodes ----
+// Trainer-Konten entstehen absichtlich NICHT ueber die App, sondern ausschliesslich
+// manuell in der Firebase-Konsole (siehe FIREBASE_SETUP.md) - hier gibt es deshalb
+// bewusst keine Selbstregistrierung, nur einen Login.
 
-async function showAuthGate() {
+function showAuthGate() {
   const gate = $("#authGate");
   if (!gate) return;
   gate.hidden = false;
   document.body.classList.add("auth-locked");
-  let accessDoc = null;
-  try {
-    accessDoc = await firestoreModule.getDoc(teamDoc("meta", "access"));
-  } catch (error) {
-    console.error(error);
-  }
-  const trainerClaimed = Boolean(accessDoc?.exists());
-  $("#trainerSetupForm").hidden = trainerClaimed;
-  $("#trainerLoginForm").hidden = !trainerClaimed;
   $("#authGateError").textContent = "";
 }
 
@@ -721,36 +715,6 @@ function applyRoleRestrictions() {
   } else {
     $("#profilePlayer").disabled = false;
     renderAccessManager();
-  }
-}
-
-async function handleBootstrapTrainer(event) {
-  event.preventDefault();
-  const email = $("#trainerSetupEmail").value.trim();
-  const password = $("#trainerSetupPassword").value;
-  const setupCode = $("#trainerSetupCode").value.trim();
-  $("#authGateError").textContent = "";
-  try {
-    const credential = await authModule.createUserWithEmailAndPassword(authInstance, email, password);
-    const accessRef = teamDoc("meta", "access");
-    const memberRef = teamDoc("members", credential.user.uid);
-    await firestoreModule.runTransaction(firestoreDb, async (transaction) => {
-      const accessSnap = await transaction.get(accessRef);
-      if (accessSnap.exists()) {
-        throw new Error("trainer-already-claimed");
-      }
-      transaction.set(accessRef, { trainerClaimed: true, setupCode, createdAt: firestoreModule.serverTimestamp() });
-      transaction.set(memberRef, { role: "trainer", createdAt: firestoreModule.serverTimestamp() });
-    });
-  } catch (error) {
-    if (error.message === "trainer-already-claimed") {
-      $("#authGateError").textContent = "Es gibt bereits ein Trainer-Konto. Bitte einloggen.";
-      await showAuthGate();
-    } else if ((error.code || "").includes("permission-denied")) {
-      $("#authGateError").textContent = "Einrichtungs-Code ist falsch oder wurde noch nicht in der Firebase-Konsole angelegt.";
-    } else {
-      $("#authGateError").textContent = authErrorMessage(error);
-    }
   }
 }
 
@@ -2506,7 +2470,6 @@ $("#ratingTable").addEventListener("input", (event) => {
   updateRating(input.dataset.playerId, input.dataset.field, input.value, false);
 });
 
-$("#trainerSetupForm").addEventListener("submit", handleBootstrapTrainer);
 $("#trainerLoginForm").addEventListener("submit", handleTrainerLogin);
 $("#playerLoginForm").addEventListener("submit", handlePlayerLogin);
 $("#signOutBtn").addEventListener("click", handleSignOut);
