@@ -70,7 +70,9 @@ service cloud.firestore {
 
       match /invites/{code} {
         allow read: if isTrainer();
-        allow create: if isTrainer();
+        // TEMPORAER zu Diagnosezwecken gelockert (war: "if isTrainer();"), vom Nutzer
+        // ausdruecklich bestaetigt - wird nach dem Test wieder zurueckgesetzt.
+        allow create: if isSignedIn();
         // Einloesen: jede angemeldete Person darf einen unbenutzten Code genau einmal
         // als "benutzt" markieren (die Code-Weitergabe an den richtigen Spieler ist
         // Sache des Trainers, wie bei einem Einmal-Passwort - Codes vertraulich behandeln).
