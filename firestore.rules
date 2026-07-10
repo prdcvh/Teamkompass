@@ -69,7 +69,13 @@ service cloud.firestore {
       }
 
       match /invites/{code} {
-        allow read: if isTrainer();
+        // Ein frisch (anonym) angemeldeter Spieler ist zu diesem Zeitpunkt noch kein
+        // Teammitglied - er muss den EINEN Code, den er kennt, trotzdem lesen duerfen,
+        // um sich ueberhaupt registrieren zu koennen. "get" (gezielter Abruf eines
+        // bekannten Codes) wird deshalb fuer jeden Angemeldeten erlaubt; "list" (alle
+        // Codes auflisten) bleibt bewusst auf Trainer beschraenkt.
+        allow get: if isTrainer() || isSignedIn();
+        allow list: if isTrainer();
         // Direkte, flache Pruefung statt isTrainer() - der Diagnose-Test hat gezeigt,
         // dass die verschachtelte isTrainer()-Funktionskette hier aus unklarem Grund
         // fehlschlaegt (isSignedIn() allein hat funktioniert). Diese Variante prueft
