@@ -1,0 +1,21 @@
+name: Deploy Firestore Rules on merge
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'firestore.rules'
+      - 'firebase.json'
+
+jobs:
+  deploy_rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Write service account key
+        run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_TEAMKOMPASS_B8AAC }}' > "$RUNNER_TEMP/firebase-sa.json"
+      - name: Deploy Firestore rules
+        run: npx firebase-tools deploy --only firestore:rules --project teamkompass-b8aac
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-sa.json
