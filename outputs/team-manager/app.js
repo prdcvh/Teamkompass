@@ -734,24 +734,40 @@ async function handlePlayerLogin(event) {
   event.preventDefault();
   const code = $("#playerLoginCode").value.trim();
   $("#authGateError").textContent = "";
+
+  let credential;
   try {
-    const inviteRef = teamDoc("invites", code);
     // Erst anmelden (anonym), dann den Code pruefen: solange niemand angemeldet ist,
     // duerfen Firestore-Regeln den Code gar nicht lesen lassen (siehe firestore.rules).
-    const credential = await authModule.signInAnonymously(authInstance);
-    const inviteSnap = await firestoreModule.getDoc(inviteRef);
+    credential = await authModule.signInAnonymously(authInstance);
+  } catch (error) {
+    $("#authGateError").textContent = authErrorMessage(error);
+    return;
+  }
+
+  let invite;
+  try {
+    const inviteSnap = await firestoreModule.getDoc(teamDoc("invites", code));
     if (!inviteSnap.exists()) {
       $("#authGateError").textContent = "Dieser Code ist ungueltig.";
       await authModule.signOut(authInstance);
       return;
     }
-    const invite = inviteSnap.data();
-    const expiresAtDate = invite.expiresAt?.toDate ? invite.expiresAt.toDate() : null;
-    if (expiresAtDate && expiresAtDate < new Date()) {
-      $("#authGateError").textContent = "Dieser Code ist abgelaufen.";
-      await authModule.signOut(authInstance);
-      return;
-    }
+    invite = inviteSnap.data();
+  } catch (error) {
+    $("#authGateError").textContent = `Code konnte nicht geprueft werden (Schritt 1: Code lesen).${cloudErrorSuffix(error)}`;
+    await authModule.signOut(authInstance);
+    return;
+  }
+
+  const expiresAtDate = invite.expiresAt?.toDate ? invite.expiresAt.toDate() : null;
+  if (expiresAtDate && expiresAtDate < new Date()) {
+    $("#authGateError").textContent = "Dieser Code ist abgelaufen.";
+    await authModule.signOut(authInstance);
+    return;
+  }
+
+  try {
     // Der Code ist absichtlich mehrfach/von jedem Geraet aus nutzbar (wie ein Passwort,
     // nicht wie ein Einmal-Link) - jedes Geraet bekommt seine eigene anonyme Identitaet
     // und damit ein eigenes members-Dokument, das der Trainer einzeln sperren kann.
@@ -763,7 +779,7 @@ async function handlePlayerLogin(event) {
       createdAt: firestoreModule.serverTimestamp()
     });
   } catch (error) {
-    $("#authGateError").textContent = authErrorMessage(error);
+    $("#authGateError").textContent = `Zugang konnte nicht angelegt werden (Schritt 2: Zugang anlegen).${cloudErrorSuffix(error)}`;
   }
 }
 
