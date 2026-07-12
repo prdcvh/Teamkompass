@@ -740,36 +740,30 @@ async function handlePlayerLogin(event) {
     // duerfen Firestore-Regeln den Code gar nicht lesen lassen (siehe firestore.rules).
     const credential = await authModule.signInAnonymously(authInstance);
     const inviteSnap = await firestoreModule.getDoc(inviteRef);
-    if (!inviteSnap.exists() || inviteSnap.data().used) {
-      $("#authGateError").textContent = "Dieser Code ist ungueltig oder wurde bereits verwendet.";
+    if (!inviteSnap.exists()) {
+      $("#authGateError").textContent = "Dieser Code ist ungueltig.";
       await authModule.signOut(authInstance);
       return;
     }
-    const playerId = inviteSnap.data().playerId;
-    const memberRef = teamDoc("members", credential.user.uid);
-    // Transaktion, damit "Code als benutzt markieren" und "Mitgliedschaft anlegen"
-    // atomar zusammen gelingen oder beide unterbleiben - kein verbrannter Code ohne
-    // zugehoerigen Zugang bei einem Netzwerkfehler zwischen den beiden Schreibvorgaengen.
-    await firestoreModule.runTransaction(firestoreDb, async (transaction) => {
-      const freshInvite = await transaction.get(inviteRef);
-      if (!freshInvite.exists() || freshInvite.data().used) {
-        throw new Error("invite-already-used");
-      }
-      transaction.update(inviteRef, { used: true, claimedBy: credential.user.uid, claimedAt: firestoreModule.serverTimestamp() });
-      transaction.set(memberRef, {
-        role: "player",
-        playerId,
-        claimedInviteCode: code,
-        expiresAt: freshInvite.data().expiresAt ?? null,
-        createdAt: firestoreModule.serverTimestamp()
-      });
+    const invite = inviteSnap.data();
+    const expiresAtDate = invite.expiresAt?.toDate ? invite.expiresAt.toDate() : null;
+    if (expiresAtDate && expiresAtDate < new Date()) {
+      $("#authGateError").textContent = "Dieser Code ist abgelaufen.";
+      await authModule.signOut(authInstance);
+      return;
+    }
+    // Der Code ist absichtlich mehrfach/von jedem Geraet aus nutzbar (wie ein Passwort,
+    // nicht wie ein Einmal-Link) - jedes Geraet bekommt seine eigene anonyme Identitaet
+    // und damit ein eigenes members-Dokument, das der Trainer einzeln sperren kann.
+    await firestoreModule.setDoc(teamDoc("members", credential.user.uid), {
+      role: "player",
+      playerId: invite.playerId,
+      claimedInviteCode: code,
+      expiresAt: invite.expiresAt ?? null,
+      createdAt: firestoreModule.serverTimestamp()
     });
   } catch (error) {
-    if (error.message === "invite-already-used") {
-      $("#authGateError").textContent = "Dieser Code wurde inzwischen bereits verwendet.";
-    } else {
-      $("#authGateError").textContent = authErrorMessage(error);
-    }
+    $("#authGateError").textContent = authErrorMessage(error);
   }
 }
 
@@ -803,13 +797,12 @@ async function createInviteCodeForPlayer(playerId) {
   try {
     await firestoreModule.setDoc(teamDoc("invites", code), {
       playerId,
-      used: false,
       expiresAt,
       createdAt: firestoreModule.serverTimestamp()
     });
     const player = state.players.find((item) => item.id === playerId);
-    const validity = hasLimit ? `gueltig fuer ${days} Tage ab der Anmeldung` : "unbegrenzt gueltig";
-    alert(`Einladungscode fuer ${player?.name || "Spieler"}: ${code}\n\nGib diesen Code an den Spieler weiter - er gilt einmalig fuer die Anmeldung (${validity}).`);
+    const validity = hasLimit ? `gueltig fuer ${days} Tage ab jetzt` : "unbegrenzt gueltig";
+    alert(`Einladungscode fuer ${player?.name || "Spieler"}: ${code}\n\nGib diesen Code an den Spieler weiter - er kann sich damit von jedem Geraet aus anmelden (${validity}). Behandle den Code wie ein Passwort.`);
     renderAccessManager();
   } catch (error) {
     console.error(error);
