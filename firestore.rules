@@ -24,10 +24,15 @@ service cloud.firestore {
       }
 
       // Spieler-Zugaenge koennen ein Ablaufdatum ("expiresAt", Timestamp) haben - fehlt
-      // das Feld oder ist es null, ist der Zugang unbefristet. Trainer haben nie ein
-      // Ablaufdatum.
+      // das Feld oder ist es null, ist der Zugang unbefristet. Trainer-Dokumente (manuell
+      // in der Firebase-Konsole angelegt, siehe FIREBASE_SETUP.md) haben das Feld ueberhaupt
+      // nicht gesetzt. Direkter Feldzugriff (".data.expiresAt") wuerde in diesem Fall die
+      // gesamte Regelauswertung mit einem Fehler abbrechen (Firestore behandelt den Zugriff
+      // auf ein nicht vorhandenes Map-Feld nicht als "null", sondern als Auswertungsfehler -
+      // das war vermutlich die Ursache des fruehren, nie ganz geklaerten isTrainer()-Bugs).
+      // ".get(feld, default)" ist der dafuer vorgesehene, sichere Zugriffsweg.
       function isExpired() {
-        return memberDoc().data.expiresAt != null && memberDoc().data.expiresAt < request.time;
+        return memberDoc().data.get('expiresAt', null) != null && memberDoc().data.get('expiresAt', null) < request.time;
       }
 
       function isTeamMember() {
