@@ -51,17 +51,22 @@ service cloud.firestore {
         // (Authentication: Nutzer anlegen: Firestore: passendes members/{uid}-Dokument
         // anlegen) - siehe FIREBASE_SETUP.md. Die Konsole ist von diesen Regeln ohnehin
         // nicht betroffen, es braucht dafuer also keine eigene "allow create"-Regel.
-        // Ueber die App selbst kann sich ausschliesslich ein Spieler ueber einen zuvor
-        // eingeloesten (als benutzt markierten) Einladungscode eintragen.
+        // Ueber die App selbst kann sich ausschliesslich ein Spieler ueber einen gueltigen
+        // Einladungscode eintragen. Der Code ist bewusst mehrfach nutzbar (wie ein
+        // Passwort, kein Einmal-Link) - jedes Geraet, das den Code eingibt, bekommt eine
+        // eigene anonyme Identitaet und damit sein eigenes members-Dokument.
         allow create: if isSignedIn() && request.auth.uid == uid
           && request.resource.data.role == "player"
           && request.resource.data.playerId is string
           && request.resource.data.claimedInviteCode is string
           // "expiresAt" wird 1:1 vom Einladungscode uebernommen (Ablaufdatum steht
-          // schon beim Erzeugen des Codes fest, nicht erst bei der Einloesung).
+          // schon beim Erzeugen des Codes fest).
           && get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.playerId == request.resource.data.playerId
-          && get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.used == true
-          && request.resource.data.expiresAt == get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.expiresAt;
+          && request.resource.data.expiresAt == get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.expiresAt
+          && (
+            get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.expiresAt == null
+            || get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.expiresAt > request.time
+          );
         // Kein Update: eine bestehende Mitgliedschaft wird nicht bearbeitet, sondern
         // vom Trainer geloescht (Zugang sperren) und bei Bedarf neu eingeladen.
         allow update: if false;
@@ -83,14 +88,9 @@ service cloud.firestore {
         // die fuer ein Trainer-Konto (nie befristet) ohnehin nicht gebraucht werden.
         allow create: if isSignedIn()
           && get(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid)).data.role == "trainer";
-        // Einloesen: jede angemeldete Person darf einen unbenutzten Code genau einmal
-        // als "benutzt" markieren (die Code-Weitergabe an den richtigen Spieler ist
-        // Sache des Trainers, wie bei einem Einmal-Passwort - Codes vertraulich behandeln).
-        allow update: if isSignedIn()
-          && resource.data.used == false
-          && request.resource.data.used == true
-          && request.resource.data.playerId == resource.data.playerId
-          && request.resource.data.expiresAt == resource.data.expiresAt;
+        // Kein Update noetig - der Code wird beim Einloesen nicht veraendert (er bleibt
+        // fuer jedes weitere Geraet gueltig, bis er ablaeuft oder der Trainer ihn loescht).
+        allow update: if false;
         allow delete: if isTrainer();
       }
 

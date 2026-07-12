@@ -95,12 +95,15 @@ sich niemand, der die App-URL kennt, selbst zum Trainer machen.
    werden).
 7. Fuer jeden Spieler in der Kader-Ansicht auf "Einladen" klicken - das erzeugt einen
    6-stelligen Einladungscode. Den Code vertraulich an den jeweiligen Spieler weitergeben
-   (wie ein Einmal-Passwort). Der Spieler gibt ihn einmalig auf dem Login-Bildschirm ein
-   und ist danach auf diesem Geraet dauerhaft angemeldet - beschraenkt auf sein eigenes
-   Spielerprofil. Beim Erzeugen des Codes laesst sich der Zugang optional befristen
-   (z.B. 30 Tage ab der Anmeldung); danach verliert der Zugriff automatisch die
-   Berechtigung. In der Kader-Ansicht unter "Spieler-Zugaenge verwalten" siehst du alle
-   vergebenen Zugaenge mit Ablaufdatum und kannst sie jederzeit vorzeitig sperren.
+   (wie ein Passwort - nicht wie ein Einmal-Link). Der Spieler gibt ihn auf dem
+   Login-Bildschirm ein und ist danach auf diesem Geraet dauerhaft angemeldet -
+   beschraenkt auf sein eigenes Spielerprofil. Derselbe Code funktioniert auf beliebig
+   vielen Geraeten (z.B. Handy und Tablet) - jedes Geraet, auf dem der Code eingegeben
+   wird, erscheint als eigener Eintrag in "Spieler-Zugaenge verwalten" und kann dort
+   einzeln gesperrt werden. Beim Erzeugen des Codes laesst sich der Zugang optional
+   befristen (z.B. 30 Tage ab dem Erzeugen); das Ablaufdatum gilt fuer den Code selbst
+   und alle damit angemeldeten Geraete gemeinsam - nach Ablauf funktioniert weder eine
+   neue Anmeldung mit dem Code, noch bleibt ein bereits angemeldetes Geraet zugriffsberechtigt.
 
 **Datenmodell im Rollen-Modus:**
 
