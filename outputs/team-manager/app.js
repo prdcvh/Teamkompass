@@ -887,7 +887,17 @@ async function migrateLegacyBlobToCollections() {
       alert("Keine alten Cloud-Daten gefunden.");
       return;
     }
-    const legacy = normalizeState(legacySnap.data());
+    const raw = legacySnap.data();
+    // normalizeState() faellt auf die eingebauten Beispieldaten zurueck, wenn "players"
+    // fehlt oder kein Array ist (gedacht fuer den allerersten lokalen Start der App ohne
+    // jede Daten) - bei einer Migration waere das falsch: lieber abbrechen, als
+    // versehentlich Demo-Spieler statt des echten (aber leeren/fehlerhaften) alten
+    // Dokuments in die neue Struktur zu schreiben.
+    if (!Array.isArray(raw.players) || raw.players.length === 0) {
+      alert("Im alten Dokument wurden keine Spieler gefunden. Migration abgebrochen, es wurde nichts geschrieben.");
+      return;
+    }
+    const legacy = normalizeState(raw);
     await Promise.all(legacy.players.map((player) => cloudSavePlayer(player)));
     await Promise.all(legacy.events.map(async (event) => {
       await cloudSaveEvent(event);
