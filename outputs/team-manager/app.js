@@ -831,7 +831,13 @@ async function handlePlayerLogin(event) {
       createdAt: firestoreModule.serverTimestamp()
     });
   } catch (error) {
-    $("#authGateError").textContent = `Zugang konnte nicht angelegt werden (Schritt 2: Zugang anlegen).${cloudErrorSuffix(error)}`;
+    console.error(error);
+    if ((error.code || "").includes("permission-denied")) {
+      const expiresAtDebug = invite.expiresAt?.toDate ? invite.expiresAt.toDate().toISOString() : String(invite.expiresAt);
+      $("#authGateError").textContent = `Zugang konnte nicht angelegt werden (Schritt 2: Zugang anlegen). (Code: permission-denied)\n\nDiagnose - teamId: "${currentTeamId}", eigene UID: "${credential.user.uid}", Code: "${code}", invite.playerId: "${invite.playerId}" (Typ: ${typeof invite.playerId}), invite.expiresAt: "${expiresAtDebug}".`;
+    } else {
+      $("#authGateError").textContent = `Zugang konnte nicht angelegt werden (Schritt 2: Zugang anlegen).${cloudErrorSuffix(error)}`;
+    }
   }
 }
 
