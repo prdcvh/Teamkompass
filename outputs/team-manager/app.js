@@ -621,15 +621,31 @@ function rebuildStateFromCloudCache() {
     selectedEventId: state.selectedEventId
   });
   localStorage.setItem(storageKey, JSON.stringify(state));
+  // Sobald einmal echte Spieler in der neuen Struktur angekommen sind, macht die
+  // Migration aus dem alten Blob-Dokument keinen Sinn mehr - im Gegenteil, sie wuerde
+  // neuere Aenderungen wieder mit dem laengst veralteten alten Dokument ueberschreiben.
+  // Den Button dann ausblenden schuetzt vor einem versehentlichen erneuten Klick.
+  if (isCloudTrainer()) {
+    $("#migrateDataBtn").hidden = state.players.length > 0;
+  }
   renderAll();
 }
 
 // ---- Granulare Cloud-Schreibvorgaenge (greifen nur im Rollen-Modus als Trainer,
 // per Security Rules serverseitig erzwungen - in jedem anderen Modus ein No-Op) ----
 
+// Speichert/loescht diese Funktionen schlagen fehl, ohne dass die (schon lokal
+// angezeigte) Aenderung tatsaechlich in der Cloud angekommen ist - ohne die alert()s
+// hier wuerde das niemand bemerken, bis die Aenderung beim naechsten Laden des echten
+// Cloud-Stands kommentarlos wieder verschwindet.
 async function cloudSavePlayer(player) {
   if (!isCloudTrainer()) return;
-  try { await firestoreModule.setDoc(teamDoc("players", player.id), player); } catch (error) { console.error(error); }
+  try {
+    await firestoreModule.setDoc(teamDoc("players", player.id), player);
+  } catch (error) {
+    console.error(error);
+    alert(`Spieler konnte nicht in der Cloud gespeichert werden - die Aenderung geht sonst verloren.${cloudErrorSuffix(error)}`);
+  }
 }
 
 async function cloudDeletePlayer(playerId) {
@@ -641,13 +657,21 @@ async function cloudDeletePlayer(playerId) {
     await Promise.all(state.events.map((event) => (
       event.ratings?.[playerId] ? firestoreModule.deleteDoc(teamDoc("events", event.id, "ratings", playerId)) : Promise.resolve()
     )));
-  } catch (error) { console.error(error); }
+  } catch (error) {
+    console.error(error);
+    alert(`Spieler konnte nicht vollstaendig aus der Cloud geloescht werden.${cloudErrorSuffix(error)}`);
+  }
 }
 
 async function cloudSaveEvent(event) {
   if (!isCloudTrainer()) return;
   const { ratings, ...meta } = event;
-  try { await firestoreModule.setDoc(teamDoc("events", event.id), meta); } catch (error) { console.error(error); }
+  try {
+    await firestoreModule.setDoc(teamDoc("events", event.id), meta);
+  } catch (error) {
+    console.error(error);
+    alert(`Event konnte nicht in der Cloud gespeichert werden - die Aenderung geht sonst verloren.${cloudErrorSuffix(error)}`);
+  }
 }
 
 async function cloudDeleteEvent(event) {
@@ -655,32 +679,60 @@ async function cloudDeleteEvent(event) {
   try {
     await firestoreModule.deleteDoc(teamDoc("events", event.id));
     await Promise.all(Object.keys(event.ratings || {}).map((playerId) => firestoreModule.deleteDoc(teamDoc("events", event.id, "ratings", playerId))));
-  } catch (error) { console.error(error); }
+  } catch (error) {
+    console.error(error);
+    alert(`Event konnte nicht vollstaendig aus der Cloud geloescht werden.${cloudErrorSuffix(error)}`);
+  }
 }
 
 async function cloudSaveRating(eventId, playerId, rating) {
   if (!isCloudTrainer()) return;
-  try { await firestoreModule.setDoc(teamDoc("events", eventId, "ratings", playerId), { ...rating, playerId }); } catch (error) { console.error(error); }
+  try {
+    await firestoreModule.setDoc(teamDoc("events", eventId, "ratings", playerId), { ...rating, playerId });
+  } catch (error) {
+    console.error(error);
+    alert(`Bewertung konnte nicht in der Cloud gespeichert werden - die Aenderung geht sonst verloren.${cloudErrorSuffix(error)}`);
+  }
 }
 
 async function cloudSaveDevelopmentPlan(playerId, plan) {
   if (!isCloudTrainer()) return;
-  try { await firestoreModule.setDoc(teamDoc("players", playerId, "developmentPlans", plan.id), { ...plan, playerId }); } catch (error) { console.error(error); }
+  try {
+    await firestoreModule.setDoc(teamDoc("players", playerId, "developmentPlans", plan.id), { ...plan, playerId });
+  } catch (error) {
+    console.error(error);
+    alert(`Foerderplan konnte nicht in der Cloud gespeichert werden - die Aenderung geht sonst verloren.${cloudErrorSuffix(error)}`);
+  }
 }
 
 async function cloudDeleteDevelopmentPlan(playerId, planId) {
   if (!isCloudTrainer()) return;
-  try { await firestoreModule.deleteDoc(teamDoc("players", playerId, "developmentPlans", planId)); } catch (error) { console.error(error); }
+  try {
+    await firestoreModule.deleteDoc(teamDoc("players", playerId, "developmentPlans", planId));
+  } catch (error) {
+    console.error(error);
+    alert(`Foerderplan konnte nicht aus der Cloud geloescht werden.${cloudErrorSuffix(error)}`);
+  }
 }
 
 async function cloudSaveOpponent(opponent) {
   if (!isCloudTrainer()) return;
-  try { await firestoreModule.setDoc(teamDoc("opponents", opponent.id), opponent); } catch (error) { console.error(error); }
+  try {
+    await firestoreModule.setDoc(teamDoc("opponents", opponent.id), opponent);
+  } catch (error) {
+    console.error(error);
+    alert(`Gegner konnte nicht in der Cloud gespeichert werden - die Aenderung geht sonst verloren.${cloudErrorSuffix(error)}`);
+  }
 }
 
 async function cloudDeleteOpponent(opponentId) {
   if (!isCloudTrainer()) return;
-  try { await firestoreModule.deleteDoc(teamDoc("opponents", opponentId)); } catch (error) { console.error(error); }
+  try {
+    await firestoreModule.deleteDoc(teamDoc("opponents", opponentId));
+  } catch (error) {
+    console.error(error);
+    alert(`Gegner konnte nicht aus der Cloud geloescht werden.${cloudErrorSuffix(error)}`);
+  }
 }
 
 // ---- Auth-Gate (Login), Einladungscodes ----
@@ -880,7 +932,7 @@ async function revokeAccess(uid) {
 
 async function migrateLegacyBlobToCollections() {
   if (!isCloudTrainer()) return;
-  if (!confirm("Bestehende Cloud-Daten aus dem alten Format in die neue Struktur uebertragen?")) return;
+  if (!confirm("Bestehende Cloud-Daten aus dem alten Format in die neue Struktur uebertragen?\n\nAchtung: das ueberschreibt aktuelle Spieler/Events/etc. mit dem Stand des alten Dokuments. Nur einmalig direkt nach der Einrichtung verwenden.")) return;
   try {
     const legacySnap = await firestoreModule.getDoc(teamDoc("appState", "current"));
     if (!legacySnap.exists()) {
