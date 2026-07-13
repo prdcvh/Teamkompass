@@ -86,13 +86,12 @@ service cloud.firestore {
         // Codes auflisten) bleibt bewusst auf Trainer beschraenkt.
         allow get: if isTrainer() || isSignedIn();
         allow list: if isTrainer();
-        // Direkte, flache Pruefung statt isTrainer() - der Diagnose-Test hat gezeigt,
-        // dass die verschachtelte isTrainer()-Funktionskette hier aus unklarem Grund
-        // fehlschlaegt (isSignedIn() allein hat funktioniert). Diese Variante prueft
-        // die Rolle direkt und ohne die isExpired()/isTeamMember()-Zwischenschritte,
-        // die fuer ein Trainer-Konto (nie befristet) ohnehin nicht gebraucht werden.
-        allow create: if isSignedIn()
-          && get(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid)).data.role == "trainer";
+        // War zwischenzeitlich eine abgeflachte Sonderpruefung (isTrainer() schlug hier
+        // unerklaert fehl) - die Ursache ist inzwischen gefunden und behoben: isExpired()
+        // griff direkt auf ein bei Trainer-Konten fehlendes "expiresAt"-Feld zu, was die
+        // gesamte Regelauswertung mit einem Fehler abbrechen liess statt "false" zu liefern.
+        // Jetzt wieder die normale, konsistente Pruefung.
+        allow create: if isTrainer();
         // Kein Update noetig - der Code wird beim Einloesen nicht veraendert (er bleibt
         // fuer jedes weitere Geraet gueltig, bis er ablaeuft oder der Trainer ihn loescht).
         allow update: if false;
@@ -111,7 +110,11 @@ service cloud.firestore {
         allow write: if isTrainer();
 
         match /developmentPlans/{planId} {
-          allow read: if isTrainer() || (isTeamMember() && resource.data.playerId == memberDoc().data.playerId);
+          // ".get('playerId', null)" statt direktem Feldzugriff - gleiche Absicherung wie
+          // bei isExpired(): ein Trainer-Dokument hat kein "playerId"-Feld, direkter
+          // Zugriff wuerde die Regelauswertung in diesem (eigentlich schon durch
+          // isTrainer() abgedeckten) Fall unnoetig riskant machen.
+          allow read: if isTrainer() || (isTeamMember() && resource.data.playerId == memberDoc().data.get('playerId', null));
           allow write: if isTrainer();
         }
       }
@@ -121,7 +124,11 @@ service cloud.firestore {
         allow write: if isTrainer();
 
         match /ratings/{playerId} {
-          allow read: if isTrainer() || (isTeamMember() && resource.data.playerId == memberDoc().data.playerId);
+          // ".get('playerId', null)" statt direktem Feldzugriff - gleiche Absicherung wie
+          // bei isExpired(): ein Trainer-Dokument hat kein "playerId"-Feld, direkter
+          // Zugriff wuerde die Regelauswertung in diesem (eigentlich schon durch
+          // isTrainer() abgedeckten) Fall unnoetig riskant machen.
+          allow read: if isTrainer() || (isTeamMember() && resource.data.playerId == memberDoc().data.get('playerId', null));
           allow write: if isTrainer();
         }
       }
