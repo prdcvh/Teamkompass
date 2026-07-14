@@ -60,15 +60,12 @@ service cloud.firestore {
         // Einladungscode eintragen. Der Code ist bewusst mehrfach nutzbar (wie ein
         // Passwort, kein Einmal-Link) - jedes Geraet, das den Code eingibt, bekommt eine
         // eigene anonyme Identitaet und damit sein eigenes members-Dokument.
-        // TEMPORAERE DIAGNOSE-REGEL: der get()-Abgleich mit dem Einladungscode ist
-        // versuchsweise entfernt, um einzugrenzen, ob genau DAS die Ursache der
-        // wiederholten unerklaerten permission-denied-Fehler ist. Ohne den Code-Abgleich
-        // koennte sich aktuell jeder angemeldete Nutzer selbst einen Spieler-Zugang zu
-        // einer beliebigen playerId anlegen - nur fuer die Dauer dieses Tests!
-        allow create: if isSignedIn() && request.auth.uid == uid
-          && request.resource.data.role == "player"
-          && request.resource.data.playerId is string
-          && request.resource.data.claimedInviteCode is string;
+        // TEMPORAERE DIAGNOSE-REGEL (Stufe 2): selbst die minimale Pruefung (Rolle,
+        // Feldtypen, eigene UID) schlug identisch fehl - deshalb jetzt "if true" als
+        // Grundsatztest, ob ueberhaupt IRGENDEINE Schreibregel hier durchkommt. Waehrend
+        // dieses Tests kann JEDER angemeldete Nutzer ein beliebiges members-Dokument mit
+        // beliebigem Inhalt anlegen (z.B. sich selbst als Trainer eintragen)!
+        allow create: if true;
         // Kein Update: eine bestehende Mitgliedschaft wird nicht bearbeitet, sondern
         // vom Trainer geloescht (Zugang sperren) und bei Bedarf neu eingeladen.
         allow update: if false;
