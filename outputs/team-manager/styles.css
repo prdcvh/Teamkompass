@@ -710,6 +710,11 @@ menu {
   width: auto;
 }
 
+.past-events-toggle {
+  margin-top: 16px;
+  margin-bottom: 0;
+}
+
 .event-group-label {
   margin: 14px 2px 2px;
   color: var(--muted);
@@ -1416,10 +1421,33 @@ canvas {
   font-size: 1.1rem;
 }
 
+.opponent-details-toggle summary {
+  width: fit-content;
+  color: var(--red-dark);
+  font-weight: 800;
+  font-size: 0.86rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.opponent-details-toggle summary::-webkit-details-marker {
+  display: none;
+}
+
+.opponent-details-toggle summary::after {
+  margin-left: 6px;
+  content: "⌄";
+}
+
+.opponent-details-toggle[open] summary::after {
+  content: "⌃";
+}
+
 .opponent-detail-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+  margin-top: 10px;
 }
 
 .opponent-detail-grid section {

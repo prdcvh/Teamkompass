@@ -221,6 +221,12 @@
                 </select>
               </div>
               <div class="event-list" id="eventList"></div>
+              <details class="control-disclosure past-events-toggle" id="pastEventsToggle" hidden>
+                <summary id="pastEventsSummary">Vergangene Events</summary>
+                <div class="disclosure-body">
+                  <div class="event-list" id="pastEventsList"></div>
+                </div>
+              </details>
             </section>
             <section class="panel event-editor">
               <div class="panel-head">
@@ -408,6 +414,9 @@
               <div class="panel-head">
                 <h2>Gegnerprofile</h2>
                 <span class="muted" id="opponentCount">0 Gegner</span>
+              </div>
+              <div class="event-filter-bar">
+                <input type="search" id="opponentSearch" placeholder="Gegner suchen" aria-label="Gegner suchen" />
               </div>
               <div class="opponent-list" id="opponentList"></div>
             </section>
