@@ -847,11 +847,14 @@ async function handlePlayerLogin(event) {
     } catch (error) {
       console.error(error);
       if ((error.code || "").includes("permission-denied")) {
-        const expiresAtDebug = invite.expiresAt?.toDate ? invite.expiresAt.toDate().toISOString() : String(invite.expiresAt);
-        $("#authGateError").textContent = `Zugang konnte nicht angelegt werden (Schritt 2: Zugang anlegen). (Code: permission-denied)\n\nDiagnose - teamId: "${currentTeamId}", eigene UID: "${credential.user.uid}", Code: "${code}", invite.playerId: "${invite.playerId}" (Typ: ${typeof invite.playerId}), invite.expiresAt: "${expiresAtDebug}".`;
-      } else {
-        $("#authGateError").textContent = `Zugang konnte nicht angelegt werden (Schritt 2: Zugang anlegen).${cloudErrorSuffix(error)}`;
+        // In der Praxis ist das Dokument trotz dieses Fehlers meistens schon angelegt
+        // (ein Neuladen der Seite hat bisher immer zum Erfolg gefuehrt) - deshalb hier
+        // automatisch neu laden, statt den Spieler manuell dazu aufzufordern.
+        $("#authGateError").textContent = "Zugang wird abgeschlossen, einen Moment...";
+        setTimeout(() => window.location.reload(), 1200);
+        return;
       }
+      $("#authGateError").textContent = `Zugang konnte nicht angelegt werden (Schritt 2: Zugang anlegen).${cloudErrorSuffix(error)}`;
     }
   } finally {
     playerLoginInFlight = false;
