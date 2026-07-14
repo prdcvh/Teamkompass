@@ -60,12 +60,21 @@ service cloud.firestore {
         // Einladungscode eintragen. Der Code ist bewusst mehrfach nutzbar (wie ein
         // Passwort, kein Einmal-Link) - jedes Geraet, das den Code eingibt, bekommt eine
         // eigene anonyme Identitaet und damit sein eigenes members-Dokument.
-        // TEMPORAERE DIAGNOSE-REGEL (Stufe 2): selbst die minimale Pruefung (Rolle,
-        // Feldtypen, eigene UID) schlug identisch fehl - deshalb jetzt "if true" als
-        // Grundsatztest, ob ueberhaupt IRGENDEINE Schreibregel hier durchkommt. Waehrend
-        // dieses Tests kann JEDER angemeldete Nutzer ein beliebiges members-Dokument mit
-        // beliebigem Inhalt anlegen (z.B. sich selbst als Trainer eintragen)!
-        allow create: if true;
+        // Die Diagnose (auch "if true" scheiterte beim allerersten Versuch nach einem
+        // Deploy, klappte aber nach einem Neuladen) zeigt: es lag nie an der Regel-Logik,
+        // sondern an der kurzen Verzoegerung, bis ein frisch deployter Regelsatz global
+        // greift. Deshalb wieder die vollstaendige, sichere Pruefung inkl. Einladungscode-
+        // und Ablaufdatum-Abgleich.
+        allow create: if isSignedIn() && request.auth.uid == uid
+          && request.resource.data.role == "player"
+          && request.resource.data.playerId is string
+          && request.resource.data.claimedInviteCode is string
+          && get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.playerId == request.resource.data.playerId
+          && request.resource.data.expiresAt == get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.expiresAt
+          && (
+            get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.expiresAt == null
+            || get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.expiresAt > request.time
+          );
         // Kein Update: eine bestehende Mitgliedschaft wird nicht bearbeitet, sondern
         // vom Trainer geloescht (Zugang sperren) und bei Bedarf neu eingeladen.
         allow update: if false;
