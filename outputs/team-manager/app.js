@@ -806,6 +806,10 @@ async function handlePlayerLogin(event) {
       // Erst anmelden (anonym), dann den Code pruefen: solange niemand angemeldet ist,
       // duerfen Firestore-Regeln den Code gar nicht lesen lassen (siehe firestore.rules).
       credential = await authModule.signInAnonymously(authInstance);
+      // Erzwingt, dass ein frischer Auth-Token vorliegt, bevor irgendein Firestore-Aufruf
+      // folgt - direkt nach signInAnonymously() kann es sonst kurzzeitig zu
+      // permission-denied kommen, weil der neue Token noch nicht ueberall angekommen ist.
+      await credential.user.getIdToken(true);
     } catch (error) {
       $("#authGateError").textContent = authErrorMessage(error);
       return;
@@ -833,28 +837,40 @@ async function handlePlayerLogin(event) {
       return;
     }
 
+    const memberPayload = {
+      role: "player",
+      playerId: invite.playerId,
+      claimedInviteCode: code,
+      expiresAt: invite.expiresAt ?? null,
+      createdAt: firestoreModule.serverTimestamp()
+    };
+    const memberRef = teamDoc("members", credential.user.uid);
+    // Der Code ist absichtlich mehrfach/von jedem Geraet aus nutzbar (wie ein Passwort,
+    // nicht wie ein Einmal-Link) - jedes Geraet bekommt seine eigene anonyme Identitaet
+    // und damit ein eigenes members-Dokument, das der Trainer einzeln sperren kann.
     try {
-      // Der Code ist absichtlich mehrfach/von jedem Geraet aus nutzbar (wie ein Passwort,
-      // nicht wie ein Einmal-Link) - jedes Geraet bekommt seine eigene anonyme Identitaet
-      // und damit ein eigenes members-Dokument, das der Trainer einzeln sperren kann.
-      await firestoreModule.setDoc(teamDoc("members", credential.user.uid), {
-        role: "player",
-        playerId: invite.playerId,
-        claimedInviteCode: code,
-        expiresAt: invite.expiresAt ?? null,
-        createdAt: firestoreModule.serverTimestamp()
-      });
-    } catch (error) {
-      console.error(error);
-      if ((error.code || "").includes("permission-denied")) {
-        // In der Praxis ist das Dokument trotz dieses Fehlers meistens schon angelegt
-        // (ein Neuladen der Seite hat bisher immer zum Erfolg gefuehrt) - deshalb hier
-        // automatisch neu laden, statt den Spieler manuell dazu aufzufordern.
-        $("#authGateError").textContent = "Zugang wird abgeschlossen, einen Moment...";
-        setTimeout(() => window.location.reload(), 1200);
+      await firestoreModule.setDoc(memberRef, memberPayload);
+    } catch (firstError) {
+      if (!(firstError.code || "").includes("permission-denied")) {
+        console.error(firstError);
+        $("#authGateError").textContent = `Zugang konnte nicht angelegt werden (Schritt 2: Zugang anlegen).${cloudErrorSuffix(firstError)}`;
         return;
       }
-      $("#authGateError").textContent = `Zugang konnte nicht angelegt werden (Schritt 2: Zugang anlegen).${cloudErrorSuffix(error)}`;
+      // Direkt nach dem Login kommt es manchmal kurzzeitig zu permission-denied, weil der
+      // frische Auth-Token noch nicht ueberall angekommen ist - ein Wiederholungsversuch
+      // nach kurzer Wartezeit behebt das meistens von selbst.
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      try {
+        await firestoreModule.setDoc(memberRef, memberPayload);
+      } catch (secondError) {
+        console.error(secondError);
+        if ((secondError.code || "").includes("permission-denied")) {
+          $("#authGateError").textContent = "Zugang wird abgeschlossen, einen Moment...";
+          setTimeout(() => window.location.reload(), 1200);
+          return;
+        }
+        $("#authGateError").textContent = `Zugang konnte nicht angelegt werden (Schritt 2: Zugang anlegen).${cloudErrorSuffix(secondError)}`;
+      }
     }
   } finally {
     playerLoginInFlight = false;
