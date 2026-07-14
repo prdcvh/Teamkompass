@@ -402,6 +402,11 @@ let currentPlayerId = null;
 let authModule = null;
 let authInstance = null;
 let firestoreDb = null;
+// Schutz gegen doppeltes Absenden des Spieler-Login-Formulars (z.B. Doppel-Tap auf
+// mobilen Geraeten): ein zweiter, fast gleichzeitiger Schreibversuch auf denselben
+// members/{uid}-Pfad wuerde, nachdem der erste das Dokument schon angelegt hat, als
+// "update" statt "create" gewertet und faellt damit unter "allow update: if false".
+let playerLoginInFlight = false;
 let currentTeamId = null;
 let cloudUnsubscribers = [];
 let legacyBlobMode = false;
@@ -784,60 +789,73 @@ async function handleTrainerLogin(event) {
 
 async function handlePlayerLogin(event) {
   event.preventDefault();
-  const code = $("#playerLoginCode").value.trim();
-  $("#authGateError").textContent = "";
+  // Schutz gegen Doppel-Absenden (z.B. Doppel-Tap auf dem Handy): ein zweiter,
+  // fast gleichzeitiger Versuch wuerde sonst auf ein vom ersten Versuch bereits
+  // angelegtes Dokument treffen und als verbotenes "update" abgelehnt werden.
+  if (playerLoginInFlight) return;
+  playerLoginInFlight = true;
+  const submitButton = event.target.querySelector("button[type='submit']");
+  if (submitButton) submitButton.disabled = true;
 
-  let credential;
   try {
-    // Erst anmelden (anonym), dann den Code pruefen: solange niemand angemeldet ist,
-    // duerfen Firestore-Regeln den Code gar nicht lesen lassen (siehe firestore.rules).
-    credential = await authModule.signInAnonymously(authInstance);
-  } catch (error) {
-    $("#authGateError").textContent = authErrorMessage(error);
-    return;
-  }
+    const code = $("#playerLoginCode").value.trim();
+    $("#authGateError").textContent = "";
 
-  let invite;
-  try {
-    const inviteSnap = await firestoreModule.getDoc(teamDoc("invites", code));
-    if (!inviteSnap.exists()) {
-      $("#authGateError").textContent = "Dieser Code ist ungueltig.";
+    let credential;
+    try {
+      // Erst anmelden (anonym), dann den Code pruefen: solange niemand angemeldet ist,
+      // duerfen Firestore-Regeln den Code gar nicht lesen lassen (siehe firestore.rules).
+      credential = await authModule.signInAnonymously(authInstance);
+    } catch (error) {
+      $("#authGateError").textContent = authErrorMessage(error);
+      return;
+    }
+
+    let invite;
+    try {
+      const inviteSnap = await firestoreModule.getDoc(teamDoc("invites", code));
+      if (!inviteSnap.exists()) {
+        $("#authGateError").textContent = "Dieser Code ist ungueltig.";
+        await authModule.signOut(authInstance);
+        return;
+      }
+      invite = inviteSnap.data();
+    } catch (error) {
+      $("#authGateError").textContent = `Code konnte nicht geprueft werden (Schritt 1: Code lesen).${cloudErrorSuffix(error)}`;
       await authModule.signOut(authInstance);
       return;
     }
-    invite = inviteSnap.data();
-  } catch (error) {
-    $("#authGateError").textContent = `Code konnte nicht geprueft werden (Schritt 1: Code lesen).${cloudErrorSuffix(error)}`;
-    await authModule.signOut(authInstance);
-    return;
-  }
 
-  const expiresAtDate = invite.expiresAt?.toDate ? invite.expiresAt.toDate() : null;
-  if (expiresAtDate && expiresAtDate < new Date()) {
-    $("#authGateError").textContent = "Dieser Code ist abgelaufen.";
-    await authModule.signOut(authInstance);
-    return;
-  }
-
-  try {
-    // Der Code ist absichtlich mehrfach/von jedem Geraet aus nutzbar (wie ein Passwort,
-    // nicht wie ein Einmal-Link) - jedes Geraet bekommt seine eigene anonyme Identitaet
-    // und damit ein eigenes members-Dokument, das der Trainer einzeln sperren kann.
-    await firestoreModule.setDoc(teamDoc("members", credential.user.uid), {
-      role: "player",
-      playerId: invite.playerId,
-      claimedInviteCode: code,
-      expiresAt: invite.expiresAt ?? null,
-      createdAt: firestoreModule.serverTimestamp()
-    });
-  } catch (error) {
-    console.error(error);
-    if ((error.code || "").includes("permission-denied")) {
-      const expiresAtDebug = invite.expiresAt?.toDate ? invite.expiresAt.toDate().toISOString() : String(invite.expiresAt);
-      $("#authGateError").textContent = `Zugang konnte nicht angelegt werden (Schritt 2: Zugang anlegen). (Code: permission-denied)\n\nDiagnose - teamId: "${currentTeamId}", eigene UID: "${credential.user.uid}", Code: "${code}", invite.playerId: "${invite.playerId}" (Typ: ${typeof invite.playerId}), invite.expiresAt: "${expiresAtDebug}".`;
-    } else {
-      $("#authGateError").textContent = `Zugang konnte nicht angelegt werden (Schritt 2: Zugang anlegen).${cloudErrorSuffix(error)}`;
+    const expiresAtDate = invite.expiresAt?.toDate ? invite.expiresAt.toDate() : null;
+    if (expiresAtDate && expiresAtDate < new Date()) {
+      $("#authGateError").textContent = "Dieser Code ist abgelaufen.";
+      await authModule.signOut(authInstance);
+      return;
     }
+
+    try {
+      // Der Code ist absichtlich mehrfach/von jedem Geraet aus nutzbar (wie ein Passwort,
+      // nicht wie ein Einmal-Link) - jedes Geraet bekommt seine eigene anonyme Identitaet
+      // und damit ein eigenes members-Dokument, das der Trainer einzeln sperren kann.
+      await firestoreModule.setDoc(teamDoc("members", credential.user.uid), {
+        role: "player",
+        playerId: invite.playerId,
+        claimedInviteCode: code,
+        expiresAt: invite.expiresAt ?? null,
+        createdAt: firestoreModule.serverTimestamp()
+      });
+    } catch (error) {
+      console.error(error);
+      if ((error.code || "").includes("permission-denied")) {
+        const expiresAtDebug = invite.expiresAt?.toDate ? invite.expiresAt.toDate().toISOString() : String(invite.expiresAt);
+        $("#authGateError").textContent = `Zugang konnte nicht angelegt werden (Schritt 2: Zugang anlegen). (Code: permission-denied)\n\nDiagnose - teamId: "${currentTeamId}", eigene UID: "${credential.user.uid}", Code: "${code}", invite.playerId: "${invite.playerId}" (Typ: ${typeof invite.playerId}), invite.expiresAt: "${expiresAtDebug}".`;
+      } else {
+        $("#authGateError").textContent = `Zugang konnte nicht angelegt werden (Schritt 2: Zugang anlegen).${cloudErrorSuffix(error)}`;
+      }
+    }
+  } finally {
+    playerLoginInFlight = false;
+    if (submitButton) submitButton.disabled = false;
   }
 }
 
