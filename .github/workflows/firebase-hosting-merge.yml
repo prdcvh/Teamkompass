@@ -17,3 +17,11 @@ jobs:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TEAMKOMPASS_B8AAC }}
           channelId: live
           projectId: teamkompass-b8aac
+          target: main
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TEAMKOMPASS_B8AAC }}
+          channelId: live
+          projectId: teamkompass-b8aac
+          target: u17

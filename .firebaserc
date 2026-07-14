@@ -1,5 +1,17 @@
 {
   "projects": {
     "default": "teamkompass-b8aac"
+  },
+  "targets": {
+    "teamkompass-b8aac": {
+      "hosting": {
+        "main": [
+          "teamkompass-b8aac"
+        ],
+        "u17": [
+          "teamkompass-u17"
+        ]
+      }
+    }
   }
 }

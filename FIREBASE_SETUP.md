@@ -128,3 +128,44 @@ angemeldeten Trainer, der weitere Konten anlegen koennte); alle weiteren Trainer
 laufen ueber "Trainer-Konto anlegen" in der App. Spieler-Zugaenge sind an das jeweilige
 Geraet gebunden (anonyme Anmeldung, kein Passwort-Reset - bei Geraetewechsel muss neu
 eingeladen werden).
+
+## 6. Weitere Mannschaft einrichten (z.B. ein anderer Trainer mit eigenem Team)
+
+Das Datenmodell trennt Teams bereits vollstaendig ueber die `teamId`
+(`teams/{teamId}/...`, siehe `firestore.rules`) - zwei Teams mit unterschiedlicher
+`teamId` im selben Firebase-Projekt sehen sich gegenseitig nie, weder Kader noch
+Trainer-/Spieler-Zugaenge. Fuer eine zweite Mannschaft (hier: U17, `teamId: "U17"`)
+sind bereits vorbereitet:
+
+- `outputs/u17/` - eigene Kopie der App mit eigenem Branding und eigener `firebase-config.js`
+  (`teamId: "U17"`, `enableRoles: true`, gleiches Firebase-Projekt).
+- `firebase.json` / `.firebaserc` - Hosting-Targets `main` (bestehende Mannschaft) und `u17`
+  (neue Mannschaft), beide im selben Firebase-Projekt `teamkompass-b8aac`.
+- `.github/workflows/firebase-hosting-merge.yml` - deployt bei jedem Merge nach `main` beide
+  Hosting-Targets.
+
+**Noch noetig - einmalig, nur in der Firebase-Konsole (nicht per Code moeglich):**
+
+1. Firebase Console -> Hosting -> "Website hinzufuegen" -> Site-ID `teamkompass-u17` vergeben
+   (oder per Firebase-CLI, sofern lokal installiert und eingeloggt:
+   `firebase hosting:sites:create teamkompass-u17 --project teamkompass-b8aac`).
+   Ist die gewuenschte Site-ID bereits vergeben, eine andere waehlen und in `.firebaserc`
+   (Eintrag `targets.teamkompass-b8aac.hosting.u17`) sowie ggf. in dieser Anleitung anpassen.
+2. Passt die verwendete Site-ID nicht zu der in `.firebaserc` bereits eingetragenen
+   (`teamkompass-u17`), das Target lokal neu setzen: `firebase target:apply hosting u17 <site-id> --project teamkompass-b8aac`
+   (schreibt `.firebaserc`) und den geaenderten Stand committen.
+3. Firestore-Regeln sind bereits generisch fuer beliebige `teamId` gueltig - hier ist nichts
+   weiter zu tun.
+4. Erstes Trainer-Konto fuer `U17` anlegen (gleicher Bootstrap-Schritt wie in Abschnitt 5,
+   Schritt 3, nur mit `teamId: "U17"` statt der bisherigen `teamId`):
+   Firebase Console -> Authentication -> Nutzer hinzufuegen -> die generierte UID kopieren ->
+   Firestore -> Dokument `teams/U17/members/{UID}` mit Feld `role: "trainer"` anlegen.
+5. Diesen Branch nach `main` mergen - der Deploy-Workflow veroeffentlicht danach automatisch
+   beide Sites. Die neue Mannschaft ist danach unter `https://teamkompass-u17.web.app`
+   erreichbar (URL haengt von der tatsaechlich vergebenen Site-ID ab).
+6. Der U17-Trainer meldet sich mit dem in Schritt 4 angelegten Konto an und legt seine Spieler,
+   Einladungscodes und bei Bedarf weitere Trainer-Konten direkt in der App an - unabhaengig
+   vom bestehenden Team.
+
+Fuer ein drittes Team etc. dieselben Schritte mit einer weiteren `teamId`, einem weiteren
+Hosting-Target und einem weiteren `outputs/<team>`-Ordner wiederholen.
