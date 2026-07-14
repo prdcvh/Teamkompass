@@ -1,6 +1,6 @@
 window.TEAMKOMPASS_CONFIG = {
   storage: "firebase",
-  teamId: "u17-team",
+  teamId: "U17",
   // Rollen-Modus (Trainer-Login + Spieler-Einladungscodes, siehe firestore.rules)
   // ist hier von Anfang an aktiv, analog zur bestehenden U14-Instanz.
   enableRoles: true,

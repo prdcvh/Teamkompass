@@ -134,11 +134,11 @@ eingeladen werden).
 Das Datenmodell trennt Teams bereits vollstaendig ueber die `teamId`
 (`teams/{teamId}/...`, siehe `firestore.rules`) - zwei Teams mit unterschiedlicher
 `teamId` im selben Firebase-Projekt sehen sich gegenseitig nie, weder Kader noch
-Trainer-/Spieler-Zugaenge. Fuer eine zweite Mannschaft (hier: U17, `teamId: "u17-team"`)
+Trainer-/Spieler-Zugaenge. Fuer eine zweite Mannschaft (hier: U17, `teamId: "U17"`)
 sind bereits vorbereitet:
 
 - `outputs/u17/` - eigene Kopie der App mit eigenem Branding und eigener `firebase-config.js`
-  (`teamId: "u17-team"`, `enableRoles: true`, gleiches Firebase-Projekt).
+  (`teamId: "U17"`, `enableRoles: true`, gleiches Firebase-Projekt).
 - `firebase.json` / `.firebaserc` - Hosting-Targets `main` (bestehende Mannschaft) und `u17`
   (neue Mannschaft), beide im selben Firebase-Projekt `teamkompass-b8aac`.
 - `.github/workflows/firebase-hosting-merge.yml` - deployt bei jedem Merge nach `main` beide
@@ -156,10 +156,10 @@ sind bereits vorbereitet:
    (schreibt `.firebaserc`) und den geaenderten Stand committen.
 3. Firestore-Regeln sind bereits generisch fuer beliebige `teamId` gueltig - hier ist nichts
    weiter zu tun.
-4. Erstes Trainer-Konto fuer `u17-team` anlegen (gleicher Bootstrap-Schritt wie in Abschnitt 5,
-   Schritt 3, nur mit `teamId: "u17-team"` statt der bisherigen `teamId`):
+4. Erstes Trainer-Konto fuer `U17` anlegen (gleicher Bootstrap-Schritt wie in Abschnitt 5,
+   Schritt 3, nur mit `teamId: "U17"` statt der bisherigen `teamId`):
    Firebase Console -> Authentication -> Nutzer hinzufuegen -> die generierte UID kopieren ->
-   Firestore -> Dokument `teams/u17-team/members/{UID}` mit Feld `role: "trainer"` anlegen.
+   Firestore -> Dokument `teams/U17/members/{UID}` mit Feld `role: "trainer"` anlegen.
 5. Diesen Branch nach `main` mergen - der Deploy-Workflow veroeffentlicht danach automatisch
    beide Sites. Die neue Mannschaft ist danach unter `https://teamkompass-u17.web.app`
    erreichbar (URL haengt von der tatsaechlich vergebenen Site-ID ab).
