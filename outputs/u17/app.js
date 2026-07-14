@@ -1538,7 +1538,7 @@ function renderSquad() {
           <button class="ghost-button" data-action="profile" data-id="${player.id}">Profil</button>
           <button class="ghost-button" data-action="edit" data-id="${player.id}">Bearbeiten</button>
           <button class="ghost-button" data-action="invite" data-id="${player.id}">Einladen</button>
-          <button class="ghost-button" data-action="delete" data-id="${player.id}">Löschen</button>
+          <button class="ghost-button danger" data-action="delete" data-id="${player.id}" type="button">Löschen</button>
         </td>
       </tr>
     `;
@@ -1567,13 +1567,40 @@ function renderSelects() {
   if (selectedEvent()) $("#eventSelect").value = selectedEvent().id;
 }
 
+let eventFilter = { query: "", type: "all" };
+let ratingStepperIndex = 0;
+let lastRatingStepperKey = null;
+const ratingFieldLabels = { effort: "Einsatz", technique: "Technik", tactics: "Taktik", comprehension: "Auffassungsgabe" };
+
+function filteredEvents() {
+  const query = eventFilter.query.trim().toLowerCase();
+  return sortedEvents().filter((event) => {
+    const matchesType = eventFilter.type === "all" || event.type === eventFilter.type;
+    if (!matchesType) return false;
+    if (!query) return true;
+    const haystack = [event.title, event.opponent, event.location].filter(Boolean).join(" ").toLowerCase();
+    return haystack.includes(query);
+  });
+}
+
+function monthLabel(dateValue) {
+  if (!dateValue) return "Ohne Datum";
+  const label = new Date(`${dateValue}T00:00:00`).toLocaleDateString("de-DE", { month: "long", year: "numeric" });
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
 function renderEvents() {
-  const events = sortedEvents();
-  $("#eventList").innerHTML = events.map((event) => {
+  const events = filteredEvents();
+  let lastMonth = null;
+  const cards = events.map((event) => {
     const rated = Object.values(event.ratings || {}).filter((rating) => rating.grade && rating.attendance !== "absent").length;
     const active = event.id === selectedEvent()?.id ? "active" : "";
     const result = gameResult(event);
+    const month = monthLabel(event.date);
+    const groupHeader = month !== lastMonth ? `<div class="event-group-label">${month}</div>` : "";
+    lastMonth = month;
     return `
+      ${groupHeader}
       <button class="event-card ${active}" data-event-id="${event.id}">
         <span class="event-type">${event.type}</span>
         <strong>${event.title}</strong>
@@ -1582,8 +1609,19 @@ function renderEvents() {
         <span>${rated} Bewertungen</span>
       </button>
     `;
-  }).join("") || `<p class="muted">Noch keine Events angelegt.</p>`;
+  }).join("");
+  $("#eventList").innerHTML = cards || (state.events.length ? `<p class="muted">Keine Events gefunden.</p>` : `<p class="muted">Noch keine Events angelegt.</p>`);
   renderRatingTable();
+}
+
+function ratingPlayersForEvent(event) {
+  const filter = $("#ratingFilter").value;
+  return [...state.players].sort((a, b) => a.number - b.number).filter((player) => {
+    const attendance = event.ratings?.[player.id]?.attendance || "open";
+    if (filter === "present") return attendance === "present" || attendance === "limited";
+    if (filter === "missing") return attendance === "absent" || attendance === "open";
+    return true;
+  });
 }
 
 function renderRatingTable() {
@@ -1592,6 +1630,7 @@ function renderRatingTable() {
     $("#eventEditorTitle").textContent = "Event bewerten";
     $("#eventEditorMeta").textContent = "Lege zuerst ein Event an.";
     $("#ratingTable").innerHTML = "";
+    $("#ratingStepper").hidden = true;
     return;
   }
 
@@ -1614,13 +1653,13 @@ function renderRatingTable() {
   $("#selectedTrainingFocus").disabled = event.type !== "Training";
   $("#selectedTrainingFocus").closest("label").hidden = event.type !== "Training";
   renderRatingTableHead(event.type === "Spiel");
-  const filter = $("#ratingFilter").value;
-  const players = [...state.players].sort((a, b) => a.number - b.number).filter((player) => {
-    const attendance = event.ratings?.[player.id]?.attendance || "open";
-    if (filter === "present") return attendance === "present" || attendance === "limited";
-    if (filter === "missing") return attendance === "absent" || attendance === "open";
-    return true;
-  });
+  const players = ratingPlayersForEvent(event);
+
+  const stepperKey = `${event.id}:${$("#ratingFilter").value}`;
+  if (stepperKey !== lastRatingStepperKey) {
+    ratingStepperIndex = 0;
+    lastRatingStepperKey = stepperKey;
+  }
 
   $("#ratingTable").innerHTML = players.map((player) => {
     const rating = event.ratings?.[player.id] || {};
@@ -1633,22 +1672,19 @@ function renderRatingTable() {
     return `
       <tr class="attendance-row attendance-${attendance}">
         <td data-label="Spieler"><div class="player-cell"><span class="number-badge">${player.number}</span><strong>${player.name}</strong></div></td>
-        <td data-label="Anwesenheit">${selectHtml(player.id, "attendance", attendance, [
-          ["open", "Offen"],
-          ["present", "Anwesend"],
-          ["limited", "Teilweise"],
-          ["absent", "Fehlt"]
-        ])}</td>
+        <td data-label="Anwesenheit">${attendanceChipsHtml(player.id, attendance)}</td>
         <td data-label="Gesamtnote"><span class="computed-grade">${gradeLabel(calculatedGrade(rating))}</span></td>
-        <td data-label="Einsatz">${gradeSelectHtml(player.id, "effort", rating.effort)}</td>
-        <td data-label="Technik">${gradeSelectHtml(player.id, "technique", rating.technique)}</td>
-        <td data-label="Taktik">${gradeSelectHtml(player.id, "tactics", rating.tactics)}</td>
-        <td data-label="Auffassung">${gradeSelectHtml(player.id, "comprehension", rating.comprehension)}</td>
+        <td data-label="Einsatz">${gradeChipsHtml(player.id, "effort", rating.effort)}</td>
+        <td data-label="Technik">${gradeChipsHtml(player.id, "technique", rating.technique)}</td>
+        <td data-label="Taktik">${gradeChipsHtml(player.id, "tactics", rating.tactics)}</td>
+        <td data-label="Auffassung">${gradeChipsHtml(player.id, "comprehension", rating.comprehension)}</td>
         ${gameFields}
         <td data-label="Notiz"><input class="rating-note" data-player-id="${player.id}" data-field="note" value="${escapeHtml(rating.note || "")}" placeholder="Kurznotiz" /></td>
       </tr>
     `;
   }).join("");
+
+  renderRatingStepper(event, players, matchDuration);
 }
 
 function renderRatingTableHead(isGame) {
@@ -1665,13 +1701,77 @@ function renderRatingTableHead(isGame) {
   `;
 }
 
-function selectHtml(playerId, field, value, options) {
-  return `<select class="rating-input" data-player-id="${playerId}" data-field="${field}">${options.map(([optionValue, label]) => `<option value="${optionValue}" ${String(value) === optionValue ? "selected" : ""}>${label}</option>`).join("")}</select>`;
+function chipGroupHtml(playerId, field, value, options, extraClass = "") {
+  return `<div class="chip-group ${extraClass}" role="group">${options.map(([optionValue, label]) => `
+    <button type="button" class="chip-button ${String(value ?? "") === optionValue ? "active" : ""}" data-value="${optionValue}" data-player-id="${playerId}" data-field="${field}">${label}</button>
+  `).join("")}</div>`;
 }
 
-function gradeSelectHtml(playerId, field, value) {
-  const options = [["", "-"], [1, "1"], [2, "2"], [3, "3"], [4, "4"], [5, "5"], [6, "6"]];
-  return selectHtml(playerId, field, value || "", options.map(([optionValue, label]) => [String(optionValue), label]));
+function attendanceChipsHtml(playerId, value) {
+  return chipGroupHtml(playerId, "attendance", value, [
+    ["open", "Offen"],
+    ["present", "Anwesend"],
+    ["limited", "Teilweise"],
+    ["absent", "Fehlt"]
+  ], "attendance-chips");
+}
+
+function gradeChipsHtml(playerId, field, value) {
+  const options = [["", "–"], ["1", "1"], ["2", "2"], ["3", "3"], ["4", "4"], ["5", "5"], ["6", "6"]];
+  return chipGroupHtml(playerId, field, value ?? "", options, "grade-chips");
+}
+
+function renderRatingCard(player, event, matchDuration) {
+  const rating = event.ratings?.[player.id] || {};
+  const attendance = rating.attendance || "open";
+  const gameFields = event.type === "Spiel" ? `
+    <div class="rating-card-numbers">
+      <label>Minuten <input class="rating-input" data-player-id="${player.id}" data-field="minutes" type="number" min="0" max="${matchDuration || 90}" value="${rating.minutes ?? ""}" /></label>
+      <label>Tore <input class="rating-input" data-player-id="${player.id}" data-field="goals" type="number" min="0" max="20" value="${rating.goals ?? ""}" /></label>
+      <label>Vorlagen <input class="rating-input" data-player-id="${player.id}" data-field="assists" type="number" min="0" max="20" value="${rating.assists ?? ""}" /></label>
+    </div>
+  ` : "";
+  return `
+    <div class="rating-card-head">
+      <span class="number-badge">${player.number}</span>
+      <div>
+        <strong>${escapeHtml(player.name)}</strong>
+        <span class="computed-grade">Gesamtnote ${gradeLabel(calculatedGrade(rating))}</span>
+      </div>
+    </div>
+    <div class="rating-card-field">
+      <span class="rating-card-label">Anwesenheit</span>
+      ${attendanceChipsHtml(player.id, attendance)}
+    </div>
+    <div class="rating-card-grades">
+      ${["effort", "technique", "tactics", "comprehension"].map((field) => `
+        <div class="rating-card-field">
+          <span class="rating-card-label">${ratingFieldLabels[field]}</span>
+          ${gradeChipsHtml(player.id, field, rating[field])}
+        </div>
+      `).join("")}
+    </div>
+    ${gameFields}
+    <label class="rating-card-field">Notiz <input class="rating-note" data-player-id="${player.id}" data-field="note" value="${escapeHtml(rating.note || "")}" placeholder="Kurznotiz" /></label>
+  `;
+}
+
+function renderRatingStepper(event, players, matchDuration) {
+  const stepper = $("#ratingStepper");
+  if (!players.length) {
+    stepper.hidden = true;
+    return;
+  }
+  stepper.hidden = false;
+  ratingStepperIndex = Math.max(0, Math.min(ratingStepperIndex, players.length - 1));
+  const player = players[ratingStepperIndex];
+  const attendance = event.ratings?.[player.id]?.attendance || "open";
+  $("#stepperPosition").textContent = `${ratingStepperIndex + 1} / ${players.length}`;
+  $("#stepperJump").innerHTML = players.map((item, index) => `<option value="${index}" ${index === ratingStepperIndex ? "selected" : ""}>${item.number} · ${escapeHtml(item.name)}</option>`).join("");
+  $("#stepperPrevBtn").disabled = ratingStepperIndex === 0;
+  $("#stepperNextBtn").disabled = ratingStepperIndex === players.length - 1;
+  $("#stepperCard").className = `rating-stepper-card attendance-${attendance}`;
+  $("#stepperCard").innerHTML = renderRatingCard(player, event, matchDuration);
 }
 
 function escapeHtml(value) {
@@ -1862,7 +1962,7 @@ function renderDevelopmentPlans(playerId) {
       </div>
       <div class="row-actions">
         <button class="ghost-button" data-action="edit-plan" data-id="${plan.id}" type="button">Bearbeiten</button>
-        <button class="ghost-button" data-action="delete-plan" data-id="${plan.id}" type="button">Löschen</button>
+        <button class="ghost-button danger" data-action="delete-plan" data-id="${plan.id}" type="button">Löschen</button>
       </div>
     </article>
   `).join("") || `<p class="muted">Noch kein Förderplan für diesen Spieler angelegt.</p>`;
@@ -2441,7 +2541,7 @@ function renderOpponentAnalysis() {
         </div>
         <div class="row-actions">
           <button class="ghost-button" data-action="edit-opponent" data-id="${opponent.id}" type="button">Bearbeiten</button>
-          <button class="ghost-button" data-action="delete-opponent" data-id="${opponent.id}" type="button">Löschen</button>
+          <button class="ghost-button danger" data-action="delete-opponent" data-id="${opponent.id}" type="button">Löschen</button>
         </div>
       </div>
       <div class="opponent-detail-grid">
@@ -2656,6 +2756,56 @@ $("#ratingTable").addEventListener("input", (event) => {
   const input = event.target.closest(".rating-note");
   if (!input) return;
   updateRating(input.dataset.playerId, input.dataset.field, input.value, false);
+});
+
+$("#ratingTable").addEventListener("click", (event) => {
+  const chip = event.target.closest(".chip-button");
+  if (!chip) return;
+  updateRating(chip.dataset.playerId, chip.dataset.field, chip.dataset.value);
+});
+
+$("#ratingStepper").addEventListener("click", (event) => {
+  const chip = event.target.closest(".chip-button");
+  if (chip) {
+    updateRating(chip.dataset.playerId, chip.dataset.field, chip.dataset.value);
+  }
+});
+
+$("#ratingStepper").addEventListener("change", (event) => {
+  const input = event.target.closest(".rating-input");
+  if (!input) return;
+  updateRating(input.dataset.playerId, input.dataset.field, input.value);
+});
+
+$("#ratingStepper").addEventListener("input", (event) => {
+  const input = event.target.closest(".rating-note");
+  if (!input) return;
+  updateRating(input.dataset.playerId, input.dataset.field, input.value, false);
+});
+
+$("#eventSearch").addEventListener("input", (event) => {
+  eventFilter.query = event.target.value;
+  renderEvents();
+});
+
+$("#eventTypeFilter").addEventListener("change", (event) => {
+  eventFilter.type = event.target.value;
+  renderEvents();
+});
+
+$("#stepperPrevBtn").addEventListener("click", () => {
+  ratingStepperIndex = Math.max(0, ratingStepperIndex - 1);
+  renderRatingTable();
+});
+
+$("#stepperNextBtn").addEventListener("click", () => {
+  ratingStepperIndex += 1;
+  renderRatingTable();
+});
+
+$("#stepperJump").addEventListener("change", (event) => {
+  ratingStepperIndex = Number(event.target.value);
+  renderRatingTable();
 });
 
 $("#trainerLoginForm").addEventListener("submit", handleTrainerLogin);

@@ -211,6 +211,14 @@
                 <h2>Events</h2>
                 <button class="primary-button" id="newEventBtn">Event anlegen</button>
               </div>
+              <div class="event-filter-bar">
+                <input type="search" id="eventSearch" placeholder="Suche nach Titel oder Gegner" aria-label="Events durchsuchen" />
+                <select id="eventTypeFilter" aria-label="Nach Typ filtern">
+                  <option value="all">Alle Typen</option>
+                  <option value="Training">Training</option>
+                  <option value="Spiel">Spiel</option>
+                </select>
+              </div>
               <div class="event-list" id="eventList"></div>
             </section>
             <section class="panel event-editor">
@@ -219,7 +227,7 @@
                   <h2 id="eventEditorTitle">Event bewerten</h2>
                   <span class="muted" id="eventEditorMeta">Training oder Spiel auswählen</span>
                 </div>
-                <button class="ghost-button" id="deleteEventBtn">Event löschen</button>
+                <button class="ghost-button danger" id="deleteEventBtn" type="button">Event löschen</button>
               </div>
               <details class="control-disclosure event-controls" open>
                 <summary>Eventdetails und Filter</summary>
@@ -264,6 +272,17 @@
                   </thead>
                   <tbody id="ratingTable"></tbody>
                 </table>
+              </div>
+              <div class="rating-stepper" id="ratingStepper" hidden>
+                <div class="rating-stepper-nav">
+                  <button type="button" class="icon-button" id="stepperPrevBtn" aria-label="Vorheriger Spieler">‹</button>
+                  <div class="rating-stepper-position">
+                    <span id="stepperPosition">1 / 1</span>
+                    <select id="stepperJump" aria-label="Spieler auswählen"></select>
+                  </div>
+                  <button type="button" class="icon-button" id="stepperNextBtn" aria-label="Nächster Spieler">›</button>
+                </div>
+                <div class="rating-stepper-card" id="stepperCard"></div>
               </div>
             </section>
           </div>
