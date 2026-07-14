@@ -505,9 +505,36 @@ async function handleAuthStateChanged(user) {
     await showAuthGate();
     return;
   }
-  const memberSnap = await firestoreModule.getDoc(teamDoc("members", user.uid));
+  let memberSnap;
+  try {
+    memberSnap = await firestoreModule.getDoc(teamDoc("members", user.uid));
+  } catch (error) {
+    console.error(error);
+    await showAuthGate();
+    // Anonyme Spieler-Anmeldungen legen ihr eigenes members-Dokument erst kurz NACH
+    // diesem Aufruf an (siehe handlePlayerLogin) - ein voruebergehendes permission-denied
+    // hier ist fuer sie normal und wird dort separat behandelt, deshalb keine Fehlermeldung
+    // fuer anonyme Nutzer ueberschreiben.
+    if (!user.isAnonymous) {
+      $("#authGateError").textContent = `Zugang konnte nicht geprueft werden.${cloudErrorSuffix(error)} (Diagnose - teamId: "${currentTeamId}", UID: "${user.uid}")`;
+    }
+    return;
+  }
   if (!memberSnap.exists()) {
     await showAuthGate();
+    // Kein members/{uid}-Dokument gefunden. Fuer ein frisch (per E-Mail/Passwort)
+    // angemeldetes Trainer-Konto bedeutet das meist: beim manuellen Anlegen in der
+    // Firebase-Konsole (siehe FIREBASE_SETUP.md) fehlt das Dokument, hat die falsche
+    // Dokument-ID (muss exakt die UID sein) oder liegt unter einer anderen teamId.
+    // Ohne diese Meldung sah es bisher so aus, als wuerde "Anmelden" gar nichts tun -
+    // die Anmeldung selbst klappt naemlich, nur die Rollenpruefung schlaegt fehl.
+    // Anonyme Spieler-Anmeldungen legen ihr members-Dokument erst im Anschluss an
+    // diese Pruefung an (siehe handlePlayerLogin), sind an dieser Stelle also normal
+    // noch ohne Dokument - fuer sie deshalb keine Fehlermeldung.
+    if (!user.isAnonymous) {
+      $("#authGateError").textContent = `Kein Zugang fuer dieses Konto gefunden. Pruefe, ob unter teams/${currentTeamId}/members/${user.uid} ein Dokument mit Feld "role" existiert. (Diagnose - teamId: "${currentTeamId}", UID: "${user.uid}")`;
+      await authModule.signOut(authInstance);
+    }
     return;
   }
   const member = memberSnap.data();
