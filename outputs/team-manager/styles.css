@@ -115,6 +115,7 @@ summary:focus-visible {
   border: 3px solid rgba(255, 255, 255, 0.86);
   border-radius: 999px;
   background: #fff;
+  object-fit: contain;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
 }
 
