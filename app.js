@@ -1195,7 +1195,7 @@ function downloadProfilePdf() {
   const ratings = playerRatings(playerId).sort((a, b) => new Date(a.event.date) - new Date(b.event.date));
   const average = playerAverageGrade(playerId);
   const gameStats = playerGameStats(playerId);
-  const logoUrl = new URL("./assets/club-logo.svg", window.location.href).href;
+  const logoUrl = new URL("./assets/club-logo.png", window.location.href).href;
   const performanceGraph = profilePerformanceSvg(ratings);
   const skillRows = profileSkillAverages(ratings).map((item) => `
     <tr><td>${item.label}</td><td>${gradeLabel(item.value)}</td><td><div class="bar"><span style="width:${gradeToPercent(item.value)}%"></span></div></td></tr>
