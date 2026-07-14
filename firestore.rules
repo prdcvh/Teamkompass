@@ -60,18 +60,15 @@ service cloud.firestore {
         // Einladungscode eintragen. Der Code ist bewusst mehrfach nutzbar (wie ein
         // Passwort, kein Einmal-Link) - jedes Geraet, das den Code eingibt, bekommt eine
         // eigene anonyme Identitaet und damit sein eigenes members-Dokument.
-        // Prueft nur noch, ob die playerId zu einem vorhandenen Einladungscode passt -
-        // der zusaetzliche Abgleich "mitgeschicktes expiresAt == Code-expiresAt" ist
-        // trotz augenscheinlich korrekter Werte (gleicher Typ, gleicher Wert) wiederholt
-        // mit permission-denied fehlgeschlagen - dasselbe unerklaerte Muster wie beim
-        // frueheren isTrainer()-Bug bei invites/create. Das Ablaufdatum wird ohnehin bei
-        // JEDER spaeteren Nutzung ueber isExpired() (Feld im eigenen members-Dokument)
-        // durchgesetzt, unabhaengig davon, was hier beim Anlegen mitgeschickt wurde.
+        // TEMPORAERE DIAGNOSE-REGEL: der get()-Abgleich mit dem Einladungscode ist
+        // versuchsweise entfernt, um einzugrenzen, ob genau DAS die Ursache der
+        // wiederholten unerklaerten permission-denied-Fehler ist. Ohne den Code-Abgleich
+        // koennte sich aktuell jeder angemeldete Nutzer selbst einen Spieler-Zugang zu
+        // einer beliebigen playerId anlegen - nur fuer die Dauer dieses Tests!
         allow create: if isSignedIn() && request.auth.uid == uid
           && request.resource.data.role == "player"
           && request.resource.data.playerId is string
-          && request.resource.data.claimedInviteCode is string
-          && get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.playerId == request.resource.data.playerId;
+          && request.resource.data.claimedInviteCode is string;
         // Kein Update: eine bestehende Mitgliedschaft wird nicht bearbeitet, sondern
         // vom Trainer geloescht (Zugang sperren) und bei Bedarf neu eingeladen.
         allow update: if false;
