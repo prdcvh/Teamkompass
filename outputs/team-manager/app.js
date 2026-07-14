@@ -1341,7 +1341,7 @@ function renderPitch() {
     return `
       <div class="pitch-player" style="left:${slot.x}%;top:${slot.y}%">
         <em>${slot.label}</em>
-        <strong>${player.number} ${escapeHtml(player.name.split(" ").at(-1))}</strong>
+        <strong>${player.number} ${escapeHtml(player.name.split(" ")[0])}</strong>
         <span>${matchedPosition} · Note ${gradeLabel(grade)}</span>
       </div>
     `;
