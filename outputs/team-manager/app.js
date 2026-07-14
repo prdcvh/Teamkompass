@@ -792,6 +792,7 @@ function applyRoleRestrictions() {
   document.body.classList.toggle("role-trainer-cloud", isCloudTrainer());
   $("#signOutBtn").hidden = !isCloudActive();
   $("#migrateDataBtn").hidden = !isCloudTrainer();
+  $("#addTrainerBtn").hidden = !isCloudTrainer();
   if (currentRole === "player") {
     $("#mobileViewSelect").innerHTML = '<option value="profiles">Profile</option>';
     $("#profilePlayer").disabled = true;
@@ -922,6 +923,45 @@ function authErrorMessage(error) {
 async function handleSignOut() {
   if (!authInstance) return;
   await authModule.signOut(authInstance);
+}
+
+// Erspart das bisher fehleranfaellige manuelle Anlegen in der Firebase-Konsole
+// (Auth-User anlegen, UID kopieren, passendes members/{uid}-Dokument von Hand nachbauen -
+// jede Abweichung, z.B. ein vertipptes Zeichen in der UID, fuehrte bisher zu einem
+// stillen Fehlschlag beim Login). Legt beides in einem Zug an.
+async function createTrainerAccount() {
+  if (!isCloudTrainer()) return;
+  const email = prompt("E-Mail-Adresse fuer das neue Trainer-Konto:");
+  if (!email) return;
+  const trimmedEmail = email.trim();
+  const password = prompt("Passwort fuer das neue Trainer-Konto (mind. 6 Zeichen):");
+  if (!password) return;
+
+  const config = window.TEAMKOMPASS_CONFIG || {};
+  const appModule = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js");
+  // Eine zweite, temporaere Firebase-App-Instanz ist noetig: createUserWithEmailAndPassword()
+  // meldet auf der normalen Auth-Instanz sonst die eigene, gerade aktive Trainer-Sitzung ab
+  // und stattdessen als das neu angelegte Konto an. Mit einer eigenen Instanz bleibt die
+  // eigene Sitzung unberuehrt, waehrend das neue Konto trotzdem entsteht.
+  const secondaryApp = appModule.initializeApp(config.firebase, `trainer-create-${Date.now()}`);
+  try {
+    const secondaryAuth = authModule.getAuth(secondaryApp);
+    const credential = await authModule.createUserWithEmailAndPassword(secondaryAuth, trimmedEmail, password);
+    const newUid = credential.user.uid;
+    // Die eigentliche Trainer-Sitzung (authInstance/firestoreDb) ist von der zweiten
+    // App-Instanz unberuehrt, dieser Schreibvorgang laeuft also weiterhin unter der
+    // eigenen, bereits als Trainer erkannten Identitaet - siehe firestore.rules.
+    await firestoreModule.setDoc(teamDoc("members", newUid), {
+      role: "trainer",
+      createdAt: firestoreModule.serverTimestamp()
+    });
+    alert(`Trainer-Konto fuer ${trimmedEmail} wurde angelegt. Diese Person kann sich jetzt mit dieser E-Mail und dem eingegebenen Passwort im Trainer-Login anmelden.`);
+  } catch (error) {
+    console.error(error);
+    alert(`Trainer-Konto konnte nicht angelegt werden. ${authErrorMessage(error)}`);
+  } finally {
+    await appModule.deleteApp(secondaryApp).catch(() => {});
+  }
 }
 
 async function createInviteCodeForPlayer(playerId) {
@@ -2622,6 +2662,7 @@ $("#trainerLoginForm").addEventListener("submit", handleTrainerLogin);
 $("#playerLoginForm").addEventListener("submit", handlePlayerLogin);
 $("#signOutBtn").addEventListener("click", handleSignOut);
 $("#migrateDataBtn").addEventListener("click", migrateLegacyBlobToCollections);
+$("#addTrainerBtn").addEventListener("click", createTrainerAccount);
 $("#accessManagerList").addEventListener("click", (event) => {
   const button = event.target.closest("button[data-action='revoke-access']");
   if (!button) return;

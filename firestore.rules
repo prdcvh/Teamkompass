@@ -51,29 +51,37 @@ service cloud.firestore {
         // Trainer duerfen die ganze Liste sehen (Zugaenge verwalten); diese Regel
         // haengt nicht von resource-Daten ab und ist daher fuer Listenabfragen sicher.
         allow read: if isTrainer() || (isSignedIn() && request.auth.uid == uid);
-        // Trainer-Mitgliedschaften ("role": "trainer") werden absichtlich NICHT ueber
-        // die App erstellt, sondern ausschliesslich manuell in der Firebase-Konsole
-        // (Authentication: Nutzer anlegen: Firestore: passendes members/{uid}-Dokument
-        // anlegen) - siehe FIREBASE_SETUP.md. Die Konsole ist von diesen Regeln ohnehin
-        // nicht betroffen, es braucht dafuer also keine eigene "allow create"-Regel.
-        // Ueber die App selbst kann sich ausschliesslich ein Spieler ueber einen gueltigen
-        // Einladungscode eintragen. Der Code ist bewusst mehrfach nutzbar (wie ein
-        // Passwort, kein Einmal-Link) - jedes Geraet, das den Code eingibt, bekommt eine
-        // eigene anonyme Identitaet und damit sein eigenes members-Dokument.
+        // Zwei erlaubte Wege, ein members/{uid}-Dokument anzulegen:
+        // 1. Ein bereits bestehender Trainer legt (in der App, ueber eine zweite,
+        //    temporaere Firebase-App-Instanz fuer den neuen Auth-User - siehe
+        //    createTrainerAccount() in app.js) ein weiteres Trainer-Konto an. Die neue
+        //    UID gehoert dabei nicht dem aufrufenden Trainer, deshalb kein
+        //    "request.auth.uid == uid" in diesem Zweig. Das allererste Trainer-Konto
+        //    braucht weiterhin einen manuellen Bootstrap-Schritt in der Firebase-Konsole
+        //    (Authentication: Nutzer anlegen: Firestore: passendes members/{uid}-Dokument
+        //    anlegen), siehe FIREBASE_SETUP.md - danach reicht dieser Weg fuer alle
+        //    weiteren Trainer/Co-Trainer.
+        // 2. Ein frisch (anonym) angemeldeter Spieler traegt sich selbst mit einem
+        //    gueltigen Einladungscode ein. Der Code ist bewusst mehrfach nutzbar (wie ein
+        //    Passwort, kein Einmal-Link) - jedes Geraet, das den Code eingibt, bekommt eine
+        //    eigene anonyme Identitaet und damit sein eigenes members-Dokument.
         // Die Diagnose (auch "if true" scheiterte beim allerersten Versuch nach einem
         // Deploy, klappte aber nach einem Neuladen) zeigt: es lag nie an der Regel-Logik,
         // sondern an der kurzen Verzoegerung, bis ein frisch deployter Regelsatz global
-        // greift. Deshalb wieder die vollstaendige, sichere Pruefung inkl. Einladungscode-
-        // und Ablaufdatum-Abgleich.
-        allow create: if isSignedIn() && request.auth.uid == uid
-          && request.resource.data.role == "player"
-          && request.resource.data.playerId is string
-          && request.resource.data.claimedInviteCode is string
-          && get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.playerId == request.resource.data.playerId
-          && request.resource.data.expiresAt == get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.expiresAt
-          && (
-            get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.expiresAt == null
-            || get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.expiresAt > request.time
+        // greift.
+        allow create: if
+          (isTrainer() && request.resource.data.role == "trainer")
+          || (
+            isSignedIn() && request.auth.uid == uid
+            && request.resource.data.role == "player"
+            && request.resource.data.playerId is string
+            && request.resource.data.claimedInviteCode is string
+            && get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.playerId == request.resource.data.playerId
+            && request.resource.data.expiresAt == get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.expiresAt
+            && (
+              get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.expiresAt == null
+              || get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.expiresAt > request.time
+            )
           );
         // Kein Update: eine bestehende Mitgliedschaft wird nicht bearbeitet, sondern
         // vom Trainer geloescht (Zugang sperren) und bei Bedarf neu eingeladen.

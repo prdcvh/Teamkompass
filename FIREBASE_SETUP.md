@@ -75,16 +75,15 @@ sich niemand, der die App-URL kennt, selbst zum Trainer machen.
    - per Firebase-CLI: `firebase deploy --only firestore:rules`, oder
    - manuell: Inhalt von `firestore.rules` in Firebase Console -> Firestore Database
      -> Regeln einfuegen und veroeffentlichen.
-3. Trainer-Konto manuell anlegen:
+3. Erstes Trainer-Konto manuell anlegen (einmaliger Bootstrap-Schritt - danach nicht
+   mehr noetig, siehe Schritt 7):
    - Firebase Console -> Authentication -> Tab "Users" -> "Nutzer hinzufuegen" ->
      E-Mail + Passwort eingeben. Firebase zeigt danach die generierte **Nutzer-ID (UID)**
      an - die brauchst du im naechsten Schritt.
    - Firebase Console -> Firestore Database -> Daten -> zur Collection
      `teams/{teamId}/members` navigieren (bzw. neu anlegen) -> Dokument mit der
      **Dokument-ID = die eben kopierte UID** anlegen, darin ein Feld `role` (Typ String,
-     Wert `trainer`) anlegen.
-   - Für weitere Trainer-Konten (z.B. Co-Trainer) diese beiden Schritte einfach
-     wiederholen.
+     Wert `trainer`) anlegen. Mehr Felder braucht ein Trainer-Dokument nicht.
 4. In `firebase-config.js` `enableRoles: true` setzen und deployen.
 5. Die App oeffnen - es erscheint ein Login-Bildschirm mit dem Trainer-Login. Dort die
    in Schritt 3 vergebene E-Mail/Passwort-Kombination eingeben.
@@ -104,6 +103,12 @@ sich niemand, der die App-URL kennt, selbst zum Trainer machen.
    befristen (z.B. 30 Tage ab dem Erzeugen); das Ablaufdatum gilt fuer den Code selbst
    und alle damit angemeldeten Geraete gemeinsam - nach Ablauf funktioniert weder eine
    neue Anmeldung mit dem Code, noch bleibt ein bereits angemeldetes Geraet zugriffsberechtigt.
+8. Weitere Trainer-Konten (z.B. Co-Trainer) legst du ab jetzt direkt in der App an:
+   im Menue "Aktionen" auf "Trainer-Konto anlegen" klicken und E-Mail + Passwort fuer
+   das neue Konto eingeben. Die App legt Auth-Konto und passendes members-Dokument in
+   einem Schritt an - kein manuelles UID-Kopieren mehr noetig. Der Bootstrap-Schritt aus
+   3. bleibt nur fuer das allererste Trainer-Konto erforderlich, da es dafuer naturgemaess
+   noch keinen angemeldeten Trainer gibt, der den Button klicken koennte.
 
 **Datenmodell im Rollen-Modus:**
 
@@ -117,7 +122,9 @@ teams/{teamId}/events/{eventId}/ratings/{playerId}   # individuelle Bewertung
 teams/{teamId}/opponents/{opponentId}
 ```
 
-**Grenzen dieser Version:** Trainer-Konten (auch weitere, z.B. Co-Trainer) muessen immer
-manuell in der Firebase-Konsole angelegt werden, es gibt keinen Einladungsweg dafuer;
-Spieler-Zugaenge sind an das jeweilige Geraet gebunden (anonyme Anmeldung, kein
-Passwort-Reset - bei Geraetewechsel muss neu eingeladen werden).
+**Grenzen dieser Version:** Nur das allererste Trainer-Konto muss manuell in der
+Firebase-Konsole angelegt werden (Bootstrap-Problem: es gibt anfangs noch keinen
+angemeldeten Trainer, der weitere Konten anlegen koennte); alle weiteren Trainer-Konten
+laufen ueber "Trainer-Konto anlegen" in der App. Spieler-Zugaenge sind an das jeweilige
+Geraet gebunden (anonyme Anmeldung, kein Passwort-Reset - bei Geraetewechsel muss neu
+eingeladen werden).
