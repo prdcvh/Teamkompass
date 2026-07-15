@@ -927,6 +927,13 @@ tr:last-child td {
   background: var(--red);
 }
 
+.grade-chips .chip-button[data-value=""].active {
+  color: var(--muted);
+  border-color: var(--line);
+  background: var(--field);
+  font-weight: 750;
+}
+
 .attendance-chips {
   display: grid;
   grid-template-columns: 1fr 1fr;
