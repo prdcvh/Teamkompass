@@ -1574,7 +1574,7 @@ const ratingFieldLabels = { effort: "Einsatz", technique: "Technik", tactics: "T
 
 function filteredEvents() {
   const query = eventFilter.query.trim().toLowerCase();
-  return sortedEvents().filter((event) => {
+  return state.events.filter((event) => {
     const matchesType = eventFilter.type === "all" || event.type === eventFilter.type;
     if (!matchesType) return false;
     if (!query) return true;
@@ -1589,10 +1589,9 @@ function monthLabel(dateValue) {
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
-function renderEvents() {
-  const events = filteredEvents();
+function eventCardsHtml(events) {
   let lastMonth = null;
-  const cards = events.map((event) => {
+  return events.map((event) => {
     const rated = Object.values(event.ratings || {}).filter((rating) => rating.grade && rating.attendance !== "absent").length;
     const active = event.id === selectedEvent()?.id ? "active" : "";
     const result = gameResult(event);
@@ -1610,7 +1609,27 @@ function renderEvents() {
       </button>
     `;
   }).join("");
-  $("#eventList").innerHTML = cards || (state.events.length ? `<p class="muted">Keine Events gefunden.</p>` : `<p class="muted">Noch keine Events angelegt.</p>`);
+}
+
+function renderEvents() {
+  const events = filteredEvents();
+  const today = new Date().toISOString().slice(0, 10);
+  const upcoming = events.filter((event) => event.date >= today).sort((a, b) => new Date(a.date) - new Date(b.date));
+  const past = events.filter((event) => event.date < today).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  $("#eventList").innerHTML = eventCardsHtml(upcoming) || (events.length ? `<p class="muted">Keine anstehenden Events.</p>` : `<p class="muted">Noch keine Events angelegt.</p>`);
+
+  const pastToggle = $("#pastEventsToggle");
+  if (past.length) {
+    pastToggle.hidden = false;
+    $("#pastEventsSummary").textContent = `Vergangene Events (${past.length})`;
+    $("#pastEventsList").innerHTML = eventCardsHtml(past);
+  } else {
+    pastToggle.hidden = true;
+    pastToggle.open = false;
+    $("#pastEventsList").innerHTML = "";
+  }
+
   renderRatingTable();
 }
 
@@ -2528,10 +2547,24 @@ function exportData() {
   URL.revokeObjectURL(link.href);
 }
 
+let opponentFilter = "";
+
 function renderOpponentAnalysis() {
-  const opponents = [...(state.opponents || [])].sort((a, b) => a.name.localeCompare(b.name, "de"));
+  const query = opponentFilter.trim().toLowerCase();
+  const opponents = [...(state.opponents || [])]
+    .filter((opponent) => !query || [opponent.name, opponent.formation, opponent.style].filter(Boolean).join(" ").toLowerCase().includes(query))
+    .sort((a, b) => a.name.localeCompare(b.name, "de"));
   $("#opponentCount").textContent = `${opponents.length} Gegner`;
-  $("#opponentList").innerHTML = opponents.map((opponent) => `
+  $("#opponentList").innerHTML = opponents.map((opponent) => {
+    const details = [
+      opponent.strengths ? opponentDetail("Stärken", opponent.strengths) : "",
+      opponent.weaknesses ? opponentDetail("Schwächen", opponent.weaknesses) : "",
+      opponent.keyPlayers ? opponentDetail("Schlüsselspieler", opponent.keyPlayers) : "",
+      opponent.setPieces ? opponentDetail("Standards", opponent.setPieces) : "",
+      opponent.gamePlan ? opponentDetail("Matchplan", opponent.gamePlan) : "",
+      opponent.notes ? opponentDetail("Notizen", opponent.notes) : ""
+    ].join("");
+    return `
     <article class="opponent-card">
       <div class="opponent-card-head">
         <div>
@@ -2544,16 +2577,15 @@ function renderOpponentAnalysis() {
           <button class="ghost-button danger" data-action="delete-opponent" data-id="${opponent.id}" type="button">Löschen</button>
         </div>
       </div>
-      <div class="opponent-detail-grid">
-        ${opponent.strengths ? opponentDetail("Stärken", opponent.strengths) : ""}
-        ${opponent.weaknesses ? opponentDetail("Schwächen", opponent.weaknesses) : ""}
-        ${opponent.keyPlayers ? opponentDetail("Schlüsselspieler", opponent.keyPlayers) : ""}
-        ${opponent.setPieces ? opponentDetail("Standards", opponent.setPieces) : ""}
-        ${opponent.gamePlan ? opponentDetail("Matchplan", opponent.gamePlan) : ""}
-        ${opponent.notes ? opponentDetail("Notizen", opponent.notes) : ""}
-      </div>
+      ${details ? `
+      <details class="opponent-details-toggle">
+        <summary>Details anzeigen</summary>
+        <div class="opponent-detail-grid">${details}</div>
+      </details>
+      ` : ""}
     </article>
-  `).join("") || `<p class="muted">Noch keine Gegneranalyse angelegt.</p>`;
+  `;
+  }).join("") || `<p class="muted">${query ? "Kein Gegner gefunden." : "Noch keine Gegneranalyse angelegt."}</p>`;
 }
 
 function opponentDetail(label, value) {
@@ -2701,6 +2733,10 @@ $("#developmentPlanForm").addEventListener("submit", saveDevelopmentPlan);
 $("#cancelDevelopmentPlanBtn").addEventListener("click", resetDevelopmentPlanForm);
 $("#opponentForm").addEventListener("submit", saveOpponent);
 $("#cancelOpponentBtn").addEventListener("click", resetOpponentForm);
+$("#opponentSearch").addEventListener("input", (event) => {
+  opponentFilter = event.target.value;
+  renderOpponentAnalysis();
+});
 
 $("#developmentPlanList").addEventListener("click", (event) => {
   const button = event.target.closest("button");
@@ -2738,13 +2774,16 @@ $("#playerTable").addEventListener("click", (event) => {
   }
 });
 
-$("#eventList").addEventListener("click", (event) => {
+function handleEventListClick(event) {
   const card = event.target.closest("[data-event-id]");
   if (!card) return;
   state.selectedEventId = card.dataset.eventId;
   persist();
   renderEvents();
-});
+}
+
+$("#eventList").addEventListener("click", handleEventListClick);
+$("#pastEventsList").addEventListener("click", handleEventListClick);
 
 $("#ratingTable").addEventListener("change", (event) => {
   const input = event.target.closest(".rating-input");
