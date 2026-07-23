@@ -409,6 +409,10 @@ let firestoreDb = null;
 let playerLoginInFlight = false;
 let currentTeamId = null;
 let cloudUnsubscribers = [];
+// Pro-Event- bzw. pro-Spieler-Listener fuer ratings/developmentPlans (siehe startCloudSync):
+// eventId/playerId -> unsubscribe-Funktion.
+let ratingListeners = {};
+let planListeners = {};
 let legacyBlobMode = false;
 let legacyCloudSaveTimer = null;
 const cloudCache = { players: [], events: [], ratings: {}, developmentPlans: {}, opponents: [] };
@@ -556,32 +560,18 @@ function startCloudSync() {
   // Event-Metadaten (Titel/Datum/Ergebnis, keine Noten) sind fuer alle Teammitglieder lesbar.
   cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("events"), (snapshot) => {
     cloudCache.events = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+    const eventIds = cloudCache.events.map((event) => event.id);
+    if (currentRole === "trainer") syncRatingListeners(eventIds);
+    else if (currentRole === "player" && currentPlayerId) syncPlayerRatingListeners(eventIds);
     rebuildStateFromCloudCache();
   }, (error) => console.error("events sync", error)));
 
   if (currentRole === "trainer") {
     cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("players"), (snapshot) => {
       cloudCache.players = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+      syncPlanListeners(cloudCache.players.map((player) => player.id));
       rebuildStateFromCloudCache();
     }, (error) => console.error("players sync", error)));
-
-    cloudUnsubscribers.push(firestoreModule.onSnapshot(
-      firestoreModule.collectionGroup(firestoreDb, "ratings"),
-      (snapshot) => {
-        cloudCache.ratings = groupRatingsByEvent(snapshot);
-        rebuildStateFromCloudCache();
-      },
-      (error) => console.error("ratings sync", error)
-    ));
-
-    cloudUnsubscribers.push(firestoreModule.onSnapshot(
-      firestoreModule.collectionGroup(firestoreDb, "developmentPlans"),
-      (snapshot) => {
-        cloudCache.developmentPlans = groupPlansByPlayer(snapshot);
-        rebuildStateFromCloudCache();
-      },
-      (error) => console.error("development plans sync", error)
-    ));
 
     cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("opponents"), (snapshot) => {
       cloudCache.opponents = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
@@ -596,51 +586,94 @@ function startCloudSync() {
       rebuildStateFromCloudCache();
     }, (error) => console.error("player sync", error)));
 
-    cloudUnsubscribers.push(firestoreModule.onSnapshot(
-      firestoreModule.query(firestoreModule.collectionGroup(firestoreDb, "ratings"), firestoreModule.where("playerId", "==", currentPlayerId)),
-      (snapshot) => {
-        cloudCache.ratings = groupRatingsByEvent(snapshot);
-        rebuildStateFromCloudCache();
-      },
-      (error) => console.error("ratings sync", error)
-    ));
-
-    cloudUnsubscribers.push(firestoreModule.onSnapshot(
-      firestoreModule.query(firestoreModule.collectionGroup(firestoreDb, "developmentPlans"), firestoreModule.where("playerId", "==", currentPlayerId)),
-      (snapshot) => {
-        cloudCache.developmentPlans = groupPlansByPlayer(snapshot);
-        rebuildStateFromCloudCache();
-      },
-      (error) => console.error("development plans sync", error)
-    ));
+    cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("players", currentPlayerId, "developmentPlans"), (snapshot) => {
+      cloudCache.developmentPlans = { [currentPlayerId]: snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })) };
+      rebuildStateFromCloudCache();
+    }, (error) => console.error("development plans sync", error)));
   }
 }
 
-function groupRatingsByEvent(snapshot) {
-  const byEvent = {};
-  snapshot.forEach((docSnap) => {
-    const eventId = docSnap.ref.parent.parent?.id;
-    if (!eventId) return;
-    byEvent[eventId] ||= {};
-    byEvent[eventId][docSnap.id] = docSnap.data();
+// ratings/developmentPlans liegen als Unter-Collections unter jeweils einem Event bzw.
+// Spieler (teams/{teamId}/events/{eventId}/ratings, teams/{teamId}/players/{playerId}/
+// developmentPlans). Frueher wurden sie ueber eine teamuebergreifende collectionGroup-
+// Abfrage gelesen - das schlug fehl, sobald es (wie seit der U17-Site) mehr als ein Team
+// in derselben Firebase-Instanz gibt: Firestore laesst eine Listenabfrage nur zu, wenn
+// die Regel fuer JEDES moegliche Ergebnis zutrifft, und "ratings/developmentPlans
+// irgendeines Teams" schliesst zwangslaeufig Dokumente ein, die dieser Nutzer nicht lesen
+// darf - die gesamte Abfrage wurde deshalb mit "permission-denied" abgelehnt, ohne dass
+// das im UI sichtbar war (nur console.error, kein alert). Ein Listener pro Event/Spieler,
+// jeweils direkt unter der eigenen teamId, umgeht das Problem komplett.
+function syncRatingListeners(eventIds) {
+  const idSet = new Set(eventIds);
+  Object.keys(ratingListeners).forEach((eventId) => {
+    if (idSet.has(eventId)) return;
+    ratingListeners[eventId]();
+    delete ratingListeners[eventId];
+    delete cloudCache.ratings[eventId];
   });
-  return byEvent;
+  eventIds.forEach((eventId) => {
+    if (ratingListeners[eventId]) return;
+    ratingListeners[eventId] = firestoreModule.onSnapshot(
+      teamCollection("events", eventId, "ratings"),
+      (snapshot) => {
+        cloudCache.ratings[eventId] = {};
+        snapshot.forEach((docSnap) => { cloudCache.ratings[eventId][docSnap.id] = docSnap.data(); });
+        rebuildStateFromCloudCache();
+      },
+      (error) => console.error("ratings sync", eventId, error)
+    );
+  });
 }
 
-function groupPlansByPlayer(snapshot) {
-  const byPlayer = {};
-  snapshot.forEach((docSnap) => {
-    const playerId = docSnap.ref.parent.parent?.id;
-    if (!playerId) return;
-    byPlayer[playerId] ||= [];
-    byPlayer[playerId].push({ id: docSnap.id, ...docSnap.data() });
+function syncPlayerRatingListeners(eventIds) {
+  const idSet = new Set(eventIds);
+  Object.keys(ratingListeners).forEach((eventId) => {
+    if (idSet.has(eventId)) return;
+    ratingListeners[eventId]();
+    delete ratingListeners[eventId];
+    delete cloudCache.ratings[eventId];
   });
-  return byPlayer;
+  eventIds.forEach((eventId) => {
+    if (ratingListeners[eventId]) return;
+    ratingListeners[eventId] = firestoreModule.onSnapshot(
+      teamDoc("events", eventId, "ratings", currentPlayerId),
+      (docSnap) => {
+        cloudCache.ratings[eventId] = docSnap.exists() ? { [currentPlayerId]: docSnap.data() } : {};
+        rebuildStateFromCloudCache();
+      },
+      (error) => console.error("ratings sync", eventId, error)
+    );
+  });
+}
+
+function syncPlanListeners(playerIds) {
+  const idSet = new Set(playerIds);
+  Object.keys(planListeners).forEach((playerId) => {
+    if (idSet.has(playerId)) return;
+    planListeners[playerId]();
+    delete planListeners[playerId];
+    delete cloudCache.developmentPlans[playerId];
+  });
+  playerIds.forEach((playerId) => {
+    if (planListeners[playerId]) return;
+    planListeners[playerId] = firestoreModule.onSnapshot(
+      teamCollection("players", playerId, "developmentPlans"),
+      (snapshot) => {
+        cloudCache.developmentPlans[playerId] = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+        rebuildStateFromCloudCache();
+      },
+      (error) => console.error("development plans sync", playerId, error)
+    );
+  });
 }
 
 function stopCloudSync() {
   cloudUnsubscribers.forEach((unsubscribe) => unsubscribe());
   cloudUnsubscribers = [];
+  Object.values(ratingListeners).forEach((unsubscribe) => unsubscribe());
+  ratingListeners = {};
+  Object.values(planListeners).forEach((unsubscribe) => unsubscribe());
+  planListeners = {};
 }
 
 function rebuildStateFromCloudCache() {
