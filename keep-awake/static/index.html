@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Keep Awake</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #16181d;
+    --panel: #1e2129;
+    --border: #2c313c;
+    --text: #e4e6eb;
+    --muted: #8b93a3;
+    --accent: #4f8cff;
+    --green: #3ec97a;
+    --yellow: #e0b23e;
+    --red: #e05a4e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 14px;
+  }
+  .wrap {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 24px 16px 60px;
+  }
+  h1 {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0 0 16px;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .status-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 13px;
+  }
+  .badge.dot::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    display: inline-block;
+  }
+  .badge.running { color: var(--green); background: rgba(62,201,122,0.12); }
+  .badge.paused { color: var(--yellow); background: rgba(224,178,62,0.12); }
+  .badge.stopped { color: var(--muted); background: rgba(139,147,163,0.12); }
+
+  .metrics {
+    display: flex;
+    gap: 24px;
+    margin-top: 14px;
+  }
+  .metric .label { color: var(--muted); font-size: 12px; }
+  .metric .value { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  button {
+    font: inherit;
+    cursor: pointer;
+    border: none;
+    border-radius: 8px;
+  }
+  .toggle-btn {
+    width: 100%;
+    padding: 16px;
+    font-size: 16px;
+    font-weight: 700;
+    margin-top: 14px;
+    background: var(--accent);
+    color: #fff;
+  }
+  .toggle-btn.stop { background: var(--red); }
+
+  fieldset {
+    border: none;
+    padding: 0;
+    margin: 0 0 14px;
+  }
+  legend {
+    color: var(--muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 8px;
+  }
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  .row label.field-label {
+    min-width: 150px;
+    color: var(--text);
+  }
+  .radio-group { display: flex; gap: 16px; }
+  .radio-group label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+
+  input[type="number"], input[type="time"] {
+    background: #12141a;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 6px 8px;
+    width: 90px;
+  }
+  input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; }
+
+  .days { display: flex; gap: 10px; }
+  .days label { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); cursor: pointer; }
+
+  .save-btn {
+    background: var(--border);
+    color: var(--text);
+    padding: 8px 16px;
+    font-weight: 600;
+  }
+  .save-btn:hover { background: #363c48; }
+
+  .hint {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.5;
+    margin-top: 10px;
+  }
+
+  .log {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 280px;
+    overflow-y: auto;
+  }
+  .log li {
+    display: flex;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .log li:last-child { border-bottom: none; }
+  .log time { color: var(--muted); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+  .log .empty { color: var(--muted); }
+
+  .save-status { font-size: 12px; color: var(--green); margin-left: 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Keep Awake</h1>
+
+  <div class="panel">
+    <div class="status-row">
+      <span id="status-badge" class="badge dot stopped">Gestoppt</span>
+      <button id="toggle-btn" class="toggle-btn">Start</button>
+    </div>
+    <div class="metrics">
+      <div class="metric">
+        <div class="label">Nächste Aktion in</div>
+        <div class="value" id="next-action">–</div>
+      </div>
+      <div class="metric">
+        <div class="label">Laufzeit</div>
+        <div class="value" id="runtime">00:00:00</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <fieldset>
+      <legend>Modus</legend>
+      <div class="radio-group">
+        <label><input type="radio" name="mode" value="key"> Tastendruck (F15)</label>
+        <label><input type="radio" name="mode" value="mouse"> Mausbewegung</label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Intervall</legend>
+      <div class="row">
+        <label class="field-label" for="interval-base">Basis (Sekunden)</label>
+        <input type="number" id="interval-base" min="1">
+      </div>
+      <div class="row">
+        <label class="field-label" for="interval-jitter">Jitter ± (Sekunden)</label>
+        <input type="number" id="interval-jitter" min="0">
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Zeitplan</legend>
+      <div class="row">
+        <label><input type="checkbox" id="schedule-enabled"> Aktiv von / bis begrenzen</label>
+      </div>
+      <div class="row">
+        <label class="field-label" for="schedule-start">Von</label>
+        <input type="time" id="schedule-start">
+        <label class="field-label" for="schedule-end" style="min-width:auto;">bis</label>
+        <input type="time" id="schedule-end">
+      </div>
+      <div class="row">
+        <div class="days">
+          <label><input type="checkbox" class="day" value="0"> Mo</label>
+          <label><input type="checkbox" class="day" value="1"> Di</label>
+          <label><input type="checkbox" class="day" value="2"> Mi</label>
+          <label><input type="checkbox" class="day" value="3"> Do</label>
+          <label><input type="checkbox" class="day" value="4"> Fr</label>
+          <label><input type="checkbox" class="day" value="5"> Sa</label>
+          <label><input type="checkbox" class="day" value="6"> So</label>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Auto-Stop</legend>
+      <div class="row">
+        <label><input type="checkbox" id="autostop-enabled"> Nach fester Laufzeit automatisch stoppen</label>
+      </div>
+      <div class="row">
+        <label class="field-label" for="autostop-minutes">Minuten</label>
+        <input type="number" id="autostop-minutes" min="1">
+      </div>
+    </fieldset>
+
+    <button id="save-btn" class="save-btn">Einstellungen speichern</button>
+    <span id="save-status" class="save-status"></span>
+
+    <p class="hint">
+      Failsafe: Den Mauszeiger schnell in die linke obere Bildschirmecke bewegen,
+      um die aktuelle Aktion sofort abzubrechen und den Worker zu stoppen (pyautogui-Failsafe).
+    </p>
+  </div>
+
+  <div class="panel">
+    <fieldset>
+      <legend>Ereignis-Log</legend>
+      <ul class="log" id="log-list">
+        <li class="empty">Noch keine Ereignisse.</li>
+      </ul>
+    </fieldset>
+  </div>
+</div>
+
+<script>
+const badgeEl = document.getElementById('status-badge');
+const toggleBtn = document.getElementById('toggle-btn');
+const nextActionEl = document.getElementById('next-action');
+const runtimeEl = document.getElementById('runtime');
+const logListEl = document.getElementById('log-list');
+const saveBtn = document.getElementById('save-btn');
+const saveStatusEl = document.getElementById('save-status');
+
+let currentState = 'stopped';
+
+function formatRuntime(totalSeconds) {
+  const s = Math.floor(totalSeconds);
+  const h = String(Math.floor(s / 3600)).padStart(2, '0');
+  const m = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
+  const sec = String(s % 60).padStart(2, '0');
+  return `${h}:${m}:${sec}`;
+}
+
+function renderStatus(data) {
+  currentState = data.state;
+  badgeEl.className = 'badge dot ' + data.state;
+  if (data.state === 'running') {
+    badgeEl.textContent = 'Aktiv';
+  } else if (data.state === 'paused') {
+    badgeEl.textContent = 'Pausiert' + (data.paused_reason ? ` (${data.paused_reason})` : '');
+  } else {
+    badgeEl.textContent = 'Gestoppt';
+  }
+
+  nextActionEl.textContent = (data.state === 'running' && data.next_action_in != null)
+    ? `${Math.ceil(data.next_action_in)}s`
+    : '–';
+
+  runtimeEl.textContent = formatRuntime(data.runtime_s || 0);
+
+  toggleBtn.textContent = data.state === 'stopped' ? 'Start' : 'Stop';
+  toggleBtn.classList.toggle('stop', data.state !== 'stopped');
+
+  if (data.log && data.log.length) {
+    logListEl.innerHTML = data.log
+      .map(entry => `<li><time>${entry.time}</time><span>${entry.message}</span></li>`)
+      .join('');
+  } else {
+    logListEl.innerHTML = '<li class="empty">Noch keine Ereignisse.</li>';
+  }
+}
+
+async function fetchStatus() {
+  try {
+    const res = await fetch('/api/status');
+    renderStatus(await res.json());
+  } catch (e) {
+    // Server kurz nicht erreichbar - naechster Poll versucht es erneut.
+  }
+}
+
+async function fetchConfig() {
+  const res = await fetch('/api/config');
+  const cfg = await res.json();
+  document.querySelector(`input[name="mode"][value="${cfg.mode}"]`).checked = true;
+  document.getElementById('interval-base').value = cfg.interval_base_s;
+  document.getElementById('interval-jitter').value = cfg.interval_jitter_s;
+  document.getElementById('schedule-enabled').checked = cfg.schedule_enabled;
+  document.getElementById('schedule-start').value = cfg.schedule_start;
+  document.getElementById('schedule-end').value = cfg.schedule_end;
+  document.querySelectorAll('.day').forEach(cb => {
+    cb.checked = cfg.schedule_days.includes(Number(cb.value));
+  });
+  document.getElementById('autostop-enabled').checked = cfg.auto_stop_enabled;
+  document.getElementById('autostop-minutes').value = cfg.auto_stop_minutes;
+}
+
+async function saveConfig() {
+  const cfg = {
+    mode: document.querySelector('input[name="mode"]:checked').value,
+    interval_base_s: Number(document.getElementById('interval-base').value),
+    interval_jitter_s: Number(document.getElementById('interval-jitter').value),
+    schedule_enabled: document.getElementById('schedule-enabled').checked,
+    schedule_start: document.getElementById('schedule-start').value,
+    schedule_end: document.getElementById('schedule-end').value,
+    schedule_days: Array.from(document.querySelectorAll('.day:checked')).map(cb => Number(cb.value)),
+    auto_stop_enabled: document.getElementById('autostop-enabled').checked,
+    auto_stop_minutes: Number(document.getElementById('autostop-minutes').value),
+  };
+  const res = await fetch('/api/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(cfg),
+  });
+  if (res.ok) {
+    saveStatusEl.textContent = 'Gespeichert';
+    setTimeout(() => { saveStatusEl.textContent = ''; }, 2000);
+  } else {
+    saveStatusEl.textContent = 'Fehler beim Speichern';
+    saveStatusEl.style.color = 'var(--red)';
+  }
+}
+
+toggleBtn.addEventListener('click', async () => {
+  const endpoint = currentState === 'stopped' ? '/api/start' : '/api/stop';
+  const res = await fetch(endpoint, { method: 'POST' });
+  renderStatus(await res.json());
+});
+
+saveBtn.addEventListener('click', saveConfig);
+
+fetchConfig();
+fetchStatus();
+setInterval(fetchStatus, 1000);
+</script>
+</body>
+</html>
