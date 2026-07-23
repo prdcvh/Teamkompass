@@ -1693,10 +1693,10 @@ function renderRatingTable() {
         <td data-label="Spieler"><div class="player-cell"><span class="number-badge">${player.number}</span><strong>${player.name}</strong></div></td>
         <td data-label="Anwesenheit">${attendanceChipsHtml(player.id, attendance)}</td>
         <td data-label="Gesamtnote"><span class="computed-grade">${gradeLabel(calculatedGrade(rating))}</span></td>
-        <td data-label="Einsatz">${gradeChipsHtml(player.id, "effort", rating.effort)}</td>
-        <td data-label="Technik">${gradeChipsHtml(player.id, "technique", rating.technique)}</td>
-        <td data-label="Taktik">${gradeChipsHtml(player.id, "tactics", rating.tactics)}</td>
-        <td data-label="Auffassung">${gradeChipsHtml(player.id, "comprehension", rating.comprehension)}</td>
+        <td data-label="Einsatz">${gradeSelectHtml(player.id, "effort", rating.effort)}</td>
+        <td data-label="Technik">${gradeSelectHtml(player.id, "technique", rating.technique)}</td>
+        <td data-label="Taktik">${gradeSelectHtml(player.id, "tactics", rating.tactics)}</td>
+        <td data-label="Auffassung">${gradeSelectHtml(player.id, "comprehension", rating.comprehension)}</td>
         ${gameFields}
         <td data-label="Notiz"><input class="rating-note" data-player-id="${player.id}" data-field="note" value="${escapeHtml(rating.note || "")}" placeholder="Kurznotiz" /></td>
       </tr>
@@ -1738,6 +1738,11 @@ function attendanceChipsHtml(playerId, value) {
 function gradeChipsHtml(playerId, field, value) {
   const options = [["", "–"], ["1", "1"], ["2", "2"], ["3", "3"], ["4", "4"], ["5", "5"], ["6", "6"]];
   return chipGroupHtml(playerId, field, value ?? "", options, "grade-chips");
+}
+
+function gradeSelectHtml(playerId, field, value) {
+  const options = [["", "–"], ["1", "1"], ["2", "2"], ["3", "3"], ["4", "4"], ["5", "5"], ["6", "6"]];
+  return `<select class="rating-input grade-select" data-player-id="${playerId}" data-field="${field}">${options.map(([optionValue, label]) => `<option value="${optionValue}" ${String(value ?? "") === optionValue ? "selected" : ""}>${label}</option>`).join("")}</select>`;
 }
 
 function renderRatingCard(player, event, matchDuration) {
