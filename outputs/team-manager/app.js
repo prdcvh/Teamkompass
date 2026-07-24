@@ -1724,7 +1724,7 @@ function renderRatingTable() {
     return `
       <tr class="attendance-row attendance-${attendance}">
         <td data-label="Spieler"><div class="player-cell"><span class="number-badge">${player.number}</span><strong>${player.name}</strong></div></td>
-        <td data-label="Anwesenheit">${attendanceChipsHtml(player.id, attendance)}</td>
+        <td data-label="Anwesenheit">${attendanceSelectHtml(player.id, attendance)}</td>
         <td data-label="Gesamtnote"><span class="computed-grade">${gradeLabel(calculatedGrade(rating))}</span></td>
         <td data-label="Einsatz">${gradeSelectHtml(player.id, "effort", rating.effort)}</td>
         <td data-label="Technik">${gradeSelectHtml(player.id, "technique", rating.technique)}</td>
@@ -1759,13 +1759,9 @@ function chipGroupHtml(playerId, field, value, options, extraClass = "") {
   `).join("")}</div>`;
 }
 
-function attendanceChipsHtml(playerId, value) {
-  return chipGroupHtml(playerId, "attendance", value, [
-    ["open", "Offen"],
-    ["present", "Anwesend"],
-    ["limited", "Teilweise"],
-    ["absent", "Fehlt"]
-  ], "attendance-chips");
+function attendanceSelectHtml(playerId, value) {
+  const options = [["open", "Offen"], ["present", "Anwesend"], ["limited", "Teilweise"], ["absent", "Fehlt"]];
+  return `<select class="rating-input attendance-select" data-player-id="${playerId}" data-field="attendance">${options.map(([optionValue, label]) => `<option value="${optionValue}" ${String(value ?? "open") === optionValue ? "selected" : ""}>${label}</option>`).join("")}</select>`;
 }
 
 function gradeChipsHtml(playerId, field, value) {
@@ -1798,7 +1794,7 @@ function renderRatingCard(player, event, matchDuration) {
     </div>
     <div class="rating-card-field">
       <span class="rating-card-label">Anwesenheit</span>
-      ${attendanceChipsHtml(player.id, attendance)}
+      ${attendanceSelectHtml(player.id, attendance)}
     </div>
     <div class="rating-card-grades">
       ${["effort", "technique", "tactics", "comprehension"].map((field) => `

@@ -865,11 +865,6 @@ table {
   background: var(--panel);
 }
 
-.attendance-chips .chip-button {
-  padding: 0 4px;
-  font-size: 0.86rem;
-}
-
 th,
 td {
   padding: 13px 14px;
@@ -944,38 +939,6 @@ tr:last-child td {
   border-color: var(--line);
   background: var(--field);
   font-weight: 750;
-}
-
-.attendance-chips {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-}
-
-.attendance-chips .chip-button {
-  min-width: 0;
-}
-
-.attendance-chips .chip-button[data-value="present"].active {
-  color: var(--green-dark);
-  border-color: var(--green);
-  background: var(--soft-green);
-}
-
-.attendance-chips .chip-button[data-value="limited"].active {
-  color: var(--amber);
-  border-color: var(--amber);
-  background: var(--soft-amber);
-}
-
-.attendance-chips .chip-button[data-value="absent"].active {
-  color: var(--red-dark);
-  border-color: var(--red-dark);
-  background: var(--soft-danger);
-}
-
-.attendance-chips .chip-button[data-value="open"].active {
-  border-color: var(--muted);
-  background: var(--soft-panel);
 }
 
 .rating-stepper {
