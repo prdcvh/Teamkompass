@@ -1289,6 +1289,10 @@ function formatDate(value) {
   return new Date(`${value}T00:00:00`).toLocaleDateString("de-DE");
 }
 
+function activeAbsenceOn(playerId, dateStr) {
+  return (state.absences?.[playerId] || []).find((item) => item.from && item.to && dateStr >= item.from && dateStr <= item.to) || null;
+}
+
 // Verletzung (Status "Verletzt" + "ca. verletzt bis") und eingetragene Abwesenheiten
 // (Urlaub, Klassenfahrt etc.) fuehren beide dazu, dass ein Spieler fuer Events in diesem
 // Zeitraum automatisch als "Fehlt" vorbelegt wird - siehe applyAutoAbsence/reconcileAbsences.
@@ -1297,8 +1301,19 @@ function unavailabilityReason(player, dateStr) {
   if (player.status === "Verletzt" && player.injuryUntil && dateStr <= player.injuryUntil) {
     return `Verletzt (ca. bis ${formatDate(player.injuryUntil)})`;
   }
-  const absence = (state.absences?.[player.id] || []).find((item) => item.from && item.to && dateStr >= item.from && dateStr <= item.to);
+  const absence = activeAbsenceOn(player.id, dateStr);
   return absence ? `${absence.label} (bis ${formatDate(absence.to)})` : null;
+}
+
+// Status-Anzeige (Kader/Profil): eine heute laufende Abwesenheit ueberlagert den manuell
+// gesetzten Status - "Sperre" wird dabei als eigener Grund erkannt, jede andere Abwesenheit
+// (Urlaub, Klassenfahrt etc.) zeigt "Abwesend". Ohne aktive Abwesenheit bleibt es beim
+// manuell gepflegten Status (Fit/Angeschlagen/Verletzt/Pause).
+function playerEffectiveStatus(player) {
+  const today = new Date().toISOString().slice(0, 10);
+  const absence = activeAbsenceOn(player.id, today);
+  if (!absence) return player.status;
+  return absence.label.trim().toLowerCase().startsWith("sperre") ? "Gesperrt" : "Abwesend";
 }
 
 function hasRatingData(rating) {
@@ -1489,7 +1504,7 @@ function bestDevelopment(ratings) {
 }
 
 function renderMetrics() {
-  const fitPlayers = state.players.filter((player) => player.status === "Fit").length;
+  const fitPlayers = state.players.filter((player) => playerEffectiveStatus(player) === "Fit").length;
   const gradedRatings = state.players.map((player) => playerAverageGrade(player.id)).filter(Boolean);
   const teamGrade = gradedRatings.length ? roundGrade(gradedRatings.reduce((sum, grade) => sum + grade, 0) / gradedRatings.length) : null;
   const highRiskPlayers = state.players.filter((player) => playerInjuryRisk(player.id).level === "Hoch").length;
@@ -1557,7 +1572,7 @@ function renderPitch() {
     ]
   };
   const candidates = state.players
-    .filter((player) => player.status !== "Verletzt")
+    .filter((player) => !["Verletzt", "Gesperrt", "Abwesend"].includes(playerEffectiveStatus(player)))
     .sort((a, b) => (playerAverageGrade(a.id) || 9) - (playerAverageGrade(b.id) || 9) || a.number - b.number);
   const slots = formations[$("#formationSelect").value];
   const assigned = assignFormationSlots(slots, candidates);
@@ -1686,19 +1701,20 @@ function renderSquad() {
   const position = $("#positionFilter").value;
   const players = state.players.filter((player) => {
     const positions = parsePositions(player.positions || player.position);
-    const matchesQuery = [player.name, positionText(player), player.status, String(player.number)].join(" ").toLowerCase().includes(query);
+    const matchesQuery = [player.name, positionText(player), playerEffectiveStatus(player), String(player.number)].join(" ").toLowerCase().includes(query);
     const matchesPosition = position === "all" || positions.includes(position);
     return matchesQuery && matchesPosition;
   });
   $("#playerTable").innerHTML = players.map((player) => {
-    const statusClass = player.status === "Verletzt" ? "danger" : player.status === "Angeschlagen" ? "warning" : "";
+    const effectiveStatus = playerEffectiveStatus(player);
+    const statusClass = effectiveStatus === "Verletzt" || effectiveStatus === "Gesperrt" ? "danger" : effectiveStatus === "Angeschlagen" || effectiveStatus === "Abwesend" ? "warning" : "";
     const risk = playerInjuryRisk(player.id);
     return `
       <tr>
         <td data-label="Spieler"><div class="player-cell"><span class="number-badge">${player.number}</span><strong>${player.name}</strong></div></td>
         <td data-label="Positionen">${positionChips(player)}</td>
         <td data-label="Geburtsdatum">${formatDate(player.birthdate)}</td>
-        <td data-label="Status"><span class="status-pill ${statusClass}">${player.status}</span></td>
+        <td data-label="Status"><span class="status-pill ${statusClass}">${escapeHtml(effectiveStatus)}</span></td>
         <td data-label="Events">${playerAttendanceCount(player.id)}</td>
         <td data-label="Note">${gradeLabel(playerAverageGrade(player.id))}</td>
         <td data-label="Risiko"><span class="risk-pill ${risk.level.toLowerCase()}">${risk.level}</span></td>
@@ -2295,12 +2311,13 @@ function deleteAbsence(absenceId) {
 function renderProfileHeader(player, ratings) {
   const average = playerAverageGrade(player?.id);
   const risk = player ? playerInjuryRisk(player.id) : null;
+  const effectiveStatus = player ? playerEffectiveStatus(player) : null;
   $("#profileHeader").innerHTML = player ? `
     <div class="profile-card">
       <div class="profile-number">${player.number}</div>
       <div>
         <strong>${player.name}</strong>
-        <span>${positionText(player)} · ${formatDate(player.birthdate)} · ${ageFromBirthdate(player.birthdate) ?? "-"} Jahre · ${player.status}${player.status === "Verletzt" && player.injuryUntil ? ` (ca. bis ${formatDate(player.injuryUntil)})` : ""}</span>
+        <span>${positionText(player)} · ${formatDate(player.birthdate)} · ${ageFromBirthdate(player.birthdate) ?? "-"} Jahre · ${escapeHtml(effectiveStatus)}${effectiveStatus === "Verletzt" && player.injuryUntil ? ` (ca. bis ${formatDate(player.injuryUntil)})` : ""}</span>
       </div>
       <div class="profile-grade">
         <span>Ø Note</span>
@@ -2486,7 +2503,7 @@ function downloadProfilePdf() {
           <div>
             <p class="muted">1. FC Königstein U17 · Spielerprofil</p>
             <h1>${escapeHtml(player.name)}</h1>
-            <div class="muted">Nr. ${player.number} · ${escapeHtml(positionText(player))} · ${formatDate(player.birthdate)} · ${player.status}</div>
+            <div class="muted">Nr. ${player.number} · ${escapeHtml(positionText(player))} · ${formatDate(player.birthdate)} · ${escapeHtml(playerEffectiveStatus(player))}</div>
           </div>
           <img src="${logoUrl}" alt="Logo" />
         </header>
