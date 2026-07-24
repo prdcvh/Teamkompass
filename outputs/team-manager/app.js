@@ -1696,15 +1696,42 @@ function renderLeaders() {
   `).join("") || `<p class="muted">Noch keine Bewertungen vorhanden.</p>`;
 }
 
+function sortedSquad(players) {
+  const sorted = [...players];
+  switch ($("#squadSort").value) {
+    case "name":
+      sorted.sort((a, b) => a.name.localeCompare(b.name, "de"));
+      break;
+    case "position":
+      sorted.sort((a, b) => positionText(a).localeCompare(positionText(b), "de") || a.number - b.number);
+      break;
+    case "age":
+      sorted.sort((a, b) => new Date(b.birthdate) - new Date(a.birthdate));
+      break;
+    case "status":
+      sorted.sort((a, b) => playerEffectiveStatus(a).localeCompare(playerEffectiveStatus(b), "de") || a.number - b.number);
+      break;
+    case "grade":
+      sorted.sort((a, b) => (playerAverageGrade(a.id) ?? 99) - (playerAverageGrade(b.id) ?? 99));
+      break;
+    case "risk":
+      sorted.sort((a, b) => playerInjuryRisk(b.id).percentage - playerInjuryRisk(a.id).percentage);
+      break;
+    default:
+      sorted.sort((a, b) => a.number - b.number);
+  }
+  return sorted;
+}
+
 function renderSquad() {
   const query = $("#searchInput").value.trim().toLowerCase();
   const position = $("#positionFilter").value;
-  const players = state.players.filter((player) => {
+  const players = sortedSquad(state.players.filter((player) => {
     const positions = parsePositions(player.positions || player.position);
     const matchesQuery = [player.name, positionText(player), playerEffectiveStatus(player), String(player.number)].join(" ").toLowerCase().includes(query);
     const matchesPosition = position === "all" || positions.includes(position);
     return matchesQuery && matchesPosition;
-  });
+  }));
   $("#playerTable").innerHTML = players.map((player) => {
     const effectiveStatus = playerEffectiveStatus(player);
     const statusClass = effectiveStatus === "Verletzt" || effectiveStatus === "Gesperrt" ? "danger" : effectiveStatus === "Angeschlagen" || effectiveStatus === "Abwesend" ? "warning" : "";
@@ -2951,6 +2978,7 @@ window.addEventListener("resize", () => {
 $("#formationSelect").addEventListener("change", renderPitch);
 $("#searchInput").addEventListener("input", renderSquad);
 $("#positionFilter").addEventListener("change", renderSquad);
+$("#squadSort").addEventListener("change", renderSquad);
 $("#addPlayerTop").addEventListener("click", () => openPlayerDialog());
 $("#closeDialogBtn").addEventListener("click", () => $("#playerDialog").close());
 $("#cancelDialogBtn").addEventListener("click", () => $("#playerDialog").close());
