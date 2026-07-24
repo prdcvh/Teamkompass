@@ -103,6 +103,7 @@
   #stepperPrevBtn,
   #stepperNextBtn { width: 48px; min-height: 48px; font-size: 1.3rem; }
   #stepperJump { width: 100%; min-height: 40px; }
+  .attendance-select { width: 100%; min-height: 44px; }
 
   .table-wrap tr { display: flex; flex-wrap: wrap; padding: 14px; border-radius: 10px; }
   .table-wrap td { min-width: 0; flex: 1 1 100%; }
