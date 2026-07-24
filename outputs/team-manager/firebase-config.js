@@ -49,7 +49,7 @@ window.addEventListener("load", () => {
       });
     });
 
-    document.querySelectorAll("th, .analysis-bar-row strong").forEach((element) => {
+    document.querySelectorAll("th, .analysis-bar-row strong, .rating-card-label").forEach((element) => {
       const replacement = ratingLabels[element.textContent.trim()];
       if (replacement && element.textContent !== replacement) element.textContent = replacement;
     });
