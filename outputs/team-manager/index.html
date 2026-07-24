@@ -360,6 +360,35 @@
             </form>
             <div class="development-list" id="developmentPlanList"></div>
           </section>
+          <section class="panel development-panel">
+            <div class="panel-head">
+              <div>
+                <h2>Abwesenheiten</h2>
+                <span class="muted">Urlaub, Klassenfahrt & Co. - Events in diesem Zeitraum werden automatisch auf "Fehlt" gesetzt</span>
+              </div>
+            </div>
+            <form class="development-form" id="absenceForm">
+              <input type="hidden" id="absenceId" />
+              <label>Grund
+                <input id="absenceLabel" list="absenceReasons" maxlength="50" placeholder="z.B. Urlaub, Klassenfahrt" required />
+              </label>
+              <datalist id="absenceReasons">
+                <option value="Urlaub"></option>
+                <option value="Klassenfahrt"></option>
+                <option value="Schule"></option>
+                <option value="Sonstiges"></option>
+              </datalist>
+              <div class="form-grid">
+                <label>Von <input id="absenceFrom" type="date" required /></label>
+                <label>Bis <input id="absenceTo" type="date" required /></label>
+              </div>
+              <div class="panel-actions">
+                <button class="ghost-button" id="cancelAbsenceBtn" type="button">Zurücksetzen</button>
+                <button class="primary-button" type="submit">Abwesenheit speichern</button>
+              </div>
+            </form>
+            <div class="development-list" id="absenceList"></div>
+          </section>
           <div class="analytics-grid" id="analyticsCards"></div>
         </section>
 
@@ -493,6 +522,7 @@
               <option>Pause</option>
             </select>
           </label>
+          <label id="playerInjuryUntilField">Ca. verletzt bis <input id="playerInjuryUntil" type="date" /></label>
         </div>
         <menu>
           <button class="ghost-button" type="button" id="cancelDialogBtn">Abbrechen</button>

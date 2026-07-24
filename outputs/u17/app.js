@@ -195,10 +195,12 @@ function normalizeState(data) {
   const players = Array.isArray(data.players) ? data.players : structuredClone(sampleData.players);
   const playerIds = new Set(players.map((player) => player.id));
   const developmentPlans = normalizeDevelopmentPlans(data.developmentPlans, playerIds);
+  const absences = normalizeAbsences(data.absences, playerIds);
   return {
     players: players.map(normalizePlayer),
     events: events.map(normalizeEvent),
     developmentPlans,
+    absences,
     opponents: Array.isArray(data.opponents) ? data.opponents.map(normalizeOpponent) : structuredClone(sampleData.opponents),
     selectedEventId: data.selectedEventId || data.events?.[0]?.id || sampleData.selectedEventId
   };
@@ -228,6 +230,27 @@ function normalizeDevelopmentPlan(plan = {}) {
   };
 }
 
+function normalizeAbsences(absences = {}, playerIds = new Set()) {
+  const normalized = {};
+  Object.entries(absences || {}).forEach(([playerId, items]) => {
+    if (playerIds.size && !playerIds.has(playerId)) return;
+    normalized[playerId] = Array.isArray(items) ? items.map(normalizeAbsence) : [];
+  });
+  playerIds.forEach((playerId) => {
+    normalized[playerId] ||= [];
+  });
+  return normalized;
+}
+
+function normalizeAbsence(absence = {}) {
+  return {
+    id: absence.id || `ab${crypto.randomUUID()}`,
+    label: absence.label || "",
+    from: absence.from || "",
+    to: absence.to || ""
+  };
+}
+
 function normalizeOpponent(opponent = {}) {
   return {
     id: opponent.id || `o${crypto.randomUUID()}`,
@@ -246,9 +269,10 @@ function normalizeOpponent(opponent = {}) {
 
 function normalizePlayer(player) {
   const positions = parsePositions(player.positions || player.position || "");
-  if (player.birthdate) return { ...player, positions };
+  const injuryUntil = player.injuryUntil || "";
+  if (player.birthdate) return { ...player, positions, injuryUntil };
   const year = new Date().getFullYear() - Number(player.age || 20);
-  return { ...player, positions, birthdate: `${year}-07-01` };
+  return { ...player, positions, injuryUntil, birthdate: `${year}-07-01` };
 }
 
 function parsePositions(value) {
@@ -413,9 +437,10 @@ let cloudUnsubscribers = [];
 // eventId/playerId -> unsubscribe-Funktion.
 let ratingListeners = {};
 let planListeners = {};
+let absenceListeners = {};
 let legacyBlobMode = false;
 let legacyCloudSaveTimer = null;
-const cloudCache = { players: [], events: [], ratings: {}, developmentPlans: {}, opponents: [] };
+const cloudCache = { players: [], events: [], ratings: {}, developmentPlans: {}, absences: {}, opponents: [] };
 
 function isCloudActive() {
   return Boolean(firestoreDb);
@@ -555,6 +580,7 @@ function startCloudSync() {
   cloudCache.events = [];
   cloudCache.ratings = {};
   cloudCache.developmentPlans = {};
+  cloudCache.absences = {};
   cloudCache.opponents = [];
 
   // Event-Metadaten (Titel/Datum/Ergebnis, keine Noten) sind fuer alle Teammitglieder lesbar.
@@ -570,6 +596,7 @@ function startCloudSync() {
     cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("players"), (snapshot) => {
       cloudCache.players = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
       syncPlanListeners(cloudCache.players.map((player) => player.id));
+      syncAbsenceListeners(cloudCache.players.map((player) => player.id));
       rebuildStateFromCloudCache();
     }, (error) => console.error("players sync", error)));
 
@@ -590,6 +617,11 @@ function startCloudSync() {
       cloudCache.developmentPlans = { [currentPlayerId]: snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })) };
       rebuildStateFromCloudCache();
     }, (error) => console.error("development plans sync", error)));
+
+    cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("players", currentPlayerId, "absences"), (snapshot) => {
+      cloudCache.absences = { [currentPlayerId]: snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })) };
+      rebuildStateFromCloudCache();
+    }, (error) => console.error("absences sync", error)));
   }
 }
 
@@ -667,6 +699,27 @@ function syncPlanListeners(playerIds) {
   });
 }
 
+function syncAbsenceListeners(playerIds) {
+  const idSet = new Set(playerIds);
+  Object.keys(absenceListeners).forEach((playerId) => {
+    if (idSet.has(playerId)) return;
+    absenceListeners[playerId]();
+    delete absenceListeners[playerId];
+    delete cloudCache.absences[playerId];
+  });
+  playerIds.forEach((playerId) => {
+    if (absenceListeners[playerId]) return;
+    absenceListeners[playerId] = firestoreModule.onSnapshot(
+      teamCollection("players", playerId, "absences"),
+      (snapshot) => {
+        cloudCache.absences[playerId] = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+        rebuildStateFromCloudCache();
+      },
+      (error) => console.error("absences sync", playerId, error)
+    );
+  });
+}
+
 function stopCloudSync() {
   cloudUnsubscribers.forEach((unsubscribe) => unsubscribe());
   cloudUnsubscribers = [];
@@ -674,6 +727,8 @@ function stopCloudSync() {
   ratingListeners = {};
   Object.values(planListeners).forEach((unsubscribe) => unsubscribe());
   planListeners = {};
+  Object.values(absenceListeners).forEach((unsubscribe) => unsubscribe());
+  absenceListeners = {};
 }
 
 function rebuildStateFromCloudCache() {
@@ -682,6 +737,7 @@ function rebuildStateFromCloudCache() {
     players: cloudCache.players,
     events,
     developmentPlans: cloudCache.developmentPlans,
+    absences: cloudCache.absences,
     opponents: cloudCache.opponents,
     selectedEventId: state.selectedEventId
   });
@@ -719,6 +775,8 @@ async function cloudDeletePlayer(playerId) {
     await firestoreModule.deleteDoc(teamDoc("players", playerId));
     const plans = state.developmentPlans?.[playerId] || [];
     await Promise.all(plans.map((plan) => firestoreModule.deleteDoc(teamDoc("players", playerId, "developmentPlans", plan.id))));
+    const absences = state.absences?.[playerId] || [];
+    await Promise.all(absences.map((absence) => firestoreModule.deleteDoc(teamDoc("players", playerId, "absences", absence.id))));
     await Promise.all(state.events.map((event) => (
       event.ratings?.[playerId] ? firestoreModule.deleteDoc(teamDoc("events", event.id, "ratings", playerId)) : Promise.resolve()
     )));
@@ -777,6 +835,26 @@ async function cloudDeleteDevelopmentPlan(playerId, planId) {
   } catch (error) {
     console.error(error);
     alert(`Foerderplan konnte nicht aus der Cloud geloescht werden.${cloudErrorSuffix(error)}`);
+  }
+}
+
+async function cloudSaveAbsence(playerId, absence) {
+  if (!isCloudTrainer()) return;
+  try {
+    await firestoreModule.setDoc(teamDoc("players", playerId, "absences", absence.id), { ...absence, playerId });
+  } catch (error) {
+    console.error(error);
+    alert(`Abwesenheit konnte nicht in der Cloud gespeichert werden - die Aenderung geht sonst verloren.${cloudErrorSuffix(error)}`);
+  }
+}
+
+async function cloudDeleteAbsence(playerId, absenceId) {
+  if (!isCloudTrainer()) return;
+  try {
+    await firestoreModule.deleteDoc(teamDoc("players", playerId, "absences", absenceId));
+  } catch (error) {
+    console.error(error);
+    alert(`Abwesenheit konnte nicht aus der Cloud geloescht werden.${cloudErrorSuffix(error)}`);
   }
 }
 
@@ -1101,6 +1179,9 @@ async function migrateLegacyBlobToCollections() {
     await Promise.all(Object.entries(legacy.developmentPlans || {}).flatMap(([playerId, plans]) =>
       plans.map((plan) => cloudSaveDevelopmentPlan(playerId, plan))
     ));
+    await Promise.all(Object.entries(legacy.absences || {}).flatMap(([playerId, absences]) =>
+      absences.map((absence) => cloudSaveAbsence(playerId, absence))
+    ));
     await Promise.all(legacy.opponents.map((opponent) => cloudSaveOpponent(opponent)));
     alert("Migration abgeschlossen. Das alte Dokument bleibt vorerst unveraendert erhalten.");
   } catch (error) {
@@ -1206,6 +1287,60 @@ function intensityLabel(value) {
 function formatDate(value) {
   if (!value) return "-";
   return new Date(`${value}T00:00:00`).toLocaleDateString("de-DE");
+}
+
+// Verletzung (Status "Verletzt" + "ca. verletzt bis") und eingetragene Abwesenheiten
+// (Urlaub, Klassenfahrt etc.) fuehren beide dazu, dass ein Spieler fuer Events in diesem
+// Zeitraum automatisch als "Fehlt" vorbelegt wird - siehe applyAutoAbsence/reconcileAbsences.
+function unavailabilityReason(player, dateStr) {
+  if (!player || !dateStr) return null;
+  if (player.status === "Verletzt" && player.injuryUntil && dateStr <= player.injuryUntil) {
+    return `Verletzt (ca. bis ${formatDate(player.injuryUntil)})`;
+  }
+  const absence = (state.absences?.[player.id] || []).find((item) => item.from && item.to && dateStr >= item.from && dateStr <= item.to);
+  return absence ? `${absence.label} (bis ${formatDate(absence.to)})` : null;
+}
+
+function hasRatingData(rating) {
+  if (!rating) return false;
+  return ["effort", "technique", "tactics", "comprehension", "minutes", "goals", "assists", "note"]
+    .some((field) => rating[field] !== "" && rating[field] != null);
+}
+
+// Ueberschreibt nur Ratings, die noch komplett unbearbeitet sind ("open" ohne jede
+// weitere Eingabe) - sowohl eine manuell gesetzte Anwesenheit als auch bereits
+// eingetragene Teilnoten/Notizen bleiben immer unangetastet.
+function applyAutoAbsence(event) {
+  let changed = false;
+  state.players.forEach((player) => {
+    const existing = event.ratings?.[player.id];
+    if (existing?.attendance && existing.attendance !== "open") return;
+    if (hasRatingData(existing)) return;
+    const reason = unavailabilityReason(player, event.date);
+    if (!reason) return;
+    event.ratings ||= {};
+    event.ratings[player.id] = {
+      attendance: "absent",
+      grade: "",
+      effort: "",
+      technique: "",
+      tactics: "",
+      comprehension: "",
+      minutes: "",
+      goals: "",
+      assists: "",
+      note: reason
+    };
+    cloudSaveRating(event.id, player.id, event.ratings[player.id]);
+    changed = true;
+  });
+  return changed;
+}
+
+function reconcileAbsences() {
+  let changed = false;
+  state.events.forEach((event) => { if (applyAutoAbsence(event)) changed = true; });
+  if (changed) persist();
 }
 
 function ageFromBirthdate(value) {
@@ -1842,7 +1977,15 @@ function openPlayerDialog(player) {
   $("#playerNumber").value = player?.number || nextNumber();
   $("#playerBirthdate").value = player?.birthdate || "2006-07-01";
   $("#playerStatus").value = player?.status || "Fit";
+  $("#playerInjuryUntil").value = player?.injuryUntil || "";
+  syncPlayerInjuryField();
   $("#playerDialog").showModal();
+}
+
+function syncPlayerInjuryField() {
+  const isInjured = $("#playerStatus").value === "Verletzt";
+  $("#playerInjuryUntilField").hidden = !isInjured;
+  if (!isInjured) $("#playerInjuryUntil").value = "";
 }
 
 function nextNumber() {
@@ -1876,7 +2019,8 @@ function savePlayer(event) {
     positions,
     number,
     birthdate: $("#playerBirthdate").value,
-    status: $("#playerStatus").value
+    status: $("#playerStatus").value,
+    injuryUntil: $("#playerStatus").value === "Verletzt" ? $("#playerInjuryUntil").value : ""
   };
   const existingIndex = state.players.findIndex((item) => item.id === id);
   if (existingIndex >= 0) state.players[existingIndex] = player;
@@ -1884,6 +2028,7 @@ function savePlayer(event) {
   $("#playerDialog").close();
   persist();
   cloudSavePlayer(player);
+  reconcileAbsences();
   renderAll();
 }
 
@@ -1932,6 +2077,7 @@ function saveEvent(event) {
     notes: $("#eventNotes").value.trim(),
     ratings: {}
   };
+  applyAutoAbsence(newEvent);
   state.events.push(newEvent);
   state.selectedEventId = newEvent.id;
   $("#eventDialog").close();
@@ -2000,6 +2146,7 @@ function drawProfile() {
   renderProfileHistory(ratings);
   renderProfileDeepAnalysis(playerId, ratings);
   renderDevelopmentPlans(playerId);
+  renderAbsenceList(playerId);
   renderAnalyticsCards(playerId, ratings);
 }
 
@@ -2078,6 +2225,73 @@ function deleteDevelopmentPlan(planId) {
   drawProfile();
 }
 
+function renderAbsenceList(playerId) {
+  const absences = [...(state.absences?.[playerId] || [])].sort((a, b) => new Date(b.from || 0) - new Date(a.from || 0));
+  $("#absenceList").innerHTML = absences.map((absence) => `
+    <article class="development-item">
+      <div>
+        <strong>${escapeHtml(absence.label)}</strong>
+        <p>${formatDate(absence.from)} – ${formatDate(absence.to)}</p>
+      </div>
+      <div class="row-actions">
+        <button class="ghost-button" data-action="edit-absence" data-id="${absence.id}" type="button">Bearbeiten</button>
+        <button class="ghost-button danger" data-action="delete-absence" data-id="${absence.id}" type="button">Löschen</button>
+      </div>
+    </article>
+  `).join("") || `<p class="muted">Noch keine Abwesenheit für diesen Spieler eingetragen.</p>`;
+}
+
+function resetAbsenceForm() {
+  $("#absenceId").value = "";
+  $("#absenceLabel").value = "";
+  $("#absenceFrom").value = "";
+  $("#absenceTo").value = "";
+}
+
+function saveAbsence(event) {
+  event.preventDefault();
+  const playerId = $("#profilePlayer").value || state.players[0]?.id;
+  if (!playerId) return;
+  state.absences ||= {};
+  state.absences[playerId] ||= [];
+  const id = $("#absenceId").value || `ab${crypto.randomUUID()}`;
+  const absence = {
+    id,
+    label: $("#absenceLabel").value.trim(),
+    from: $("#absenceFrom").value,
+    to: $("#absenceTo").value
+  };
+  const existingIndex = state.absences[playerId].findIndex((item) => item.id === id);
+  if (existingIndex >= 0) state.absences[playerId][existingIndex] = absence;
+  else state.absences[playerId].push(absence);
+  resetAbsenceForm();
+  persist();
+  cloudSaveAbsence(playerId, absence);
+  reconcileAbsences();
+  drawProfile();
+}
+
+function editAbsence(absenceId) {
+  const playerId = $("#profilePlayer").value || state.players[0]?.id;
+  const absence = state.absences?.[playerId]?.find((item) => item.id === absenceId);
+  if (!absence) return;
+  $("#absenceId").value = absence.id;
+  $("#absenceLabel").value = absence.label;
+  $("#absenceFrom").value = absence.from;
+  $("#absenceTo").value = absence.to;
+}
+
+function deleteAbsence(absenceId) {
+  const playerId = $("#profilePlayer").value || state.players[0]?.id;
+  if (!playerId) return;
+  if (!confirm("Diese Abwesenheit wirklich löschen?")) return;
+  state.absences ||= {};
+  state.absences[playerId] = (state.absences?.[playerId] || []).filter((item) => item.id !== absenceId);
+  persist();
+  cloudDeleteAbsence(playerId, absenceId);
+  drawProfile();
+}
+
 function renderProfileHeader(player, ratings) {
   const average = playerAverageGrade(player?.id);
   const risk = player ? playerInjuryRisk(player.id) : null;
@@ -2086,7 +2300,7 @@ function renderProfileHeader(player, ratings) {
       <div class="profile-number">${player.number}</div>
       <div>
         <strong>${player.name}</strong>
-        <span>${positionText(player)} · ${formatDate(player.birthdate)} · ${ageFromBirthdate(player.birthdate) ?? "-"} Jahre · ${player.status}</span>
+        <span>${positionText(player)} · ${formatDate(player.birthdate)} · ${ageFromBirthdate(player.birthdate) ?? "-"} Jahre · ${player.status}${player.status === "Verletzt" && player.injuryUntil ? ` (ca. bis ${formatDate(player.injuryUntil)})` : ""}</span>
       </div>
       <div class="profile-grade">
         <span>Ø Note</span>
@@ -2724,6 +2938,7 @@ $("#addPlayerTop").addEventListener("click", () => openPlayerDialog());
 $("#closeDialogBtn").addEventListener("click", () => $("#playerDialog").close());
 $("#cancelDialogBtn").addEventListener("click", () => $("#playerDialog").close());
 $("#playerForm").addEventListener("submit", savePlayer);
+$("#playerStatus").addEventListener("change", syncPlayerInjuryField);
 $("#positionOptions").addEventListener("change", () => $("#playerCustomPositions").setCustomValidity(""));
 $("#playerCustomPositions").addEventListener("input", () => $("#playerCustomPositions").setCustomValidity(""));
 $("#playerNumber").addEventListener("input", () => $("#playerNumber").setCustomValidity(""));
@@ -2760,11 +2975,14 @@ $("#selectedMatchDuration").addEventListener("change", (event) => updateSelected
 $("#selectedTrainingFocus").addEventListener("change", (event) => updateSelectedEventMeta("trainingFocus", event.target.value));
 $("#profilePlayer").addEventListener("change", () => {
   resetDevelopmentPlanForm();
+  resetAbsenceForm();
   drawProfile();
 });
 $("#profilePdfBtn").addEventListener("click", downloadProfilePdf);
 $("#developmentPlanForm").addEventListener("submit", saveDevelopmentPlan);
 $("#cancelDevelopmentPlanBtn").addEventListener("click", resetDevelopmentPlanForm);
+$("#absenceForm").addEventListener("submit", saveAbsence);
+$("#cancelAbsenceBtn").addEventListener("click", resetAbsenceForm);
 $("#opponentForm").addEventListener("submit", saveOpponent);
 $("#cancelOpponentBtn").addEventListener("click", resetOpponentForm);
 $("#opponentSearch").addEventListener("input", (event) => {
@@ -2777,6 +2995,13 @@ $("#developmentPlanList").addEventListener("click", (event) => {
   if (!button) return;
   if (button.dataset.action === "edit-plan") editDevelopmentPlan(button.dataset.id);
   if (button.dataset.action === "delete-plan") deleteDevelopmentPlan(button.dataset.id);
+});
+
+$("#absenceList").addEventListener("click", (event) => {
+  const button = event.target.closest("button");
+  if (!button) return;
+  if (button.dataset.action === "edit-absence") editAbsence(button.dataset.id);
+  if (button.dataset.action === "delete-absence") deleteAbsence(button.dataset.id);
 });
 
 $("#opponentList").addEventListener("click", (event) => {
@@ -2798,11 +3023,12 @@ $("#playerTable").addEventListener("click", (event) => {
   if (button.dataset.action === "edit") openPlayerDialog(player);
   if (button.dataset.action === "invite" && player) createInviteCodeForPlayer(player.id);
   if (button.dataset.action === "delete" && player) {
-    if (!confirm(`"${player.name}" wirklich löschen? Alle Bewertungen und der Förderplan dieses Spielers gehen verloren.`)) return;
+    if (!confirm(`"${player.name}" wirklich löschen? Alle Bewertungen, der Förderplan und die Abwesenheiten dieses Spielers gehen verloren.`)) return;
     cloudDeletePlayer(player.id);
     state.players = state.players.filter((item) => item.id !== player.id);
     state.events.forEach((item) => delete item.ratings?.[player.id]);
     delete state.developmentPlans?.[player.id];
+    delete state.absences?.[player.id];
     persist();
     renderAll();
   }
