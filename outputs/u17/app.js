@@ -1487,7 +1487,8 @@ function playerGameStats(playerId) {
     scorers,
     appearanceRate: possibleMinutes ? Math.round((minutes / possibleMinutes) * 100) : 0,
     scorersPerGame: appearances ? roundGrade(scorers / appearances) : null,
-    minutesPerGame: appearances ? Math.round(minutes / appearances) : 0
+    minutesPerGame: appearances ? Math.round(minutes / appearances) : 0,
+    minutesPerScorer: scorers ? Math.round(minutes / scorers) : null
   };
 }
 
@@ -2464,7 +2465,8 @@ function renderAnalyticsCards(playerId, ratings = playerRatings(playerId)) {
     ["Einsatzquote", `${gameStats.appearanceRate}%`],
     ["Scorer/Spiel", statLabel(gameStats.scorersPerGame)],
     ["Tore + Vorlagen", `${gameStats.goals} + ${gameStats.assists}`],
-    ["Min./Spiel", gameStats.minutesPerGame || "-"]
+    ["Min./Spiel", gameStats.minutesPerGame || "-"],
+    ["Min./Scorerpunkt", gameStats.minutesPerScorer ?? "-"]
   ];
   $("#analyticsCards").innerHTML = cards.map(([label, value]) => `<article class="insight-card"><span class="muted">${label}</span><strong>${value}</strong></article>`).join("");
 }
