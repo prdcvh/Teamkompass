@@ -205,6 +205,7 @@
                   <th>Events</th>
                   <th>Note</th>
                   <th>Risiko</th>
+                  <th>Messwerte</th>
                   <th></th>
                 </tr>
               </thead>
@@ -401,6 +402,28 @@
               </div>
             </form>
             <div class="development-list" id="absenceList"></div>
+          </section>
+          <section class="panel development-panel" id="measurementPanel">
+            <div class="panel-head">
+              <div>
+                <h2>Körperentwicklung</h2>
+                <span class="muted">Größe, Gewicht &amp; BMI - ca. einmal im Monat erfassen</span>
+              </div>
+            </div>
+            <canvas id="measurementChart" width="980" height="360" aria-label="Größe, Gewicht und BMI"></canvas>
+            <form class="development-form" id="measurementForm">
+              <input type="hidden" id="measurementId" />
+              <div class="form-grid">
+                <label>Datum <input id="measurementDate" type="date" required /></label>
+                <label>Größe (cm) <input id="measurementHeight" type="number" min="0" step="0.1" /></label>
+                <label>Gewicht (kg) <input id="measurementWeight" type="number" min="0" step="0.1" /></label>
+              </div>
+              <div class="panel-actions">
+                <button class="ghost-button" id="cancelMeasurementBtn" type="button">Zurücksetzen</button>
+                <button class="primary-button" type="submit">Messung speichern</button>
+              </div>
+            </form>
+            <div class="development-list" id="measurementList"></div>
           </section>
           <section class="panel">
             <div class="panel-head">

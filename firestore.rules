@@ -133,6 +133,11 @@ service cloud.firestore {
           allow read: if isTrainer() || (isTeamMember() && resource.data.playerId == memberDoc().data.get('playerId', null));
           allow write: if isTrainer();
         }
+
+        match /measurements/{measurementId} {
+          allow read: if isTrainer() || (isTeamMember() && resource.data.playerId == memberDoc().data.get('playerId', null));
+          allow write: if isTrainer();
+        }
       }
 
       match /events/{eventId} {
