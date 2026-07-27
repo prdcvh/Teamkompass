@@ -1890,7 +1890,6 @@ function swapPlayers(playerIdA, playerIdB) {
 }
 
 let pitchSubstituteTarget = null;
-let draggedPlayerId = null;
 
 function openPitchSubstituteDialog(zoneLabel, playerId) {
   pitchSubstituteTarget = { zone: zoneLabel, playerId: playerId || null };
@@ -1946,7 +1945,7 @@ function renderPitchBench() {
   const bench = state.players.filter((player) => !onPitch.has(player.id));
   $("#pitchBench").innerHTML = bench.length
     ? bench.map((player) => `
-        <button type="button" class="bench-player" draggable="true" data-player-id="${player.id}">
+        <button type="button" class="bench-player" data-player-id="${player.id}">
           <span class="number-badge">${player.number}</span>
           <span>${escapeHtml(player.name.split(" ")[0])}</span>
           <small class="muted">${positionText(player)}</small>
@@ -1977,7 +1976,7 @@ function renderPitch() {
       const positions = parsePositions(player.positions || player.position);
       const outOfPosition = !positions.includes(zone);
       return `
-        <div class="pitch-player ${outOfPosition ? "out-of-position" : ""}" draggable="true" data-player-id="${player.id}" data-zone="${zone}">
+        <div class="pitch-player ${outOfPosition ? "out-of-position" : ""}" data-player-id="${player.id}" data-zone="${zone}">
           <em>${zone}</em>
           <strong>${player.number} ${escapeHtml(player.name.split(" ")[0])}</strong>
           <span>Note ${gradeLabel(playerAverageGrade(player.id))}</span>
@@ -3494,55 +3493,125 @@ $("#pitch").addEventListener("click", (event) => {
   openPitchSubstituteDialog(zoneEl.dataset.zone, chip?.dataset.playerId || null);
 });
 
-document.addEventListener("dragstart", (event) => {
-  const chip = event.target.closest(".pitch-player, .bench-player");
-  if (!chip) return;
-  draggedPlayerId = chip.dataset.playerId;
-  event.dataTransfer.setData("text/plain", draggedPlayerId);
-  event.dataTransfer.effectAllowed = "move";
-});
+// Startelf-Drag&Drop laeuft komplett ueber die Pointer Events API statt der
+// nativen HTML5-Drag&Drop-API: Letztere feuert auf Touch-Geraeten (v.a. iOS
+// Safari, aber auch inkonsistent auf Android) gar nicht oder nur unzuverlaessig,
+// waehrend Pointer Events Maus, Touch und Stift einheitlich behandeln.
+let pitchDrag = null;
+let suppressNextPitchClick = false;
+const PITCH_DRAG_THRESHOLD = 8;
 
-document.addEventListener("dragend", () => {
-  draggedPlayerId = null;
-  document.querySelectorAll(".pitch-zone.drag-over").forEach((el) => el.classList.remove("drag-over"));
-});
+function pitchZoneAt(x, y) {
+  return document.elementFromPoint(x, y)?.closest(".pitch-zone") || null;
+}
 
-$("#pitch").addEventListener("dragover", (event) => {
-  const zoneEl = event.target.closest(".pitch-zone");
-  if (!zoneEl) return;
-  event.preventDefault();
-  zoneEl.classList.add("drag-over");
-});
+function pitchBenchAt(x, y) {
+  return document.elementFromPoint(x, y)?.closest(".pitch-bench") || null;
+}
 
-$("#pitch").addEventListener("dragleave", (event) => {
-  const zoneEl = event.target.closest(".pitch-zone");
-  if (zoneEl && !zoneEl.contains(event.relatedTarget)) zoneEl.classList.remove("drag-over");
-});
+function pitchChipAt(x, y) {
+  return document.elementFromPoint(x, y)?.closest(".pitch-player, .bench-player") || null;
+}
 
-$("#pitch").addEventListener("drop", (event) => {
-  const zoneEl = event.target.closest(".pitch-zone");
-  if (!zoneEl) return;
-  event.preventDefault();
-  const playerId = event.dataTransfer.getData("text/plain") || draggedPlayerId;
-  const targetChip = event.target.closest(".pitch-player");
-  if (playerId && targetChip && targetChip.dataset.playerId !== playerId) {
-    swapPlayers(playerId, targetChip.dataset.playerId);
-  } else if (playerId) {
+function clearPitchDragHighlights() {
+  document.querySelectorAll(".pitch-zone.drag-over, .pitch-bench.drag-over").forEach((el) => el.classList.remove("drag-over"));
+}
+
+function beginPitchDragging() {
+  const { sourceEl } = pitchDrag;
+  pitchDrag.dragging = true;
+  sourceEl.setPointerCapture(pitchDrag.pointerId);
+  const rect = sourceEl.getBoundingClientRect();
+  const ghost = sourceEl.cloneNode(true);
+  ghost.classList.add("pitch-drag-ghost");
+  ghost.style.width = `${rect.width}px`;
+  document.body.appendChild(ghost);
+  pitchDrag.ghost = ghost;
+  pitchDrag.offsetX = pitchDrag.startX - rect.left;
+  pitchDrag.offsetY = pitchDrag.startY - rect.top;
+  sourceEl.classList.add("dragging-source");
+  movePitchGhost(pitchDrag.startX, pitchDrag.startY);
+}
+
+function movePitchGhost(x, y) {
+  const { ghost, offsetX, offsetY } = pitchDrag;
+  ghost.style.left = `${x - offsetX}px`;
+  ghost.style.top = `${y - offsetY}px`;
+}
+
+function applyPitchDrop(playerId, x, y) {
+  const zoneEl = pitchZoneAt(x, y);
+  const benchEl = !zoneEl ? pitchBenchAt(x, y) : null;
+  if (!zoneEl && !benchEl) return;
+  const targetChip = pitchChipAt(x, y);
+  const targetPlayerId = targetChip?.dataset.playerId;
+  if (targetPlayerId && targetPlayerId !== playerId) {
+    swapPlayers(playerId, targetPlayerId);
+  } else if (zoneEl) {
     movePlayerToZone(playerId, zoneEl.dataset.zone);
-  }
-  zoneEl.classList.remove("drag-over");
-});
-
-$("#pitchBench").addEventListener("dragover", (event) => event.preventDefault());
-$("#pitchBench").addEventListener("drop", (event) => {
-  event.preventDefault();
-  const playerId = event.dataTransfer.getData("text/plain") || draggedPlayerId;
-  const targetChip = event.target.closest(".bench-player");
-  if (playerId && targetChip && targetChip.dataset.playerId !== playerId) {
-    swapPlayers(playerId, targetChip.dataset.playerId);
-  } else if (playerId) {
+  } else {
     removePlayerFromPitch(playerId);
   }
+}
+
+function endPitchDrag(event, cancelled) {
+  const { sourceEl, ghost, dragging, playerId } = pitchDrag;
+  sourceEl.releasePointerCapture(event.pointerId);
+  sourceEl.classList.remove("dragging-source");
+  clearPitchDragHighlights();
+  ghost?.remove();
+  if (dragging) {
+    suppressNextPitchClick = true;
+    if (!cancelled) applyPitchDrop(playerId, event.clientX, event.clientY);
+  }
+  pitchDrag = null;
+}
+
+document.addEventListener("click", (event) => {
+  if (!suppressNextPitchClick) return;
+  suppressNextPitchClick = false;
+  event.preventDefault();
+  event.stopPropagation();
+}, true);
+
+document.addEventListener("pointerdown", (event) => {
+  if (event.pointerType === "mouse" && event.button !== 0) return;
+  const chip = event.target.closest(".pitch-player, .bench-player");
+  if (!chip || !chip.dataset.playerId) return;
+  pitchDrag = {
+    pointerId: event.pointerId,
+    playerId: chip.dataset.playerId,
+    sourceEl: chip,
+    startX: event.clientX,
+    startY: event.clientY,
+    dragging: false,
+    ghost: null
+  };
+});
+
+document.addEventListener("pointermove", (event) => {
+  if (!pitchDrag || event.pointerId !== pitchDrag.pointerId) return;
+  if (!pitchDrag.dragging) {
+    const distance = Math.hypot(event.clientX - pitchDrag.startX, event.clientY - pitchDrag.startY);
+    if (distance < PITCH_DRAG_THRESHOLD) return;
+    beginPitchDragging();
+  }
+  event.preventDefault();
+  movePitchGhost(event.clientX, event.clientY);
+  clearPitchDragHighlights();
+  const zoneEl = pitchZoneAt(event.clientX, event.clientY);
+  const targetEl = zoneEl || pitchBenchAt(event.clientX, event.clientY);
+  targetEl?.classList.add("drag-over");
+});
+
+document.addEventListener("pointerup", (event) => {
+  if (!pitchDrag || event.pointerId !== pitchDrag.pointerId) return;
+  endPitchDrag(event, false);
+});
+
+document.addEventListener("pointercancel", (event) => {
+  if (!pitchDrag || event.pointerId !== pitchDrag.pointerId) return;
+  endPitchDrag(event, true);
 });
 
 $("#substituteSearch").addEventListener("input", renderSubstituteList);
