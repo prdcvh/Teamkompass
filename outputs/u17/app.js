@@ -213,6 +213,7 @@ function chartPalette() {
     line: cssVar("--line") || "#e4dcde",
     red: cssVar("--red") || "#d8072e",
     green: cssVar("--green") || "#08714f",
+    blue: cssVar("--blue") || "#1f4f72",
     amber: cssVar("--amber") || "#c9862f",
     soft: cssVar("--soft-panel") || "#f3e8eb"
   };
@@ -247,12 +248,14 @@ function normalizeState(data) {
   const developmentPlans = normalizeDevelopmentPlans(data.developmentPlans, playerIds);
   const absences = normalizeAbsences(data.absences, playerIds);
   const lineup = normalizeLineup(data.lineup, playerIds);
+  const measurements = normalizeMeasurements(data.measurements, playerIds);
   return {
     players: players.map(normalizePlayer),
     events: events.map(normalizeEvent),
     developmentPlans,
     absences,
     lineup,
+    measurements,
     opponents: Array.isArray(data.opponents) ? data.opponents.map(normalizeOpponent) : structuredClone(sampleData.opponents),
     selectedEventId: data.selectedEventId || data.events?.[0]?.id || sampleData.selectedEventId
   };
@@ -300,6 +303,27 @@ function normalizeAbsence(absence = {}) {
     label: absence.label || "",
     from: absence.from || "",
     to: absence.to || ""
+  };
+}
+
+function normalizeMeasurements(measurements = {}, playerIds = new Set()) {
+  const normalized = {};
+  Object.entries(measurements || {}).forEach(([playerId, items]) => {
+    if (playerIds.size && !playerIds.has(playerId)) return;
+    normalized[playerId] = Array.isArray(items) ? items.map(normalizeMeasurement) : [];
+  });
+  playerIds.forEach((playerId) => {
+    normalized[playerId] ||= [];
+  });
+  return normalized;
+}
+
+function normalizeMeasurement(measurement = {}) {
+  return {
+    id: measurement.id || `me${crypto.randomUUID()}`,
+    date: measurement.date || new Date().toISOString().slice(0, 10),
+    height: measurement.height ?? "",
+    weight: measurement.weight ?? ""
   };
 }
 
@@ -490,9 +514,10 @@ let cloudUnsubscribers = [];
 let ratingListeners = {};
 let planListeners = {};
 let absenceListeners = {};
+let measurementListeners = {};
 let legacyBlobMode = false;
 let legacyCloudSaveTimer = null;
-const cloudCache = { players: [], events: [], ratings: {}, developmentPlans: {}, absences: {}, opponents: [], lineup: null };
+const cloudCache = { players: [], events: [], ratings: {}, developmentPlans: {}, absences: {}, measurements: {}, opponents: [], lineup: null };
 
 function isCloudActive() {
   return Boolean(firestoreDb);
@@ -633,6 +658,7 @@ function startCloudSync() {
   cloudCache.ratings = {};
   cloudCache.developmentPlans = {};
   cloudCache.absences = {};
+  cloudCache.measurements = {};
   cloudCache.opponents = [];
   cloudCache.lineup = null;
 
@@ -650,6 +676,7 @@ function startCloudSync() {
       cloudCache.players = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
       syncPlanListeners(cloudCache.players.map((player) => player.id));
       syncAbsenceListeners(cloudCache.players.map((player) => player.id));
+      syncMeasurementListeners(cloudCache.players.map((player) => player.id));
       rebuildStateFromCloudCache();
     }, (error) => console.error("players sync", error)));
 
@@ -683,6 +710,11 @@ function startCloudSync() {
       cloudCache.absences = { [currentPlayerId]: snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })) };
       rebuildStateFromCloudCache();
     }, (error) => console.error("absences sync", error)));
+
+    cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("players", currentPlayerId, "measurements"), (snapshot) => {
+      cloudCache.measurements = { [currentPlayerId]: snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })) };
+      rebuildStateFromCloudCache();
+    }, (error) => console.error("measurements sync", error)));
   }
 }
 
@@ -781,6 +813,27 @@ function syncAbsenceListeners(playerIds) {
   });
 }
 
+function syncMeasurementListeners(playerIds) {
+  const idSet = new Set(playerIds);
+  Object.keys(measurementListeners).forEach((playerId) => {
+    if (idSet.has(playerId)) return;
+    measurementListeners[playerId]();
+    delete measurementListeners[playerId];
+    delete cloudCache.measurements[playerId];
+  });
+  playerIds.forEach((playerId) => {
+    if (measurementListeners[playerId]) return;
+    measurementListeners[playerId] = firestoreModule.onSnapshot(
+      teamCollection("players", playerId, "measurements"),
+      (snapshot) => {
+        cloudCache.measurements[playerId] = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+        rebuildStateFromCloudCache();
+      },
+      (error) => console.error("measurements sync", playerId, error)
+    );
+  });
+}
+
 function stopCloudSync() {
   cloudUnsubscribers.forEach((unsubscribe) => unsubscribe());
   cloudUnsubscribers = [];
@@ -790,6 +843,8 @@ function stopCloudSync() {
   planListeners = {};
   Object.values(absenceListeners).forEach((unsubscribe) => unsubscribe());
   absenceListeners = {};
+  Object.values(measurementListeners).forEach((unsubscribe) => unsubscribe());
+  measurementListeners = {};
 }
 
 function rebuildStateFromCloudCache() {
@@ -799,6 +854,7 @@ function rebuildStateFromCloudCache() {
     events,
     developmentPlans: cloudCache.developmentPlans,
     absences: cloudCache.absences,
+    measurements: cloudCache.measurements,
     lineup: cloudCache.lineup,
     opponents: cloudCache.opponents,
     selectedEventId: state.selectedEventId
@@ -839,6 +895,8 @@ async function cloudDeletePlayer(playerId) {
     await Promise.all(plans.map((plan) => firestoreModule.deleteDoc(teamDoc("players", playerId, "developmentPlans", plan.id))));
     const absences = state.absences?.[playerId] || [];
     await Promise.all(absences.map((absence) => firestoreModule.deleteDoc(teamDoc("players", playerId, "absences", absence.id))));
+    const measurements = state.measurements?.[playerId] || [];
+    await Promise.all(measurements.map((measurement) => firestoreModule.deleteDoc(teamDoc("players", playerId, "measurements", measurement.id))));
     await Promise.all(state.events.map((event) => (
       event.ratings?.[playerId] ? firestoreModule.deleteDoc(teamDoc("events", event.id, "ratings", playerId)) : Promise.resolve()
     )));
@@ -917,6 +975,26 @@ async function cloudDeleteAbsence(playerId, absenceId) {
   } catch (error) {
     console.error(error);
     alert(`Abwesenheit konnte nicht aus der Cloud geloescht werden.${cloudErrorSuffix(error)}`);
+  }
+}
+
+async function cloudSaveMeasurement(playerId, measurement) {
+  if (!isCloudTrainer()) return;
+  try {
+    await firestoreModule.setDoc(teamDoc("players", playerId, "measurements", measurement.id), { ...measurement, playerId });
+  } catch (error) {
+    console.error(error);
+    alert(`Messung konnte nicht in der Cloud gespeichert werden - die Aenderung geht sonst verloren.${cloudErrorSuffix(error)}`);
+  }
+}
+
+async function cloudDeleteMeasurement(playerId, measurementId) {
+  if (!isCloudTrainer()) return;
+  try {
+    await firestoreModule.deleteDoc(teamDoc("players", playerId, "measurements", measurementId));
+  } catch (error) {
+    console.error(error);
+    alert(`Messung konnte nicht aus der Cloud geloescht werden.${cloudErrorSuffix(error)}`);
   }
 }
 
@@ -1254,6 +1332,9 @@ async function migrateLegacyBlobToCollections() {
     await Promise.all(Object.entries(legacy.absences || {}).flatMap(([playerId, absences]) =>
       absences.map((absence) => cloudSaveAbsence(playerId, absence))
     ));
+    await Promise.all(Object.entries(legacy.measurements || {}).flatMap(([playerId, measurements]) =>
+      measurements.map((measurement) => cloudSaveMeasurement(playerId, measurement))
+    ));
     await Promise.all(legacy.opponents.map((opponent) => cloudSaveOpponent(opponent)));
     if (legacy.lineup && !lineupIsEmpty(legacy.lineup)) await cloudSaveLineup(legacy.lineup);
     alert("Migration abgeschlossen. Das alte Dokument bleibt vorerst unveraendert erhalten.");
@@ -1314,6 +1395,26 @@ function playerAverageGrade(playerId) {
 
 function playerAttendanceCount(playerId) {
   return state.events.filter((event) => event.ratings?.[playerId]?.attendance === "present" || event.ratings?.[playerId]?.attendance === "limited").length;
+}
+
+function playerMeasurements(playerId) {
+  return [...(state.measurements?.[playerId] || [])].sort((a, b) => new Date(a.date) - new Date(b.date));
+}
+
+function latestMeasurement(playerId) {
+  const measurements = playerMeasurements(playerId);
+  return measurements.length ? measurements[measurements.length - 1] : null;
+}
+
+function measurementMissingThisMonth(playerId) {
+  const month = new Date().toISOString().slice(0, 7);
+  return !(state.measurements?.[playerId] || []).some((item) => item.date?.slice(0, 7) === month);
+}
+
+function calculateBmi(height, weight) {
+  const heightM = Number(height) / 100;
+  if (!heightM || !weight) return null;
+  return Number(weight) / (heightM * heightM);
 }
 
 function playerInjuryRisk(playerId) {
@@ -1959,6 +2060,8 @@ function renderSquad() {
     const effectiveStatus = playerEffectiveStatus(player);
     const statusClass = effectiveStatus === "Verletzt" || effectiveStatus === "Gesperrt" ? "danger" : effectiveStatus === "Angeschlagen" || effectiveStatus === "Abwesend" ? "warning" : "";
     const risk = playerInjuryRisk(player.id);
+    const lastMeasurement = latestMeasurement(player.id);
+    const missingMeasurement = measurementMissingThisMonth(player.id);
     return `
       <tr>
         <td data-label="Spieler"><div class="player-cell"><span class="number-badge">${player.number}</span><strong>${player.name}</strong></div></td>
@@ -1968,6 +2071,12 @@ function renderSquad() {
         <td data-label="Events">${playerAttendanceCount(player.id)}</td>
         <td data-label="Note">${gradeLabel(playerAverageGrade(player.id))}</td>
         <td data-label="Risiko"><span class="risk-pill ${risk.level.toLowerCase()}">${risk.level}</span></td>
+        <td data-label="Messwerte" class="measurement-cell">
+          ${missingMeasurement
+            ? `<span class="status-pill warning">Messwerte fehlen</span>`
+            : `<span class="muted">${formatDate(lastMeasurement.date)} · ${lastMeasurement.height || "–"} cm / ${lastMeasurement.weight || "–"} kg</span>`}
+          <button class="ghost-button" data-action="add-measurement" data-id="${player.id}" type="button">Messung hinzufügen</button>
+        </td>
         <td class="row-actions" data-label="Aktionen">
           <button class="ghost-button" data-action="profile" data-id="${player.id}">Profil</button>
           <button class="ghost-button" data-action="edit" data-id="${player.id}">Bearbeiten</button>
@@ -2413,6 +2522,8 @@ function drawProfile() {
   renderProfileDeepAnalysis(playerId, ratings);
   renderDevelopmentPlans(playerId);
   renderAbsenceList(playerId);
+  renderMeasurementList(playerId);
+  renderMeasurementChart(player);
   renderAnalyticsCards(playerId, ratings);
 }
 
@@ -2571,6 +2682,162 @@ function deleteAbsence(absenceId) {
   persist();
   cloudDeleteAbsence(playerId, absenceId);
   drawProfile();
+}
+
+function renderMeasurementList(playerId) {
+  const measurements = [...playerMeasurements(playerId)].reverse();
+  $("#measurementList").innerHTML = measurements.map((measurement) => {
+    const bmi = calculateBmi(measurement.height, measurement.weight);
+    return `
+      <article class="development-item">
+        <div>
+          <strong>${formatDate(measurement.date)}</strong>
+          <p>${measurement.height || "–"} cm · ${measurement.weight || "–"} kg${bmi ? ` · BMI ${roundGrade(bmi)}` : ""}</p>
+        </div>
+        <div class="row-actions">
+          <button class="ghost-button" data-action="edit-measurement" data-id="${measurement.id}" type="button">Bearbeiten</button>
+          <button class="ghost-button danger" data-action="delete-measurement" data-id="${measurement.id}" type="button">Löschen</button>
+        </div>
+      </article>
+    `;
+  }).join("") || `<p class="muted">Noch keine Messwerte für diesen Spieler eingetragen.</p>`;
+}
+
+function resetMeasurementForm() {
+  $("#measurementId").value = "";
+  $("#measurementDate").valueAsDate = new Date();
+  $("#measurementHeight").value = "";
+  $("#measurementWeight").value = "";
+}
+
+function saveMeasurement(event) {
+  event.preventDefault();
+  const playerId = $("#profilePlayer").value || state.players[0]?.id;
+  if (!playerId) return;
+  state.measurements ||= {};
+  state.measurements[playerId] ||= [];
+  const id = $("#measurementId").value || `me${crypto.randomUUID()}`;
+  const measurement = {
+    id,
+    date: $("#measurementDate").value,
+    height: $("#measurementHeight").value,
+    weight: $("#measurementWeight").value
+  };
+  const existingIndex = state.measurements[playerId].findIndex((item) => item.id === id);
+  if (existingIndex >= 0) state.measurements[playerId][existingIndex] = measurement;
+  else state.measurements[playerId].push(measurement);
+  resetMeasurementForm();
+  persist();
+  cloudSaveMeasurement(playerId, measurement);
+  drawProfile();
+  renderSquad();
+}
+
+function editMeasurement(measurementId) {
+  const playerId = $("#profilePlayer").value || state.players[0]?.id;
+  const measurement = state.measurements?.[playerId]?.find((item) => item.id === measurementId);
+  if (!measurement) return;
+  $("#measurementId").value = measurement.id;
+  $("#measurementDate").value = measurement.date;
+  $("#measurementHeight").value = measurement.height;
+  $("#measurementWeight").value = measurement.weight;
+}
+
+function deleteMeasurement(measurementId) {
+  const playerId = $("#profilePlayer").value || state.players[0]?.id;
+  if (!playerId) return;
+  if (!confirm("Diese Messung wirklich löschen?")) return;
+  state.measurements ||= {};
+  state.measurements[playerId] = (state.measurements?.[playerId] || []).filter((item) => item.id !== measurementId);
+  persist();
+  cloudDeleteMeasurement(playerId, measurementId);
+  drawProfile();
+  renderSquad();
+}
+
+function goToMeasurementForm(playerId) {
+  $("#profilePlayer").value = playerId;
+  setView("profiles");
+  resetMeasurementForm();
+  $("#measurementPanel")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  $("#measurementHeight").focus();
+}
+
+function renderMeasurementChart(player) {
+  const canvas = $("#measurementChart");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const colors = chartPalette();
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = colors.surface;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = colors.ink;
+  ctx.font = "700 18px system-ui";
+  ctx.fillText(player ? `${player.name} · Größe, Gewicht, BMI` : "Größe, Gewicht, BMI", 58, 28);
+
+  const oneYearAgo = new Date();
+  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+  const entries = (player ? playerMeasurements(player.id) : [])
+    .filter((item) => item.height && item.weight && new Date(`${item.date}T00:00:00`) >= oneYearAgo);
+
+  if (entries.length < 2) {
+    ctx.fillStyle = colors.muted;
+    ctx.fillText("Noch nicht genug Messwerte der letzten 12 Monate fuer einen Verlauf (mind. 2 noetig).", 58, 190);
+    return;
+  }
+
+  const top = 54;
+  const bottom = 300;
+  const series = [
+    { label: "Größe (cm)", color: colors.red, values: entries.map((item) => Number(item.height)) },
+    { label: "Gewicht (kg)", color: colors.blue, values: entries.map((item) => Number(item.weight)) },
+    { label: "BMI", color: colors.green, values: entries.map((item) => calculateBmi(item.height, item.weight)) }
+  ];
+  series.forEach((s) => {
+    const min = Math.min(...s.values);
+    const max = Math.max(...s.values);
+    const range = max - min || 1;
+    s.points = entries.map((entry, index) => ({
+      x: 76 + (index * 850) / Math.max(entries.length - 1, 1),
+      y: bottom - ((s.values[index] - min) / range) * (bottom - top)
+    }));
+  });
+  series.forEach((s) => {
+    ctx.strokeStyle = s.color;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    s.points.forEach((point, index) => index ? ctx.lineTo(point.x, point.y) : ctx.moveTo(point.x, point.y));
+    ctx.stroke();
+    s.points.forEach((point) => {
+      ctx.fillStyle = s.color;
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  });
+  entries.forEach((entry, index) => {
+    ctx.fillStyle = colors.muted;
+    ctx.font = "12px system-ui";
+    ctx.fillText(entry.date.slice(0, 7), 76 + (index * 850) / Math.max(entries.length - 1, 1) - 16, 344);
+  });
+
+  const last = entries[entries.length - 1];
+  const lastBmi = calculateBmi(last.height, last.weight);
+  const legendItems = [
+    { label: `Größe ${last.height} cm`, color: series[0].color },
+    { label: `Gewicht ${last.weight} kg`, color: series[1].color },
+    { label: `BMI ${gradeLabel(lastBmi ? roundGrade(lastBmi) : null)}`, color: series[2].color }
+  ];
+  legendItems.forEach((item, index) => {
+    const x = 58 + index * 260;
+    ctx.fillStyle = item.color;
+    ctx.beginPath();
+    ctx.arc(x, 44, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = colors.ink;
+    ctx.font = "13px system-ui";
+    ctx.fillText(item.label, x + 12, 48);
+  });
 }
 
 function renderProfileHeader(player, ratings) {
@@ -3342,6 +3609,7 @@ $("#selectedTrainingFocus").addEventListener("change", (event) => updateSelected
 $("#profilePlayer").addEventListener("change", () => {
   resetDevelopmentPlanForm();
   resetAbsenceForm();
+  resetMeasurementForm();
   drawProfile();
 });
 $("#profilePdfBtn").addEventListener("click", downloadProfilePdf);
@@ -3350,6 +3618,8 @@ $("#cancelDevelopmentPlanBtn").addEventListener("click", resetDevelopmentPlanFor
 $("#absenceForm").addEventListener("submit", saveAbsence);
 $("#cancelAbsenceBtn").addEventListener("click", resetAbsenceForm);
 $("#absenceReason").addEventListener("change", syncAbsenceReasonField);
+$("#measurementForm").addEventListener("submit", saveMeasurement);
+$("#cancelMeasurementBtn").addEventListener("click", resetMeasurementForm);
 $("#opponentForm").addEventListener("submit", saveOpponent);
 $("#cancelOpponentBtn").addEventListener("click", resetOpponentForm);
 $("#opponentSearch").addEventListener("input", (event) => {
@@ -3378,6 +3648,13 @@ $("#opponentList").addEventListener("click", (event) => {
   if (button.dataset.action === "delete-opponent") deleteOpponent(button.dataset.id);
 });
 
+$("#measurementList").addEventListener("click", (event) => {
+  const button = event.target.closest("button");
+  if (!button) return;
+  if (button.dataset.action === "edit-measurement") editMeasurement(button.dataset.id);
+  if (button.dataset.action === "delete-measurement") deleteMeasurement(button.dataset.id);
+});
+
 $("#playerTable").addEventListener("click", (event) => {
   const button = event.target.closest("button");
   if (!button) return;
@@ -3389,6 +3666,7 @@ $("#playerTable").addEventListener("click", (event) => {
   }
   if (button.dataset.action === "edit") openPlayerDialog(player);
   if (button.dataset.action === "invite" && player) createInviteCodeForPlayer(player.id);
+  if (button.dataset.action === "add-measurement" && player) goToMeasurementForm(player.id);
   if (button.dataset.action === "delete" && player) {
     if (!confirm(`"${player.name}" wirklich löschen? Alle Bewertungen, der Förderplan und die Abwesenheiten dieses Spielers gehen verloren.`)) return;
     cloudDeletePlayer(player.id);
@@ -3396,6 +3674,7 @@ $("#playerTable").addEventListener("click", (event) => {
     state.events.forEach((item) => delete item.ratings?.[player.id]);
     delete state.developmentPlans?.[player.id];
     delete state.absences?.[player.id];
+    delete state.measurements?.[player.id];
     persist();
     renderAll();
   }

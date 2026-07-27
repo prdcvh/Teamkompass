@@ -1283,6 +1283,12 @@ tr:last-child td {
   gap: 8px;
 }
 
+.measurement-cell {
+  display: grid;
+  gap: 6px;
+  align-items: start;
+}
+
 .form-panel,
 .player-form {
   display: grid;
