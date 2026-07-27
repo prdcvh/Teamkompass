@@ -146,16 +146,16 @@
             <section class="panel pitch-panel">
               <div class="panel-head">
                 <div>
-                  <h2>Startelf nach Notenschnitt</h2>
+                  <h2>Startelf <span id="pitchFormationName" class="pitch-formation-name">-</span></h2>
                   <span class="muted" id="pitchTeamGrade">Mannschaftsnote –</span>
                 </div>
-                <select id="formationSelect" aria-label="Formation">
-                  <option value="4-3-3">4-3-3</option>
-                  <option value="4-2-3-1">4-2-3-1</option>
-                  <option value="3-5-2">3-5-2</option>
-                </select>
               </div>
+              <div class="formation-picker" id="formationPicker"></div>
               <div class="pitch" id="pitch"></div>
+              <div class="panel-head">
+                <span class="muted">Bank - per Drag &amp; Drop oder Klick auf eine Position im Feld einwechseln</span>
+              </div>
+              <div class="pitch-bench" id="pitchBench"></div>
             </section>
             <section class="panel">
               <div class="panel-head">
@@ -547,6 +547,24 @@
           <button class="primary-button" id="savePlayerBtn" type="submit">Speichern</button>
         </menu>
       </form>
+    </dialog>
+
+    <dialog id="substituteDialog">
+      <div class="player-form">
+        <div class="dialog-head">
+          <h2>Position <span id="substituteZoneLabel"></span> besetzen</h2>
+          <button class="icon-button" type="button" id="closeSubstituteDialogBtn" aria-label="Schließen">×</button>
+        </div>
+        <label class="search-box">
+          <span>Suche</span>
+          <input id="substituteSearch" type="search" placeholder="Name, Position" />
+        </label>
+        <div class="substitute-list" id="substituteList"></div>
+        <menu>
+          <button class="ghost-button danger" type="button" id="removeFromPitchBtn" hidden>Vom Feld nehmen</button>
+          <button class="ghost-button" type="button" id="cancelSubstituteDialogBtn">Schließen</button>
+        </menu>
+      </div>
     </dialog>
 
     <dialog id="eventDialog">

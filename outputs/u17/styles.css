@@ -642,8 +642,39 @@ menu {
   border-radius: 0 0 3px 3px;
 }
 
-.pitch-player {
+.pitch-zone {
   position: absolute;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 4px;
+  border-radius: 12px;
+  transform: translate(-50%, -50%);
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.pitch-zone.drag-over {
+  background: rgba(255, 255, 255, 0.22);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.85);
+}
+
+.pitch-zone-label {
+  display: inline-grid;
+  min-width: 28px;
+  min-height: 28px;
+  place-items: center;
+  border: 1px dashed rgba(255, 255, 255, 0.55);
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.7rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.pitch-player {
   display: grid;
   width: 92px;
   min-height: 56px;
@@ -655,7 +686,17 @@ menu {
   color: #fff;
   background: rgba(169, 6, 36, 0.86);
   text-align: center;
-  transform: translate(-50%, -50%);
+  cursor: grab;
+}
+
+.pitch-player:active {
+  cursor: grabbing;
+}
+
+.pitch-player.out-of-position {
+  border-color: rgba(36, 29, 31, 0.5);
+  color: #241d1f;
+  background: rgba(230, 170, 30, 0.92);
 }
 
 .pitch-player em {
@@ -671,6 +712,10 @@ menu {
   font-weight: 950;
 }
 
+.pitch-player.out-of-position em {
+  color: #7a4d00;
+}
+
 .pitch-player strong {
   display: block;
   font-size: 0.88rem;
@@ -682,14 +727,125 @@ menu {
   font-size: 0.74rem;
 }
 
-.pitch-player.empty-slot {
-  border-style: dashed;
-  color: rgba(255, 255, 255, 0.88);
-  background: rgba(36, 29, 31, 0.48);
+.pitch-player.out-of-position span {
+  color: #4a3200;
 }
 
-.pitch-player.empty-slot span {
-  color: rgba(255, 255, 255, 0.72);
+.formation-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.formation-option {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: var(--field);
+  text-align: left;
+  cursor: pointer;
+}
+
+.formation-option:hover {
+  border-color: var(--red);
+}
+
+.formation-option span {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.formation-option.recommended {
+  border-color: var(--green);
+  background: var(--soft-green);
+}
+
+.formation-badge {
+  position: absolute;
+  top: -9px;
+  right: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--green-dark, #08714f);
+  font-size: 0.66rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.pitch-formation-name {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.pitch-bench {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.bench-player {
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  min-width: 76px;
+  padding: 7px 10px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: var(--field);
+  text-align: center;
+  cursor: grab;
+}
+
+.bench-player:active {
+  cursor: grabbing;
+}
+
+.substitute-list {
+  display: grid;
+  gap: 6px;
+  max-height: 50vh;
+  margin-top: 10px;
+  overflow-y: auto;
+}
+
+.substitute-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: var(--field);
+  text-align: left;
+  cursor: pointer;
+}
+
+.substitute-option:hover {
+  border-color: var(--red);
+}
+
+.substitute-option.current {
+  border-color: var(--red);
+  background: var(--soft-red);
+}
+
+.substitute-option.out-of-position .substitute-option-name small {
+  color: #7a4d00;
+}
+
+.substitute-option-name {
+  display: grid;
+  gap: 1px;
 }
 
 .record-list,
