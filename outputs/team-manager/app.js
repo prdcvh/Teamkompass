@@ -1736,8 +1736,19 @@ function playerOnPitchZone(playerId) {
 // Stellt playerId in zoneLabel (entfernt ihn zuerst aus seiner bisherigen Zone).
 // Keine Kapazitaetsgrenze pro Zone - mehrere Spieler in derselben Zone werden
 // beim Rendern per Flexbox nebeneinander innerhalb der Zonenbreite verteilt.
+function pitchPlayerCount() {
+  return Object.values(state.lineup.assignments).reduce((sum, ids) => sum + ids.length, 0);
+}
+
 function movePlayerToZone(playerId, zoneLabel) {
   if (!PITCH_ZONES[zoneLabel]) return;
+  // Kapazitaetsgrenze gilt nur beim Einwechseln von der Bank - ein bereits
+  // aufgestellter Spieler darf immer die Zone wechseln, da sich die Gesamtzahl
+  // auf dem Feld dabei nicht aendert.
+  if (!playerOnPitchZone(playerId) && pitchPlayerCount() >= 11) {
+    alert("Die Startelf ist bereits voll (11 Spieler). Nimm zuerst jemanden vom Feld, bevor du einen weiteren Spieler aufstellst.");
+    return;
+  }
   const assignments = state.lineup.assignments;
   Object.keys(assignments).forEach((zone) => {
     assignments[zone] = assignments[zone].filter((id) => id !== playerId);
