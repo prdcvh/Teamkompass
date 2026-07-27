@@ -1781,6 +1781,25 @@ function removePlayerFromPitch(playerId) {
   renderPitch();
 }
 
+// Wird beim Ablegen eines Spielers direkt auf einem anderen Spieler aufgerufen
+// (auf dem Feld oder der Bank) - beide tauschen ihre Zone. Kam einer der beiden
+// von der Bank (keine Zone), landet der andere dafuer auf der Bank statt in einer
+// Zone - also eine normale Einwechslung statt eines Tauschs.
+function swapPlayers(playerIdA, playerIdB) {
+  if (playerIdA === playerIdB) return;
+  const zoneA = playerOnPitchZone(playerIdA);
+  const zoneB = playerOnPitchZone(playerIdB);
+  const assignments = state.lineup.assignments;
+  Object.keys(assignments).forEach((zone) => {
+    assignments[zone] = assignments[zone].filter((id) => id !== playerIdA && id !== playerIdB);
+  });
+  if (zoneB) assignments[zoneB].push(playerIdA);
+  if (zoneA) assignments[zoneA].push(playerIdB);
+  persist();
+  cloudSaveLineup(state.lineup);
+  renderPitch();
+}
+
 let pitchSubstituteTarget = null;
 let draggedPlayerId = null;
 
@@ -3235,7 +3254,12 @@ $("#pitch").addEventListener("drop", (event) => {
   if (!zoneEl) return;
   event.preventDefault();
   const playerId = event.dataTransfer.getData("text/plain") || draggedPlayerId;
-  if (playerId) movePlayerToZone(playerId, zoneEl.dataset.zone);
+  const targetChip = event.target.closest(".pitch-player");
+  if (playerId && targetChip && targetChip.dataset.playerId !== playerId) {
+    swapPlayers(playerId, targetChip.dataset.playerId);
+  } else if (playerId) {
+    movePlayerToZone(playerId, zoneEl.dataset.zone);
+  }
   zoneEl.classList.remove("drag-over");
 });
 
@@ -3243,7 +3267,12 @@ $("#pitchBench").addEventListener("dragover", (event) => event.preventDefault())
 $("#pitchBench").addEventListener("drop", (event) => {
   event.preventDefault();
   const playerId = event.dataTransfer.getData("text/plain") || draggedPlayerId;
-  if (playerId) removePlayerFromPitch(playerId);
+  const targetChip = event.target.closest(".bench-player");
+  if (playerId && targetChip && targetChip.dataset.playerId !== playerId) {
+    swapPlayers(playerId, targetChip.dataset.playerId);
+  } else if (playerId) {
+    removePlayerFromPitch(playerId);
+  }
 });
 
 $("#substituteSearch").addEventListener("input", renderSubstituteList);
@@ -3256,7 +3285,12 @@ $("#removeFromPitchBtn").addEventListener("click", () => {
 $("#substituteList").addEventListener("click", (event) => {
   const button = event.target.closest(".substitute-option");
   if (!button || !pitchSubstituteTarget) return;
-  movePlayerToZone(button.dataset.playerId, pitchSubstituteTarget.zone);
+  const pickedId = button.dataset.playerId;
+  if (pitchSubstituteTarget.playerId && pitchSubstituteTarget.playerId !== pickedId) {
+    swapPlayers(pickedId, pitchSubstituteTarget.playerId);
+  } else {
+    movePlayerToZone(pickedId, pitchSubstituteTarget.zone);
+  }
   $("#substituteDialog").close();
 });
 
