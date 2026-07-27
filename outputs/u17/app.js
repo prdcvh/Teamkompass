@@ -114,25 +114,6 @@ const PITCH_ZONES = {
   RA: { x: 81, y: 20, width: 24 }
 };
 
-// Welche Zonen ein Spieler ohne "gelbe Warnung" besetzen kann - naeherungsweise
-// benachbarte/verwandte Positionen, analog zu den frueheren Formations-Slots.
-const ZONE_MATCHES = {
-  TW: ["TW"],
-  LV: ["LV", "LM"],
-  IV: ["IV", "LIB"],
-  LIB: ["LIB", "IV"],
-  RV: ["RV", "RM"],
-  DM: ["DM", "ZM"],
-  ZM: ["ZM", "DM", "OM"],
-  LM: ["LM", "LV", "LA"],
-  RM: ["RM", "RV", "RA"],
-  OM: ["OM", "ZM", "HS"],
-  LA: ["LA", "LM", "ST"],
-  HS: ["HS", "ST", "OM"],
-  ST: ["ST", "HS"],
-  RA: ["RA", "RM", "ST"]
-};
-
 // Baender von hinten nach vorne - die Formationsbezeichnung (z.B. "4-3-3") wird
 // nie manuell gepflegt, sondern immer live aus der Summe pro Band abgeleitet
 // (leere Baender werden uebersprungen). So aendert sich der Titel automatisch,
@@ -1626,7 +1607,7 @@ function startOfToday() {
 function expandPreset(preset) {
   const slots = [];
   Object.entries(preset).forEach(([zone, count]) => {
-    for (let i = 0; i < count; i += 1) slots.push({ zone, matches: ZONE_MATCHES[zone] });
+    for (let i = 0; i < count; i += 1) slots.push({ zone });
   });
   return slots;
 }
@@ -1658,18 +1639,18 @@ function eligibleLineupCandidates() {
 }
 
 // Waehlt aus allen verfuegbaren Spielern die beste GESAMT-Elf fuer die uebergebenen
-// Slots: jeder Spieler besetzt hoechstens einen Slot und nur eine Zone, die er laut
-// seinem Profil auch spielen kann (slot.matches). Optimiert wird per Bitmask-DP
-// (ein Slot pro Bit) zuerst auf moeglichst wenige offene Positionen, danach auf
-// den besten Notendurchschnitt der Elf - statt slot-fuer-slot naiv den jeweils
-// besten verfuegbaren Spieler zu nehmen, was einzelne Positionen unnoetig
-// freilassen oder eine schwaechere Gesamtelf ergeben kann.
+// Slots: jeder Spieler besetzt hoechstens einen Slot und nur eine Zone, die exakt
+// in seinen eingetragenen Positionen steht (keine "verwandten" Positionen). Optimiert
+// wird per Bitmask-DP (ein Slot pro Bit) zuerst auf moeglichst wenige offene
+// Positionen, danach auf den besten Notendurchschnitt der Elf - statt slot-fuer-slot
+// naiv den jeweils besten verfuegbaren Spieler zu nehmen, was einzelne Positionen
+// unnoetig freilassen oder eine schwaechere Gesamtelf ergeben kann.
 function assignFormationSlots(slots, candidates) {
   const slotCount = slots.length;
   const fullMask = (1 << slotCount) - 1;
   const eligibility = candidates.map((player) => {
     const positions = parsePositions(player.positions || player.position);
-    return slots.reduce((bits, slot, index) => (slot.matches.some((label) => positions.includes(label)) ? bits | (1 << index) : bits), 0);
+    return slots.reduce((bits, slot, index) => (positions.includes(slot.zone) ? bits | (1 << index) : bits), 0);
   });
 
   let dp = new Array(fullMask + 1).fill(Infinity);
@@ -1679,7 +1660,6 @@ function assignFormationSlots(slots, candidates) {
   candidates.forEach((player, playerIndex) => {
     const bits = eligibility[playerIndex];
     if (!bits) return;
-    const positions = parsePositions(player.positions || player.position);
     const grade = playerAverageGrade(player.id) || 9;
     const dpNext = dp.slice();
     const parentNext = parent.slice();
@@ -1688,10 +1668,7 @@ function assignFormationSlots(slots, candidates) {
       for (let slotIndex = 0; slotIndex < slotCount; slotIndex++) {
         const bit = 1 << slotIndex;
         if (!(bits & bit) || (mask & bit)) continue;
-        // winziger Bonus fuer die exakt gelistete Position, damit bei gleicher
-        // Note die natuerlichere Position bevorzugt wird (Notenunterschiede sind
-        // immer mindestens 0.1, dieser Bonus veraendert also nie die echte Wahl)
-        const cost = grade + (positions.includes(slots[slotIndex].zone) ? 0 : 0.01);
+        const cost = grade;
         const newMask = mask | bit;
         if (dp[mask] + cost < dpNext[newMask]) {
           dpNext[newMask] = dp[mask] + cost;
@@ -1821,7 +1798,7 @@ function renderSubstituteList() {
     .filter((player) => !query || [player.name, positionText(player), String(player.number)].join(" ").toLowerCase().includes(query));
   $("#substituteList").innerHTML = players.map((player) => {
     const positions = parsePositions(player.positions || player.position);
-    const eligible = ZONE_MATCHES[zone].some((label) => positions.includes(label));
+    const eligible = positions.includes(zone);
     const currentZone = playerOnPitchZone(player.id);
     return `
       <button type="button" class="substitute-option ${eligible ? "" : "out-of-position"} ${player.id === playerId ? "current" : ""}" data-player-id="${player.id}">
@@ -1886,7 +1863,7 @@ function renderPitch() {
       const player = state.players.find((item) => item.id === playerId);
       if (!player) return "";
       const positions = parsePositions(player.positions || player.position);
-      const outOfPosition = !ZONE_MATCHES[zone].some((label) => positions.includes(label));
+      const outOfPosition = !positions.includes(zone);
       return `
         <div class="pitch-player ${outOfPosition ? "out-of-position" : ""}" draggable="true" data-player-id="${player.id}" data-zone="${zone}">
           <em>${zone}</em>
