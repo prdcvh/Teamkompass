@@ -2507,9 +2507,19 @@ function renderAbsenceList(playerId) {
   `).join("") || `<p class="muted">Noch keine Abwesenheit für diesen Spieler eingetragen.</p>`;
 }
 
+const ABSENCE_FIXED_REASONS = ["Urlaub", "Klassenfahrt", "Schule", "Sperre"];
+
+function syncAbsenceReasonField() {
+  const isCustom = $("#absenceReason").value === "Sonstiges";
+  $("#absenceCustomReasonField").hidden = !isCustom;
+  if (!isCustom) $("#absenceCustomReason").value = "";
+}
+
 function resetAbsenceForm() {
   $("#absenceId").value = "";
-  $("#absenceLabel").value = "";
+  $("#absenceReason").value = "";
+  $("#absenceCustomReason").value = "";
+  $("#absenceCustomReasonField").hidden = true;
   $("#absenceFrom").value = "";
   $("#absenceTo").value = "";
 }
@@ -2521,9 +2531,11 @@ function saveAbsence(event) {
   state.absences ||= {};
   state.absences[playerId] ||= [];
   const id = $("#absenceId").value || `ab${crypto.randomUUID()}`;
+  const reason = $("#absenceReason").value;
+  const label = reason === "Sonstiges" ? ($("#absenceCustomReason").value.trim() || "Sonstiges") : reason;
   const absence = {
     id,
-    label: $("#absenceLabel").value.trim(),
+    label,
     from: $("#absenceFrom").value,
     to: $("#absenceTo").value
   };
@@ -2542,7 +2554,10 @@ function editAbsence(absenceId) {
   const absence = state.absences?.[playerId]?.find((item) => item.id === absenceId);
   if (!absence) return;
   $("#absenceId").value = absence.id;
-  $("#absenceLabel").value = absence.label;
+  const isFixedReason = ABSENCE_FIXED_REASONS.includes(absence.label);
+  $("#absenceReason").value = isFixedReason ? absence.label : "Sonstiges";
+  $("#absenceCustomReason").value = isFixedReason ? "" : absence.label;
+  syncAbsenceReasonField();
   $("#absenceFrom").value = absence.from;
   $("#absenceTo").value = absence.to;
 }
@@ -3334,6 +3349,7 @@ $("#developmentPlanForm").addEventListener("submit", saveDevelopmentPlan);
 $("#cancelDevelopmentPlanBtn").addEventListener("click", resetDevelopmentPlanForm);
 $("#absenceForm").addEventListener("submit", saveAbsence);
 $("#cancelAbsenceBtn").addEventListener("click", resetAbsenceForm);
+$("#absenceReason").addEventListener("change", syncAbsenceReasonField);
 $("#opponentForm").addEventListener("submit", saveOpponent);
 $("#cancelOpponentBtn").addEventListener("click", resetOpponentForm);
 $("#opponentSearch").addEventListener("input", (event) => {

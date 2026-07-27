@@ -380,15 +380,18 @@
             <form class="development-form" id="absenceForm">
               <input type="hidden" id="absenceId" />
               <label>Grund
-                <input id="absenceLabel" list="absenceReasons" maxlength="50" placeholder="z.B. Urlaub, Sperre" required />
+                <select id="absenceReason" required>
+                  <option value="" disabled selected>Bitte wählen</option>
+                  <option value="Urlaub">Urlaub</option>
+                  <option value="Klassenfahrt">Klassenfahrt</option>
+                  <option value="Schule">Schule</option>
+                  <option value="Sperre">Sperre</option>
+                  <option value="Sonstiges">Sonstiges</option>
+                </select>
               </label>
-              <datalist id="absenceReasons">
-                <option value="Urlaub"></option>
-                <option value="Klassenfahrt"></option>
-                <option value="Schule"></option>
-                <option value="Sperre"></option>
-                <option value="Sonstiges"></option>
-              </datalist>
+              <label id="absenceCustomReasonField" hidden>Details
+                <input id="absenceCustomReason" maxlength="50" placeholder="z.B. Krankenhausaufenthalt" />
+              </label>
               <div class="form-grid">
                 <label>Von <input id="absenceFrom" type="date" required /></label>
                 <label>Bis <input id="absenceTo" type="date" required /></label>
