@@ -153,6 +153,12 @@ service cloud.firestore {
         allow read, write: if isTrainer();
       }
 
+      // Startelf/Taktikboard - wie das gesamte Dashboard nur fuer Trainer sichtbar,
+      // deshalb ein einzelnes Dokument statt einer Unter-Collection.
+      match /meta/lineup {
+        allow read, write: if isTrainer();
+      }
+
       // Altes Einzeldokument aus dem Single-Blob-Modell - nur fuer die einmalige
       // Migration in die neue Struktur, danach kann es geloescht werden.
       match /appState/current {

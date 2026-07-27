@@ -91,6 +91,75 @@ const sampleData = {
   selectedEventId: "e2"
 };
 
+// 14 feste Positionszonen auf dem Feld (x/y-Zentrum + Breite in % von .pitch),
+// in die Spieler per Drag & Drop oder ueber die Kaderauswahl (Klick) gestellt
+// werden koennen. Jede Zone kann beliebig viele Spieler aufnehmen (z.B. 3x IV
+// bei Dreierkette) - sie werden per Flexbox innerhalb der Zonenbreite verteilt.
+// Muss vor loadState()/normalizeState() stehen, da normalizeLineup() das schon
+// beim initialen Laden benoetigt.
+const PITCH_ZONES = {
+  TW: { x: 50, y: 92, width: 16 },
+  LV: { x: 17, y: 68, width: 20 },
+  IV: { x: 50, y: 70, width: 54 },
+  LIB: { x: 50, y: 79, width: 22 },
+  RV: { x: 83, y: 68, width: 20 },
+  DM: { x: 50, y: 54, width: 42 },
+  ZM: { x: 50, y: 46, width: 60 },
+  LM: { x: 17, y: 46, width: 20 },
+  RM: { x: 83, y: 46, width: 20 },
+  OM: { x: 50, y: 30, width: 66 },
+  LA: { x: 19, y: 20, width: 24 },
+  HS: { x: 50, y: 18, width: 30 },
+  ST: { x: 50, y: 14, width: 46 },
+  RA: { x: 81, y: 20, width: 24 }
+};
+
+// Welche Zonen ein Spieler ohne "gelbe Warnung" besetzen kann - naeherungsweise
+// benachbarte/verwandte Positionen, analog zu den frueheren Formations-Slots.
+const ZONE_MATCHES = {
+  TW: ["TW"],
+  LV: ["LV", "LM"],
+  IV: ["IV", "LIB"],
+  LIB: ["LIB", "IV"],
+  RV: ["RV", "RM"],
+  DM: ["DM", "ZM"],
+  ZM: ["ZM", "DM", "OM"],
+  LM: ["LM", "LV", "LA"],
+  RM: ["RM", "RV", "RA"],
+  OM: ["OM", "ZM", "HS"],
+  LA: ["LA", "LM", "ST"],
+  HS: ["HS", "ST", "OM"],
+  ST: ["ST", "HS"],
+  RA: ["RA", "RM", "ST"]
+};
+
+// Baender von hinten nach vorne - die Formationsbezeichnung (z.B. "4-3-3") wird
+// nie manuell gepflegt, sondern immer live aus der Summe pro Band abgeleitet
+// (leere Baender werden uebersprungen). So aendert sich der Titel automatisch,
+// sobald Spieler per Drag & Drop verschoben werden.
+const PITCH_BANDS = [
+  ["LV", "IV", "LIB", "RV"],
+  ["DM"],
+  ["LM", "ZM", "RM"],
+  ["OM"],
+  ["LA", "HS", "ST", "RA"]
+];
+
+// Formations-Vorschlaege als Anzahl Spieler pro Zone (TW immer 1). Mehr als
+// eine benoetigte Zone (z.B. OM x3 fuer eine 3er-Reihe hinter der Spitze bei
+// 4-2-3-1) wird von der Zone selbst per Flexbox nebeneinander verteilt.
+const FORMATION_PRESETS = [
+  { TW: 1, LV: 1, IV: 2, RV: 1, ZM: 3, LA: 1, ST: 1, RA: 1 },
+  { TW: 1, LV: 1, IV: 2, RV: 1, DM: 2, OM: 3, ST: 1 },
+  { TW: 1, LV: 1, IV: 2, RV: 1, LM: 1, ZM: 2, RM: 1, ST: 2 },
+  { TW: 1, LV: 1, IV: 2, RV: 1, DM: 1, ZM: 2, OM: 1, ST: 2 },
+  { TW: 1, LV: 1, IV: 2, RV: 1, DM: 1, LM: 1, ZM: 2, RM: 1, ST: 1 },
+  { TW: 1, IV: 3, LM: 1, ZM: 3, RM: 1, ST: 2 },
+  { TW: 1, IV: 3, LM: 1, ZM: 2, RM: 1, LA: 1, ST: 1, RA: 1 },
+  { TW: 1, LV: 1, IV: 3, RV: 1, ZM: 3, ST: 2 },
+  { TW: 1, LV: 1, IV: 2, RV: 1, LM: 1, ZM: 3, RM: 1, ST: 1 }
+];
+
 let state = loadState();
 let mobileAccordionsPrepared = false;
 const $ = (selector) => document.querySelector(selector);
@@ -196,11 +265,13 @@ function normalizeState(data) {
   const playerIds = new Set(players.map((player) => player.id));
   const developmentPlans = normalizeDevelopmentPlans(data.developmentPlans, playerIds);
   const absences = normalizeAbsences(data.absences, playerIds);
+  const lineup = normalizeLineup(data.lineup, playerIds);
   return {
     players: players.map(normalizePlayer),
     events: events.map(normalizeEvent),
     developmentPlans,
     absences,
+    lineup,
     opponents: Array.isArray(data.opponents) ? data.opponents.map(normalizeOpponent) : structuredClone(sampleData.opponents),
     selectedEventId: data.selectedEventId || data.events?.[0]?.id || sampleData.selectedEventId
   };
@@ -440,7 +511,7 @@ let planListeners = {};
 let absenceListeners = {};
 let legacyBlobMode = false;
 let legacyCloudSaveTimer = null;
-const cloudCache = { players: [], events: [], ratings: {}, developmentPlans: {}, absences: {}, opponents: [] };
+const cloudCache = { players: [], events: [], ratings: {}, developmentPlans: {}, absences: {}, opponents: [], lineup: null };
 
 function isCloudActive() {
   return Boolean(firestoreDb);
@@ -582,6 +653,7 @@ function startCloudSync() {
   cloudCache.developmentPlans = {};
   cloudCache.absences = {};
   cloudCache.opponents = [];
+  cloudCache.lineup = null;
 
   // Event-Metadaten (Titel/Datum/Ergebnis, keine Noten) sind fuer alle Teammitglieder lesbar.
   cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("events"), (snapshot) => {
@@ -604,6 +676,14 @@ function startCloudSync() {
       cloudCache.opponents = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
       rebuildStateFromCloudCache();
     }, (error) => console.error("opponents sync", error)));
+
+    // Startelf/Taktikboard ist wie das gesamte Dashboard nur fuer Trainer sichtbar
+    // (siehe applyRoleRestrictions) - deshalb genuegt ein einzelnes Dokument statt
+    // einer Unter-Collection pro Spieler/Event.
+    cloudUnsubscribers.push(firestoreModule.onSnapshot(teamDoc("meta", "lineup"), (docSnap) => {
+      cloudCache.lineup = docSnap.exists() ? docSnap.data() : null;
+      rebuildStateFromCloudCache();
+    }, (error) => console.error("lineup sync", error)));
   } else if (currentRole === "player" && currentPlayerId) {
     // Ein Spieler darf nie die ganze players-Collection auflisten (Firestore-Regeln
     // erlauben Listenabfragen nur, wenn sie fuer JEDES moegliche Ergebnis gelten -
@@ -738,6 +818,7 @@ function rebuildStateFromCloudCache() {
     events,
     developmentPlans: cloudCache.developmentPlans,
     absences: cloudCache.absences,
+    lineup: cloudCache.lineup,
     opponents: cloudCache.opponents,
     selectedEventId: state.selectedEventId
   });
@@ -855,6 +936,16 @@ async function cloudDeleteAbsence(playerId, absenceId) {
   } catch (error) {
     console.error(error);
     alert(`Abwesenheit konnte nicht aus der Cloud geloescht werden.${cloudErrorSuffix(error)}`);
+  }
+}
+
+async function cloudSaveLineup(lineup) {
+  if (!isCloudTrainer()) return;
+  try {
+    await firestoreModule.setDoc(teamDoc("meta", "lineup"), lineup);
+  } catch (error) {
+    console.error(error);
+    alert(`Aufstellung konnte nicht in der Cloud gespeichert werden - die Aenderung geht sonst verloren.${cloudErrorSuffix(error)}`);
   }
 }
 
@@ -1183,6 +1274,7 @@ async function migrateLegacyBlobToCollections() {
       absences.map((absence) => cloudSaveAbsence(playerId, absence))
     ));
     await Promise.all(legacy.opponents.map((opponent) => cloudSaveOpponent(opponent)));
+    if (legacy.lineup && !lineupIsEmpty(legacy.lineup)) await cloudSaveLineup(legacy.lineup);
     alert("Migration abgeschlossen. Das alte Dokument bleibt vorerst unveraendert erhalten.");
   } catch (error) {
     console.error(error);
@@ -1530,83 +1622,43 @@ function startOfToday() {
   return date;
 }
 
-function renderPitch() {
-  const formations = {
-    "4-3-3": [
-      { label: "TW", x: 50, y: 90, matches: ["TW"] },
-      { label: "LV", x: 18, y: 68, matches: ["LV", "LM"] },
-      { label: "IV", x: 38, y: 70, matches: ["IV", "LIB"] },
-      { label: "IV", x: 62, y: 70, matches: ["IV", "LIB"] },
-      { label: "RV", x: 82, y: 68, matches: ["RV", "RM"] },
-      { label: "ZM", x: 28, y: 48, matches: ["ZM", "DM"] },
-      { label: "DM", x: 50, y: 43, matches: ["DM", "ZM"] },
-      { label: "ZM", x: 72, y: 48, matches: ["ZM", "OM"] },
-      { label: "LA", x: 22, y: 22, matches: ["LA", "LM", "ST"] },
-      { label: "ST", x: 50, y: 16, matches: ["ST", "HS"] },
-      { label: "RA", x: 78, y: 22, matches: ["RA", "RM", "ST"] }
-    ],
-    "4-2-3-1": [
-      { label: "TW", x: 50, y: 90, matches: ["TW"] },
-      { label: "LV", x: 18, y: 68, matches: ["LV", "LM"] },
-      { label: "IV", x: 38, y: 70, matches: ["IV", "LIB"] },
-      { label: "IV", x: 62, y: 70, matches: ["IV", "LIB"] },
-      { label: "RV", x: 82, y: 68, matches: ["RV", "RM"] },
-      { label: "DM", x: 38, y: 52, matches: ["DM", "ZM"] },
-      { label: "DM", x: 62, y: 52, matches: ["DM", "ZM"] },
-      { label: "LA", x: 24, y: 33, matches: ["LA", "LM", "OM"] },
-      { label: "OM", x: 50, y: 29, matches: ["OM", "ZM", "HS"] },
-      { label: "RA", x: 76, y: 33, matches: ["RA", "RM", "OM"] },
-      { label: "ST", x: 50, y: 15, matches: ["ST", "HS"] }
-    ],
-    "3-5-2": [
-      { label: "TW", x: 50, y: 90, matches: ["TW"] },
-      { label: "IV", x: 28, y: 69, matches: ["IV", "LV"] },
-      { label: "IV", x: 50, y: 72, matches: ["IV", "LIB"] },
-      { label: "IV", x: 72, y: 69, matches: ["IV", "RV"] },
-      { label: "LM", x: 16, y: 48, matches: ["LM", "LV", "LA"] },
-      { label: "ZM", x: 36, y: 45, matches: ["ZM", "DM"] },
-      { label: "DM", x: 50, y: 42, matches: ["DM", "ZM"] },
-      { label: "ZM", x: 64, y: 45, matches: ["ZM", "OM"] },
-      { label: "RM", x: 84, y: 48, matches: ["RM", "RV", "RA"] },
-      { label: "ST", x: 40, y: 18, matches: ["ST", "HS", "LA"] },
-      { label: "ST", x: 60, y: 18, matches: ["ST", "HS", "RA"] }
-    ]
-  };
-  const candidates = state.players
-    .filter((player) => !["Verletzt", "Gesperrt", "Abwesend"].includes(playerEffectiveStatus(player)))
-    .sort((a, b) => (playerAverageGrade(a.id) || 9) - (playerAverageGrade(b.id) || 9) || a.number - b.number);
-  const slots = formations[$("#formationSelect").value];
-  const assigned = assignFormationSlots(slots, candidates);
-  $("#pitch").innerHTML = assigned.map(({ slot, player }) => {
-    if (!player) {
-      return `
-        <div class="pitch-player empty-slot" style="left:${slot.x}%;top:${slot.y}%">
-          <em>${slot.label}</em>
-          <strong>Offen</strong>
-          <span>keine passende Position</span>
-        </div>
-      `;
-    }
-    const grade = playerAverageGrade(player.id);
-    const matchedPosition = bestMatchedPosition(player, slot);
-    return `
-      <div class="pitch-player" style="left:${slot.x}%;top:${slot.y}%">
-        <em>${slot.label}</em>
-        <strong>${player.number} ${escapeHtml(player.name.split(" ")[0])}</strong>
-        <span>${matchedPosition} · Note ${gradeLabel(grade)}</span>
-      </div>
-    `;
-  }).join("");
-  const teamGradeEl = $("#pitchTeamGrade");
-  if (teamGradeEl) {
-    const startingGrades = assigned.map(({ player }) => player && playerAverageGrade(player.id)).filter(Boolean);
-    const teamGrade = startingGrades.length ? roundGrade(startingGrades.reduce((sum, value) => sum + value, 0) / startingGrades.length) : null;
-    teamGradeEl.textContent = teamGrade ? `Mannschaftsnote Ø ${gradeLabel(teamGrade)}` : "Mannschaftsnote noch ohne Bewertungen";
-  }
+// ---- Startelf/Taktikboard ----
+function expandPreset(preset) {
+  const slots = [];
+  Object.entries(preset).forEach(([zone, count]) => {
+    for (let i = 0; i < count; i += 1) slots.push({ zone, matches: ZONE_MATCHES[zone] });
+  });
+  return slots;
 }
 
-// Waehlt aus allen verfuegbaren Spielern die beste GESAMT-Elf fuer die Formation:
-// jeder Spieler besetzt hoechstens einen Slot und nur eine Position, die er laut
+function formationNameFromAssignments(assignments) {
+  const parts = PITCH_BANDS
+    .map((zones) => zones.reduce((sum, zone) => sum + (assignments[zone]?.length || 0), 0))
+    .filter((count) => count > 0);
+  return parts.length ? parts.join("-") : "Keine Aufstellung";
+}
+
+function normalizeLineup(lineup, playerIds = new Set()) {
+  const assignments = {};
+  Object.keys(PITCH_ZONES).forEach((zone) => {
+    const ids = Array.isArray(lineup?.assignments?.[zone]) ? lineup.assignments[zone] : [];
+    assignments[zone] = playerIds.size ? ids.filter((id) => playerIds.has(id)) : ids;
+  });
+  return { assignments };
+}
+
+function lineupIsEmpty(lineup) {
+  return Object.values(lineup.assignments).every((ids) => !ids.length);
+}
+
+function eligibleLineupCandidates() {
+  return state.players
+    .filter((player) => !["Verletzt", "Gesperrt", "Abwesend"].includes(playerEffectiveStatus(player)))
+    .sort((a, b) => (playerAverageGrade(a.id) || 9) - (playerAverageGrade(b.id) || 9) || a.number - b.number);
+}
+
+// Waehlt aus allen verfuegbaren Spielern die beste GESAMT-Elf fuer die uebergebenen
+// Slots: jeder Spieler besetzt hoechstens einen Slot und nur eine Zone, die er laut
 // seinem Profil auch spielen kann (slot.matches). Optimiert wird per Bitmask-DP
 // (ein Slot pro Bit) zuerst auf moeglichst wenige offene Positionen, danach auf
 // den besten Notendurchschnitt der Elf - statt slot-fuer-slot naiv den jeweils
@@ -1639,7 +1691,7 @@ function assignFormationSlots(slots, candidates) {
         // winziger Bonus fuer die exakt gelistete Position, damit bei gleicher
         // Note die natuerlichere Position bevorzugt wird (Notenunterschiede sind
         // immer mindestens 0.1, dieser Bonus veraendert also nie die echte Wahl)
-        const cost = grade + (positions.includes(slots[slotIndex].label) ? 0 : 0.01);
+        const cost = grade + (positions.includes(slots[slotIndex].zone) ? 0 : 0.01);
         const newMask = mask | bit;
         if (dp[mask] + cost < dpNext[newMask]) {
           dpNext[newMask] = dp[mask] + cost;
@@ -1676,10 +1728,173 @@ function popcount(mask) {
   return count;
 }
 
-function bestMatchedPosition(player, slot) {
-  const positions = parsePositions(player.positions || player.position);
-  if (positions.includes(slot.label)) return slot.label;
-  return slot.matches.find((label) => positions.includes(label)) || positions[0] || slot.label;
+function formationPreview(preset, candidates) {
+  const assigned = assignFormationSlots(expandPreset(preset), candidates);
+  const grades = assigned.map(({ player }) => player && playerAverageGrade(player.id)).filter(Boolean);
+  const grade = grades.length ? roundGrade(grades.reduce((sum, value) => sum + value, 0) / grades.length) : null;
+  return { assigned, grade, filled: assigned.filter((item) => item.player).length, total: assigned.length };
+}
+
+function assignedToAssignments(assigned) {
+  const assignments = {};
+  Object.keys(PITCH_ZONES).forEach((zone) => { assignments[zone] = []; });
+  assigned.forEach(({ slot, player }) => { if (player) assignments[slot.zone].push(player.id); });
+  return assignments;
+}
+
+function applyFormationPreset(presetIndex) {
+  const preset = FORMATION_PRESETS[presetIndex];
+  if (!preset) return;
+  const { assigned } = formationPreview(preset, eligibleLineupCandidates());
+  state.lineup = { assignments: assignedToAssignments(assigned) };
+  persist();
+  cloudSaveLineup(state.lineup);
+  renderPitch();
+}
+
+function playerOnPitchZone(playerId) {
+  return Object.entries(state.lineup.assignments).find(([, ids]) => ids.includes(playerId))?.[0] || null;
+}
+
+// Stellt playerId in zoneLabel (entfernt ihn zuerst aus seiner bisherigen Zone).
+// Keine Kapazitaetsgrenze pro Zone - mehrere Spieler in derselben Zone werden
+// beim Rendern per Flexbox nebeneinander innerhalb der Zonenbreite verteilt.
+function movePlayerToZone(playerId, zoneLabel) {
+  if (!PITCH_ZONES[zoneLabel]) return;
+  const assignments = state.lineup.assignments;
+  Object.keys(assignments).forEach((zone) => {
+    assignments[zone] = assignments[zone].filter((id) => id !== playerId);
+  });
+  assignments[zoneLabel].push(playerId);
+  persist();
+  cloudSaveLineup(state.lineup);
+  renderPitch();
+}
+
+function removePlayerFromPitch(playerId) {
+  const assignments = state.lineup.assignments;
+  Object.keys(assignments).forEach((zone) => {
+    assignments[zone] = assignments[zone].filter((id) => id !== playerId);
+  });
+  persist();
+  cloudSaveLineup(state.lineup);
+  renderPitch();
+}
+
+let pitchSubstituteTarget = null;
+let draggedPlayerId = null;
+
+function openPitchSubstituteDialog(zoneLabel, playerId) {
+  pitchSubstituteTarget = { zone: zoneLabel, playerId: playerId || null };
+  $("#substituteZoneLabel").textContent = zoneLabel;
+  $("#substituteSearch").value = "";
+  $("#removeFromPitchBtn").hidden = !playerId;
+  renderSubstituteList();
+  $("#substituteDialog").showModal();
+}
+
+function renderSubstituteList() {
+  if (!pitchSubstituteTarget) return;
+  const { zone, playerId } = pitchSubstituteTarget;
+  const query = $("#substituteSearch").value.trim().toLowerCase();
+  const players = [...state.players]
+    .sort((a, b) => a.number - b.number)
+    .filter((player) => !query || [player.name, positionText(player), String(player.number)].join(" ").toLowerCase().includes(query));
+  $("#substituteList").innerHTML = players.map((player) => {
+    const positions = parsePositions(player.positions || player.position);
+    const eligible = ZONE_MATCHES[zone].some((label) => positions.includes(label));
+    const currentZone = playerOnPitchZone(player.id);
+    return `
+      <button type="button" class="substitute-option ${eligible ? "" : "out-of-position"} ${player.id === playerId ? "current" : ""}" data-player-id="${player.id}">
+        <span class="number-badge">${player.number}</span>
+        <span class="substitute-option-name">
+          <strong>${escapeHtml(player.name)}</strong>
+          <small class="muted">${positionText(player)} · Note ${gradeLabel(playerAverageGrade(player.id))}${currentZone ? ` · aktuell ${currentZone}` : " · Bank"}</small>
+        </span>
+      </button>
+    `;
+  }).join("") || `<p class="muted">Kein Spieler gefunden.</p>`;
+}
+
+function renderFormationPicker() {
+  const candidates = eligibleLineupCandidates();
+  const previews = FORMATION_PRESETS.map((preset) => formationPreview(preset, candidates));
+  const bestGrade = previews.reduce((best, preview) => (preview.grade !== null && (best === null || preview.grade < best) ? preview.grade : best), null);
+  $("#formationPicker").innerHTML = previews.map((preview) => {
+    const name = formationNameFromAssignments(assignedToAssignments(preview.assigned));
+    const recommended = preview.grade !== null && preview.grade === bestGrade;
+    return { preview, name, recommended };
+  }).map(({ preview, name, recommended }, index) => `
+    <button type="button" class="formation-option ${recommended ? "recommended" : ""}" data-formation-index="${index}">
+      ${recommended ? `<span class="formation-badge">Empfohlen</span>` : ""}
+      <strong>${name}</strong>
+      <span>Ø ${gradeLabel(preview.grade)} · ${preview.filled}/${preview.total} besetzt</span>
+    </button>
+  `).join("");
+}
+
+function renderPitchBench() {
+  const onPitch = new Set(Object.values(state.lineup.assignments).flat());
+  const bench = state.players.filter((player) => !onPitch.has(player.id));
+  $("#pitchBench").innerHTML = bench.length
+    ? bench.map((player) => `
+        <button type="button" class="bench-player" draggable="true" data-player-id="${player.id}">
+          <span class="number-badge">${player.number}</span>
+          <span>${escapeHtml(player.name.split(" ")[0])}</span>
+          <small class="muted">${positionText(player)}</small>
+        </button>
+      `).join("")
+    : `<p class="muted">Alle Spieler stehen auf dem Feld.</p>`;
+}
+
+function renderPitch() {
+  state.lineup ||= normalizeLineup({});
+  if (lineupIsEmpty(state.lineup)) {
+    const candidates = eligibleLineupCandidates();
+    const previews = FORMATION_PRESETS.map((preset) => formationPreview(preset, candidates));
+    let bestIndex = -1;
+    previews.forEach((preview, index) => {
+      if (preview.grade !== null && (bestIndex === -1 || preview.grade < previews[bestIndex].grade)) bestIndex = index;
+    });
+    if (bestIndex >= 0) state.lineup = { assignments: assignedToAssignments(previews[bestIndex].assigned) };
+  }
+
+  const assignments = state.lineup.assignments;
+  $("#pitch").innerHTML = Object.keys(PITCH_ZONES).map((zone) => {
+    const info = PITCH_ZONES[zone];
+    const ids = assignments[zone] || [];
+    const chips = ids.map((playerId) => {
+      const player = state.players.find((item) => item.id === playerId);
+      if (!player) return "";
+      const positions = parsePositions(player.positions || player.position);
+      const outOfPosition = !ZONE_MATCHES[zone].some((label) => positions.includes(label));
+      return `
+        <div class="pitch-player ${outOfPosition ? "out-of-position" : ""}" draggable="true" data-player-id="${player.id}" data-zone="${zone}">
+          <em>${zone}</em>
+          <strong>${player.number} ${escapeHtml(player.name.split(" ")[0])}</strong>
+          <span>Note ${gradeLabel(playerAverageGrade(player.id))}</span>
+        </div>
+      `;
+    }).join("");
+    return `
+      <div class="pitch-zone ${ids.length ? "" : "pitch-zone-empty"}" style="left:${info.x}%;top:${info.y}%;width:${info.width}%" data-zone="${zone}">
+        ${chips || `<span class="pitch-zone-label">${zone}</span>`}
+      </div>
+    `;
+  }).join("");
+
+  const formationNameEl = $("#pitchFormationName");
+  if (formationNameEl) formationNameEl.textContent = formationNameFromAssignments(assignments);
+
+  const teamGradeEl = $("#pitchTeamGrade");
+  if (teamGradeEl) {
+    const startingGrades = Object.values(assignments).flat().map((playerId) => playerAverageGrade(playerId)).filter(Boolean);
+    const teamGrade = startingGrades.length ? roundGrade(startingGrades.reduce((sum, value) => sum + value, 0) / startingGrades.length) : null;
+    teamGradeEl.textContent = teamGrade ? `Mannschaftsnote Ø ${gradeLabel(teamGrade)}` : "Mannschaftsnote noch ohne Bewertungen";
+  }
+
+  renderFormationPicker();
+  renderPitchBench();
 }
 
 function renderLeaders() {
@@ -2977,7 +3192,74 @@ window.addEventListener("resize", () => {
   if (!window.matchMedia?.("(max-width: 720px)")?.matches) mobileAccordionsPrepared = false;
   prepareMobileAccordions();
 });
-$("#formationSelect").addEventListener("change", renderPitch);
+$("#formationPicker").addEventListener("click", (event) => {
+  const button = event.target.closest(".formation-option");
+  if (!button) return;
+  applyFormationPreset(Number(button.dataset.formationIndex));
+});
+
+$("#pitch").addEventListener("click", (event) => {
+  const zoneEl = event.target.closest(".pitch-zone");
+  if (!zoneEl) return;
+  const chip = event.target.closest(".pitch-player");
+  openPitchSubstituteDialog(zoneEl.dataset.zone, chip?.dataset.playerId || null);
+});
+
+document.addEventListener("dragstart", (event) => {
+  const chip = event.target.closest(".pitch-player, .bench-player");
+  if (!chip) return;
+  draggedPlayerId = chip.dataset.playerId;
+  event.dataTransfer.setData("text/plain", draggedPlayerId);
+  event.dataTransfer.effectAllowed = "move";
+});
+
+document.addEventListener("dragend", () => {
+  draggedPlayerId = null;
+  document.querySelectorAll(".pitch-zone.drag-over").forEach((el) => el.classList.remove("drag-over"));
+});
+
+$("#pitch").addEventListener("dragover", (event) => {
+  const zoneEl = event.target.closest(".pitch-zone");
+  if (!zoneEl) return;
+  event.preventDefault();
+  zoneEl.classList.add("drag-over");
+});
+
+$("#pitch").addEventListener("dragleave", (event) => {
+  const zoneEl = event.target.closest(".pitch-zone");
+  if (zoneEl && !zoneEl.contains(event.relatedTarget)) zoneEl.classList.remove("drag-over");
+});
+
+$("#pitch").addEventListener("drop", (event) => {
+  const zoneEl = event.target.closest(".pitch-zone");
+  if (!zoneEl) return;
+  event.preventDefault();
+  const playerId = event.dataTransfer.getData("text/plain") || draggedPlayerId;
+  if (playerId) movePlayerToZone(playerId, zoneEl.dataset.zone);
+  zoneEl.classList.remove("drag-over");
+});
+
+$("#pitchBench").addEventListener("dragover", (event) => event.preventDefault());
+$("#pitchBench").addEventListener("drop", (event) => {
+  event.preventDefault();
+  const playerId = event.dataTransfer.getData("text/plain") || draggedPlayerId;
+  if (playerId) removePlayerFromPitch(playerId);
+});
+
+$("#substituteSearch").addEventListener("input", renderSubstituteList);
+$("#closeSubstituteDialogBtn").addEventListener("click", () => $("#substituteDialog").close());
+$("#cancelSubstituteDialogBtn").addEventListener("click", () => $("#substituteDialog").close());
+$("#removeFromPitchBtn").addEventListener("click", () => {
+  if (pitchSubstituteTarget?.playerId) removePlayerFromPitch(pitchSubstituteTarget.playerId);
+  $("#substituteDialog").close();
+});
+$("#substituteList").addEventListener("click", (event) => {
+  const button = event.target.closest(".substitute-option");
+  if (!button || !pitchSubstituteTarget) return;
+  movePlayerToZone(button.dataset.playerId, pitchSubstituteTarget.zone);
+  $("#substituteDialog").close();
+});
+
 $("#searchInput").addEventListener("input", renderSquad);
 $("#positionFilter").addEventListener("change", renderSquad);
 $("#squadSort").addEventListener("change", renderSquad);
