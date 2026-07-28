@@ -1052,6 +1052,25 @@ table {
   background: var(--panel);
 }
 
+/* Spieler-Spalte bleibt auch beim horizontalen Scrollen sichtbar, damit man
+   beim Bewerten nicht staendig zurueckscrollen muss, um zu sehen, wessen
+   Zeile man gerade bearbeitet. Nur oberhalb des Mobile-Breakpoints aktiv, da
+   die Tabelle dort ohnehin zu einer nicht horizontal scrollenden Kartenliste
+   wird (siehe th:first-child/td:first-child-Reset im 720px-Media-Query). */
+@media (min-width: 721px) {
+  .rating-table-wrap th:first-child,
+  .rating-table-wrap td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    box-shadow: 1px 0 0 var(--line);
+  }
+
+  .rating-table-wrap thead th:first-child {
+    z-index: 4;
+  }
+}
+
 th,
 td {
   padding: 13px 14px;
@@ -1826,6 +1845,13 @@ menu {
 
   .events-layout {
     grid-template-columns: 1fr;
+  }
+
+  /* Ohne min-width:0 sprengt die breite Bewertungstabelle hier ihre Grid-Spalte
+     und damit die ganze Seite horizontal, statt nur innerhalb von
+     .rating-table-wrap zu scrollen (gleiches Problem wie bei .main weiter oben). */
+  .event-editor {
+    min-width: 0;
   }
 }
 
