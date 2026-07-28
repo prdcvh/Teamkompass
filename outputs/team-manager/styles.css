@@ -874,13 +874,13 @@ menu {
   gap: 1px;
 }
 
-.record-list,
 .event-filter-bar {
   display: flex;
   gap: 8px;
   margin-top: 14px;
 }
 
+.record-list,
 .leader-list {
   display: grid;
   gap: 10px;
