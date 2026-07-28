@@ -1417,27 +1417,111 @@ function calculateBmi(height, weight) {
   return Number(weight) / (heightM * heightM);
 }
 
+function daysBetween(earlier, later) {
+  return (later.getTime() - earlier.getTime()) / 86400000;
+}
+
+// Verletzungsrisiko-Score: kombiniert mehrere sportwissenschaftlich belegte Risikofaktoren,
+// statt nur die reine Belastungsmenge zu zaehlen. Groesster Einzelhebel ist die Akute:Chronische
+// Belastungsrelation (ACWR, Gabbett 2016) - eine ploetzliche Belastungsspitze ist der am besten
+// belegte Praediktor fuer Nicht-Kontakt-Verletzungen. Dazu kommen der aktuelle Gesundheitsstatus
+// (eine bestehende Verletzung praediziert die naechste), das Rueckfallfenster nach Rueckkehr aus
+// Verletzung/Abwesenheit sowie - weil es eine Jugendmannschaft ist - der Wachstumsschub aus den
+// monatlichen Koerpermessungen (schnelles Laengenwachstum korreliert mit Apophysen-Reizungen wie
+// Morbus Osgood-Schlatter).
 function playerInjuryRisk(playerId) {
   const player = state.players.find((item) => item.id === playerId);
-  const recentRatings = sortedEvents()
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const factors = [];
+
+  const attended = sortedEvents()
     .filter((event) => event.ratings?.[playerId]?.attendance === "present" || event.ratings?.[playerId]?.attendance === "limited")
-    .slice(0, 6);
-  const load = recentRatings.reduce((sum, event) => {
-    const attendanceFactor = event.ratings[playerId].attendance === "limited" ? 0.6 : 1;
-    return sum + Number(event.intensity || 2) * attendanceFactor;
-  }, 0);
-  const averageRecentGrade = recentRatings.length
-    ? recentRatings.reduce((sum, event) => sum + Number(event.ratings[playerId].grade || 3), 0) / recentRatings.length
-    : 0;
-  let score = load * 7;
-  if (recentRatings.length >= 4) score += 10;
-  if (averageRecentGrade >= 4) score += 12;
-  if (player?.status === "Angeschlagen") score += 24;
-  if (player?.status === "Verletzt") score += 45;
-  if (player?.status === "Pause") score += 10;
-  const percentage = Math.max(0, Math.min(100, Math.round(score)));
+    .map((event) => {
+      const rating = event.ratings[playerId];
+      const matchDuration = event.type === "Spiel" ? Number(event.matchDuration || 90) : null;
+      const exposure = matchDuration && rating.minutes !== "" && rating.minutes != null
+        ? Math.max(0.15, Math.min(1, Number(rating.minutes) / matchDuration))
+        : rating.attendance === "limited" ? 0.6 : 1;
+      return { date: new Date(`${event.date}T00:00:00`), sessionLoad: Number(event.intensity || 2) * exposure };
+    });
+
+  // Akute (7 Tage) vs. chronische (28 Tage / 4 Wochen) Belastung - ACWR-Sweetspot ca. 0.8-1.3,
+  // alles darueber ist eine Belastungsspitze mit deutlich erhoehtem Verletzungsrisiko.
+  const acuteLoad = attended.filter((item) => daysBetween(item.date, today) <= 7).reduce((sum, item) => sum + item.sessionLoad, 0);
+  const chronicLoad = attended.filter((item) => daysBetween(item.date, today) <= 28).reduce((sum, item) => sum + item.sessionLoad, 0);
+  const chronicWeeklyAvg = chronicLoad / 4;
+  const acwr = chronicWeeklyAvg > 0 ? acuteLoad / chronicWeeklyAvg : acuteLoad > 0 ? 2 : 0;
+  if (acwr > 1.3) factors.push({ label: `Akute Belastungsspitze (ACWR ${roundGrade(acwr)})`, points: Math.min(45, (acwr - 1.3) * 60) });
+  else if (acwr < 0.8 && chronicWeeklyAvg > 0) factors.push({ label: "Deutlich reduzierte Belastung", points: Math.min(10, (0.8 - acwr) * 20) });
+
+  // Zwei Einsaetze ohne mindestens einen Tag Pause dazwischen erhoehen das Risiko zusaetzlich
+  // zur reinen Wochenbelastung (kumulative Ermuedung durch fehlende Erholung).
+  const [latest, previous] = attended;
+  if (latest && previous) {
+    const gapDays = daysBetween(previous.date, latest.date);
+    if (gapDays <= 1) factors.push({ label: "Keine Erholung seit letztem Einsatz", points: 12 });
+    else if (gapDays <= 2) factors.push({ label: "Kurze Erholungszeit", points: 6 });
+  }
+
+  // Nachlassende Einsatz-Note (statt bisher der allgemeinen Gesamtnote) als Ermuedungssignal
+  // ueber die juengsten bewerteten Events.
+  const effortRatings = sortedEvents()
+    .map((event) => event.ratings?.[playerId])
+    .filter((rating) => rating && (rating.attendance === "present" || rating.attendance === "limited") && rating.effort !== "" && rating.effort != null)
+    .slice(0, 6)
+    .map((rating) => Number(rating.effort));
+  if (effortRatings.length >= 3) {
+    const recentAvg = effortRatings.slice(0, 2).reduce((sum, value) => sum + value, 0) / 2;
+    const earlierEffort = effortRatings.slice(2);
+    const earlierAvg = earlierEffort.reduce((sum, value) => sum + value, 0) / earlierEffort.length;
+    const decline = recentAvg - earlierAvg;
+    if (decline > 0.5) factors.push({ label: "Nachlassender Einsatz in Folge", points: Math.min(15, decline * 15) });
+  }
+
+  // Wachstumsschub: schnelles Laengenwachstum aus den monatlichen Koerpermessungen ist bei
+  // Jugendlichen ein anerkannter Risikofaktor fuer Apophysen-/Ueberlastungsverletzungen.
+  const measurements = playerMeasurements(playerId);
+  if (measurements.length >= 2) {
+    const [prev, last] = measurements.slice(-2);
+    const months = daysBetween(new Date(`${prev.date}T00:00:00`), new Date(`${last.date}T00:00:00`)) / 30;
+    const growthPerMonth = months > 0 ? (Number(last.height) - Number(prev.height)) / months : 0;
+    if (growthPerMonth >= 2) factors.push({ label: `Starker Wachstumsschub (${roundGrade(growthPerMonth)} cm/Monat)`, points: 18 });
+    else if (growthPerMonth >= 1) factors.push({ label: `Wachstumsschub (${roundGrade(growthPerMonth)} cm/Monat)`, points: 10 });
+  }
+
+  // Rueckkehr nach Verletzung/laengerer Abwesenheit: das Rueckfallrisiko ist in den ersten
+  // Wochen danach am hoechsten, auch wenn der Status laengst wieder "Fit" ist.
+  if (player?.injuryUntil) {
+    const daysSinceReturn = daysBetween(new Date(`${player.injuryUntil}T00:00:00`), today);
+    if (daysSinceReturn >= 0 && daysSinceReturn <= 21) {
+      factors.push({ label: "Rückkehr nach Verletzung", points: Math.round(22 * (1 - daysSinceReturn / 21)) });
+    }
+  }
+  const lastEndedAbsence = (state.absences?.[playerId] || [])
+    .filter((item) => item.to && item.to < todayStr)
+    .sort((a, b) => new Date(b.to) - new Date(a.to))[0];
+  if (lastEndedAbsence) {
+    const daysSinceEnd = daysBetween(new Date(`${lastEndedAbsence.to}T00:00:00`), today);
+    if (daysSinceEnd <= 14) factors.push({ label: "Kurz nach Abwesenheit (Wiedereinstieg)", points: Math.round(12 * (1 - daysSinceEnd / 14)) });
+  }
+
+  // Aktueller Gesundheitsstatus: eine bestehende Verletzung/Beschwerde ist der mit Abstand
+  // staerkste Einzelfaktor fuer eine (erneute) Verletzung.
+  if (player?.status === "Verletzt") factors.push({ label: "Aktuell verletzt", points: 75 });
+  if (player?.status === "Angeschlagen") factors.push({ label: "Angeschlagen", points: 45 });
+
+  const percentage = Math.max(0, Math.min(100, Math.round(factors.reduce((sum, factor) => sum + factor.points, 0))));
   const level = percentage >= 70 ? "Hoch" : percentage >= 40 ? "Mittel" : "Niedrig";
-  return { percentage, level, load: roundGrade(load), recentEvents: recentRatings.length };
+  const topFactors = [...factors].sort((a, b) => b.points - a.points).slice(0, 2).map((factor) => factor.label);
+  return {
+    percentage,
+    level,
+    load: roundGrade(acuteLoad),
+    recentEvents: attended.filter((item) => daysBetween(item.date, today) <= 28).length,
+    reason: topFactors.join(" · ") || "Keine erhöhten Risikofaktoren"
+  };
 }
 
 function roundGrade(value) {
@@ -2069,7 +2153,7 @@ function renderSquad() {
         <td data-label="Status"><span class="status-pill ${statusClass}">${escapeHtml(effectiveStatus)}</span></td>
         <td data-label="Events">${playerAttendanceCount(player.id)}</td>
         <td data-label="Note">${gradeLabel(playerAverageGrade(player.id))}</td>
-        <td data-label="Risiko"><span class="risk-pill ${risk.level.toLowerCase()}">${risk.level}</span></td>
+        <td data-label="Risiko"><span class="risk-pill ${risk.level.toLowerCase()}" title="${escapeHtml(risk.reason)}">${risk.level}</span></td>
         <td data-label="Messwerte" class="measurement-cell">
           ${missingMeasurement
             ? `<span class="status-pill warning">Messwerte fehlen</span>`
@@ -2860,7 +2944,7 @@ function renderProfileHeader(player, ratings) {
           <strong>${risk.level} · ${risk.percentage}%</strong>
         </div>
         <div class="risk-meter"><span class="${risk.level.toLowerCase()}" style="width:${risk.percentage}%"></span></div>
-        <small>Belastung ${risk.load} aus ${risk.recentEvents} jüngsten Events</small>
+        <small>${escapeHtml(risk.reason)} · Ø Belastung ${risk.load}/Woche (${risk.recentEvents} Events/4 Wochen)</small>
       </div>
     </div>
   ` : `<p class="muted">Noch kein Spieler vorhanden.</p>`;
@@ -3159,7 +3243,7 @@ function renderTeamAnalysis() {
     </article>
     <article class="team-insight">
       <strong>Belastung im Blick</strong>
-      ${highRisk.map(({ player, risk }) => `<span>${player.name} · ${risk.level} (${risk.percentage}%)</span>`).join("")}
+      ${highRisk.map(({ player, risk }) => `<span>${player.name} · ${risk.level} (${risk.percentage}%)${risk.reason ? ` · ${escapeHtml(risk.reason)}` : ""}</span>`).join("")}
     </article>
     <article class="team-insight">
       <strong>Spielauswertung</strong>
