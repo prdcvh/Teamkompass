@@ -1421,6 +1421,17 @@ function daysBetween(earlier, later) {
   return (later.getTime() - earlier.getTime()) / 86400000;
 }
 
+// Fuenf statt drei Abstufungen, benannt nach der konkreten Handlungsempfehlung statt nach
+// abstrakter Dringlichkeit - damit direkt klar ist, was zu tun ist. Sortiert von hoechster
+// zu niedrigster Schwelle, damit find() die erste zutreffende (= hoechste erreichte) Stufe liefert.
+const INJURY_RISK_TIERS = [
+  { min: 75, tier: "aussetzen", level: "Nicht einsetzen", action: "Vom Training/Spiel absehen, ärztliche/physiotherapeutische Abklärung empfohlen." },
+  { min: 55, tier: "reduzieren", level: "Deutlich reduzieren", action: "Belastung spürbar zurücknehmen, Rücksprache mit Physio/Arzt erwägen." },
+  { min: 35, tier: "anpassen", level: "Belastung anpassen", action: "Umfang/Intensität dosieren und auf ausreichend Erholung achten." },
+  { min: 15, tier: "beobachten", level: "Beobachten", action: "Aktuell keine Anpassung nötig, Entwicklung im Blick behalten." },
+  { min: 0, tier: "unauffaellig", level: "Unauffällig", action: "Kein erhöhtes Risiko, normal einsetzbar." }
+];
+
 // Verletzungsrisiko-Score: kombiniert mehrere sportwissenschaftlich belegte Risikofaktoren,
 // statt nur die reine Belastungsmenge zu zaehlen. Groesster Einzelhebel ist die Akute:Chronische
 // Belastungsrelation (ACWR, Gabbett 2016) - eine ploetzliche Belastungsspitze ist der am besten
@@ -1513,11 +1524,13 @@ function playerInjuryRisk(playerId) {
   if (player?.status === "Angeschlagen") factors.push({ label: "Angeschlagen", points: 45 });
 
   const percentage = Math.max(0, Math.min(100, Math.round(factors.reduce((sum, factor) => sum + factor.points, 0))));
-  const level = percentage >= 70 ? "Hoch" : percentage >= 40 ? "Mittel" : "Niedrig";
+  const riskTier = INJURY_RISK_TIERS.find((entry) => percentage >= entry.min);
   const topFactors = [...factors].sort((a, b) => b.points - a.points).slice(0, 2).map((factor) => factor.label);
   return {
     percentage,
-    level,
+    level: riskTier.level,
+    tier: riskTier.tier,
+    action: riskTier.action,
     load: roundGrade(acuteLoad),
     recentEvents: attended.filter((item) => daysBetween(item.date, today) <= 28).length,
     reason: topFactors.join(" · ") || "Keine erhöhten Risikofaktoren"
@@ -1766,7 +1779,7 @@ function renderMetrics() {
   const fitPlayers = state.players.filter((player) => playerEffectiveStatus(player) === "Fit").length;
   const gradedRatings = state.players.map((player) => playerAverageGrade(player.id)).filter(Boolean);
   const teamGrade = gradedRatings.length ? roundGrade(gradedRatings.reduce((sum, grade) => sum + grade, 0) / gradedRatings.length) : null;
-  const highRiskPlayers = state.players.filter((player) => playerInjuryRisk(player.id).level === "Hoch").length;
+  const highRiskPlayers = state.players.filter((player) => ["reduzieren", "aussetzen"].includes(playerInjuryRisk(player.id).tier)).length;
   const stats = teamStats();
   const nextEvent = sortedEvents().find((event) => new Date(event.date) >= startOfToday());
   const metrics = [
@@ -2153,7 +2166,7 @@ function renderSquad() {
         <td data-label="Status"><span class="status-pill ${statusClass}">${escapeHtml(effectiveStatus)}</span></td>
         <td data-label="Events">${playerAttendanceCount(player.id)}</td>
         <td data-label="Note">${gradeLabel(playerAverageGrade(player.id))}</td>
-        <td data-label="Risiko"><span class="risk-pill ${risk.level.toLowerCase()}" title="${escapeHtml(risk.reason)}">${risk.level}</span></td>
+        <td data-label="Risiko"><span class="risk-pill ${risk.tier}" title="${escapeHtml(risk.action)} (${escapeHtml(risk.reason)})">${risk.level}</span></td>
         <td data-label="Messwerte" class="measurement-cell">
           ${missingMeasurement
             ? `<span class="status-pill warning">Messwerte fehlen</span>`
@@ -2943,8 +2956,9 @@ function renderProfileHeader(player, ratings) {
           <span>Verletzungsrisiko</span>
           <strong>${risk.level} · ${risk.percentage}%</strong>
         </div>
-        <div class="risk-meter"><span class="${risk.level.toLowerCase()}" style="width:${risk.percentage}%"></span></div>
+        <div class="risk-meter"><span class="${risk.tier}" style="width:${risk.percentage}%"></span></div>
         <small>${escapeHtml(risk.reason)} · Ø Belastung ${risk.load}/Woche (${risk.recentEvents} Events/4 Wochen)</small>
+        <small>${escapeHtml(risk.action)}</small>
       </div>
     </div>
   ` : `<p class="muted">Noch kein Spieler vorhanden.</p>`;
