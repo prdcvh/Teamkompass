@@ -1280,32 +1280,52 @@ tr:last-child td {
   font-weight: 800;
 }
 
-.risk-pill.niedrig {
+.risk-pill.unauffaellig {
   color: #0a5b3a;
   background: #dff0e6;
 }
 
-.risk-pill.mittel {
+.risk-pill.beobachten {
+  color: #55690d;
+  background: #eef2d6;
+}
+
+.risk-pill.anpassen {
   color: #7a4b0d;
   background: #faebd6;
 }
 
-.risk-pill.hoch {
+.risk-pill.reduzieren {
+  color: #954a12;
+  background: #fbe3d0;
+}
+
+.risk-pill.aussetzen {
   color: #8f2424;
   background: #f6dddd;
 }
 
-:root[data-theme="dark"] .risk-pill.niedrig {
+:root[data-theme="dark"] .risk-pill.unauffaellig {
   color: #98e7c1;
   background: #173126;
 }
 
-:root[data-theme="dark"] .risk-pill.mittel {
+:root[data-theme="dark"] .risk-pill.beobachten {
+  color: #cfe08a;
+  background: #2b301a;
+}
+
+:root[data-theme="dark"] .risk-pill.anpassen {
   color: #f3ca7c;
   background: #352918;
 }
 
-:root[data-theme="dark"] .risk-pill.hoch {
+:root[data-theme="dark"] .risk-pill.reduzieren {
+  color: #ffb37a;
+  background: #3a2415;
+}
+
+:root[data-theme="dark"] .risk-pill.aussetzen {
   color: #ffacb8;
   background: #3a1b1d;
 }
@@ -1716,15 +1736,23 @@ canvas {
   height: 100%;
 }
 
-.risk-meter .niedrig {
+.risk-meter .unauffaellig {
   background: var(--green);
 }
 
-.risk-meter .mittel {
+.risk-meter .beobachten {
+  background: #8a9c2f;
+}
+
+.risk-meter .anpassen {
   background: var(--amber);
 }
 
-.risk-meter .hoch {
+.risk-meter .reduzieren {
+  background: #d9731c;
+}
+
+.risk-meter .aussetzen {
   background: var(--red);
 }
 
