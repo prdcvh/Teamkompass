@@ -426,11 +426,16 @@ function normalizeRating(rating = {}) {
   return normalized;
 }
 
+// Gewichtung der Gesamtnote: keine Teilnote darf allein dominieren (vorher gab Technik mit 45%
+// fast im Alleingang die Note vor, Auffassungsgabe zaehlte mit 5% praktisch nicht). Einsatz und
+// Technik bleiben mit 30% die staerksten Faktoren, Taktik ist mit 25% nahezu gleichwertig, und
+// Auffassungsgabe bekommt mit 15% ein Gewicht, das sie tatsaechlich beeinflussen kann - damit ein
+// laufstarker, taktisch cleverer Spieler nicht allein wegen schwaecherer Technik abgestraft wird.
 function calculatedGrade(rating) {
   if (!rating || rating.attendance === "absent") return "";
   const fields = ["effort", "technique", "tactics", "comprehension"];
   if (!fields.every((field) => rating[field])) return "";
-  return roundGrade(Number(rating.effort) * 0.3 + Number(rating.technique) * 0.45 + Number(rating.tactics) * 0.2 + Number(rating.comprehension) * 0.05);
+  return roundGrade(Number(rating.effort) * 0.3 + Number(rating.technique) * 0.3 + Number(rating.tactics) * 0.25 + Number(rating.comprehension) * 0.15);
 }
 
 function migrateLegacyState(data) {
