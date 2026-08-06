@@ -1411,9 +1411,13 @@ function latestMeasurement(playerId) {
   return measurements.length ? measurements[measurements.length - 1] : null;
 }
 
-function measurementMissingThisMonth(playerId) {
-  const month = new Date().toISOString().slice(0, 7);
-  return !(state.measurements?.[playerId] || []).some((item) => item.date?.slice(0, 7) === month);
+function quarterKey(date) {
+  return `${date.getFullYear()}-Q${Math.floor(date.getMonth() / 3) + 1}`;
+}
+
+function measurementMissingThisQuarter(playerId) {
+  const currentQuarter = quarterKey(new Date());
+  return !(state.measurements?.[playerId] || []).some((item) => item.date && quarterKey(new Date(`${item.date}T00:00:00`)) === currentQuarter);
 }
 
 function calculateBmi(height, weight) {
@@ -1443,7 +1447,7 @@ const INJURY_RISK_TIERS = [
 // belegte Praediktor fuer Nicht-Kontakt-Verletzungen. Dazu kommen der aktuelle Gesundheitsstatus
 // (eine bestehende Verletzung praediziert die naechste), das Rueckfallfenster nach Rueckkehr aus
 // Verletzung/Abwesenheit sowie - weil es eine Jugendmannschaft ist - der Wachstumsschub aus den
-// monatlichen Koerpermessungen (schnelles Laengenwachstum korreliert mit Apophysen-Reizungen wie
+// Koerpermessungen (schnelles Laengenwachstum korreliert mit Apophysen-Reizungen wie
 // Morbus Osgood-Schlatter).
 function playerInjuryRisk(playerId) {
   const player = state.players.find((item) => item.id === playerId);
@@ -1496,7 +1500,7 @@ function playerInjuryRisk(playerId) {
     if (decline > 0.5) factors.push({ label: "Nachlassender Einsatz in Folge", points: Math.min(15, decline * 15) });
   }
 
-  // Wachstumsschub: schnelles Laengenwachstum aus den monatlichen Koerpermessungen ist bei
+  // Wachstumsschub: schnelles Laengenwachstum aus den quartalsweisen Koerpermessungen ist bei
   // Jugendlichen ein anerkannter Risikofaktor fuer Apophysen-/Ueberlastungsverletzungen.
   const measurements = playerMeasurements(playerId);
   if (measurements.length >= 2) {
@@ -2162,7 +2166,7 @@ function renderSquad() {
     const statusClass = effectiveStatus === "Verletzt" || effectiveStatus === "Gesperrt" ? "danger" : effectiveStatus === "Angeschlagen" || effectiveStatus === "Abwesend" ? "warning" : "";
     const risk = playerInjuryRisk(player.id);
     const lastMeasurement = latestMeasurement(player.id);
-    const missingMeasurement = measurementMissingThisMonth(player.id);
+    const missingMeasurement = measurementMissingThisQuarter(player.id);
     return `
       <tr>
         <td data-label="Spieler"><div class="player-cell"><span class="number-badge">${player.number}</span><strong>${player.name}</strong></div></td>
