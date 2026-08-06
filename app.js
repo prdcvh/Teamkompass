@@ -388,8 +388,18 @@ function setView(viewName) {
   Object.entries(views).forEach(([name, element]) => element.classList.toggle("active", name === viewName));
   document.querySelectorAll(".nav-tab").forEach((button) => button.classList.toggle("active", button.dataset.view === viewName));
   $("#pageTitle").textContent = titles[viewName];
+  positionNavIndicator();
   if (viewName === "profiles") drawProfile();
   if (viewName === "teamAnalysis") renderTeamAnalysis();
+}
+
+function positionNavIndicator() {
+  const nav = document.querySelector(".nav-tabs");
+  const indicator = $("#navIndicator");
+  const active = nav?.querySelector(".nav-tab.active");
+  if (!nav || !indicator || !active) return;
+  indicator.style.transform = `translateY(${active.offsetTop}px)`;
+  indicator.style.height = `${active.offsetHeight}px`;
 }
 
 function selectedEvent() {
@@ -1653,6 +1663,9 @@ $("#ratingTable").addEventListener("input", (event) => {
   updateRating(input.dataset.playerId, input.dataset.field, input.value, false);
 });
 
+window.addEventListener("resize", positionNavIndicator);
+
 initTheme();
 renderAll();
+positionNavIndicator();
 initDataStore();
