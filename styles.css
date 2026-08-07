@@ -28,6 +28,7 @@
   --r-lg: 22px;
   --track-eyebrow: 0.06em;
   --track-display: -0.02em;
+  --track-small: 0.01em;
   --topbar-blur: blur(20px) saturate(180%);
   --shadow: 0 1px 2px rgba(15, 20, 26, 0.03), 0 10px 26px rgba(15, 20, 26, 0.07);
   --shadow-chip: 0 1px 2px rgba(15, 20, 26, 0.06);
@@ -176,7 +177,7 @@ button {
   color: rgba(247, 251, 248, 0.78);
   background: transparent;
   text-align: left;
-  transition: color 0.15s ease, transform 0.1s ease-out;
+  transition: color 0.15s ease, transform 0.22s cubic-bezier(0.34, 1.4, 0.64, 1);
 }
 
 .nav-tab:hover {
@@ -365,7 +366,7 @@ menu {
   min-height: 40px;
   border-radius: var(--r-sm);
   border: 1px solid transparent;
-  transition: transform 0.1s ease-out, background-color 0.15s ease, border-color 0.15s ease;
+  transition: transform 0.22s cubic-bezier(0.34, 1.4, 0.64, 1), background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .primary-button:active,
@@ -416,7 +417,7 @@ menu {
   background: var(--panel);
   font-weight: 800;
   box-shadow: var(--shadow-chip);
-  transition: transform 0.1s ease-out;
+  transition: transform 0.22s cubic-bezier(0.34, 1.4, 0.64, 1);
 }
 
 .theme-toggle:active {
@@ -1266,11 +1267,29 @@ dialog {
   color: var(--ink);
   background: var(--panel);
   box-shadow: 0 28px 80px rgba(0, 0, 0, 0.22);
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+    overlay 0.3s allow-discrete,
+    display 0.3s allow-discrete;
 }
-
+@starting-style {
+  dialog[open] { opacity: 0; transform: translateY(8px) scale(0.96); }
+}
+dialog:not([open]) { opacity: 0; transform: translateY(8px) scale(0.96); }
 dialog::backdrop {
   background: rgba(16, 24, 20, 0.52);
   backdrop-filter: blur(4px);
+  opacity: 1;
+  transition:
+    opacity 0.3s ease,
+    overlay 0.3s allow-discrete,
+    display 0.3s allow-discrete;
+}
+@starting-style {
+  dialog[open]::backdrop { opacity: 0; }
 }
 
 .dialog-head {
@@ -1286,14 +1305,26 @@ menu {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .nav-indicator,
-  .nav-tab,
-  .primary-button,
-  .ghost-button,
-  .icon-button,
-  .theme-toggle,
-  .event-card {
-    transition: none !important;
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.15s !important;
+  }
+  .nav-indicator { transition: opacity 0.15s ease !important; }
+  dialog, dialog::backdrop {
+    transform: none !important;
+    transition: opacity 0.15s ease !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .topbar {
+    background: var(--bg);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  dialog::backdrop {
+    background: rgba(16, 24, 20, 0.8);
+    backdrop-filter: none;
   }
 }
 
@@ -1400,4 +1431,33 @@ menu {
     min-height: 52px;
     font-size: 0.78rem;
   }
+}
+
+:root { --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--red); }
+
+.nav-tab:focus-visible,
+.primary-button:focus-visible,
+.ghost-button:focus-visible,
+.icon-button:focus-visible,
+.theme-toggle:focus-visible,
+.event-card:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.nav-tab:focus-visible {
+  box-shadow: 0 0 0 2px var(--sidebar-bg), 0 0 0 4px #fff;
+}
+
+.muted,
+.metric span,
+.metric small,
+.event-card small,
+.event-card span,
+.leader-item span,
+th {
+  letter-spacing: var(--track-small);
 }
