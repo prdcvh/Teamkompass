@@ -432,7 +432,7 @@ function normalizeRating(rating = {}) {
 // Auffassungsgabe bekommt mit 15% ein Gewicht, das sie tatsaechlich beeinflussen kann - damit ein
 // laufstarker, taktisch cleverer Spieler nicht allein wegen schwaecherer Technik abgestraft wird.
 function calculatedGrade(rating) {
-  if (!rating || rating.attendance === "absent") return "";
+  if (!rating || rating.attendance === "absent" || rating.attendance === "excluded") return "";
   const fields = ["effort", "technique", "tactics", "comprehension"];
   if (!fields.every((field) => rating[field])) return "";
   return roundGrade(Number(rating.effort) * 0.3 + Number(rating.technique) * 0.3 + Number(rating.tactics) * 0.25 + Number(rating.comprehension) * 0.15);
@@ -1681,7 +1681,9 @@ function teamStats() {
   const goalsAgainst = results.reduce((sum, result) => sum + result.goalsAgainst, 0);
   const eventGrades = state.events.map(teamAverageGradeForEvent).filter(Boolean);
   const avgGrade = eventGrades.length ? roundGrade(eventGrades.reduce((sum, grade) => sum + grade, 0) / eventGrades.length) : null;
-  const attendances = state.events.flatMap((event) => Object.values(event.ratings || {}).map((rating) => rating.attendance));
+  const attendances = state.events
+    .flatMap((event) => Object.values(event.ratings || {}).map((rating) => rating.attendance))
+    .filter((value) => value !== "excluded");
   const attendanceRate = attendances.length
     ? Math.round((attendances.filter((value) => value === "present" || value === "limited").length / attendances.length) * 100)
     : 0;
@@ -1738,10 +1740,12 @@ function profileAvailability(playerId) {
   const present = relevant.filter((value) => value === "present").length;
   const limited = relevant.filter((value) => value === "limited").length;
   const absent = relevant.filter((value) => value === "absent").length;
+  const excluded = relevant.filter((value) => value === "excluded").length;
   return [
     { label: "Anwesend", value: Math.round((present / total) * 100), display: `${present}/${total}` },
     { label: "Teilweise", value: Math.round((limited / total) * 100), display: `${limited}/${total}` },
-    { label: "Fehlt", value: Math.round((absent / total) * 100), display: `${absent}/${total}` }
+    { label: "Fehlt", value: Math.round((absent / total) * 100), display: `${absent}/${total}` },
+    { label: "Nicht im Kader", value: Math.round((excluded / total) * 100), display: `${excluded}/${total}` }
   ];
 }
 
@@ -1749,7 +1753,7 @@ function playerGameStats(playerId) {
   const games = gameEvents();
   const gameRatings = games
     .map((event) => ({ event, rating: event.ratings?.[playerId] }))
-    .filter(({ rating }) => rating && rating.attendance !== "absent");
+    .filter(({ rating }) => rating && rating.attendance !== "absent" && rating.attendance !== "excluded");
   const appearances = gameRatings.filter(({ rating }) => Number(rating.minutes || 0) > 0 || rating.attendance === "present" || rating.attendance === "limited").length;
   const minutes = gameRatings.reduce((sum, item) => sum + Number(item.rating.minutes || 0), 0);
   const possibleMinutes = games.reduce((sum, event) => sum + Number(event.matchDuration || 90), 0);
@@ -2286,7 +2290,7 @@ function ratingPlayersForEvent(event) {
   return [...state.players].sort((a, b) => a.number - b.number).filter((player) => {
     const attendance = event.ratings?.[player.id]?.attendance || "open";
     if (filter === "present") return attendance === "present" || attendance === "limited";
-    if (filter === "missing") return attendance === "absent" || attendance === "open";
+    if (filter === "missing") return attendance === "absent" || attendance === "excluded" || attendance === "open";
     return true;
   });
 }
@@ -2339,7 +2343,7 @@ function renderRatingTable() {
     return `
       <tr class="attendance-row attendance-${attendance}">
         <td data-label="Spieler"><div class="player-cell"><span class="number-badge">${player.number}</span><strong>${player.name}</strong></div></td>
-        <td data-label="Anwesenheit">${attendanceSelectHtml(player.id, attendance)}</td>
+        <td data-label="Anwesenheit">${attendanceSelectHtml(player.id, attendance, event.type === "Spiel")}</td>
         <td data-label="Gesamtnote"><span class="computed-grade">${gradeLabel(calculatedGrade(rating))}</span></td>
         <td data-label="Einsatz">${gradeSelectHtml(player.id, "effort", rating.effort)}</td>
         <td data-label="Technik">${gradeSelectHtml(player.id, "technique", rating.technique)}</td>
@@ -2374,8 +2378,14 @@ function chipGroupHtml(playerId, field, value, options, extraClass = "") {
   `).join("")}</div>`;
 }
 
-function attendanceSelectHtml(playerId, value) {
-  const options = [["open", "Offen"], ["present", "Anwesend"], ["limited", "Teilweise"], ["absent", "Fehlt"]];
+function attendanceSelectHtml(playerId, value, isGame = false) {
+  const options = [
+    ["open", "Offen"],
+    ["present", "Anwesend"],
+    ["limited", "Teilweise"],
+    ["absent", "Fehlt"],
+    ...(isGame ? [["excluded", "Nicht im Kader"]] : [])
+  ];
   return `<select class="rating-input attendance-select" data-player-id="${playerId}" data-field="attendance">${options.map(([optionValue, label]) => `<option value="${optionValue}" ${String(value ?? "open") === optionValue ? "selected" : ""}>${label}</option>`).join("")}</select>`;
 }
 
@@ -2409,7 +2419,7 @@ function renderRatingCard(player, event, matchDuration) {
     </div>
     <div class="rating-card-field">
       <span class="rating-card-label">Anwesenheit</span>
-      ${attendanceSelectHtml(player.id, attendance)}
+      ${attendanceSelectHtml(player.id, attendance, event.type === "Spiel")}
     </div>
     <div class="rating-card-grades">
       ${["effort", "technique", "tactics", "comprehension"].map((field) => `
@@ -2576,7 +2586,7 @@ function updateRating(playerId, field, value, rerender = true) {
   if (field === "minutes" && value !== "") {
     event.ratings[playerId].minutes = Math.min(Number(event.matchDuration || 90), Math.max(0, Number(value)));
   }
-  if (field === "attendance" && value === "absent") {
+  if (field === "attendance" && (value === "absent" || value === "excluded")) {
     event.ratings[playerId].grade = "";
     event.ratings[playerId].effort = "";
     event.ratings[playerId].technique = "";
