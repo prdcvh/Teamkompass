@@ -164,6 +164,19 @@ service cloud.firestore {
         allow read, write: if isTrainer();
       }
 
+      // Kalender (Termine/Spiele/Trainingstage) - wie Gegneranalyse und Taktikboard
+      // nur fuer Trainer sichtbar (siehe applyRoleRestrictions in app.js), deshalb
+      // analog nur Trainer-Zugriff statt Lesezugriff fuer alle Teammitglieder.
+      match /calendarEntries/{entryId} {
+        allow read, write: if isTrainer();
+      }
+
+      // Einstellungen fuer die automatische Trainingsplanung (Wochentage, Uhrzeit,
+      // Ort) - einzelnes Dokument statt Unter-Collection, analog zu meta/lineup.
+      match /meta/trainingSchedule {
+        allow read, write: if isTrainer();
+      }
+
       // Altes Einzeldokument aus dem Single-Blob-Modell - nur fuer die einmalige
       // Migration in die neue Struktur, danach kann es geloescht werden.
       match /appState/current {
