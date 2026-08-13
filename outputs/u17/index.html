@@ -54,7 +54,6 @@
         <nav class="nav-tabs" aria-label="Ansichten">
           <button class="nav-tab active" data-view="dashboard">Dashboard</button>
           <button class="nav-tab" data-view="squad">Kader</button>
-          <button class="nav-tab" data-view="calendar">Kalender</button>
           <button class="nav-tab" data-view="events">Events</button>
           <button class="nav-tab" data-view="profiles">Profile</button>
           <button class="nav-tab" data-view="opponents">Gegneranalyse</button>
@@ -64,7 +63,6 @@
           <select id="mobileViewSelect" aria-label="Bereich auswählen">
             <option value="dashboard">Dashboard</option>
             <option value="squad">Kader</option>
-            <option value="calendar">Kalender</option>
             <option value="events">Events</option>
             <option value="profiles">Profile</option>
             <option value="opponents">Gegneranalyse</option>
@@ -214,54 +212,6 @@
               </thead>
               <tbody id="playerTable"></tbody>
             </table>
-          </div>
-        </section>
-
-        <section class="view" id="calendarView">
-          <div class="split-layout calendar-layout">
-            <section class="panel calendar-panel">
-              <div class="panel-head">
-                <h2 id="calendarMonthLabel">Monat</h2>
-                <div class="calendar-nav">
-                  <button class="ghost-button" id="calendarPrevBtn" type="button" aria-label="Vorheriger Monat">‹</button>
-                  <button class="ghost-button" id="calendarTodayBtn" type="button">Heute</button>
-                  <button class="ghost-button" id="calendarNextBtn" type="button" aria-label="Nächster Monat">›</button>
-                  <button class="primary-button" id="newCalendarEntryBtn" type="button">Termin anlegen</button>
-                </div>
-              </div>
-              <div class="calendar-legend">
-                <span><span class="chip-dot dot-training"></span>Training</span>
-                <span><span class="chip-dot dot-spiel"></span>Spiel</span>
-                <span><span class="chip-dot dot-sonstiges"></span>Sonstiges</span>
-              </div>
-              <div class="calendar-weekdays">
-                <span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span>
-              </div>
-              <div class="calendar-grid" id="calendarGrid"></div>
-            </section>
-            <section class="panel calendar-side">
-              <div class="panel-head">
-                <h2>Nächste Termine</h2>
-                <span class="muted">Spiele, Training und mehr</span>
-              </div>
-              <div class="calendar-agenda" id="calendarAgenda"></div>
-              <details class="control-disclosure" open>
-                <summary>Trainingstage automatisch planen</summary>
-                <div class="disclosure-body training-schedule">
-                  <fieldset class="position-picker full-span">
-                    <legend>Wochentage</legend>
-                    <div class="weekday-options" id="weekdayOptions"></div>
-                  </fieldset>
-                  <div class="form-grid">
-                    <label>Uhrzeit <input id="trainingTime" type="time" /></label>
-                    <label>Ort <input id="trainingLocation" maxlength="50" placeholder="Hauptplatz" /></label>
-                    <label>Titel <input id="trainingTitle" maxlength="60" placeholder="Training" /></label>
-                    <label>Planungshorizont (Wochen) <input id="trainingHorizon" type="number" min="1" max="16" /></label>
-                  </div>
-                  <p class="muted">Änderungen werden sofort übernommen - offene Trainingstermine in der Zukunft werden automatisch neu geplant.</p>
-                </div>
-              </details>
-            </section>
           </div>
         </section>
 
@@ -685,58 +635,6 @@
           <button class="primary-button" type="submit">Event speichern</button>
         </menu>
       </form>
-    </dialog>
-
-    <dialog id="calendarDialog">
-      <form class="player-form" id="calendarForm">
-        <div class="dialog-head">
-          <h2 id="calendarDialogTitle">Termin anlegen</h2>
-          <button class="icon-button" type="button" id="closeCalendarDialogBtn" aria-label="Schließen">×</button>
-        </div>
-        <input type="hidden" id="calendarEntryId" />
-        <label>Titel <input id="calendarTitle" required maxlength="60" placeholder="z.B. Auswärtsspiel gegen SV Nord" /></label>
-        <div class="form-grid">
-          <label>Typ
-            <select id="calendarType">
-              <option value="Training">Training</option>
-              <option value="Spiel">Spiel</option>
-              <option value="Sonstiges">Sonstiges</option>
-            </select>
-          </label>
-          <label>Datum <input id="calendarDate" type="date" required /></label>
-          <label>Uhrzeit <input id="calendarTime" type="time" /></label>
-          <label>Ort <input id="calendarLocation" maxlength="50" placeholder="Sportplatz, Halle, auswärts" /></label>
-          <label>Gegner <input id="calendarOpponent" maxlength="50" placeholder="nur bei Spielen" /></label>
-          <label>Trainingsfokus
-            <select id="calendarTrainingFocus">
-              <option value="Eigener Ballbesitz">Eigener Ballbesitz</option>
-              <option value="Gegnerischer Ballbesitz">Gegnerischer Ballbesitz</option>
-              <option value="Umschalten">Umschalten</option>
-            </select>
-          </label>
-        </div>
-        <label>Notiz <textarea id="calendarNotes" rows="3" placeholder="Treffpunkt, Besonderheiten, Ausrüstung"></textarea></label>
-        <menu>
-          <button class="ghost-button danger" type="button" id="deleteCalendarEntryBtn" hidden>Termin löschen</button>
-          <button class="ghost-button" type="button" id="rateCalendarEntryBtn" hidden>Bewerten</button>
-          <button class="ghost-button" type="button" id="cancelCalendarDialogBtn">Abbrechen</button>
-          <button class="primary-button" type="submit">Termin speichern</button>
-        </menu>
-      </form>
-    </dialog>
-
-    <dialog id="calendarDayDialog">
-      <div class="player-form">
-        <div class="dialog-head">
-          <h2 id="calendarDayDialogTitle">Termine</h2>
-          <button class="icon-button" type="button" id="closeCalendarDayDialogBtn" aria-label="Schließen">×</button>
-        </div>
-        <div class="day-dialog-list" id="calendarDayList"></div>
-        <menu>
-          <button class="ghost-button" type="button" id="cancelCalendarDayDialogBtn">Schließen</button>
-          <button class="primary-button" type="button" id="addCalendarDayEntryBtn">Termin anlegen</button>
-        </menu>
-      </div>
     </dialog>
 
     <script src="./firebase-config.js"></script>
