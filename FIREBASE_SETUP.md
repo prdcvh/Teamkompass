@@ -132,40 +132,45 @@ eingeladen werden).
 ## 6. Weitere Mannschaft einrichten (z.B. ein anderer Trainer mit eigenem Team)
 
 Das Datenmodell trennt Teams bereits vollstaendig ueber die `teamId`
-(`teams/{teamId}/...`, siehe `firestore.rules`) - zwei Teams mit unterschiedlicher
+(`teams/{teamId}/...`, siehe `firestore.rules`) - Teams mit unterschiedlicher
 `teamId` im selben Firebase-Projekt sehen sich gegenseitig nie, weder Kader noch
-Trainer-/Spieler-Zugaenge. Fuer eine zweite Mannschaft (hier: U17, `teamId: "U17"`)
-sind bereits vorbereitet:
+Trainer-/Spieler-Zugaenge. Fuer weitere Mannschaften (bisher: U17 `teamId: "U17"`,
+U15 `teamId: "U15"`) sind jeweils bereits vorbereitet:
 
-- `outputs/u17/` - eigene Kopie der App mit eigenem Branding und eigener `firebase-config.js`
-  (`teamId: "U17"`, `enableRoles: true`, gleiches Firebase-Projekt).
-- `firebase.json` / `.firebaserc` - Hosting-Targets `main` (bestehende Mannschaft) und `u17`
-  (neue Mannschaft), beide im selben Firebase-Projekt `teamkompass-b8aac`.
-- `.github/workflows/firebase-hosting-merge.yml` - deployt bei jedem Merge nach `main` beide
-  Hosting-Targets.
+- `outputs/<team>/` (z.B. `outputs/u17/`, `outputs/u15/`) - eigene Kopie der App mit
+  eigenem Branding und eigener `firebase-config.js` (`teamId`, `enableRoles: true`,
+  gleiches Firebase-Projekt).
+- `firebase.json` / `.firebaserc` - je ein Hosting-Target pro Mannschaft
+  (`main`, `u17`, `u15`, ...), alle im selben Firebase-Projekt `teamkompass-b8aac`.
+- `.github/workflows/firebase-hosting-merge.yml` - deployt bei jedem Merge nach `main`
+  alle Hosting-Targets.
 
-**Noch noetig - einmalig, nur in der Firebase-Konsole (nicht per Code moeglich):**
+**Noch noetig pro neuer Mannschaft - einmalig, nur in der Firebase-Konsole (nicht per
+Code moeglich). Am Beispiel U15, `teamkompass-u15`:**
 
-1. Firebase Console -> Hosting -> "Website hinzufuegen" -> Site-ID `teamkompass-u17` vergeben
+1. Firebase Console -> Hosting -> "Website hinzufuegen" -> Site-ID `teamkompass-u15` vergeben
    (oder per Firebase-CLI, sofern lokal installiert und eingeloggt:
-   `firebase hosting:sites:create teamkompass-u17 --project teamkompass-b8aac`).
+   `firebase hosting:sites:create teamkompass-u15 --project teamkompass-b8aac`).
    Ist die gewuenschte Site-ID bereits vergeben, eine andere waehlen und in `.firebaserc`
-   (Eintrag `targets.teamkompass-b8aac.hosting.u17`) sowie ggf. in dieser Anleitung anpassen.
+   (Eintrag `targets.teamkompass-b8aac.hosting.u15`) sowie ggf. in dieser Anleitung anpassen.
 2. Passt die verwendete Site-ID nicht zu der in `.firebaserc` bereits eingetragenen
-   (`teamkompass-u17`), das Target lokal neu setzen: `firebase target:apply hosting u17 <site-id> --project teamkompass-b8aac`
+   (`teamkompass-u15`), das Target lokal neu setzen: `firebase target:apply hosting u15 <site-id> --project teamkompass-b8aac`
    (schreibt `.firebaserc`) und den geaenderten Stand committen.
 3. Firestore-Regeln sind bereits generisch fuer beliebige `teamId` gueltig - hier ist nichts
    weiter zu tun.
-4. Erstes Trainer-Konto fuer `U17` anlegen (gleicher Bootstrap-Schritt wie in Abschnitt 5,
-   Schritt 3, nur mit `teamId: "U17"` statt der bisherigen `teamId`):
+4. Erstes Trainer-Konto fuer `U15` anlegen (gleicher Bootstrap-Schritt wie in Abschnitt 5,
+   Schritt 3, nur mit `teamId: "U15"` statt der bisherigen `teamId`):
    Firebase Console -> Authentication -> Nutzer hinzufuegen -> die generierte UID kopieren ->
-   Firestore -> Dokument `teams/U17/members/{UID}` mit Feld `role: "trainer"` anlegen.
-5. Diesen Branch nach `main` mergen - der Deploy-Workflow veroeffentlicht danach automatisch
-   beide Sites. Die neue Mannschaft ist danach unter `https://teamkompass-u17.web.app`
-   erreichbar (URL haengt von der tatsaechlich vergebenen Site-ID ab).
-6. Der U17-Trainer meldet sich mit dem in Schritt 4 angelegten Konto an und legt seine Spieler,
+   Firestore -> Dokument `teams/U15/members/{UID}` mit Feld `role: "trainer"` anlegen.
+5. Erst NACHDEM Schritt 1 erledigt ist diesen Branch nach `main` mergen - der
+   Deploy-Workflow veroeffentlicht danach automatisch alle Sites. Vorher mergen laesst
+   den neuen Deploy-Schritt fuer `u15` bei jedem Merge nach `main` fehlschlagen, weil die
+   Site noch nicht existiert. Die neue Mannschaft ist nach dem Merge unter
+   `https://teamkompass-u15.web.app` erreichbar (URL haengt von der tatsaechlich
+   vergebenen Site-ID ab).
+6. Der U15-Trainer meldet sich mit dem in Schritt 4 angelegten Konto an und legt seine Spieler,
    Einladungscodes und bei Bedarf weitere Trainer-Konten direkt in der App an - unabhaengig
-   vom bestehenden Team.
+   von den bestehenden Teams.
 
-Fuer ein drittes Team etc. dieselben Schritte mit einer weiteren `teamId`, einem weiteren
+Fuer eine weitere Mannschaft dieselben Schritte mit einer weiteren `teamId`, einem weiteren
 Hosting-Target und einem weiteren `outputs/<team>`-Ordner wiederholen.
