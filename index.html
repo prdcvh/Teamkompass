@@ -132,11 +132,6 @@
                   <button class="primary-button" id="newCalendarEntryBtn" type="button">Termin anlegen</button>
                 </div>
               </div>
-              <div class="calendar-legend">
-                <span><span class="chip-dot dot-training"></span>Training</span>
-                <span><span class="chip-dot dot-spiel"></span>Spiel</span>
-                <span><span class="chip-dot dot-sonstiges"></span>Sonstiges</span>
-              </div>
               <div class="calendar-weekdays">
                 <span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span>
               </div>
@@ -431,20 +426,6 @@
           <button class="primary-button" type="submit">Termin speichern</button>
         </menu>
       </form>
-    </dialog>
-
-    <dialog id="calendarDayDialog">
-      <div class="player-form">
-        <div class="dialog-head">
-          <h2 id="calendarDayDialogTitle">Termine</h2>
-          <button class="icon-button" type="button" id="closeCalendarDayDialogBtn" aria-label="Schließen">×</button>
-        </div>
-        <div class="day-dialog-list" id="calendarDayList"></div>
-        <menu>
-          <button class="ghost-button" type="button" id="cancelCalendarDayDialogBtn">Schließen</button>
-          <button class="primary-button" type="button" id="addCalendarDayEntryBtn">Termin anlegen</button>
-        </menu>
-      </div>
     </dialog>
 
     <script src="./firebase-config.js"></script>

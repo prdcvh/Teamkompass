@@ -103,7 +103,6 @@ const views = {
 
 let calendarCursor = startOfMonth(new Date());
 let pendingCalendarEntryId = null;
-let calendarDayDialogDate = null;
 
 window.addEventListener("error", (event) => {
   console.error(event.error || event.message);
@@ -723,6 +722,15 @@ function isoWeekday(date) {
   return ((date.getDay() + 6) % 7) + 1;
 }
 
+function weekdayShort(dateValue) {
+  return new Date(`${dateValue}T00:00:00`).toLocaleDateString("de-DE", { weekday: "short" });
+}
+
+function shortDayMonth(dateValue) {
+  const [, month, day] = dateValue.split("-");
+  return `${Number(day)}.${Number(month)}.`;
+}
+
 function renderPitch() {
   const formations = {
     "4-3-3": [
@@ -1180,97 +1188,45 @@ function renderCalendarGrid() {
       entries: calendarEntriesForDate(dateValue)
     });
   }
-  const maxVisible = 3;
-  $("#calendarGrid").innerHTML = cells.map((cell) => {
-    const overflowCount = cell.entries.length > maxVisible ? cell.entries.length - (maxVisible - 1) : 0;
-    const visibleEntries = overflowCount ? cell.entries.slice(0, maxVisible - 1) : cell.entries;
-    return `
+  $("#calendarGrid").innerHTML = cells.map((cell) => `
     <div class="calendar-cell ${cell.inMonth ? "" : "outside"} ${cell.weekend ? "weekend" : ""} ${cell.isToday ? "today" : ""}">
       <div class="calendar-cell-head">
-        <button class="calendar-day-number" type="button" data-day-date="${cell.dateValue}">${cell.day}</button>
+        <span>${cell.day}</span>
         <button class="calendar-add-btn" type="button" data-add-date="${cell.dateValue}" aria-label="Termin anlegen">+</button>
       </div>
       <div class="calendar-cell-entries">
-        ${visibleEntries.map((entry) => `
-          <button class="calendar-chip" type="button" data-entry-id="${entry.id}">
-            <span class="chip-dot dot-${chipClass(entry)}"></span>
+        ${cell.entries.map((entry) => `
+          <button class="calendar-chip calendar-chip-${chipClass(entry)}" type="button" data-entry-id="${entry.id}">
             ${entry.time ? `<span class="chip-time">${entry.time}</span>` : ""}
             <span class="chip-title">${escapeHtml(entry.title)}</span>
             ${entry.eventId ? `<span class="chip-check" title="Bewertet">✓</span>` : ""}
           </button>
         `).join("")}
-        ${overflowCount ? `<button class="calendar-more-chip" type="button" data-more-date="${cell.dateValue}">+${overflowCount} weitere</button>` : ""}
       </div>
-    </div>
-  `;
-  }).join("");
-}
-
-function agendaDayHeading(dateValue) {
-  const today = startOfToday();
-  const date = new Date(`${dateValue}T00:00:00`);
-  if (date.getTime() === today.getTime()) return "Heute";
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  if (date.getTime() === tomorrow.getTime()) return "Morgen";
-  return date.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" });
-}
-
-function renderCalendarAgenda() {
-  const today = startOfToday();
-  const upcoming = sortedCalendarEntries().filter((entry) => new Date(`${entry.date}T00:00:00`) >= today).slice(0, 20);
-  if (!upcoming.length) {
-    $("#calendarAgenda").innerHTML = `<p class="agenda-empty">Keine anstehenden Termine geplant.</p>`;
-    return;
-  }
-  const groups = [];
-  upcoming.forEach((entry) => {
-    const lastGroup = groups.at(-1);
-    if (lastGroup && lastGroup.date === entry.date) lastGroup.entries.push(entry);
-    else groups.push({ date: entry.date, entries: [entry] });
-  });
-  $("#calendarAgenda").innerHTML = groups.map((group) => `
-    <div class="agenda-day-group">
-      <h3 class="agenda-day-heading">${agendaDayHeading(group.date)}</h3>
-      ${group.entries.map((entry) => `
-        <article class="agenda-item">
-          <div class="agenda-body">
-            <span class="chip-dot dot-${chipClass(entry)}"></span>
-            <div class="agenda-text">
-              <strong>${escapeHtml(entry.title)}</strong>
-              <small>${[entry.time, entry.location, entry.opponent ? `vs. ${entry.opponent}` : ""].filter(Boolean).join(" · ")}</small>
-            </div>
-          </div>
-          <div class="agenda-actions">
-            ${entry.type !== "Sonstiges" ? `<button class="ghost-button" type="button" data-rate-id="${entry.id}">${entry.eventId ? "Zur Bewertung" : "Bewerten"}</button>` : ""}
-            <button class="icon-button" type="button" data-edit-id="${entry.id}" aria-label="Bearbeiten">✎</button>
-          </div>
-        </article>
-      `).join("")}
     </div>
   `).join("");
 }
 
-function formatLongDate(dateValue) {
-  return new Date(`${dateValue}T00:00:00`).toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-}
-
-function openCalendarDayDialog(dateValue) {
-  calendarDayDialogDate = dateValue;
-  $("#calendarDayDialogTitle").textContent = formatLongDate(dateValue);
-  const entries = calendarEntriesForDate(dateValue);
-  $("#calendarDayList").innerHTML = entries.map((entry) => `
-    <button class="day-dialog-row" type="button" data-entry-id="${entry.id}">
-      <span class="chip-dot dot-${chipClass(entry)}"></span>
-      <span class="day-dialog-time">${entry.time || "–"}</span>
-      <span class="day-dialog-title">
+function renderCalendarAgenda() {
+  const today = startOfToday();
+  const upcoming = sortedCalendarEntries().filter((entry) => new Date(`${entry.date}T00:00:00`) >= today).slice(0, 12);
+  $("#calendarAgenda").innerHTML = upcoming.map((entry) => `
+    <article class="agenda-item">
+      <div class="agenda-date">
+        <strong>${shortDayMonth(entry.date)}</strong>
+        <small>${weekdayShort(entry.date)}</small>
+      </div>
+      <div class="agenda-body">
+        <span class="event-type">${entry.type}</span>
         <strong>${escapeHtml(entry.title)}</strong>
-        <small>${[entry.location, entry.opponent ? `vs. ${entry.opponent}` : ""].filter(Boolean).join(" · ")}</small>
-      </span>
-      ${entry.eventId ? `<span class="chip-check" title="Bewertet">✓</span>` : ""}
-    </button>
-  `).join("") || `<p class="muted">Noch keine Termine an diesem Tag.</p>`;
-  $("#calendarDayDialog").showModal();
+        <small>${[entry.time, entry.location, entry.opponent ? `vs. ${entry.opponent}` : ""].filter(Boolean).join(" · ")}</small>
+      </div>
+      <div class="agenda-actions">
+        ${entry.type !== "Sonstiges" ? `<button class="ghost-button" type="button" data-rate-id="${entry.id}">${entry.eventId ? "Zur Bewertung" : "Bewerten"}</button>` : ""}
+        <button class="icon-button" type="button" data-edit-id="${entry.id}" aria-label="Bearbeiten">✎</button>
+      </div>
+    </article>
+  `).join("") || `<p class="muted">Keine anstehenden Termine geplant.</p>`;
 }
 
 function renderTrainingScheduleForm() {
@@ -2047,33 +2003,9 @@ $("#calendarGrid").addEventListener("click", (event) => {
     if (entry) openCalendarDialog(entry);
     return;
   }
-  const moreBtn = event.target.closest("[data-more-date]");
-  if (moreBtn) {
-    openCalendarDayDialog(moreBtn.dataset.moreDate);
-    return;
-  }
-  const dayBtn = event.target.closest("[data-day-date]");
-  if (dayBtn) {
-    openCalendarDayDialog(dayBtn.dataset.dayDate);
-    return;
-  }
   const addBtn = event.target.closest("[data-add-date]");
   if (addBtn) openCalendarDialog(null, addBtn.dataset.addDate);
 });
-$("#calendarDayList").addEventListener("click", (event) => {
-  const row = event.target.closest("[data-entry-id]");
-  if (!row) return;
-  const entry = state.calendarEntries.find((item) => item.id === row.dataset.entryId);
-  $("#calendarDayDialog").close();
-  if (entry) openCalendarDialog(entry);
-});
-$("#addCalendarDayEntryBtn").addEventListener("click", () => {
-  const date = calendarDayDialogDate;
-  $("#calendarDayDialog").close();
-  openCalendarDialog(null, date);
-});
-$("#closeCalendarDayDialogBtn").addEventListener("click", () => $("#calendarDayDialog").close());
-$("#cancelCalendarDayDialogBtn").addEventListener("click", () => $("#calendarDayDialog").close());
 $("#calendarAgenda").addEventListener("click", (event) => {
   const rateBtn = event.target.closest("[data-rate-id]");
   if (rateBtn) {
