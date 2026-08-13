@@ -60,28 +60,6 @@ const sampleData = {
       }
     }
   ],
-  calendarEntries: [
-    {
-      id: "cal1",
-      type: "Spiel",
-      title: "Auswärtsspiel gegen FC Bergheim",
-      date: "2026-06-13",
-      time: "15:00",
-      location: "Sportpark Bergheim",
-      opponent: "FC Bergheim",
-      trainingFocus: "",
-      notes: "Abfahrt 13:30 Uhr ab Vereinsheim.",
-      auto: false,
-      eventId: null
-    }
-  ],
-  trainingSchedule: {
-    weekdays: [2, 4],
-    time: "18:00",
-    location: "Hauptplatz",
-    title: "Training",
-    horizonWeeks: 6
-  },
   selectedEventId: "e2"
 };
 
@@ -95,14 +73,10 @@ const standardPositions = ["TW", "IV", "LIB", "LV", "RV", "DM", "ZM", "OM", "LM"
 const views = {
   dashboard: $("#dashboardView"),
   squad: $("#squadView"),
-  calendar: $("#calendarView"),
   events: $("#eventsView"),
   profiles: $("#profilesView"),
   teamAnalysis: $("#teamAnalysisView")
 };
-
-let calendarCursor = startOfMonth(new Date());
-let pendingCalendarEntryId = null;
 
 window.addEventListener("error", (event) => {
   console.error(event.error || event.message);
@@ -119,7 +93,6 @@ window.addEventListener("unhandledrejection", (event) => {
 const titles = {
   dashboard: "Dashboard",
   squad: "Kader",
-  calendar: "Kalender",
   events: "Events und Bewertungen",
   profiles: "Spielerprofile",
   teamAnalysis: "Teamanalyse"
@@ -192,41 +165,10 @@ function loadState() {
 function normalizeState(data) {
   const events = Array.isArray(data.events) ? data.events : structuredClone(sampleData.events);
   const players = Array.isArray(data.players) ? data.players : structuredClone(sampleData.players);
-  const calendarEntries = Array.isArray(data.calendarEntries) ? data.calendarEntries : structuredClone(sampleData.calendarEntries || []);
   return {
     players: players.map(normalizePlayer),
     events: events.map(normalizeEvent),
-    calendarEntries: calendarEntries.map(normalizeCalendarEntry),
-    trainingSchedule: normalizeTrainingSchedule(data.trainingSchedule),
     selectedEventId: data.selectedEventId || data.events?.[0]?.id || sampleData.selectedEventId
-  };
-}
-
-function normalizeCalendarEntry(entry = {}) {
-  const type = ["Training", "Spiel", "Sonstiges"].includes(entry.type) ? entry.type : "Training";
-  return {
-    id: entry.id || `cal${crypto.randomUUID()}`,
-    type,
-    title: entry.title || "",
-    date: entry.date || toDateInputValue(new Date()),
-    time: entry.time || "",
-    location: entry.location || "",
-    opponent: type === "Spiel" ? entry.opponent || "" : "",
-    trainingFocus: type === "Training" ? entry.trainingFocus || "Eigener Ballbesitz" : "",
-    notes: entry.notes || "",
-    auto: Boolean(entry.auto),
-    eventId: entry.eventId || null
-  };
-}
-
-function normalizeTrainingSchedule(schedule = {}) {
-  const source = schedule || {};
-  return {
-    weekdays: Array.isArray(source.weekdays) ? [...new Set(source.weekdays.map(Number).filter((day) => day >= 1 && day <= 7))] : [],
-    time: source.time || "18:00",
-    location: source.location || "",
-    title: source.title || "Training",
-    horizonWeeks: Number(source.horizonWeeks) > 0 ? Number(source.horizonWeeks) : 6
   };
 }
 
@@ -706,31 +648,6 @@ function startOfToday() {
   return date;
 }
 
-function startOfMonth(date) {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
-}
-
-function addMonths(date, delta) {
-  return new Date(date.getFullYear(), date.getMonth() + delta, 1);
-}
-
-function toDateInputValue(date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
-function isoWeekday(date) {
-  return ((date.getDay() + 6) % 7) + 1;
-}
-
-function weekdayShort(dateValue) {
-  return new Date(`${dateValue}T00:00:00`).toLocaleDateString("de-DE", { weekday: "short" });
-}
-
-function shortDayMonth(dateValue) {
-  const [, month, day] = dateValue.split("-");
-  return `${Number(day)}.${Number(month)}.`;
-}
-
 function renderPitch() {
   const formations = {
     "4-3-3": [
@@ -1045,18 +962,18 @@ function savePlayer(event) {
   renderAll();
 }
 
-function openEventDialog(prefill = null) {
-  $("#eventTitle").value = prefill?.title || "";
-  $("#eventType").value = prefill?.type === "Spiel" ? "Spiel" : "Training";
-  $("#eventDate").value = prefill?.date || toDateInputValue(new Date());
+function openEventDialog() {
+  $("#eventTitle").value = "";
+  $("#eventType").value = "Training";
+  $("#eventDate").valueAsDate = new Date();
   $("#eventIntensity").value = "2";
-  $("#eventLocation").value = prefill?.location || "";
-  $("#eventTrainingFocus").value = prefill?.trainingFocus || "Eigener Ballbesitz";
-  $("#eventOpponent").value = prefill?.opponent || "";
+  $("#eventLocation").value = "";
+  $("#eventTrainingFocus").value = "Eigener Ballbesitz";
+  $("#eventOpponent").value = "";
   $("#eventGoalsFor").value = 0;
   $("#eventGoalsAgainst").value = 0;
   $("#eventMatchDuration").value = 90;
-  $("#eventNotes").value = prefill?.notes || "";
+  $("#eventNotes").value = "";
   syncEventGameFields();
   $("#eventDialog").showModal();
 }
@@ -1092,11 +1009,6 @@ function saveEvent(event) {
   };
   state.events.push(newEvent);
   state.selectedEventId = newEvent.id;
-  if (pendingCalendarEntryId) {
-    const linkedEntry = state.calendarEntries.find((item) => item.id === pendingCalendarEntryId);
-    if (linkedEntry) linkedEntry.eventId = newEvent.id;
-    pendingCalendarEntryId = null;
-  }
   $("#eventDialog").close();
   persist();
   renderAll();
@@ -1145,236 +1057,6 @@ function updateSelectedEventMeta(field, value) {
   else if (field === "trainingFocus") event[field] = event.type === "Training" ? value : "";
   else if (field === "matchDuration") event[field] = event.type === "Spiel" ? Math.max(1, numericValue || 90) : "";
   else event[field] = event.type === "Spiel" ? numericValue : "";
-  persist();
-  renderAll();
-}
-
-function sortedCalendarEntries() {
-  return [...state.calendarEntries].sort((a, b) => `${a.date}T${a.time || "00:00"}`.localeCompare(`${b.date}T${b.time || "00:00"}`));
-}
-
-function calendarEntriesForDate(dateValue) {
-  return sortedCalendarEntries().filter((entry) => entry.date === dateValue);
-}
-
-function chipClass(entry) {
-  return entry.type.toLowerCase();
-}
-
-function renderCalendar() {
-  renderCalendarGrid();
-  renderCalendarAgenda();
-  renderTrainingScheduleForm();
-}
-
-function renderCalendarGrid() {
-  const year = calendarCursor.getFullYear();
-  const month = calendarCursor.getMonth();
-  $("#calendarMonthLabel").textContent = calendarCursor.toLocaleDateString("de-DE", { month: "long", year: "numeric" });
-  const firstOfMonth = new Date(year, month, 1);
-  const startOffset = isoWeekday(firstOfMonth) - 1;
-  const gridStart = new Date(year, month, 1 - startOffset);
-  const today = toDateInputValue(new Date());
-  const cells = [];
-  for (let i = 0; i < 42; i += 1) {
-    const cellDate = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i);
-    const dateValue = toDateInputValue(cellDate);
-    cells.push({
-      dateValue,
-      day: cellDate.getDate(),
-      inMonth: cellDate.getMonth() === month,
-      weekend: isoWeekday(cellDate) >= 6,
-      isToday: dateValue === today,
-      entries: calendarEntriesForDate(dateValue)
-    });
-  }
-  $("#calendarGrid").innerHTML = cells.map((cell) => `
-    <div class="calendar-cell ${cell.inMonth ? "" : "outside"} ${cell.weekend ? "weekend" : ""} ${cell.isToday ? "today" : ""}">
-      <div class="calendar-cell-head">
-        <span>${cell.day}</span>
-        <button class="calendar-add-btn" type="button" data-add-date="${cell.dateValue}" aria-label="Termin anlegen">+</button>
-      </div>
-      <div class="calendar-cell-entries">
-        ${cell.entries.map((entry) => `
-          <button class="calendar-chip calendar-chip-${chipClass(entry)}" type="button" data-entry-id="${entry.id}">
-            ${entry.time ? `<span class="chip-time">${entry.time}</span>` : ""}
-            <span class="chip-title">${escapeHtml(entry.title)}</span>
-            ${entry.eventId ? `<span class="chip-check" title="Bewertet">✓</span>` : ""}
-          </button>
-        `).join("")}
-      </div>
-    </div>
-  `).join("");
-}
-
-function renderCalendarAgenda() {
-  const today = startOfToday();
-  const upcoming = sortedCalendarEntries().filter((entry) => new Date(`${entry.date}T00:00:00`) >= today).slice(0, 12);
-  $("#calendarAgenda").innerHTML = upcoming.map((entry) => `
-    <article class="agenda-item">
-      <div class="agenda-date">
-        <strong>${shortDayMonth(entry.date)}</strong>
-        <small>${weekdayShort(entry.date)}</small>
-      </div>
-      <div class="agenda-body">
-        <span class="event-type">${entry.type}</span>
-        <strong>${escapeHtml(entry.title)}</strong>
-        <small>${[entry.time, entry.location, entry.opponent ? `vs. ${entry.opponent}` : ""].filter(Boolean).join(" · ")}</small>
-      </div>
-      <div class="agenda-actions">
-        ${entry.type !== "Sonstiges" ? `<button class="ghost-button" type="button" data-rate-id="${entry.id}">${entry.eventId ? "Zur Bewertung" : "Bewerten"}</button>` : ""}
-        <button class="icon-button" type="button" data-edit-id="${entry.id}" aria-label="Bearbeiten">✎</button>
-      </div>
-    </article>
-  `).join("") || `<p class="muted">Keine anstehenden Termine geplant.</p>`;
-}
-
-function renderTrainingScheduleForm() {
-  const schedule = state.trainingSchedule;
-  const weekdayLabels = [[1, "Mo"], [2, "Di"], [3, "Mi"], [4, "Do"], [5, "Fr"], [6, "Sa"], [7, "So"]];
-  const selected = new Set(schedule.weekdays);
-  $("#weekdayOptions").innerHTML = weekdayLabels.map(([value, label]) => `
-    <label class="position-option">
-      <input type="checkbox" value="${value}" ${selected.has(value) ? "checked" : ""} />
-      <span>${label}</span>
-    </label>
-  `).join("");
-  $("#trainingTime").value = schedule.time || "";
-  $("#trainingLocation").value = schedule.location || "";
-  $("#trainingTitle").value = schedule.title || "Training";
-  $("#trainingHorizon").value = schedule.horizonWeeks || 6;
-}
-
-function openCalendarDialog(entry, presetDate) {
-  $("#calendarDialogTitle").textContent = entry ? "Termin bearbeiten" : "Termin anlegen";
-  $("#calendarEntryId").value = entry?.id || "";
-  $("#calendarTitle").value = entry?.title || "";
-  $("#calendarType").value = entry?.type || "Spiel";
-  $("#calendarDate").value = entry?.date || presetDate || toDateInputValue(new Date());
-  $("#calendarTime").value = entry?.time || "";
-  $("#calendarLocation").value = entry?.location || "";
-  $("#calendarOpponent").value = entry?.opponent || "";
-  $("#calendarTrainingFocus").value = entry?.trainingFocus || "Eigener Ballbesitz";
-  $("#calendarNotes").value = entry?.notes || "";
-  $("#deleteCalendarEntryBtn").hidden = !entry;
-  $("#rateCalendarEntryBtn").hidden = !entry || entry.type === "Sonstiges";
-  $("#rateCalendarEntryBtn").textContent = entry?.eventId ? "Zur Bewertung" : "Bewerten";
-  syncCalendarTypeFields();
-  $("#calendarDialog").showModal();
-}
-
-function syncCalendarTypeFields() {
-  const type = $("#calendarType").value;
-  const opponentField = $("#calendarOpponent");
-  opponentField.disabled = type !== "Spiel";
-  opponentField.closest("label").hidden = type !== "Spiel";
-  const focusField = $("#calendarTrainingFocus");
-  focusField.disabled = type !== "Training";
-  focusField.closest("label").hidden = type !== "Training";
-}
-
-function saveCalendarEntry(event) {
-  event.preventDefault();
-  const id = $("#calendarEntryId").value || `cal${crypto.randomUUID()}`;
-  const existing = state.calendarEntries.find((item) => item.id === id);
-  const type = $("#calendarType").value;
-  const entry = {
-    id,
-    type,
-    title: $("#calendarTitle").value.trim(),
-    date: $("#calendarDate").value,
-    time: $("#calendarTime").value,
-    location: $("#calendarLocation").value.trim(),
-    opponent: type === "Spiel" ? $("#calendarOpponent").value.trim() : "",
-    trainingFocus: type === "Training" ? $("#calendarTrainingFocus").value : "",
-    notes: $("#calendarNotes").value.trim(),
-    auto: existing?.auto || false,
-    eventId: existing?.eventId || null
-  };
-  const existingIndex = state.calendarEntries.findIndex((item) => item.id === id);
-  if (existingIndex >= 0) state.calendarEntries[existingIndex] = entry;
-  else state.calendarEntries.push(entry);
-  $("#calendarDialog").close();
-  persist();
-  renderAll();
-}
-
-function deleteCalendarEntryById(id) {
-  state.calendarEntries = state.calendarEntries.filter((item) => item.id !== id);
-  persist();
-  renderAll();
-}
-
-function rateCalendarEntry(entryId) {
-  const entry = state.calendarEntries.find((item) => item.id === entryId);
-  if (!entry) return;
-  if (entry.eventId && state.events.some((item) => item.id === entry.eventId)) {
-    state.selectedEventId = entry.eventId;
-    persist();
-    renderAll();
-    setView("events");
-    return;
-  }
-  pendingCalendarEntryId = entry.id;
-  openEventDialog({
-    title: entry.title,
-    type: entry.type === "Spiel" ? "Spiel" : "Training",
-    date: entry.date,
-    location: entry.location,
-    trainingFocus: entry.trainingFocus,
-    opponent: entry.opponent,
-    notes: entry.notes
-  });
-}
-
-function removeFutureUnratedAutoTrainings() {
-  const today = startOfToday();
-  state.calendarEntries = state.calendarEntries.filter((entry) => (
-    !(entry.auto && entry.type === "Training" && !entry.eventId && new Date(`${entry.date}T00:00:00`) >= today)
-  ));
-}
-
-function ensureTrainingEntries() {
-  const schedule = state.trainingSchedule;
-  if (!schedule || !schedule.weekdays.length) return;
-  const today = startOfToday();
-  const horizonEnd = new Date(today);
-  horizonEnd.setDate(horizonEnd.getDate() + (schedule.horizonWeeks || 6) * 7);
-  const existingDates = new Set(
-    state.calendarEntries.filter((entry) => entry.auto && entry.type === "Training").map((entry) => entry.date)
-  );
-  let added = false;
-  for (let cursor = new Date(today); cursor <= horizonEnd; cursor.setDate(cursor.getDate() + 1)) {
-    if (!schedule.weekdays.includes(isoWeekday(cursor))) continue;
-    const dateValue = toDateInputValue(cursor);
-    if (existingDates.has(dateValue)) continue;
-    state.calendarEntries.push({
-      id: `cal-auto-${dateValue}`,
-      type: "Training",
-      title: schedule.title || "Training",
-      date: dateValue,
-      time: schedule.time || "",
-      location: schedule.location || "",
-      opponent: "",
-      trainingFocus: "Eigener Ballbesitz",
-      notes: "",
-      auto: true,
-      eventId: null
-    });
-    existingDates.add(dateValue);
-    added = true;
-  }
-  if (added) persist();
-}
-
-function updateTrainingScheduleField(field, value) {
-  const schedule = { ...state.trainingSchedule };
-  if (field === "weekdays") schedule.weekdays = [...document.querySelectorAll("#weekdayOptions input:checked")].map((input) => Number(input.value));
-  else if (field === "horizonWeeks") schedule.horizonWeeks = Math.max(1, Math.min(16, Number(value) || 6));
-  else schedule[field] = value;
-  state.trainingSchedule = schedule;
-  removeFutureUnratedAutoTrainings();
-  ensureTrainingEntries();
   persist();
   renderAll();
 }
@@ -1901,7 +1583,6 @@ function renderAll() {
   safeRender(renderLeaders, "Formkurve");
   safeRender(renderSelects, "Auswahllisten");
   safeRender(renderSquad, "Kader");
-  safeRender(renderCalendar, "Kalender");
   safeRender(renderEvents, "Events");
   safeRender(drawProfile, "Spielerprofile");
   safeRender(renderTeamAnalysis, "Teamanalyse");
@@ -1936,7 +1617,6 @@ $("#eventForm").addEventListener("submit", saveEvent);
 $("#eventType").addEventListener("change", syncEventGameFields);
 $("#closeEventDialogBtn").addEventListener("click", () => $("#eventDialog").close());
 $("#cancelEventDialogBtn").addEventListener("click", () => $("#eventDialog").close());
-$("#eventDialog").addEventListener("close", () => { pendingCalendarEntryId = null; });
 $("#eventSelect").addEventListener("change", (event) => {
   state.selectedEventId = event.target.value;
   persist();
@@ -1992,54 +1672,7 @@ $("#ratingTable").addEventListener("input", (event) => {
 
 window.addEventListener("resize", positionNavIndicator);
 
-$("#calendarPrevBtn").addEventListener("click", () => { calendarCursor = addMonths(calendarCursor, -1); renderCalendarGrid(); });
-$("#calendarNextBtn").addEventListener("click", () => { calendarCursor = addMonths(calendarCursor, 1); renderCalendarGrid(); });
-$("#calendarTodayBtn").addEventListener("click", () => { calendarCursor = startOfMonth(new Date()); renderCalendarGrid(); });
-$("#newCalendarEntryBtn").addEventListener("click", () => openCalendarDialog(null));
-$("#calendarGrid").addEventListener("click", (event) => {
-  const chip = event.target.closest("[data-entry-id]");
-  if (chip) {
-    const entry = state.calendarEntries.find((item) => item.id === chip.dataset.entryId);
-    if (entry) openCalendarDialog(entry);
-    return;
-  }
-  const addBtn = event.target.closest("[data-add-date]");
-  if (addBtn) openCalendarDialog(null, addBtn.dataset.addDate);
-});
-$("#calendarAgenda").addEventListener("click", (event) => {
-  const rateBtn = event.target.closest("[data-rate-id]");
-  if (rateBtn) {
-    rateCalendarEntry(rateBtn.dataset.rateId);
-    return;
-  }
-  const editBtn = event.target.closest("[data-edit-id]");
-  if (editBtn) {
-    const entry = state.calendarEntries.find((item) => item.id === editBtn.dataset.editId);
-    if (entry) openCalendarDialog(entry);
-  }
-});
-$("#calendarForm").addEventListener("submit", saveCalendarEntry);
-$("#calendarType").addEventListener("change", syncCalendarTypeFields);
-$("#closeCalendarDialogBtn").addEventListener("click", () => $("#calendarDialog").close());
-$("#cancelCalendarDialogBtn").addEventListener("click", () => $("#calendarDialog").close());
-$("#deleteCalendarEntryBtn").addEventListener("click", () => {
-  const id = $("#calendarEntryId").value;
-  $("#calendarDialog").close();
-  if (id) deleteCalendarEntryById(id);
-});
-$("#rateCalendarEntryBtn").addEventListener("click", () => {
-  const id = $("#calendarEntryId").value;
-  $("#calendarDialog").close();
-  if (id) rateCalendarEntry(id);
-});
-$("#weekdayOptions").addEventListener("change", () => updateTrainingScheduleField("weekdays"));
-$("#trainingTime").addEventListener("change", (event) => updateTrainingScheduleField("time", event.target.value));
-$("#trainingLocation").addEventListener("change", (event) => updateTrainingScheduleField("location", event.target.value.trim()));
-$("#trainingTitle").addEventListener("change", (event) => updateTrainingScheduleField("title", event.target.value.trim() || "Training"));
-$("#trainingHorizon").addEventListener("change", (event) => updateTrainingScheduleField("horizonWeeks", event.target.value));
-
 initTheme();
-ensureTrainingEntries();
 renderAll();
 positionNavIndicator();
 initDataStore();

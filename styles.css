@@ -567,10 +567,6 @@ menu {
   grid-template-columns: minmax(280px, 0.42fr) minmax(0, 1fr);
 }
 
-.calendar-layout {
-  grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.6fr);
-}
-
 .profile-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(320px, 0.42fr);
@@ -1068,206 +1064,6 @@ tr:last-child td {
   color: var(--muted);
 }
 
-.calendar-nav {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.calendar-weekdays {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 8px;
-  margin-top: 16px;
-  color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 800;
-  text-align: center;
-  text-transform: uppercase;
-  letter-spacing: var(--track-eyebrow);
-}
-
-.calendar-grid {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  grid-auto-rows: minmax(96px, auto);
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.calendar-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-  padding: 8px;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  background: var(--field);
-}
-
-.calendar-cell.outside {
-  opacity: 0.42;
-}
-
-.calendar-cell.weekend {
-  background: var(--soft-panel);
-}
-
-.calendar-cell.today {
-  border-color: rgba(216, 7, 46, 0.5);
-  box-shadow: inset 0 0 0 1px rgba(216, 7, 46, 0.5);
-}
-
-.calendar-cell-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 0.82rem;
-  font-weight: 800;
-}
-
-.calendar-add-btn {
-  display: grid;
-  width: 20px;
-  height: 20px;
-  place-items: center;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  color: var(--muted);
-  background: transparent;
-  font-size: 0.8rem;
-  line-height: 1;
-  opacity: 0;
-  transition: opacity 0.15s ease;
-}
-
-.calendar-cell:hover .calendar-add-btn,
-.calendar-cell:focus-within .calendar-add-btn {
-  opacity: 1;
-}
-
-.calendar-cell-entries {
-  display: grid;
-  gap: 4px;
-}
-
-.calendar-chip {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  width: 100%;
-  min-width: 0;
-  padding: 3px 6px;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  color: var(--ink);
-  background: var(--soft-neutral);
-  font-size: 0.74rem;
-  font-weight: 700;
-  text-align: left;
-}
-
-.calendar-chip-training {
-  color: var(--green-dark);
-  background: var(--soft-green);
-}
-
-.calendar-chip-spiel {
-  color: var(--red-dark);
-  background: var(--soft-red);
-}
-
-.calendar-chip-sonstiges {
-  color: var(--ink);
-  background: var(--soft-amber);
-}
-
-.chip-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.chip-check {
-  margin-left: auto;
-}
-
-.calendar-agenda {
-  display: grid;
-  gap: 10px;
-  margin: 14px 0 18px;
-}
-
-.agenda-item {
-  display: grid;
-  grid-template-columns: 52px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  padding: 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-row);
-  background: var(--field);
-}
-
-.agenda-date {
-  text-align: center;
-}
-
-.agenda-date small {
-  display: block;
-  color: var(--muted);
-  text-transform: uppercase;
-}
-
-.agenda-body {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.agenda-body strong,
-.agenda-body small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.agenda-body small {
-  color: var(--muted);
-}
-
-.agenda-actions {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 6px;
-}
-
-.agenda-actions .ghost-button,
-.agenda-actions .icon-button {
-  min-height: 32px;
-  padding: 0 10px;
-  font-size: 0.8rem;
-}
-
-.agenda-actions .icon-button {
-  width: 100%;
-  font-size: 0.9rem;
-}
-
-.training-schedule {
-  display: grid;
-  gap: 14px;
-}
-
-.weekday-options {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 8px;
-}
-
 canvas {
   width: 100%;
   height: auto;
@@ -1492,7 +1288,6 @@ dialog::backdrop {
 menu {
   margin: 4px 0 0;
   padding: 0;
-  flex-wrap: wrap;
   justify-content: flex-end;
 }
 
@@ -1524,7 +1319,7 @@ menu {
   }
 
   .nav-tabs {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 
   .metrics-grid,
@@ -1538,8 +1333,7 @@ menu {
     grid-template-columns: 1fr 1fr;
   }
 
-  .events-layout,
-  .calendar-layout {
+  .events-layout {
     grid-template-columns: 1fr;
   }
 }
