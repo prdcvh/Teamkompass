@@ -426,11 +426,11 @@ function normalizeRating(rating = {}) {
   return normalized;
 }
 
-// Gewichtung der Gesamtnote: keine Teilnote darf allein dominieren (vorher gab Technik mit 45%
-// fast im Alleingang die Note vor, Auffassungsgabe zaehlte mit 5% praktisch nicht). Einsatz und
-// Technik bleiben mit 30% die staerksten Faktoren, Taktik ist mit 25% nahezu gleichwertig, und
-// Auffassungsgabe bekommt mit 15% ein Gewicht, das sie tatsaechlich beeinflussen kann - damit ein
-// laufstarker, taktisch cleverer Spieler nicht allein wegen schwaecherer Technik abgestraft wird.
+// Gewichtung der Gesamtnote: keine Teilnote darf allein dominieren. Einsatz und Fehlerquote
+// bleiben mit 30% die staerksten Faktoren, Entscheidungsfindung ist mit 25% nahezu gleichwertig,
+// und Lernfaehigkeit bekommt mit 15% ein Gewicht, das sie tatsaechlich beeinflussen kann - damit
+// ein laufstarker, spielintelligenter Spieler nicht allein wegen einer schwaecheren Fehlerquote
+// abgestraft wird.
 function calculatedGrade(rating) {
   if (!rating || rating.attendance === "absent" || rating.attendance === "excluded") return "";
   const fields = ["effort", "technique", "tactics", "comprehension"];
@@ -1724,9 +1724,9 @@ function positionCoverage() {
 function profileSkillAverages(ratings) {
   const fields = [
     ["effort", "Einsatz"],
-    ["technique", "Technik"],
-    ["tactics", "Taktik"],
-    ["comprehension", "Auffassung"]
+    ["technique", "Fehlerquote"],
+    ["tactics", "Entscheidungsfindung"],
+    ["comprehension", "Lernfähigkeit"]
   ];
   return fields.map(([field, label]) => {
     const values = ratings.map((item) => Number(item.rating[field])).filter(Boolean);
@@ -2222,7 +2222,7 @@ function renderSelects() {
 let eventFilter = { query: "", type: "all" };
 let ratingStepperIndex = 0;
 let lastRatingStepperKey = null;
-const ratingFieldLabels = { effort: "Einsatz", technique: "Technik", tactics: "Taktik", comprehension: "Auffassungsgabe" };
+const ratingFieldLabels = { effort: "Einsatz", technique: "Fehlerquote", tactics: "Entscheidungsfindung", comprehension: "Lernfähigkeit" };
 
 function filteredEvents() {
   const query = eventFilter.query.trim().toLowerCase();
@@ -2346,9 +2346,9 @@ function renderRatingTable() {
         <td data-label="Anwesenheit">${attendanceSelectHtml(player.id, attendance, event.type === "Spiel")}</td>
         <td data-label="Gesamtnote"><span class="computed-grade">${gradeLabel(calculatedGrade(rating))}</span></td>
         <td data-label="Einsatz">${gradeSelectHtml(player.id, "effort", rating.effort)}</td>
-        <td data-label="Technik">${gradeSelectHtml(player.id, "technique", rating.technique)}</td>
-        <td data-label="Taktik">${gradeSelectHtml(player.id, "tactics", rating.tactics)}</td>
-        <td data-label="Auffassung">${gradeSelectHtml(player.id, "comprehension", rating.comprehension)}</td>
+        <td data-label="Fehlerquote">${gradeSelectHtml(player.id, "technique", rating.technique)}</td>
+        <td data-label="Entscheidungsfindung">${gradeSelectHtml(player.id, "tactics", rating.tactics)}</td>
+        <td data-label="Lernfähigkeit">${gradeSelectHtml(player.id, "comprehension", rating.comprehension)}</td>
         ${gameFields}
         <td data-label="Notiz"><input class="rating-note" data-player-id="${player.id}" data-field="note" value="${escapeHtml(rating.note || "")}" placeholder="Kurznotiz" /></td>
       </tr>
@@ -2364,9 +2364,9 @@ function renderRatingTableHead(isGame) {
     <th>Anwesenheit</th>
     <th>Gesamtnote</th>
     <th>Einsatz</th>
-    <th>Technik</th>
-    <th>Taktik</th>
-    <th>Auffassungsgabe</th>
+    <th>Fehlerquote</th>
+    <th>Entscheidungsfindung</th>
+    <th>Lernfähigkeit</th>
     ${isGame ? "<th>Min.</th><th>Tore</th><th>Vorlagen</th>" : ""}
     <th>Notiz</th>
   `;

@@ -254,11 +254,14 @@ function normalizeRating(rating = {}) {
   return normalized;
 }
 
+// Gewichtung der Gesamtnote: Einsatz und Fehlerquote sind mit 30% die staerksten Faktoren,
+// Entscheidungsfindung ist mit 25% nahezu gleichwertig, und Lernfaehigkeit bekommt mit 15%
+// ein Gewicht, das sie tatsaechlich beeinflussen kann - keine Teilnote darf allein dominieren.
 function calculatedGrade(rating) {
   if (!rating || rating.attendance === "absent" || rating.attendance === "excluded") return "";
   const fields = ["effort", "technique", "tactics", "comprehension"];
   if (!fields.every((field) => rating[field])) return "";
-  return roundGrade(Number(rating.effort) * 0.3 + Number(rating.technique) * 0.45 + Number(rating.tactics) * 0.2 + Number(rating.comprehension) * 0.05);
+  return roundGrade(Number(rating.effort) * 0.3 + Number(rating.technique) * 0.3 + Number(rating.tactics) * 0.25 + Number(rating.comprehension) * 0.15);
 }
 
 function migrateLegacyState(data) {
@@ -559,9 +562,9 @@ function positionCoverage() {
 function profileSkillAverages(ratings) {
   const fields = [
     ["effort", "Einsatz"],
-    ["technique", "Technik"],
-    ["tactics", "Taktik"],
-    ["comprehension", "Auffassung"]
+    ["technique", "Fehlerquote"],
+    ["tactics", "Entscheidungsfindung"],
+    ["comprehension", "Lernfähigkeit"]
   ];
   return fields.map(([field, label]) => {
     const values = ratings.map((item) => Number(item.rating[field])).filter(Boolean);
@@ -893,9 +896,9 @@ function renderRatingTableHead(isGame) {
     <th>Anwesenheit</th>
     <th>Gesamtnote</th>
     <th>Einsatz</th>
-    <th>Technik</th>
-    <th>Taktik</th>
-    <th>Auffassungsgabe</th>
+    <th>Fehlerquote</th>
+    <th>Entscheidungsfindung</th>
+    <th>Lernfähigkeit</th>
     ${isGame ? "<th>Min.</th><th>Tore</th><th>Vorlagen</th>" : ""}
     <th>Notiz</th>
   `;
