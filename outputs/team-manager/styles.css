@@ -2097,6 +2097,93 @@ menu {
     color: var(--red);
     background: none;
   }
+
+  #squadView .table-wrap {
+    display: none;
+  }
+
+  .player-cards-mobile {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .player-card-mobile {
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--panel);
+    box-shadow: 0 10px 22px rgba(36, 29, 31, 0.04);
+  }
+
+  .player-card-mobile-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .player-card-mobile-top strong {
+    font-size: 0.98rem;
+  }
+
+  .player-card-mobile-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .player-card-mobile-grade {
+    margin-left: auto;
+    font-weight: 900;
+  }
+
+  .player-card-mobile-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--line);
+  }
+
+  .player-card-mobile-actions .ghost-button {
+    flex: 1;
+    min-width: 0;
+    padding: 8px 6px;
+    font-size: 0.78rem;
+  }
+}
+
+.player-cards-mobile,
+.fab-mobile {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .fab-mobile {
+    position: fixed;
+    right: 16px;
+    bottom: 92px;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+    border: none;
+    border-radius: 50%;
+    color: #fff;
+    background: var(--red);
+    box-shadow: 0 10px 24px rgba(216, 7, 46, 0.38);
+  }
+
+  .fab-mobile svg {
+    width: 22px;
+    height: 22px;
+  }
 }
 
 .bottom-nav-mobile {

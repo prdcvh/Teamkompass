@@ -2198,6 +2198,30 @@ function renderSquad() {
       </tr>
     `;
   }).join("");
+  $("#playerCardsMobile").innerHTML = players.map((player) => {
+    const effectiveStatus = playerEffectiveStatus(player);
+    const statusClass = effectiveStatus === "Verletzt" || effectiveStatus === "Gesperrt" ? "danger" : effectiveStatus === "Angeschlagen" || effectiveStatus === "Abwesend" ? "warning" : "";
+    const risk = playerInjuryRisk(player.id);
+    return `
+      <article class="player-card-mobile">
+        <div class="player-card-mobile-top">
+          <strong>${escapeHtml(player.name)}</strong>
+          <span class="status-pill ${statusClass}">${escapeHtml(effectiveStatus)}</span>
+        </div>
+        <div class="player-card-mobile-meta">
+          ${positionChips(player)}
+          <span class="risk-pill ${risk.tier}" title="${escapeHtml(risk.action)} (${escapeHtml(risk.reason)})">${risk.level}</span>
+          <span class="player-card-mobile-grade">${gradeLabel(playerAverageGrade(player.id))}</span>
+        </div>
+        <div class="player-card-mobile-actions">
+          <button class="ghost-button" data-action="profile" data-id="${player.id}">Profil</button>
+          <button class="ghost-button" data-action="edit" data-id="${player.id}">Bearbeiten</button>
+          <button class="ghost-button" data-action="invite" data-id="${player.id}">Einladen</button>
+          <button class="ghost-button danger" data-action="delete" data-id="${player.id}" type="button">Löschen</button>
+        </div>
+      </article>
+    `;
+  }).join("") || `<p class="muted">Keine Spieler gefunden.</p>`;
 }
 
 function renderSelects() {
@@ -3845,7 +3869,7 @@ $("#measurementList").addEventListener("click", (event) => {
   if (button.dataset.action === "delete-measurement") deleteMeasurement(button.dataset.id);
 });
 
-$("#playerTable").addEventListener("click", (event) => {
+function handleSquadActionClick(event) {
   const button = event.target.closest("button");
   if (!button) return;
   const player = state.players.find((item) => item.id === button.dataset.id);
@@ -3868,7 +3892,10 @@ $("#playerTable").addEventListener("click", (event) => {
     persist();
     renderAll();
   }
-});
+}
+$("#playerTable").addEventListener("click", handleSquadActionClick);
+$("#playerCardsMobile").addEventListener("click", handleSquadActionClick);
+$("#addPlayerFabMobile").addEventListener("click", () => openPlayerDialog());
 
 function handleEventListClick(event) {
   const card = event.target.closest("[data-event-id]");
