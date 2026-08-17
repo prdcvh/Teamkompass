@@ -2110,6 +2110,17 @@ menu {
     display: block;
   }
 
+  /* Gegnerliste vor das Erfassungsformular: auf Mobile will man zuerst
+     nachschlagen, nicht als erstes ein langes Formular sehen. */
+  .opponent-layout {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .opponent-layout .panel:first-child {
+    order: 2;
+  }
+
   .player-cards-mobile {
     display: flex;
     flex-direction: column;
