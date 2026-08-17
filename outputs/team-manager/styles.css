@@ -2102,6 +2102,14 @@ menu {
     display: none;
   }
 
+  .rating-table-wrap {
+    display: none;
+  }
+
+  .rating-stepper:not([hidden]) {
+    display: block;
+  }
+
   .player-cards-mobile {
     display: flex;
     flex-direction: column;
