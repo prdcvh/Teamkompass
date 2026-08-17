@@ -1365,11 +1365,14 @@ function setView(viewName) {
   prepareMobileAccordions();
 }
 
+function isMobileViewport() {
+  return Boolean(window.matchMedia?.("(max-width: 720px)")?.matches);
+}
+
 function prepareMobileAccordions() {
-  const isMobile = window.matchMedia?.("(max-width: 720px)")?.matches;
-  if (!isMobile || mobileAccordionsPrepared) return;
-  document.querySelectorAll(".dashboard-section").forEach((section, index) => {
-    section.open = index === 0;
+  if (!isMobileViewport() || mobileAccordionsPrepared) return;
+  document.querySelectorAll(".dashboard-section").forEach((section) => {
+    section.open = section.dataset.mobileDefaultOpen === "true";
   });
   document.querySelectorAll(".control-disclosure").forEach((section) => {
     section.open = false;
@@ -2119,7 +2122,7 @@ function renderLeaders() {
     .map((player) => ({ player, grade: playerAverageGrade(player.id), events: playerAttendanceCount(player.id) }))
     .filter((item) => item.grade)
     .sort((a, b) => a.grade - b.grade)
-    .slice(0, 6);
+    .slice(0, isMobileViewport() ? undefined : 6);
   $("#leaderList").innerHTML = leaders.map(({ player, grade, events }) => `
     <article class="leader-item">
       <div><strong>${player.name}</strong><br><small class="muted">${events} Events · ${positionText(player)}</small></div>
@@ -3594,8 +3597,9 @@ function safeRender(fn, label) {
 document.querySelectorAll(".nav-tab").forEach((button) => button.addEventListener("click", () => setView(button.dataset.view)));
 $("#mobileViewSelect").addEventListener("change", (event) => setView(event.target.value));
 window.addEventListener("resize", () => {
-  if (!window.matchMedia?.("(max-width: 720px)")?.matches) mobileAccordionsPrepared = false;
+  if (!isMobileViewport()) mobileAccordionsPrepared = false;
   prepareMobileAccordions();
+  renderLeaders();
 });
 $("#formationPicker").addEventListener("click", (event) => {
   const button = event.target.closest(".formation-option");
