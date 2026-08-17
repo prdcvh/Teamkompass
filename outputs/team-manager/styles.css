@@ -66,6 +66,12 @@
   box-sizing: border-box;
 }
 
+.bottom-nav-mobile,
+.player-cards-mobile,
+.fab-mobile {
+  display: none;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -1980,7 +1986,7 @@ menu {
   .team-analysis-layout,
   .team-chart-grid,
   .profile-deep-grid {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 
   .events-layout {
@@ -2003,6 +2009,10 @@ menu {
   .main,
   .sidebar {
     padding: 16px;
+  }
+
+  .main {
+    --main-pad: 16px;
   }
 
   .sidebar {
@@ -2039,7 +2049,7 @@ menu {
   }
 
   .welcome-panel,
-  .quick-access-section {
+  .mobile-accordion.quick-access-section {
     display: none;
   }
 
@@ -2063,7 +2073,8 @@ menu {
   }
 
   .bottom-nav-tab {
-    width: auto;
+    flex: 1 1 0;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -2071,11 +2082,18 @@ menu {
     background: none;
     border: none;
     color: var(--muted);
-    padding: 4px 8px;
+    padding: 4px 2px;
     border-radius: 8px;
     font-weight: 700;
     text-align: center;
     -webkit-tap-highlight-color: transparent;
+  }
+
+  .bottom-nav-tab span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
   }
 
   .bottom-nav-tab::before {
@@ -2108,6 +2126,20 @@ menu {
 
   .rating-stepper:not([hidden]) {
     display: block;
+  }
+
+  /* Die 9 Formations-Vorschläge sprengen als Umbruch-Raster auf schmalen
+     Screens die Seite (viel Scrollen bis zum eigentlichen Feld) - stattdessen
+     eine kompakte, horizontal scrollbare Reihe. */
+  .formation-picker {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .formation-option {
+    flex-shrink: 0;
   }
 
   /* Gegnerliste vor das Erfassungsformular: auf Mobile will man zuerst
@@ -2174,14 +2206,7 @@ menu {
     padding: 8px 6px;
     font-size: 0.78rem;
   }
-}
 
-.player-cards-mobile,
-.fab-mobile {
-  display: none;
-}
-
-@media (max-width: 720px) {
   .fab-mobile {
     position: fixed;
     right: 16px;
@@ -2203,13 +2228,6 @@ menu {
     width: 22px;
     height: 22px;
   }
-}
-
-.bottom-nav-mobile {
-  display: none;
-}
-
-@media (max-width: 720px) {
 
   .mobile-accordion {
     display: block;
@@ -2273,7 +2291,7 @@ menu {
 
   .top-actions {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     width: 100%;
   }
 
@@ -2298,7 +2316,7 @@ menu {
   .event-meta-editor,
   .position-options,
   .form-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .welcome-panel {
