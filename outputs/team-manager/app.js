@@ -1365,11 +1365,14 @@ function setView(viewName) {
   prepareMobileAccordions();
 }
 
+function isMobileViewport() {
+  return Boolean(window.matchMedia?.("(max-width: 720px)")?.matches);
+}
+
 function prepareMobileAccordions() {
-  const isMobile = window.matchMedia?.("(max-width: 720px)")?.matches;
-  if (!isMobile || mobileAccordionsPrepared) return;
-  document.querySelectorAll(".dashboard-section").forEach((section, index) => {
-    section.open = index === 0;
+  if (!isMobileViewport() || mobileAccordionsPrepared) return;
+  document.querySelectorAll(".dashboard-section").forEach((section) => {
+    section.open = section.dataset.mobileDefaultOpen === "true";
   });
   document.querySelectorAll(".control-disclosure").forEach((section) => {
     section.open = false;
@@ -2119,7 +2122,7 @@ function renderLeaders() {
     .map((player) => ({ player, grade: playerAverageGrade(player.id), events: playerAttendanceCount(player.id) }))
     .filter((item) => item.grade)
     .sort((a, b) => a.grade - b.grade)
-    .slice(0, 6);
+    .slice(0, isMobileViewport() ? undefined : 6);
   $("#leaderList").innerHTML = leaders.map(({ player, grade, events }) => `
     <article class="leader-item">
       <div><strong>${player.name}</strong><br><small class="muted">${events} Events · ${positionText(player)}</small></div>
@@ -2195,6 +2198,30 @@ function renderSquad() {
       </tr>
     `;
   }).join("");
+  $("#playerCardsMobile").innerHTML = players.map((player) => {
+    const effectiveStatus = playerEffectiveStatus(player);
+    const statusClass = effectiveStatus === "Verletzt" || effectiveStatus === "Gesperrt" ? "danger" : effectiveStatus === "Angeschlagen" || effectiveStatus === "Abwesend" ? "warning" : "";
+    const risk = playerInjuryRisk(player.id);
+    return `
+      <article class="player-card-mobile">
+        <div class="player-card-mobile-top">
+          <strong>${escapeHtml(player.name)}</strong>
+          <span class="status-pill ${statusClass}">${escapeHtml(effectiveStatus)}</span>
+        </div>
+        <div class="player-card-mobile-meta">
+          ${positionChips(player)}
+          <span class="risk-pill ${risk.tier}" title="${escapeHtml(risk.action)} (${escapeHtml(risk.reason)})">${risk.level}</span>
+          <span class="player-card-mobile-grade">${gradeLabel(playerAverageGrade(player.id))}</span>
+        </div>
+        <div class="player-card-mobile-actions">
+          <button class="ghost-button" data-action="profile" data-id="${player.id}">Profil</button>
+          <button class="ghost-button" data-action="edit" data-id="${player.id}">Bearbeiten</button>
+          <button class="ghost-button" data-action="invite" data-id="${player.id}">Einladen</button>
+          <button class="ghost-button danger" data-action="delete" data-id="${player.id}" type="button">Löschen</button>
+        </div>
+      </article>
+    `;
+  }).join("") || `<p class="muted">Keine Spieler gefunden.</p>`;
 }
 
 function renderSelects() {
@@ -2874,7 +2901,9 @@ function goToMeasurementForm(playerId) {
   $("#profilePlayer").value = playerId;
   setView("profiles");
   resetMeasurementForm();
-  $("#measurementPanel")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  const panel = $("#measurementPanel");
+  if (panel) panel.open = true;
+  panel?.scrollIntoView({ behavior: "smooth", block: "center" });
   $("#measurementHeight").focus();
 }
 
@@ -3594,8 +3623,9 @@ function safeRender(fn, label) {
 document.querySelectorAll(".nav-tab").forEach((button) => button.addEventListener("click", () => setView(button.dataset.view)));
 $("#mobileViewSelect").addEventListener("change", (event) => setView(event.target.value));
 window.addEventListener("resize", () => {
-  if (!window.matchMedia?.("(max-width: 720px)")?.matches) mobileAccordionsPrepared = false;
+  if (!isMobileViewport()) mobileAccordionsPrepared = false;
   prepareMobileAccordions();
+  renderLeaders();
 });
 $("#formationPicker").addEventListener("click", (event) => {
   const button = event.target.closest(".formation-option");
@@ -3841,7 +3871,7 @@ $("#measurementList").addEventListener("click", (event) => {
   if (button.dataset.action === "delete-measurement") deleteMeasurement(button.dataset.id);
 });
 
-$("#playerTable").addEventListener("click", (event) => {
+function handleSquadActionClick(event) {
   const button = event.target.closest("button");
   if (!button) return;
   const player = state.players.find((item) => item.id === button.dataset.id);
@@ -3864,7 +3894,10 @@ $("#playerTable").addEventListener("click", (event) => {
     persist();
     renderAll();
   }
-});
+}
+$("#playerTable").addEventListener("click", handleSquadActionClick);
+$("#playerCardsMobile").addEventListener("click", handleSquadActionClick);
+$("#addPlayerFabMobile").addEventListener("click", () => openPlayerDialog());
 
 function handleEventListClick(event) {
   const card = event.target.closest("[data-event-id]");
