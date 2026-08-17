@@ -372,90 +372,84 @@
               <div class="analysis-bars" id="profileAvailabilityBars"></div>
             </section>
           </div>
-          <section class="panel development-panel">
-            <div class="panel-head">
-              <div>
-                <h2>Förderplan</h2>
-                <span class="muted">individuelle Ziele, Maßnahmen und Status</span>
-              </div>
+          <details class="control-disclosure development-panel" open>
+            <summary>Förderplan</summary>
+            <div class="disclosure-body">
+              <span class="muted">individuelle Ziele, Maßnahmen und Status</span>
+              <form class="development-form" id="developmentPlanForm">
+                <input type="hidden" id="developmentPlanId" />
+                <label>Schwerpunkt <input id="developmentPlanFocus" maxlength="50" placeholder="z.B. erster Kontakt, Orientierung, Mut im 1 gegen 1" required /></label>
+                <label>Ziel <input id="developmentPlanGoal" maxlength="90" placeholder="konkret beobachtbares Ziel" required /></label>
+                <label>Maßnahmen <textarea id="developmentPlanActions" rows="3" placeholder="Trainingsformen, Coachingpunkte, Heimaufgabe"></textarea></label>
+                <div class="form-grid">
+                  <label>Status
+                    <select id="developmentPlanStatus">
+                      <option>Offen</option>
+                      <option>In Arbeit</option>
+                      <option>Erreicht</option>
+                    </select>
+                  </label>
+                  <label>Zieldatum <input id="developmentPlanDueDate" type="date" /></label>
+                </div>
+                <div class="panel-actions">
+                  <button class="ghost-button" id="cancelDevelopmentPlanBtn" type="button">Zurücksetzen</button>
+                  <button class="primary-button" type="submit">Förderplan speichern</button>
+                </div>
+              </form>
+              <div class="development-list" id="developmentPlanList"></div>
             </div>
-            <form class="development-form" id="developmentPlanForm">
-              <input type="hidden" id="developmentPlanId" />
-              <label>Schwerpunkt <input id="developmentPlanFocus" maxlength="50" placeholder="z.B. erster Kontakt, Orientierung, Mut im 1 gegen 1" required /></label>
-              <label>Ziel <input id="developmentPlanGoal" maxlength="90" placeholder="konkret beobachtbares Ziel" required /></label>
-              <label>Maßnahmen <textarea id="developmentPlanActions" rows="3" placeholder="Trainingsformen, Coachingpunkte, Heimaufgabe"></textarea></label>
-              <div class="form-grid">
-                <label>Status
-                  <select id="developmentPlanStatus">
-                    <option>Offen</option>
-                    <option>In Arbeit</option>
-                    <option>Erreicht</option>
+          </details>
+          <details class="control-disclosure development-panel" open>
+            <summary>Abwesenheiten</summary>
+            <div class="disclosure-body">
+              <span class="muted">Urlaub, Klassenfahrt, Sperre & Co. - Events in diesem Zeitraum werden automatisch auf "Fehlt" gesetzt, der Status zeigt "Abwesend" (bei "Sperre" als Grund "Gesperrt")</span>
+              <form class="development-form" id="absenceForm">
+                <input type="hidden" id="absenceId" />
+                <label>Grund
+                  <select id="absenceReason" required>
+                    <option value="" disabled selected>Bitte wählen</option>
+                    <option value="Urlaub">Urlaub</option>
+                    <option value="Klassenfahrt">Klassenfahrt</option>
+                    <option value="Schule">Schule</option>
+                    <option value="Sperre">Sperre</option>
+                    <option value="Sonstiges">Sonstiges</option>
                   </select>
                 </label>
-                <label>Zieldatum <input id="developmentPlanDueDate" type="date" /></label>
-              </div>
-              <div class="panel-actions">
-                <button class="ghost-button" id="cancelDevelopmentPlanBtn" type="button">Zurücksetzen</button>
-                <button class="primary-button" type="submit">Förderplan speichern</button>
-              </div>
-            </form>
-            <div class="development-list" id="developmentPlanList"></div>
-          </section>
-          <section class="panel development-panel">
-            <div class="panel-head">
-              <div>
-                <h2>Abwesenheiten</h2>
-                <span class="muted">Urlaub, Klassenfahrt, Sperre & Co. - Events in diesem Zeitraum werden automatisch auf "Fehlt" gesetzt, der Status zeigt "Abwesend" (bei "Sperre" als Grund "Gesperrt")</span>
-              </div>
+                <label id="absenceCustomReasonField" hidden>Details
+                  <input id="absenceCustomReason" maxlength="50" placeholder="z.B. Krankenhausaufenthalt" />
+                </label>
+                <div class="form-grid">
+                  <label>Von <input id="absenceFrom" type="date" required /></label>
+                  <label>Bis <input id="absenceTo" type="date" required /></label>
+                </div>
+                <div class="panel-actions">
+                  <button class="ghost-button" id="cancelAbsenceBtn" type="button">Zurücksetzen</button>
+                  <button class="primary-button" type="submit">Abwesenheit speichern</button>
+                </div>
+              </form>
+              <div class="development-list" id="absenceList"></div>
             </div>
-            <form class="development-form" id="absenceForm">
-              <input type="hidden" id="absenceId" />
-              <label>Grund
-                <select id="absenceReason" required>
-                  <option value="" disabled selected>Bitte wählen</option>
-                  <option value="Urlaub">Urlaub</option>
-                  <option value="Klassenfahrt">Klassenfahrt</option>
-                  <option value="Schule">Schule</option>
-                  <option value="Sperre">Sperre</option>
-                  <option value="Sonstiges">Sonstiges</option>
-                </select>
-              </label>
-              <label id="absenceCustomReasonField" hidden>Details
-                <input id="absenceCustomReason" maxlength="50" placeholder="z.B. Krankenhausaufenthalt" />
-              </label>
-              <div class="form-grid">
-                <label>Von <input id="absenceFrom" type="date" required /></label>
-                <label>Bis <input id="absenceTo" type="date" required /></label>
-              </div>
-              <div class="panel-actions">
-                <button class="ghost-button" id="cancelAbsenceBtn" type="button">Zurücksetzen</button>
-                <button class="primary-button" type="submit">Abwesenheit speichern</button>
-              </div>
-            </form>
-            <div class="development-list" id="absenceList"></div>
-          </section>
-          <section class="panel development-panel" id="measurementPanel">
-            <div class="panel-head">
-              <div>
-                <h2>Körperentwicklung</h2>
-                <span class="muted">Größe, Gewicht &amp; BMI - ca. einmal im Quartal erfassen</span>
-              </div>
+          </details>
+          <details class="control-disclosure development-panel" id="measurementPanel" open>
+            <summary>Körperentwicklung</summary>
+            <div class="disclosure-body">
+              <span class="muted">Größe, Gewicht &amp; BMI - ca. einmal im Quartal erfassen</span>
+              <canvas id="measurementChart" width="980" height="360" aria-label="Größe, Gewicht und BMI"></canvas>
+              <form class="development-form" id="measurementForm">
+                <input type="hidden" id="measurementId" />
+                <div class="form-grid">
+                  <label>Datum <input id="measurementDate" type="date" required /></label>
+                  <label>Größe (cm) <input id="measurementHeight" type="number" min="0" step="0.1" /></label>
+                  <label>Gewicht (kg) <input id="measurementWeight" type="number" min="0" step="0.1" /></label>
+                </div>
+                <div class="panel-actions">
+                  <button class="ghost-button" id="cancelMeasurementBtn" type="button">Zurücksetzen</button>
+                  <button class="primary-button" type="submit">Messung speichern</button>
+                </div>
+              </form>
+              <div class="development-list" id="measurementList"></div>
             </div>
-            <canvas id="measurementChart" width="980" height="360" aria-label="Größe, Gewicht und BMI"></canvas>
-            <form class="development-form" id="measurementForm">
-              <input type="hidden" id="measurementId" />
-              <div class="form-grid">
-                <label>Datum <input id="measurementDate" type="date" required /></label>
-                <label>Größe (cm) <input id="measurementHeight" type="number" min="0" step="0.1" /></label>
-                <label>Gewicht (kg) <input id="measurementWeight" type="number" min="0" step="0.1" /></label>
-              </div>
-              <div class="panel-actions">
-                <button class="ghost-button" id="cancelMeasurementBtn" type="button">Zurücksetzen</button>
-                <button class="primary-button" type="submit">Messung speichern</button>
-              </div>
-            </form>
-            <div class="development-list" id="measurementList"></div>
-          </section>
+          </details>
           <section class="panel">
             <div class="panel-head">
               <div>

@@ -2901,7 +2901,9 @@ function goToMeasurementForm(playerId) {
   $("#profilePlayer").value = playerId;
   setView("profiles");
   resetMeasurementForm();
-  $("#measurementPanel")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  const panel = $("#measurementPanel");
+  if (panel) panel.open = true;
+  panel?.scrollIntoView({ behavior: "smooth", block: "center" });
   $("#measurementHeight").focus();
 }
 
