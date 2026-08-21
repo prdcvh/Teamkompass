@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ScoutKompass | Sichtungstool für den HVAC</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Hauptnavigation">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">HVAC</div>
+          <div>
+            <strong>ScoutKompass</strong>
+            <span>Sichtungstool für den HVAC</span>
+          </div>
+        </div>
+        <nav class="nav-tabs" aria-label="Ansichten">
+          <div class="nav-indicator" id="navIndicator" aria-hidden="true"></div>
+          <button class="nav-tab active" data-view="dashboard">Dashboard</button>
+          <button class="nav-tab" data-view="database">Spielerdatenbank</button>
+          <button class="nav-tab" data-view="reports">Sichtungen</button>
+          <button class="nav-tab" data-view="scouts">Scouts</button>
+        </nav>
+        <div class="season-card">
+          <span>Saison</span>
+          <strong>2026/27</strong>
+          <small id="storageState">Lokal gespeichert (Demo)</small>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">HVAC &middot; Sichtungswesen</p>
+            <h1 id="pageTitle">Dashboard</h1>
+          </div>
+          <div class="top-actions">
+            <div class="search-box">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="m20 20-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              <input type="search" id="globalSearch" placeholder="Spieler oder Verein suchen…" aria-label="Spieler oder Verein suchen" />
+            </div>
+            <button class="theme-toggle" id="themeToggle" type="button" aria-pressed="false" title="Darkmode umschalten">
+              <span class="theme-toggle-icon" aria-hidden="true">◐</span>
+              <span id="themeToggleText">Darkmode</span>
+            </button>
+            <button class="primary-button" id="newReportBtn" type="button">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+              Neue Sichtung
+            </button>
+          </div>
+        </header>
+
+        <!-- DASHBOARD -->
+        <section class="view active" id="dashboardView">
+          <section class="welcome-panel">
+            <div>
+              <span class="welcome-kicker">Hessischer Verband &middot; Sichtungswesen</span>
+              <h2>Alle Sichtungen deiner Scouts auf einen Blick</h2>
+              <p>Erfasse Spielereindrücke direkt vom Spielfeldrand, behalte Wiedervorlagen im Auge und baue eine gemeinsame Talentdatenbank für den ganzen Verband auf.</p>
+            </div>
+            <div class="welcome-actions">
+              <button class="primary-button" id="heroReportBtn">Sichtung erfassen</button>
+              <button class="ghost-button" id="heroDbBtn">Spielerdatenbank öffnen</button>
+            </div>
+          </section>
+          <div class="metrics-grid" id="metricsGrid"></div>
+          <div class="dashboard-layout">
+            <section class="panel">
+              <div class="panel-head">
+                <h2>Anstehende Wiedervorlagen</h2>
+                <span class="panel-hint" id="watchlistCount"></span>
+              </div>
+              <div class="watchlist" id="watchlistPanel"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-head">
+                <h2>Zuletzt gesichtet</h2>
+                <span class="panel-hint">Neueste zuerst</span>
+              </div>
+              <div class="activity-feed" id="activityFeed"></div>
+            </section>
+          </div>
+          <div class="dashboard-layout dashboard-layout-2col">
+            <section class="panel">
+              <div class="panel-head">
+                <h2>Top bewertete Spieler</h2>
+                <span class="panel-hint">Notenschnitt (1 = sehr gut)</span>
+              </div>
+              <div class="top-players" id="topPlayers"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-head">
+                <h2>Scout-Aktivität</h2>
+                <span class="panel-hint">Letzte 30 Tage</span>
+              </div>
+              <div class="scout-activity" id="scoutActivity"></div>
+            </section>
+          </div>
+        </section>
+
+        <!-- DATABASE -->
+        <section class="view" id="databaseView">
+          <div class="filter-bar">
+            <div class="filter-group">
+              <label for="filterPosition">Position</label>
+              <select id="filterPosition"><option value="">Alle</option></select>
+            </div>
+            <div class="filter-group">
+              <label for="filterYear">Jahrgang</label>
+              <select id="filterYear"><option value="">Alle</option></select>
+            </div>
+            <div class="filter-group">
+              <label for="filterStatus">Status</label>
+              <select id="filterStatus"><option value="">Alle</option></select>
+            </div>
+            <div class="filter-group">
+              <label for="filterGrade">Beste Note</label>
+              <select id="filterGrade">
+                <option value="">Alle</option>
+                <option value="2">1–2 (gut &amp; besser)</option>
+                <option value="3">1–3 (befriedigend &amp; besser)</option>
+                <option value="4">1–4 (ausreichend &amp; besser)</option>
+              </select>
+            </div>
+            <label class="filter-check">
+              <input type="checkbox" id="filterWatchAgain" />
+              Nur Wiedervorlagen
+            </label>
+            <button class="ghost-button filter-reset" id="filterReset" type="button">Filter zurücksetzen</button>
+          </div>
+          <div class="db-head-row">
+            <p class="db-count" id="dbCount"></p>
+          </div>
+          <div class="player-table" id="playerTable"></div>
+        </section>
+
+        <!-- PLAYER PROFILE -->
+        <section class="view" id="profileView">
+          <button class="back-link" id="backToDb" type="button">&larr; Zurück zur Spielerdatenbank</button>
+          <div id="profileContent"></div>
+        </section>
+
+        <!-- REPORTS FEED -->
+        <section class="view" id="reportsView">
+          <div class="filter-bar">
+            <div class="filter-group">
+              <label for="reportsScoutFilter">Scout</label>
+              <select id="reportsScoutFilter"><option value="">Alle</option></select>
+            </div>
+            <div class="filter-group">
+              <label for="reportsRecFilter">Empfehlung</label>
+              <select id="reportsRecFilter"><option value="">Alle</option></select>
+            </div>
+          </div>
+          <div class="reports-list" id="reportsList"></div>
+        </section>
+
+        <!-- SCOUTS -->
+        <section class="view" id="scoutsView">
+          <div class="scouts-grid" id="scoutsGrid"></div>
+        </section>
+      </main>
+    </div>
+
+    <!-- NEW REPORT MODAL -->
+    <div class="modal-overlay" id="reportModalOverlay">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="reportModalTitle">
+        <div class="modal-head">
+          <h2 id="reportModalTitle">Neue Sichtung erfassen</h2>
+          <button class="modal-close" id="reportModalClose" type="button" aria-label="Schließen">&times;</button>
+        </div>
+        <form id="reportForm">
+          <div class="form-section">
+            <div class="form-row">
+              <div class="form-field form-field-wide">
+                <label for="playerSelect">Spieler</label>
+                <input list="playerOptions" id="playerSelect" placeholder="Spieler suchen oder neu anlegen…" autocomplete="off" required />
+                <datalist id="playerOptions"></datalist>
+              </div>
+            </div>
+            <details class="new-player-toggle" id="newPlayerDetails">
+              <summary>Spieler nicht gefunden? Neuen Spieler anlegen</summary>
+              <div class="form-row">
+                <div class="form-field">
+                  <label for="newPlayerClub">Verein</label>
+                  <input type="text" id="newPlayerClub" placeholder="z. B. SV Blau-Weiß Lindenau" />
+                </div>
+                <div class="form-field">
+                  <label for="newPlayerYear">Jahrgang</label>
+                  <input type="number" id="newPlayerYear" placeholder="2010" min="2005" max="2018" />
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-field">
+                  <label for="newPlayerPosition">Hauptposition</label>
+                  <select id="newPlayerPosition"></select>
+                </div>
+                <div class="form-field">
+                  <label for="newPlayerFoot">Starker Fuß</label>
+                  <select id="newPlayerFoot">
+                    <option value="rechts">Rechts</option>
+                    <option value="links">Links</option>
+                    <option value="beidfüßig">Beidfüßig</option>
+                  </select>
+                </div>
+              </div>
+            </details>
+          </div>
+
+          <div class="form-section">
+            <div class="form-row">
+              <div class="form-field">
+                <label for="matchDate">Datum</label>
+                <input type="date" id="matchDate" required />
+              </div>
+              <div class="form-field form-field-wide">
+                <label for="matchInfo">Spiel / Wettbewerb</label>
+                <input type="text" id="matchInfo" placeholder="z. B. Kreisliga A – TuS Eichenberg vs. SV Wiesengrund" required />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-field">
+                <label for="scoutSelect">Beobachtender Scout</label>
+                <select id="scoutSelect" required></select>
+              </div>
+              <div class="form-field">
+                <label for="positionObserved">Position im Spiel</label>
+                <select id="positionObserved" required></select>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <label class="grade-label">Note <span class="grade-scale-hint">(1 = sehr gut … 6 = ungenügend)</span></label>
+            <div class="grade-picker" id="gradePicker" role="radiogroup" aria-label="Note vergeben">
+              <button type="button" class="grade-tile" data-grade="1" role="radio" aria-checked="false">1</button>
+              <button type="button" class="grade-tile" data-grade="2" role="radio" aria-checked="false">2</button>
+              <button type="button" class="grade-tile" data-grade="3" role="radio" aria-checked="false">3</button>
+              <button type="button" class="grade-tile" data-grade="4" role="radio" aria-checked="false">4</button>
+              <button type="button" class="grade-tile" data-grade="5" role="radio" aria-checked="false">5</button>
+              <button type="button" class="grade-tile" data-grade="6" role="radio" aria-checked="false">6</button>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <div class="form-row">
+              <div class="form-field form-field-wide">
+                <label for="strengths">Stärken</label>
+                <input type="text" id="strengths" placeholder="z. B. Zweikampfstark, gutes Stellungsspiel" />
+              </div>
+              <div class="form-field form-field-wide">
+                <label for="weaknesses">Schwächen</label>
+                <input type="text" id="weaknesses" placeholder="z. B. Abschlussschwäche, langsam im Antritt" />
+              </div>
+            </div>
+            <div class="form-field">
+              <label for="comment">Kommentar</label>
+              <textarea id="comment" rows="3" placeholder="Freitext-Eindruck zum Spiel…"></textarea>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <div class="form-row">
+              <div class="form-field">
+                <label for="recommendation">Empfehlung</label>
+                <select id="recommendation">
+                  <option value="weiterverfolgen">Weiterverfolgen</option>
+                  <option value="empfehlen">Für Kader/Auswahl empfehlen</option>
+                  <option value="zurückstellen">Zurückstellen</option>
+                  <option value="kein-bedarf">Kein Bedarf</option>
+                </select>
+              </div>
+              <div class="form-field watch-again-field">
+                <label class="filter-check watch-again-check">
+                  <input type="checkbox" id="watchAgainCheck" checked />
+                  Erneut ansehen
+                </label>
+                <input type="date" id="watchAgainDate" />
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="ghost-button" id="reportCancelBtn">Abbrechen</button>
+            <button type="submit" class="primary-button">Sichtung speichern</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
