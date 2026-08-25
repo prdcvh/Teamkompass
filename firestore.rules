@@ -43,8 +43,14 @@ service cloud.firestore {
         return isTeamMember() && memberDoc().data.role == "trainer";
       }
 
+      function isMedical() {
+        return isTeamMember() && memberDoc().data.role == "medical";
+      }
+
       function isPlayerFor(playerId) {
-        return isTeamMember() && memberDoc().data.role == "player" && memberDoc().data.playerId == playerId;
+        return isTeamMember()
+          && memberDoc().data.role in ["player", "parent"]
+          && memberDoc().data.playerId == playerId;
       }
 
       match /members/{uid} {
@@ -70,13 +76,14 @@ service cloud.firestore {
         // sondern an der kurzen Verzoegerung, bis ein frisch deployter Regelsatz global
         // greift.
         allow create: if
-          (isTrainer() && request.resource.data.role == "trainer")
+          (isTrainer() && request.resource.data.role in ["trainer", "medical"])
           || (
             isSignedIn() && request.auth.uid == uid
-            && request.resource.data.role == "player"
+            && request.resource.data.role in ["player", "parent"]
             && request.resource.data.playerId is string
             && request.resource.data.claimedInviteCode is string
             && get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.playerId == request.resource.data.playerId
+            && get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.role == request.resource.data.role
             && request.resource.data.expiresAt == get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.expiresAt
             && (
               get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.expiresAt == null
@@ -106,7 +113,12 @@ service cloud.firestore {
         // Kein Update noetig - der Code wird beim Einloesen nicht veraendert (er bleibt
         // fuer jedes weitere Geraet gueltig, bis er ablaeuft oder der Trainer ihn loescht).
         allow update: if false;
-        allow delete: if isTrainer();
+        allow delete: if isTrainer() || (
+          isSignedIn()
+          && getAfter(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid)).data.role in ["player", "parent"]
+          && getAfter(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid)).data.playerId == resource.data.playerId
+          && getAfter(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid)).data.claimedInviteCode == code
+        );
       }
 
       // "players/{playerId}" wird von Spielern immer per direktem Dokument-Get
@@ -117,7 +129,7 @@ service cloud.firestore {
       // Datenfeld (nicht auf das Pfadsegment) prueft, das exakt zum Abfragefilter passt.
       // Deshalb tragen diese beiden Dokumenttypen zusaetzlich ein eigenes "playerId"-Feld.
       match /players/{playerId} {
-        allow read: if isTrainer() || isPlayerFor(playerId);
+        allow read: if isTrainer() || isMedical() || isPlayerFor(playerId);
         allow write: if isTrainer();
 
         match /developmentPlans/{planId} {
@@ -125,17 +137,23 @@ service cloud.firestore {
           // bei isExpired(): ein Trainer-Dokument hat kein "playerId"-Feld, direkter
           // Zugriff wuerde die Regelauswertung in diesem (eigentlich schon durch
           // isTrainer() abgedeckten) Fall unnoetig riskant machen.
-          allow read: if isTrainer() || (isTeamMember() && resource.data.playerId == memberDoc().data.get('playerId', null));
-          allow write: if isTrainer();
+          allow read: if isTrainer() || (isTeamMember() && memberDoc().data.role in ["player", "parent"] && resource.data.playerId == memberDoc().data.get('playerId', null));
+          allow create, delete: if isTrainer();
+          allow update: if isTrainer() || (
+            isTeamMember()
+            && memberDoc().data.role == "player"
+            && resource.data.playerId == memberDoc().data.get('playerId', null)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["selfReflection", "selfReflectionAt"])
+          );
         }
 
         match /absences/{absenceId} {
-          allow read: if isTrainer() || (isTeamMember() && resource.data.playerId == memberDoc().data.get('playerId', null));
+          allow read: if isTrainer() || isMedical() || (isTeamMember() && memberDoc().data.role in ["player", "parent"] && resource.data.playerId == memberDoc().data.get('playerId', null));
           allow write: if isTrainer();
         }
 
         match /measurements/{measurementId} {
-          allow read: if isTrainer() || (isTeamMember() && resource.data.playerId == memberDoc().data.get('playerId', null));
+          allow read: if isTrainer() || isMedical() || (isTeamMember() && memberDoc().data.role in ["player", "parent"] && resource.data.playerId == memberDoc().data.get('playerId', null));
           allow write: if isTrainer();
         }
       }
@@ -149,7 +167,7 @@ service cloud.firestore {
           // bei isExpired(): ein Trainer-Dokument hat kein "playerId"-Feld, direkter
           // Zugriff wuerde die Regelauswertung in diesem (eigentlich schon durch
           // isTrainer() abgedeckten) Fall unnoetig riskant machen.
-          allow read: if isTrainer() || (isTeamMember() && resource.data.playerId == memberDoc().data.get('playerId', null));
+          allow read: if isTrainer() || (isTeamMember() && memberDoc().data.role in ["player", "parent"] && resource.data.playerId == memberDoc().data.get('playerId', null));
           allow write: if isTrainer();
         }
       }
@@ -161,6 +179,10 @@ service cloud.firestore {
       // Startelf/Taktikboard - wie das gesamte Dashboard nur fuer Trainer sichtbar,
       // deshalb ein einzelnes Dokument statt einer Unter-Collection.
       match /meta/lineup {
+        allow read, write: if isTrainer();
+      }
+
+      match /meta/operations {
         allow read, write: if isTrainer();
       }
 

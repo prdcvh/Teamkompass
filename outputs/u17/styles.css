@@ -80,6 +80,108 @@ body {
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
+#storageState[data-sync-state="pending"] { color: var(--amber); }
+#storageState[data-sync-state="error"] { color: var(--red); font-weight: 700; }
+#storageState[data-sync-state="saved"] { color: var(--green); }
+
+.operations-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.operations-hero,
+.privacy-panel { grid-column: 1 / -1; }
+
+.operations-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.operations-summary article,
+.matchday-score {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--soft-panel);
+}
+
+.operations-summary span,
+.operations-summary small,
+.matchday-score span,
+.matchday-score small { color: var(--muted); }
+.operations-summary strong { font-size: 1.08rem; }
+
+.action-feed,
+.activity-log,
+.matchday-checks { display: grid; gap: 10px; }
+
+.operations-week { grid-column: 1 / -1; }
+.week-timeline { display: grid; grid-template-columns: repeat(7, minmax(120px, 1fr)); gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+.week-day { min-height: 126px; display: grid; align-content: start; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--field); }
+.week-day > div { display: flex; justify-content: space-between; gap: 8px; }
+.week-day > div span { color: var(--muted); }
+.week-day.has-event { border-color: color-mix(in srgb, var(--red) 45%, var(--line)); }
+.week-day button { display: grid; gap: 4px; padding: 9px; border: 0; border-radius: 9px; background: var(--soft-panel); color: inherit; text-align: left; }
+.week-day small { color: var(--muted); }
+
+.action-item {
+  padding: 13px 14px;
+  border-left: 4px solid var(--line);
+  border-radius: 10px;
+  background: var(--soft-panel);
+}
+.action-item.high { border-color: var(--red); }
+.action-item.medium { border-color: var(--amber); }
+.action-item.ok { border-color: var(--green); }
+.action-item p { margin: 5px 0 0; color: var(--muted); }
+
+.matchday-checks { margin: 14px 0; }
+.matchday-checks span { padding-left: 24px; position: relative; }
+.matchday-checks span::before { content: "○"; position: absolute; left: 0; color: var(--muted); }
+.matchday-checks span.done::before { content: "✓"; color: var(--green); font-weight: 800; }
+
+.privacy-grid {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.activity-log article {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.activity-log span { color: var(--muted); font-size: .85rem; }
+
+@media (max-width: 850px) {
+  .operations-grid { grid-template-columns: 1fr; }
+  .operations-hero, .privacy-panel { grid-column: auto; }
+  .operations-summary { grid-template-columns: 1fr; }
+}
+
+@media (pointer: coarse) {
+  button, input, select, summary { min-height: 44px; }
+}
+
+.command-palette { border: 0; padding: 0; width: min(620px, calc(100vw - 28px)); background: transparent; }
+.command-palette::backdrop { background: rgb(20 15 17 / 55%); backdrop-filter: blur(5px); }
+.command-palette-box { display: grid; gap: 12px; padding: 18px; border-radius: 18px; background: var(--panel); color: var(--ink); box-shadow: 0 24px 80px rgb(0 0 0 / 28%); }
+.command-palette-box label { display: grid; gap: 8px; font-weight: 700; }
+.command-palette-box input { width: 100%; font-size: 1rem; }
+#commandResults { display: grid; gap: 5px; max-height: 55vh; overflow: auto; }
+#commandResults button { display: flex; justify-content: space-between; gap: 16px; width: 100%; padding: 11px 12px; border: 0; border-radius: 10px; background: transparent; color: inherit; text-align: left; }
+#commandResults button:hover, #commandResults button:focus-visible { background: var(--soft-panel); }
+#commandResults span { color: var(--muted); }
+.sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
+
 ::selection {
   color: #fff;
   background: var(--red);
@@ -2722,15 +2824,34 @@ body.auth-locked .app-shell {
 }
 
 /* Spieler-Rolle: nur die Profil-Ansicht darf erreichbar sein */
-body.role-player .nav-tab:not([data-view="profiles"]) {
+body.role-player .nav-tab:not([data-view="profiles"]),
+body.role-parent .nav-tab:not([data-view="profiles"]) {
   display: none;
 }
 
 body.role-player #addPlayerTop,
 body.role-player #exportBtn,
 body.role-player .development-form,
-body.role-player #developmentPlanList .row-actions {
+body.role-player #developmentPlanList .row-actions,
+body.role-parent #addPlayerTop,
+body.role-parent #exportBtn,
+body.role-parent .development-form,
+body.role-parent #developmentPlanList .row-actions {
   display: none;
+}
+
+/* Medizinische Rolle: reine Leseansicht fuer Verfuegbarkeit und Messhistorie. */
+body.role-medical .nav-tab:not([data-view="squad"]):not([data-view="profiles"]),
+body.role-medical #addPlayerTop,
+body.role-medical #addPlayerFabMobile,
+body.role-medical #exportBtn,
+body.role-medical #accessManagerPanel,
+body.role-medical .row-actions,
+body.role-medical .measurement-cell button,
+body.role-medical .development-form,
+body.role-medical #developmentPlanList,
+body.role-medical #analyticsCards {
+  display: none !important;
 }
 
 /* Einladungscode je Spieler nur fuer den Trainer im Rollen-Modus sichtbar */

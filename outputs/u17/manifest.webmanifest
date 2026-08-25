@@ -1,0 +1,12 @@
+{
+  "name": "TeamKompass",
+  "short_name": "TeamKompass",
+  "description": "Mannschaftsplanung, Spieltagssteuerung und Spielerentwicklung.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f6f2f3",
+  "theme_color": "#d8072e",
+  "icons": [
+    { "src": "./assets/club-logo.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
