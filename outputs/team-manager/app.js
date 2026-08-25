@@ -1,6 +1,7 @@
 const storageKey = "teamkompass-data-v2";
 const legacyStorageKey = "teamkompass-data-v1";
 const themeStorageKey = "teamkompass-theme";
+const cacheStampKey = "teamkompass-cache-written-at";
 
 const sampleData = {
   players: [
@@ -150,6 +151,7 @@ const views = {
   dashboard: $("#dashboardView"),
   squad: $("#squadView"),
   events: $("#eventsView"),
+  planning: $("#planningView"),
   profiles: $("#profilesView"),
   opponents: $("#opponentsView"),
   teamAnalysis: $("#teamAnalysisView")
@@ -171,6 +173,7 @@ const titles = {
   dashboard: "Dashboard",
   squad: "Kader",
   events: "Events und Bewertungen",
+  planning: "Planung",
   profiles: "Spielerprofile",
   opponents: "Gegneranalyse",
   teamAnalysis: "Teamanalyse"
@@ -180,6 +183,12 @@ function initTheme() {
   const storedTheme = localStorage.getItem(themeStorageKey);
   const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)")?.matches;
   applyTheme(storedTheme || (prefersDark ? "dark" : "light"));
+}
+
+function applyTeamBrand() {
+  const teamName = window.TEAMKOMPASS_CONFIG?.teamName || "TeamKompass";
+  document.querySelectorAll(".brand strong, .welcome-kicker").forEach((element) => { element.textContent = teamName; });
+  document.querySelectorAll(".club-logo").forEach((image) => { image.alt = `${teamName} Logo`; });
 }
 
 function applyTheme(theme) {
@@ -220,6 +229,16 @@ function chartPalette() {
 }
 
 function loadState() {
+  try {
+    const workspace = JSON.parse(localStorage.getItem("teamkompass-workspace-v1") || "{}");
+    const retentionMs = Number(workspace.retentionDays || 90) * 86400000;
+    const stamp = Number(localStorage.getItem(cacheStampKey) || Date.now());
+    if (Date.now() - stamp > retentionMs) {
+      localStorage.removeItem(storageKey);
+      localStorage.removeItem(legacyStorageKey);
+      localStorage.removeItem(cacheStampKey);
+    }
+  } catch { /* Ungültige lokale Metadaten dürfen den App-Start nicht blockieren. */ }
   const stored = localStorage.getItem(storageKey);
   if (stored) {
     try {
@@ -279,6 +298,10 @@ function normalizeDevelopmentPlan(plan = {}) {
     focus: plan.focus || "",
     goal: plan.goal || "",
     actions: plan.actions || "",
+    selfReflection: plan.selfReflection || "",
+    selfReflectionAt: plan.selfReflectionAt || "",
+    coachReview: plan.coachReview || "",
+    reviewDate: plan.reviewDate || "",
     status: plan.status || "Offen",
     dueDate: plan.dueDate || "",
     createdAt: plan.createdAt || new Date().toISOString().slice(0, 10)
@@ -485,11 +508,30 @@ function scoreToGrade(record) {
 function persist() {
   state = normalizeState(state);
   localStorage.setItem(storageKey, JSON.stringify(state));
+  localStorage.setItem(cacheStampKey, String(Date.now()));
+  if (isCloudTrainer()) setSyncState("pending", "Wird gespeichert …");
   if (legacyBlobMode) {
     scheduleLegacyCloudSave();
   } else if (!isCloudActive()) {
     $("#storageState").textContent = `Gespeichert ${new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}`;
   }
+}
+
+function setSyncState(stateName, label) {
+  const target = $("#storageState");
+  if (!target) return;
+  target.dataset.syncState = stateName;
+  target.textContent = label;
+}
+
+function cloudWriteSucceeded() {
+  setSyncState("saved", `Cloud synchronisiert ${new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}`);
+}
+
+function cloudWriteFailed(error, label) {
+  console.error(error);
+  setSyncState("error", "Speichern fehlgeschlagen – erneut versuchen");
+  alert(`${label}${cloudErrorSuffix(error)}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -655,6 +697,7 @@ async function handleAuthStateChanged(user) {
   applyRoleRestrictions();
   startCloudSync();
   $("#storageState").textContent = "Cloud verbunden";
+  document.dispatchEvent(new CustomEvent("teamkompass:cloud-ready"));
 }
 
 function startCloudSync() {
@@ -697,7 +740,7 @@ function startCloudSync() {
       cloudCache.lineup = docSnap.exists() ? docSnap.data() : null;
       rebuildStateFromCloudCache();
     }, (error) => console.error("lineup sync", error)));
-  } else if (currentRole === "player" && currentPlayerId) {
+  } else if (["player", "parent"].includes(currentRole) && currentPlayerId) {
     // Ein Spieler darf nie die ganze players-Collection auflisten (Firestore-Regeln
     // erlauben Listenabfragen nur, wenn sie fuer JEDES moegliche Ergebnis gelten -
     // deshalb gezielter Get auf das eigene Dokument statt einer Collection-Abfrage).
@@ -720,6 +763,13 @@ function startCloudSync() {
       cloudCache.measurements = { [currentPlayerId]: snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })) };
       rebuildStateFromCloudCache();
     }, (error) => console.error("measurements sync", error)));
+  } else if (currentRole === "medical") {
+    cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("players"), (snapshot) => {
+      cloudCache.players = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+      syncAbsenceListeners(cloudCache.players.map((player) => player.id));
+      syncMeasurementListeners(cloudCache.players.map((player) => player.id));
+      rebuildStateFromCloudCache();
+    }, (error) => console.error("medical player sync", error)));
   }
 }
 
@@ -885,29 +935,33 @@ function rebuildStateFromCloudCache() {
 async function cloudSavePlayer(player) {
   if (!isCloudTrainer()) return;
   try {
-    await firestoreModule.setDoc(teamDoc("players", player.id), player);
+    await firestoreModule.setDoc(teamDoc("players", player.id), player, { merge: true });
+    cloudWriteSucceeded();
   } catch (error) {
-    console.error(error);
-    alert(`Spieler konnte nicht in der Cloud gespeichert werden - die Aenderung geht sonst verloren.${cloudErrorSuffix(error)}`);
+    cloudWriteFailed(error, "Spieler konnte nicht in der Cloud gespeichert werden – die Änderung ist nur lokal sichtbar.");
   }
 }
 
 async function cloudDeletePlayer(playerId) {
   if (!isCloudTrainer()) return;
   try {
-    await firestoreModule.deleteDoc(teamDoc("players", playerId));
-    const plans = state.developmentPlans?.[playerId] || [];
-    await Promise.all(plans.map((plan) => firestoreModule.deleteDoc(teamDoc("players", playerId, "developmentPlans", plan.id))));
-    const absences = state.absences?.[playerId] || [];
-    await Promise.all(absences.map((absence) => firestoreModule.deleteDoc(teamDoc("players", playerId, "absences", absence.id))));
-    const measurements = state.measurements?.[playerId] || [];
-    await Promise.all(measurements.map((measurement) => firestoreModule.deleteDoc(teamDoc("players", playerId, "measurements", measurement.id))));
-    await Promise.all(state.events.map((event) => (
-      event.ratings?.[playerId] ? firestoreModule.deleteDoc(teamDoc("events", event.id, "ratings", playerId)) : Promise.resolve()
-    )));
+    const childSnapshots = await Promise.all(["developmentPlans", "absences", "measurements"].map((name) => firestoreModule.getDocs(teamCollection("players", playerId, name))));
+    const refs = childSnapshots.flatMap((snapshot) => snapshot.docs.map((docSnap) => docSnap.ref));
+    const ratingSnapshots = await Promise.all(state.events.map((event) => firestoreModule.getDoc(teamDoc("events", event.id, "ratings", playerId))));
+    refs.push(...ratingSnapshots.filter((snapshot) => snapshot.exists()).map((snapshot) => snapshot.ref));
+    refs.push(teamDoc("players", playerId));
+    await commitDeleteRefs(refs);
+    cloudWriteSucceeded();
   } catch (error) {
-    console.error(error);
-    alert(`Spieler konnte nicht vollstaendig aus der Cloud geloescht werden.${cloudErrorSuffix(error)}`);
+    cloudWriteFailed(error, "Spieler konnte nicht vollständig aus der Cloud gelöscht werden.");
+  }
+}
+
+async function commitDeleteRefs(refs) {
+  for (let offset = 0; offset < refs.length; offset += 450) {
+    const batch = firestoreModule.writeBatch(firestoreDb);
+    refs.slice(offset, offset + 450).forEach((ref) => batch.delete(ref));
+    await batch.commit();
   }
 }
 
@@ -915,31 +969,31 @@ async function cloudSaveEvent(event) {
   if (!isCloudTrainer()) return;
   const { ratings, ...meta } = event;
   try {
-    await firestoreModule.setDoc(teamDoc("events", event.id), meta);
+    await firestoreModule.setDoc(teamDoc("events", event.id), meta, { merge: true });
+    cloudWriteSucceeded();
   } catch (error) {
-    console.error(error);
-    alert(`Event konnte nicht in der Cloud gespeichert werden - die Aenderung geht sonst verloren.${cloudErrorSuffix(error)}`);
+    cloudWriteFailed(error, "Event konnte nicht in der Cloud gespeichert werden – die Änderung ist nur lokal sichtbar.");
   }
 }
 
 async function cloudDeleteEvent(event) {
   if (!isCloudTrainer()) return;
   try {
-    await firestoreModule.deleteDoc(teamDoc("events", event.id));
-    await Promise.all(Object.keys(event.ratings || {}).map((playerId) => firestoreModule.deleteDoc(teamDoc("events", event.id, "ratings", playerId))));
+    const ratings = await firestoreModule.getDocs(teamCollection("events", event.id, "ratings"));
+    await commitDeleteRefs([...ratings.docs.map((docSnap) => docSnap.ref), teamDoc("events", event.id)]);
+    cloudWriteSucceeded();
   } catch (error) {
-    console.error(error);
-    alert(`Event konnte nicht vollstaendig aus der Cloud geloescht werden.${cloudErrorSuffix(error)}`);
+    cloudWriteFailed(error, "Event konnte nicht vollständig aus der Cloud gelöscht werden.");
   }
 }
 
 async function cloudSaveRating(eventId, playerId, rating) {
   if (!isCloudTrainer()) return;
   try {
-    await firestoreModule.setDoc(teamDoc("events", eventId, "ratings", playerId), { ...rating, playerId });
+    await firestoreModule.setDoc(teamDoc("events", eventId, "ratings", playerId), { ...rating, playerId }, { merge: true });
+    cloudWriteSucceeded();
   } catch (error) {
-    console.error(error);
-    alert(`Bewertung konnte nicht in der Cloud gespeichert werden - die Aenderung geht sonst verloren.${cloudErrorSuffix(error)}`);
+    cloudWriteFailed(error, "Bewertung konnte nicht in der Cloud gespeichert werden – die Änderung ist nur lokal sichtbar.");
   }
 }
 
@@ -1055,14 +1109,21 @@ function hideAuthGate() {
 
 function applyRoleRestrictions() {
   document.body.classList.toggle("role-player", currentRole === "player");
+  document.body.classList.toggle("role-parent", currentRole === "parent");
+  document.body.classList.toggle("role-medical", currentRole === "medical");
   document.body.classList.toggle("role-trainer-cloud", isCloudTrainer());
   $("#signOutBtn").hidden = !isCloudActive();
   $("#migrateDataBtn").hidden = !isCloudTrainer();
   $("#addTrainerBtn").hidden = !isCloudTrainer();
-  if (currentRole === "player") {
+  $("#addMedicalBtn").hidden = !isCloudTrainer();
+  if (["player", "parent"].includes(currentRole)) {
     $("#mobileViewSelect").innerHTML = '<option value="profiles">Profile</option>';
     $("#profilePlayer").disabled = true;
     setView("profiles");
+  } else if (currentRole === "medical") {
+    $("#mobileViewSelect").innerHTML = '<option value="squad">Kader</option><option value="profiles">Profile</option>';
+    $("#profilePlayer").disabled = false;
+    setView("squad");
   } else {
     $("#profilePlayer").disabled = false;
     renderAccessManager();
@@ -1132,18 +1193,21 @@ async function handlePlayerLogin(event) {
     }
 
     const memberPayload = {
-      role: "player",
+      role: invite.role || "player",
       playerId: invite.playerId,
       claimedInviteCode: code,
       expiresAt: invite.expiresAt ?? null,
       createdAt: firestoreModule.serverTimestamp()
     };
     const memberRef = teamDoc("members", credential.user.uid);
-    // Der Code ist absichtlich mehrfach/von jedem Geraet aus nutzbar (wie ein Passwort,
-    // nicht wie ein Einmal-Link) - jedes Geraet bekommt seine eigene anonyme Identitaet
-    // und damit ein eigenes members-Dokument, das der Trainer einzeln sperren kann.
+    const inviteRef = teamDoc("invites", code);
+    // Mitgliedschaft und Token-Verbrauch werden atomar geschrieben. Ein Token kann
+    // dadurch weder wiederverwendet noch nach erfolgreicher Anmeldung weitergegeben werden.
     try {
-      await firestoreModule.setDoc(memberRef, memberPayload);
+      const batch = firestoreModule.writeBatch(firestoreDb);
+      batch.set(memberRef, memberPayload);
+      batch.delete(inviteRef);
+      await batch.commit();
     } catch (firstError) {
       if (!(firstError.code || "").includes("permission-denied")) {
         console.error(firstError);
@@ -1155,7 +1219,10 @@ async function handlePlayerLogin(event) {
       // nach kurzer Wartezeit behebt das meistens von selbst.
       await new Promise((resolve) => setTimeout(resolve, 1500));
       try {
-        await firestoreModule.setDoc(memberRef, memberPayload);
+        const retryBatch = firestoreModule.writeBatch(firestoreDb);
+        retryBatch.set(memberRef, memberPayload);
+        retryBatch.delete(inviteRef);
+        await retryBatch.commit();
       } catch (secondError) {
         console.error(secondError);
         if ((secondError.code || "").includes("permission-denied")) {
@@ -1196,11 +1263,20 @@ async function handleSignOut() {
 // jede Abweichung, z.B. ein vertipptes Zeichen in der UID, fuehrte bisher zu einem
 // stillen Fehlschlag beim Login). Legt beides in einem Zug an.
 async function createTrainerAccount() {
+  return createStaffAccount("trainer");
+}
+
+async function createMedicalAccount() {
+  return createStaffAccount("medical");
+}
+
+async function createStaffAccount(role) {
   if (!isCloudTrainer()) return;
-  const email = prompt("E-Mail-Adresse fuer das neue Trainer-Konto:");
+  const label = role === "medical" ? "medizinischen Lesezugang" : "Trainer-Konto";
+  const email = prompt(`E-Mail-Adresse für den ${label}:`);
   if (!email) return;
   const trimmedEmail = email.trim();
-  const password = prompt("Passwort fuer das neue Trainer-Konto (mind. 6 Zeichen):");
+  const password = prompt(`Passwort für den ${label} (mind. 6 Zeichen):`);
   if (!password) return;
 
   const config = window.TEAMKOMPASS_CONFIG || {};
@@ -1209,7 +1285,7 @@ async function createTrainerAccount() {
   // meldet auf der normalen Auth-Instanz sonst die eigene, gerade aktive Trainer-Sitzung ab
   // und stattdessen als das neu angelegte Konto an. Mit einer eigenen Instanz bleibt die
   // eigene Sitzung unberuehrt, waehrend das neue Konto trotzdem entsteht.
-  const secondaryApp = appModule.initializeApp(config.firebase, `trainer-create-${Date.now()}`);
+  const secondaryApp = appModule.initializeApp(config.firebase, `staff-create-${Date.now()}`);
   try {
     const secondaryAuth = authModule.getAuth(secondaryApp);
     const credential = await authModule.createUserWithEmailAndPassword(secondaryAuth, trimmedEmail, password);
@@ -1218,13 +1294,13 @@ async function createTrainerAccount() {
     // App-Instanz unberuehrt, dieser Schreibvorgang laeuft also weiterhin unter der
     // eigenen, bereits als Trainer erkannten Identitaet - siehe firestore.rules.
     await firestoreModule.setDoc(teamDoc("members", newUid), {
-      role: "trainer",
+      role,
       createdAt: firestoreModule.serverTimestamp()
     });
-    alert(`Trainer-Konto fuer ${trimmedEmail} wurde angelegt. Diese Person kann sich jetzt mit dieser E-Mail und dem eingegebenen Passwort im Trainer-Login anmelden.`);
+    alert(`${role === "medical" ? "Medizinischer Lesezugang" : "Trainer-Konto"} für ${trimmedEmail} wurde angelegt.`);
   } catch (error) {
     console.error(error);
-    alert(`Trainer-Konto konnte nicht angelegt werden. ${authErrorMessage(error)}`);
+    alert(`${label} konnte nicht angelegt werden. ${authErrorMessage(error)}`);
   } finally {
     await appModule.deleteApp(secondaryApp).catch(() => {});
   }
@@ -1232,21 +1308,26 @@ async function createTrainerAccount() {
 
 async function createInviteCodeForPlayer(playerId) {
   if (!isCloudTrainer()) return;
+  const accessInput = prompt("Zugangstyp eingeben: Spieler oder Eltern", "Spieler");
+  if (accessInput === null) return;
+  const role = accessInput.trim().toLowerCase().startsWith("eltern") ? "parent" : "player";
   const daysInput = prompt("Zugang befristen? Anzahl Tage ab der Anmeldung eingeben, oder leer lassen fuer unbegrenzten Zugang:", "");
   if (daysInput === null) return;
   const days = Number(daysInput.trim());
   const hasLimit = daysInput.trim() !== "" && Number.isFinite(days) && days > 0;
   const expiresAt = hasLimit ? firestoreModule.Timestamp.fromDate(new Date(Date.now() + days * 24 * 60 * 60 * 1000)) : null;
-  const code = String(Math.floor(100000 + Math.random() * 900000));
+  const tokenBytes = crypto.getRandomValues(new Uint8Array(24));
+  const code = Array.from(tokenBytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
   try {
     await firestoreModule.setDoc(teamDoc("invites", code), {
       playerId,
+      role,
       expiresAt,
       createdAt: firestoreModule.serverTimestamp()
     });
     const player = state.players.find((item) => item.id === playerId);
     const validity = hasLimit ? `gueltig fuer ${days} Tage ab jetzt` : "unbegrenzt gueltig";
-    alert(`Einladungscode fuer ${player?.name || "Spieler"}: ${code}\n\nGib diesen Code an den Spieler weiter - er kann sich damit von jedem Geraet aus anmelden (${validity}). Behandle den Code wie ein Passwort.`);
+    alert(`Einmaliger ${role === "parent" ? "Eltern" : "Spieler"}-Zugang für ${player?.name || "Spieler"}: ${code}\n\nDer Code wird bei der ersten erfolgreichen Anmeldung ungültig (${validity}). Behandle ihn bis dahin wie ein Passwort.`);
     renderAccessManager();
   } catch (error) {
     console.error(error);
@@ -1268,11 +1349,9 @@ async function renderAccessManager() {
   const list = $("#accessManagerList");
   if (!list) return;
   try {
-    const snapshot = await firestoreModule.getDocs(
-      firestoreModule.query(teamCollection("members"), firestoreModule.where("role", "==", "player"))
-    );
+    const snapshot = await firestoreModule.getDocs(teamCollection("members"));
     const now = new Date();
-    list.innerHTML = snapshot.docs.map((docSnap) => {
+    list.innerHTML = snapshot.docs.filter((docSnap) => ["player", "parent", "medical"].includes(docSnap.data().role)).map((docSnap) => {
       const data = docSnap.data();
       const player = state.players.find((item) => item.id === data.playerId);
       const expiresAtDate = data.expiresAt?.toDate ? data.expiresAt.toDate() : null;
@@ -1284,7 +1363,7 @@ async function renderAccessManager() {
       }
       return `
         <div class="access-row">
-          <div><strong>${escapeHtml(player?.name || data.playerId)}</strong><span class="muted">${status}</span></div>
+          <div><strong>${escapeHtml(data.role === "medical" ? "Medizinischer Lesezugang" : player?.name || data.playerId)}</strong><span class="muted">${data.role === "parent" ? "Eltern · " : data.role === "medical" ? "Read-only · " : "Spieler · "}${status}</span></div>
           <button class="ghost-button" data-action="revoke-access" data-uid="${docSnap.id}" type="button">Zugang sperren</button>
         </div>
       `;
@@ -1441,7 +1520,7 @@ const INJURY_RISK_TIERS = [
   { min: 55, tier: "reduzieren", level: "Deutlich reduzieren", action: "Belastung spürbar zurücknehmen, Rücksprache mit Physio/Arzt erwägen." },
   { min: 35, tier: "anpassen", level: "Belastung anpassen", action: "Umfang/Intensität dosieren und auf ausreichend Erholung achten." },
   { min: 15, tier: "beobachten", level: "Beobachten", action: "Aktuell keine Anpassung nötig, Entwicklung im Blick behalten." },
-  { min: 0, tier: "unauffaellig", level: "Unauffällig", action: "Kein erhöhtes Risiko, normal einsetzbar." }
+  { min: 0, tier: "unauffaellig", level: "Unauffällig", action: "Belastung unauffällig; Verfügbarkeit individuell prüfen." }
 ];
 
 // Verletzungsrisiko-Score: kombiniert mehrere sportwissenschaftlich belegte Risikofaktoren,
@@ -1545,7 +1624,7 @@ function playerInjuryRisk(playerId) {
     action: riskTier.action,
     load: roundGrade(acuteLoad),
     recentEvents: attended.filter((item) => daysBetween(item.date, today) <= 28).length,
-    reason: topFactors.join(" · ") || "Keine erhöhten Risikofaktoren"
+    reason: topFactors.join(" · ") || "Keine auffälligen Belastungsfaktoren"
   };
 }
 
@@ -1805,7 +1884,7 @@ function renderMetrics() {
     ["Teamnote", gradeLabel(teamGrade)],
     ["Bilanz", `${stats.wins}-${stats.draws}-${stats.losses}`],
     ["Tore", `${stats.goalsFor}:${stats.goalsAgainst}`],
-    ["Risiko hoch", highRiskPlayers]
+    ["Belastung hoch", highRiskPlayers]
   ];
   $("#metricsGrid").innerHTML = metrics.map(([label, value]) => `<article class="metric"><span>${label}</span><strong>${value}</strong></article>`).join("");
   if (nextEvent) $("#metricsGrid").innerHTML += `<article class="metric metric-wide"><span>Nächstes Event</span><strong>${nextEvent.date}</strong><small>${nextEvent.title}</small></article>`;
@@ -1831,6 +1910,13 @@ function formationNameFromAssignments(assignments) {
     .map((zones) => zones.reduce((sum, zone) => sum + (assignments[zone]?.length || 0), 0))
     .filter((count) => count > 0);
   return parts.length ? parts.join("-") : "Keine Aufstellung";
+}
+
+function formationNameFromPreset(preset) {
+  const parts = PITCH_BANDS
+    .map((zones) => zones.reduce((sum, zone) => sum + Number(preset[zone] || 0), 0))
+    .filter((count) => count > 0);
+  return parts.join("-");
 }
 
 function normalizeLineup(lineup, playerIds = new Set()) {
@@ -2039,16 +2125,22 @@ function renderSubstituteList() {
 function renderFormationPicker() {
   const candidates = eligibleLineupCandidates();
   const previews = FORMATION_PRESETS.map((preset) => formationPreview(preset, candidates));
-  const bestGrade = previews.reduce((best, preview) => (preview.grade !== null && (best === null || preview.grade < best) ? preview.grade : best), null);
-  $("#formationPicker").innerHTML = previews.map((preview) => {
-    const name = formationNameFromAssignments(assignedToAssignments(preview.assigned));
-    const recommended = preview.grade !== null && preview.grade === bestGrade;
+  const completePreviews = previews.filter((preview) => preview.filled === preview.total);
+  const recommendationPool = completePreviews.length ? completePreviews : previews;
+  const bestFilled = Math.max(...recommendationPool.map((preview) => preview.filled));
+  const bestGrade = recommendationPool.reduce((best, preview) => (
+    preview.filled === bestFilled && preview.grade !== null && (best === null || preview.grade < best) ? preview.grade : best
+  ), null);
+  const recommendedIndex = previews.findIndex((preview) => preview.filled === bestFilled && preview.grade === bestGrade);
+  $("#formationPicker").innerHTML = previews.map((preview, index) => {
+    const name = formationNameFromPreset(FORMATION_PRESETS[index]);
+    const recommended = index === recommendedIndex;
     return { preview, name, recommended };
   }).map(({ preview, name, recommended }, index) => `
     <button type="button" class="formation-option ${recommended ? "recommended" : ""}" data-formation-index="${index}">
       ${recommended ? `<span class="formation-badge">Empfohlen</span>` : ""}
       <strong>${name}</strong>
-      <span>Ø ${gradeLabel(preview.grade)} · ${preview.filled}/${preview.total} besetzt</span>
+      <span>Ø ${gradeLabel(preview.grade)} · ${preview.filled}/${preview.total} besetzt${preview.filled < preview.total ? ` · ${preview.total - preview.filled} offen` : ""}</span>
     </button>
   `).join("");
 }
@@ -2125,7 +2217,7 @@ function renderLeaders() {
     .slice(0, isMobileViewport() ? undefined : 6);
   $("#leaderList").innerHTML = leaders.map(({ player, grade, events }) => `
     <article class="leader-item">
-      <div><strong>${player.name}</strong><br><small class="muted">${events} Events · ${positionText(player)}</small></div>
+      <div><strong>${escapeHtml(player.name)}</strong><br><small class="muted">${events} Events · ${escapeHtml(positionText(player))}</small></div>
       <strong>${gradeLabel(grade)}</strong>
       <div class="bar"><span style="width:${gradeToPercent(grade)}%"></span></div>
     </article>
@@ -2176,13 +2268,13 @@ function renderSquad() {
     const missingMeasurement = measurementMissingThisQuarter(player.id);
     return `
       <tr>
-        <td data-label="Spieler"><div class="player-cell"><span class="number-badge">${player.number}</span><strong>${player.name}</strong></div></td>
+        <td data-label="Spieler"><div class="player-cell"><span class="number-badge">${player.number}</span><strong>${escapeHtml(player.name)}</strong></div></td>
         <td data-label="Positionen">${positionChips(player)}</td>
         <td data-label="Geburtsdatum">${formatDate(player.birthdate)}</td>
         <td data-label="Status"><span class="status-pill ${statusClass}">${escapeHtml(effectiveStatus)}</span></td>
         <td data-label="Events">${playerAttendanceCount(player.id)}</td>
         <td data-label="Note">${gradeLabel(playerAverageGrade(player.id))}</td>
-        <td data-label="Risiko"><span class="risk-pill ${risk.tier}" title="${escapeHtml(risk.action)} (${escapeHtml(risk.reason)})">${risk.level}</span></td>
+        <td data-label="Belastung"><span class="risk-pill ${risk.tier}" title="${escapeHtml(risk.action)} (${escapeHtml(risk.reason)})">${risk.level}</span></td>
         <td data-label="Messwerte" class="measurement-cell">
           ${missingMeasurement
             ? `<span class="status-pill warning">Messwerte fehlen</span>`
@@ -2228,7 +2320,7 @@ function renderSelects() {
   const selectedProfilePlayer = $("#profilePlayer").value;
   const playerOptions = [...state.players]
     .sort((a, b) => a.number - b.number)
-    .map((player) => `<option value="${player.id}">${player.number} · ${player.name}</option>`)
+    .map((player) => `<option value="${escapeHtml(player.id)}">${player.number} · ${escapeHtml(player.name)}</option>`)
     .join("");
   $("#profilePlayer").innerHTML = playerOptions;
   if (state.players.some((player) => player.id === selectedProfilePlayer)) $("#profilePlayer").value = selectedProfilePlayer;
@@ -2241,7 +2333,7 @@ function renderSelects() {
   $("#positionFilter").innerHTML = `<option value="all">Alle Positionen</option>${positionOptions}`;
   if ([...$("#positionFilter").options].some((option) => option.value === selectedPosition)) $("#positionFilter").value = selectedPosition;
 
-  const eventOptions = sortedEvents().map((event) => `<option value="${event.id}">${event.date} · ${event.type} · ${event.title}</option>`).join("");
+  const eventOptions = sortedEvents().map((event) => `<option value="${escapeHtml(event.id)}">${escapeHtml(event.date)} · ${escapeHtml(event.type)} · ${escapeHtml(event.title)}</option>`).join("");
   $("#eventSelect").innerHTML = eventOptions;
   if (selectedEvent()) $("#eventSelect").value = selectedEvent().id;
 }
@@ -2280,9 +2372,9 @@ function eventCardsHtml(events) {
     return `
       ${groupHeader}
       <button class="event-card ${active}" data-event-id="${event.id}">
-        <span class="event-type">${event.type}</span>
-        <strong>${event.title}</strong>
-        <small>${event.date}${event.opponent ? ` · vs. ${event.opponent}` : ""}${result ? ` · ${result.goalsFor}:${result.goalsAgainst}` : ""}</small>
+        <span class="event-type">${escapeHtml(event.type)}</span>
+        <strong>${escapeHtml(event.title)}</strong>
+        <small>${escapeHtml(event.date)}${event.opponent ? ` · vs. ${escapeHtml(event.opponent)}` : ""}${result ? ` · ${result.goalsFor}:${result.goalsAgainst}` : ""}</small>
         <span>Intensität ${intensityLabel(event.intensity)}</span>
         <span>${rated} Bewertungen</span>
       </button>
@@ -2369,7 +2461,7 @@ function renderRatingTable() {
     ` : "";
     return `
       <tr class="attendance-row attendance-${attendance}">
-        <td data-label="Spieler"><div class="player-cell"><span class="number-badge">${player.number}</span><strong>${player.name}</strong></div></td>
+        <td data-label="Spieler"><div class="player-cell"><span class="number-badge">${player.number}</span><strong>${escapeHtml(player.name)}</strong></div></td>
         <td data-label="Anwesenheit">${attendanceSelectHtml(player.id, attendance, event.type === "Spiel")}</td>
         <td data-label="Gesamtnote"><span class="computed-grade">${gradeLabel(calculatedGrade(rating))}</span></td>
         <td data-label="Einsatz">${gradeSelectHtml(player.id, "effort", rating.effort)}</td>
@@ -2495,6 +2587,8 @@ function openPlayerDialog(player) {
   $("#playerBirthdate").value = player?.birthdate || "2006-07-01";
   $("#playerStatus").value = player?.status || "Fit";
   $("#playerInjuryUntil").value = player?.injuryUntil || "";
+  $("#playerConsentStatus").value = player?.consentStatus || "pending";
+  $("#playerConsentDate").value = player?.consentDate || "";
   syncPlayerInjuryField();
   $("#playerDialog").showModal();
 }
@@ -2537,7 +2631,9 @@ function savePlayer(event) {
     number,
     birthdate: $("#playerBirthdate").value,
     status: $("#playerStatus").value,
-    injuryUntil: $("#playerStatus").value === "Verletzt" ? $("#playerInjuryUntil").value : ""
+    injuryUntil: $("#playerStatus").value === "Verletzt" ? $("#playerInjuryUntil").value : "",
+    consentStatus: $("#playerConsentStatus").value,
+    consentDate: $("#playerConsentDate").value
   };
   const existingIndex = state.players.findIndex((item) => item.id === id);
   if (existingIndex >= 0) state.players[existingIndex] = player;
@@ -2678,6 +2774,9 @@ function renderDevelopmentPlans(playerId) {
         <strong>${escapeHtml(plan.focus)}</strong>
         <p>${escapeHtml(plan.goal)}</p>
         <small class="muted">${plan.dueDate ? `Ziel bis ${formatDate(plan.dueDate)} · ` : ""}${escapeHtml(plan.actions || "Keine Maßnahmen notiert.")}</small>
+        ${plan.selfReflection ? `<p><strong>Selbstreflexion:</strong> ${escapeHtml(plan.selfReflection)}</p>` : ""}
+        ${plan.coachReview ? `<p><strong>Trainerreview:</strong> ${escapeHtml(plan.coachReview)}</p>` : ""}
+        ${currentRole === "player" ? `<form class="self-reflection-form" data-plan-id="${escapeHtml(plan.id)}"><label>Meine Reflexion<textarea rows="2" maxlength="400">${escapeHtml(plan.selfReflection)}</textarea></label><button class="primary-button" type="submit">Reflexion speichern</button></form>` : ""}
       </div>
       <div class="row-actions">
         <button class="ghost-button" data-action="edit-plan" data-id="${plan.id}" type="button">Bearbeiten</button>
@@ -2692,6 +2791,8 @@ function resetDevelopmentPlanForm() {
   $("#developmentPlanFocus").value = "";
   $("#developmentPlanGoal").value = "";
   $("#developmentPlanActions").value = "";
+  $("#developmentPlanCoachReview").value = "";
+  $("#developmentPlanReviewDate").value = "";
   $("#developmentPlanStatus").value = "Offen";
   $("#developmentPlanDueDate").value = "";
 }
@@ -2708,6 +2809,10 @@ function saveDevelopmentPlan(event) {
     focus: $("#developmentPlanFocus").value.trim(),
     goal: $("#developmentPlanGoal").value.trim(),
     actions: $("#developmentPlanActions").value.trim(),
+    selfReflection: state.developmentPlans[playerId].find((item) => item.id === id)?.selfReflection || "",
+    selfReflectionAt: state.developmentPlans[playerId].find((item) => item.id === id)?.selfReflectionAt || "",
+    coachReview: $("#developmentPlanCoachReview").value.trim(),
+    reviewDate: $("#developmentPlanReviewDate").value,
     status: $("#developmentPlanStatus").value,
     dueDate: $("#developmentPlanDueDate").value,
     createdAt: state.developmentPlans[playerId].find((item) => item.id === id)?.createdAt || new Date().toISOString().slice(0, 10)
@@ -2729,6 +2834,8 @@ function editDevelopmentPlan(planId) {
   $("#developmentPlanFocus").value = plan.focus;
   $("#developmentPlanGoal").value = plan.goal;
   $("#developmentPlanActions").value = plan.actions;
+  $("#developmentPlanCoachReview").value = plan.coachReview || "";
+  $("#developmentPlanReviewDate").value = plan.reviewDate || "";
   $("#developmentPlanStatus").value = plan.status;
   $("#developmentPlanDueDate").value = plan.dueDate;
 }
@@ -2741,6 +2848,27 @@ function deleteDevelopmentPlan(planId) {
   state.developmentPlans[playerId] = (state.developmentPlans?.[playerId] || []).filter((plan) => plan.id !== planId);
   persist();
   cloudDeleteDevelopmentPlan(playerId, planId);
+  drawProfile();
+}
+
+async function saveSelfReflection(event) {
+  event.preventDefault();
+  if (currentRole !== "player" || !currentPlayerId) return;
+  const planId = event.target.dataset.planId;
+  const plan = state.developmentPlans?.[currentPlayerId]?.find((item) => item.id === planId);
+  if (!plan) return;
+  plan.selfReflection = event.target.querySelector("textarea").value.trim();
+  plan.selfReflectionAt = new Date().toISOString();
+  localStorage.setItem(storageKey, JSON.stringify(state));
+  try {
+    await firestoreModule.setDoc(teamDoc("players", currentPlayerId, "developmentPlans", planId), {
+      selfReflection: plan.selfReflection,
+      selfReflectionAt: plan.selfReflectionAt
+    }, { merge: true });
+    setSyncState("saved", "Reflexion gespeichert");
+  } catch (error) {
+    cloudWriteFailed(error, "Reflexion konnte nicht gespeichert werden.");
+  }
   drawProfile();
 }
 
@@ -2992,8 +3120,9 @@ function renderProfileHeader(player, ratings) {
     <div class="profile-card">
       <div class="profile-number">${player.number}</div>
       <div>
-        <strong>${player.name}</strong>
-        <span>${positionText(player)} · ${formatDate(player.birthdate)} · ${ageFromBirthdate(player.birthdate) ?? "-"} Jahre · ${escapeHtml(effectiveStatus)}${effectiveStatus === "Verletzt" && player.injuryUntil ? ` (ca. bis ${formatDate(player.injuryUntil)})` : ""}</span>
+        <strong>${escapeHtml(player.name)}</strong>
+        <span>${escapeHtml(positionText(player))} · ${formatDate(player.birthdate)} · ${ageFromBirthdate(player.birthdate) ?? "-"} Jahre · ${escapeHtml(effectiveStatus)}${effectiveStatus === "Verletzt" && player.injuryUntil ? ` (ca. bis ${formatDate(player.injuryUntil)})` : ""}</span>
+        <small class="muted">Datennutzung: ${player.consentStatus === "granted" ? `dokumentiert${player.consentDate ? ` am ${formatDate(player.consentDate)}` : ""}` : player.consentStatus === "revoked" ? "widerrufen – Datenprüfung erforderlich" : "noch offen"}</small>
       </div>
       <div class="profile-grade">
         <span>Ø Note</span>
@@ -3001,7 +3130,7 @@ function renderProfileHeader(player, ratings) {
       </div>
       <div class="risk-panel">
         <div>
-          <span>Verletzungsrisiko</span>
+          <span>Belastungsindikator</span>
           <strong>${risk.level} · ${risk.percentage}%</strong>
         </div>
         <div class="risk-meter"><span class="${risk.tier}" style="width:${risk.percentage}%"></span></div>
@@ -3063,9 +3192,9 @@ function renderProfileHistory(ratings) {
   $("#profileHistory").innerHTML = ratings.map(({ event, rating }) => `
     <article class="record-item">
       <div>
-        <strong>${event.title}</strong>
-        <small>${event.date} · ${event.type}${gameResult(event) ? ` · ${gameResult(event).goalsFor}:${gameResult(event).goalsAgainst}` : ""} · Intensität ${intensityLabel(event.intensity)} · Note ${rating.grade}</small>
-        <p class="muted">${rating.note || event.notes || "Keine Notiz"}</p>
+        <strong>${escapeHtml(event.title)}</strong>
+        <small>${escapeHtml(event.date)} · ${escapeHtml(event.type)}${gameResult(event) ? ` · ${gameResult(event).goalsFor}:${gameResult(event).goalsAgainst}` : ""} · Intensität ${intensityLabel(event.intensity)} · Note ${rating.grade}</small>
+        <p class="muted">${escapeHtml(rating.note || event.notes || "Keine Notiz")}</p>
       </div>
       <span class="grade-badge">${rating.grade}</span>
     </article>
@@ -3107,7 +3236,7 @@ function renderAnalyticsCards(playerId, ratings = playerRatings(playerId)) {
     ["Bewertete Events", ratings.length],
     ["Teilnahmen", playerAttendanceCount(playerId)],
     ["Trend", trend === null ? "-" : `${trend > 0 ? "+" : ""}${roundGrade(trend)}`],
-    ["Risiko", `${risk.level} · ${risk.percentage}%`],
+    ["Belastungsindikator", `${risk.level} · ${risk.percentage}%`],
     ["Ø Intensität zuletzt", avgIntensity ? avgIntensity.toFixed(1).replace(".", ",") : "-"],
     ["Entwicklung Saison", development === null ? "-" : `${development > 0 ? "+" : ""}${gradeLabel(development)}`],
     ["Bestes Event", bestEvent ? `${gradeLabel(bestEvent.rating.grade)} · ${bestEvent.event.type}` : "-"],
@@ -3179,7 +3308,7 @@ function downloadProfilePdf() {
       <body>
         <header>
           <div>
-            <p class="muted">1. FC Königstein U14 · Spielerprofil</p>
+            <p class="muted">${escapeHtml(window.TEAMKOMPASS_CONFIG?.teamName || "TeamKompass")} · Spielerprofil</p>
             <h1>${escapeHtml(player.name)}</h1>
             <div class="muted">Nr. ${player.number} · ${escapeHtml(positionText(player))} · ${formatDate(player.birthdate)} · ${escapeHtml(playerEffectiveStatus(player))}</div>
           </div>
@@ -3301,11 +3430,11 @@ function renderTeamAnalysis() {
   $("#teamInsightList").innerHTML = `
     <article class="team-insight">
       <strong>Topform</strong>
-      ${topPlayers.map(({ player, grade }) => `<span>${player.name} · Note ${gradeLabel(grade)}</span>`).join("") || "<span>Noch keine Bewertungen.</span>"}
+      ${topPlayers.map(({ player, grade }) => `<span>${escapeHtml(player.name)} · Note ${gradeLabel(grade)}</span>`).join("") || "<span>Noch keine Bewertungen.</span>"}
     </article>
     <article class="team-insight">
       <strong>Belastung im Blick</strong>
-      ${highRisk.map(({ player, risk }) => `<span>${player.name} · ${risk.level} (${risk.percentage}%)${risk.reason ? ` · ${escapeHtml(risk.reason)}` : ""}</span>`).join("")}
+      ${highRisk.map(({ player, risk }) => `<span>${escapeHtml(player.name)} · ${risk.level} (${risk.percentage}%)${risk.reason ? ` · ${escapeHtml(risk.reason)}` : ""}</span>`).join("")}
     </article>
     <article class="team-insight">
       <strong>Spielauswertung</strong>
@@ -3609,6 +3738,7 @@ function renderAll() {
   safeRender(drawProfile, "Spielerprofile");
   safeRender(renderOpponentAnalysis, "Gegneranalyse");
   safeRender(renderTeamAnalysis, "Teamanalyse");
+  document.dispatchEvent(new CustomEvent("teamkompass:render"));
 }
 
 function safeRender(fn, label) {
@@ -3849,6 +3979,7 @@ $("#developmentPlanList").addEventListener("click", (event) => {
   if (button.dataset.action === "edit-plan") editDevelopmentPlan(button.dataset.id);
   if (button.dataset.action === "delete-plan") deleteDevelopmentPlan(button.dataset.id);
 });
+$("#developmentPlanList").addEventListener("submit", saveSelfReflection);
 
 $("#absenceList").addEventListener("click", (event) => {
   const button = event.target.closest("button");
@@ -3977,12 +4108,40 @@ $("#playerLoginForm").addEventListener("submit", handlePlayerLogin);
 $("#signOutBtn").addEventListener("click", handleSignOut);
 $("#migrateDataBtn").addEventListener("click", migrateLegacyBlobToCollections);
 $("#addTrainerBtn").addEventListener("click", createTrainerAccount);
+$("#addMedicalBtn").addEventListener("click", createMedicalAccount);
 $("#accessManagerList").addEventListener("click", (event) => {
   const button = event.target.closest("button[data-action='revoke-access']");
   if (!button) return;
   revokeAccess(button.dataset.uid);
 });
 
+window.TeamKompass = Object.freeze({
+  getState: () => structuredClone(state),
+  newEvent: () => openEventDialog(),
+  saveWorkspace: async (workspace) => {
+    if (!isCloudTrainer()) return false;
+    await firestoreModule.setDoc(teamDoc("meta", "operations"), { ...workspace, updatedAt: firestoreModule.serverTimestamp() }, { merge: true });
+    return true;
+  },
+  subscribeWorkspace: (callback) => {
+    if (!isCloudTrainer()) return () => {};
+    return firestoreModule.onSnapshot(teamDoc("meta", "operations"), (snapshot) => {
+      if (snapshot.exists()) callback(snapshot.data());
+    }, console.error);
+  },
+  openEvent: (eventId) => {
+    if (state.events.some((event) => event.id === eventId)) state.selectedEventId = eventId;
+    setView("events");
+    renderEvents();
+  },
+  openPlayer: (playerId) => {
+    if ($("#profilePlayer")) $("#profilePlayer").value = playerId;
+    setView("profiles");
+    drawProfile();
+  }
+});
+
+applyTeamBrand();
 initTheme();
 prepareMobileAccordions();
 renderAll();

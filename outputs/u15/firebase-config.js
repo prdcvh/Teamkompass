@@ -1,6 +1,7 @@
 window.TEAMKOMPASS_CONFIG = {
   storage: "firebase",
   teamId: "U15",
+  teamName: "1. FC Königstein U15",
   // Rollen-Modus (Trainer-Login + Spieler-Einladungscodes, siehe firestore.rules)
   // ist hier von Anfang an aktiv, analog zur bestehenden U14-Instanz.
   enableRoles: true,

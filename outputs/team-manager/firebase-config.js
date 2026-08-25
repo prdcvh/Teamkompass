@@ -1,6 +1,7 @@
 window.TEAMKOMPASS_CONFIG = {
   storage: "firebase",
   teamId: "mein-team",
+  teamName: "1. FC Königstein U14",
   // Auf true stellen, um den Rollen-Modus (Trainer-Login + Spieler-Einladungscodes,
   // siehe firestore.rules) zu aktivieren. Vorher in der Firebase-Konsole unter
   // Authentication die Anmeldemethoden "E-Mail/Passwort" und "Anonym" aktivieren
