@@ -36,7 +36,7 @@
   .topbar h1 { font-size: clamp(1.75rem, 9vw, 2.25rem); }
   .eyebrow { margin-bottom: 4px; }
 
-  .top-actions { gap: 8px; grid-template-columns: auto 1fr; }
+  .top-actions { gap: 8px; grid-template-columns: auto auto minmax(0, 1fr); }
   .top-actions button,
   .top-actions summary,
   .primary-button,

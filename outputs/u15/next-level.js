@@ -117,12 +117,20 @@
       else document.querySelector(`.nav-tab[data-view="${button.dataset.id}"]`)?.click();
       dialog.close();
     });
+    const openPalette = () => {
+      if (dialog.open) return;
+      dialog.showModal();
+      input.value = "";
+      render();
+      requestAnimationFrame(() => input.focus());
+    };
     document.addEventListener("keydown", (event) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
-        if (!dialog.open) { dialog.showModal(); input.value = ""; render(); requestAnimationFrame(() => input.focus()); }
+        openPalette();
       }
     });
+    document.querySelector("#globalSearchBtn")?.addEventListener("click", openPalette);
     dialog.addEventListener("click", (event) => { if (event.target === dialog) dialog.close(); });
   }
 

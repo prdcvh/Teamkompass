@@ -1431,6 +1431,9 @@ async function migrateLegacyBlobToCollections() {
 function setView(viewName) {
   Object.entries(views).forEach(([name, element]) => element.classList.toggle("active", name === viewName));
   document.querySelectorAll(".nav-tab").forEach((button) => button.classList.toggle("active", button.dataset.view === viewName));
+  if ($("#moreNavTab")) {
+    $("#moreNavTab").classList.toggle("active", ["profiles", "opponents", "teamAnalysis"].includes(viewName));
+  }
   if ($("#mobileViewSelect")) $("#mobileViewSelect").value = viewName;
   $("#pageTitle").textContent = titles[viewName];
   if (viewName === "dashboard") { renderMetrics(); renderPitch(); renderLeaders(); }
@@ -1454,7 +1457,7 @@ function prepareMobileAccordions() {
     section.open = section.dataset.mobileDefaultOpen === "true";
   });
   document.querySelectorAll(".control-disclosure").forEach((section) => {
-    section.open = false;
+    section.open = section.dataset.mobileDefaultOpen === "true";
   });
   mobileAccordionsPrepared = true;
 }
@@ -3752,6 +3755,12 @@ function safeRender(fn, label) {
 
 document.querySelectorAll(".nav-tab").forEach((button) => button.addEventListener("click", () => setView(button.dataset.view)));
 $("#mobileViewSelect").addEventListener("change", (event) => setView(event.target.value));
+if ($("#moreNavTab") && $("#moreSheet")) {
+  $("#moreNavTab").addEventListener("click", () => $("#moreSheet").showModal());
+  $("#moreSheet").addEventListener("click", (event) => {
+    if (event.target === $("#moreSheet") || event.target.closest(".nav-tab")) $("#moreSheet").close();
+  });
+}
 window.addEventListener("resize", () => {
   if (!isMobileViewport()) mobileAccordionsPrepared = false;
   prepareMobileAccordions();
