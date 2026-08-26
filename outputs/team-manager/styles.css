@@ -162,9 +162,9 @@ body {
 .activity-log span { color: var(--muted); font-size: .85rem; }
 
 @media (max-width: 850px) {
-  .operations-grid { grid-template-columns: 1fr; }
+  .operations-grid { grid-template-columns: minmax(0, 1fr); }
   .operations-hero, .privacy-panel { grid-column: auto; }
-  .operations-summary { grid-template-columns: 1fr; }
+  .operations-summary { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (pointer: coarse) {
@@ -2184,7 +2184,7 @@ menu {
     background: none;
     border: none;
     color: var(--muted);
-    padding: 4px 2px;
+    padding: 4px 1px;
     border-radius: 8px;
     font-weight: 700;
     text-align: center;
@@ -2208,14 +2208,65 @@ menu {
   }
 
   .bottom-nav-tab span {
-    font-size: 0.66rem;
-    letter-spacing: 0.01em;
+    font-size: 0.68rem;
+    letter-spacing: 0;
   }
 
   .bottom-nav-tab.active,
   .bottom-nav-tab:hover {
     color: var(--red);
     background: none;
+  }
+
+  .more-sheet {
+    width: 100vw;
+    max-width: none;
+    margin: auto 0 0;
+    padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
+    border: 0;
+    border-radius: 18px 18px 0 0;
+  }
+
+  .more-sheet::backdrop {
+    background: rgba(20, 15, 17, 0.64);
+  }
+
+  .more-sheet-title {
+    margin: 0 0 12px;
+    font-weight: 900;
+    font-size: 1.05rem;
+  }
+
+  .more-sheet-list {
+    display: grid;
+    gap: 8px;
+  }
+
+  #moreSheet.more-sheet .more-sheet-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    min-height: 52px;
+    padding: 12px 16px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--soft-panel);
+    color: var(--ink);
+    font-weight: 700;
+    font-size: 1rem;
+    text-align: left;
+  }
+
+  #moreSheet.more-sheet .more-sheet-item svg {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    color: var(--red);
+  }
+
+  #moreSheet.more-sheet .more-sheet-item:active {
+    transform: scale(0.98);
   }
 
   #squadView .table-wrap {
@@ -2393,7 +2444,7 @@ menu {
 
   .top-actions {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: auto auto minmax(0, 1fr);
     width: 100%;
   }
 
