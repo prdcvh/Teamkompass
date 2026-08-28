@@ -142,6 +142,14 @@ const FORMATION_PRESETS = [
   { TW: 1, LV: 1, IV: 2, RV: 1, LM: 1, ZM: 3, RM: 1, ST: 1 }
 ];
 
+// Gruende der Abwesenheitserfassung. "Verletzung" ist dabei mehr als ein Label:
+// solche Eintraege setzen den Status auf "Verletzt" und gehen in den
+// Belastungsindikator ein (siehe isInjuryAbsence/playerInjuryRisk).
+// Muss vor loadState()/normalizeState() stehen, da normalizeAbsence() das schon
+// beim initialen Laden benoetigt.
+const ABSENCE_INJURY_REASON = "Verletzung";
+const ABSENCE_FIXED_REASONS = [ABSENCE_INJURY_REASON, "Urlaub", "Klassenfahrt", "Schule", "Sperre"];
+
 let state = loadState();
 let mobileAccordionsPrepared = false;
 const $ = (selector) => document.querySelector(selector);
@@ -454,10 +462,32 @@ function normalizeAbsences(absences = {}, playerIds = new Set()) {
 function normalizeAbsence(absence = {}) {
   return {
     id: absence.id || `ab${crypto.randomUUID()}`,
+    kind: isInjuryAbsence(absence) ? "injury" : "absence",
     label: absence.label || "",
+    detail: absence.detail || "",
     from: absence.from || "",
     to: absence.to || ""
   };
+}
+
+// Eine Verletzung ist ein eigener Abwesenheitsgrund: sie setzt den Status auf
+// "Verletzt" statt nur "Abwesend" und zaehlt im Belastungsindikator mit. Eintraege
+// von vor dieser Unterscheidung kennen das Feld noch nicht - dort wurde eine
+// Verletzung als Freitext gepflegt, deshalb zaehlt hilfsweise auch das Label.
+function isInjuryAbsence(absence) {
+  if (absence?.kind) return absence.kind === "injury";
+  return /^verletz/i.test((absence?.label || "").trim());
+}
+
+// Anzeigename inkl. Verletzungsart ("Verletzung · Muskelfaserriss Oberschenkel").
+function absenceTitle(absence) {
+  const detail = (absence?.detail || "").trim();
+  return detail ? `${absence.label} · ${detail}` : absence?.label || "";
+}
+
+function absencePeriodText(absence) {
+  if (!absence?.to) return `seit ${formatDate(absence?.from)} · Ende offen`;
+  return `${formatDate(absence.from)} – ${formatDate(absence.to)}`;
 }
 
 function normalizeMeasurements(measurements = {}, playerIds = new Set()) {
@@ -1738,15 +1768,25 @@ function playerInjuryRisk(playerId) {
   }
 
   // Rueckkehr nach Verletzung/laengerer Abwesenheit: das Rueckfallrisiko ist in den ersten
-  // Wochen danach am hoechsten, auch wenn der Status laengst wieder "Fit" ist.
-  if (player?.injuryUntil) {
-    const daysSinceReturn = daysBetween(new Date(`${player.injuryUntil}T00:00:00`), today);
+  // Wochen danach am hoechsten, auch wenn der Status laengst wieder "Fit" ist. Das
+  // Statusfeld ("ca. verletzt bis") und eine eingetragene Verletzung beschreiben dabei
+  // oft dieselbe Rueckkehr - deshalb zaehlt nur die juengste der beiden, sonst wuerde
+  // derselbe Faktor doppelt vergeben.
+  const endedInjuries = (state.absences?.[playerId] || [])
+    .filter((item) => isInjuryAbsence(item) && item.to && item.to < todayStr)
+    .map((item) => item.to);
+  if (player?.injuryUntil) endedInjuries.push(player.injuryUntil);
+  const lastInjuryEnd = endedInjuries.sort().at(-1);
+  if (lastInjuryEnd) {
+    const daysSinceReturn = daysBetween(new Date(`${lastInjuryEnd}T00:00:00`), today);
     if (daysSinceReturn >= 0 && daysSinceReturn <= 21) {
       factors.push({ label: "Rückkehr nach Verletzung", points: Math.round(22 * (1 - daysSinceReturn / 21)) });
     }
   }
+  // Abwesenheiten ohne Verletzung (Urlaub, Klassenfahrt) wiegen beim Wiedereinstieg
+  // deutlich leichter und werden deshalb getrennt und nur einmal gewertet.
   const lastEndedAbsence = (state.absences?.[playerId] || [])
-    .filter((item) => item.to && item.to < todayStr)
+    .filter((item) => !isInjuryAbsence(item) && item.to && item.to < todayStr)
     .sort((a, b) => new Date(b.to) - new Date(a.to))[0];
   if (lastEndedAbsence) {
     const daysSinceEnd = daysBetween(new Date(`${lastEndedAbsence.to}T00:00:00`), today);
@@ -1754,8 +1794,10 @@ function playerInjuryRisk(playerId) {
   }
 
   // Aktueller Gesundheitsstatus: eine bestehende Verletzung/Beschwerde ist der mit Abstand
-  // staerkste Einzelfaktor fuer eine (erneute) Verletzung.
-  if (player?.status === "Verletzt") factors.push({ label: "Aktuell verletzt", points: 75 });
+  // staerkste Einzelfaktor fuer eine (erneute) Verletzung. Eine heute laufende eingetragene
+  // Verletzung zaehlt genauso wie der manuell gesetzte Status "Verletzt".
+  const activeAbsence = activeAbsenceOn(playerId, todayStr);
+  if (player?.status === "Verletzt" || isInjuryAbsence(activeAbsence)) factors.push({ label: "Aktuell verletzt", points: 75 });
   if (player?.status === "Angeschlagen") factors.push({ label: "Angeschlagen", points: 45 });
 
   const percentage = Math.max(0, Math.min(100, Math.round(factors.reduce((sum, factor) => sum + factor.points, 0))));
@@ -1795,30 +1837,43 @@ function formatDate(value) {
   return new Date(`${value}T00:00:00`).toLocaleDateString("de-DE");
 }
 
+// Ein offenes Enddatum ist nur bei Verletzungen zulaessig - dort steht die Rueckkehr
+// am Anfang haeufig noch nicht fest, der Eintrag laeuft dann bis er beendet wird.
+// Bei allen anderen Gruenden ist "Bis" Pflicht, ein Eintrag ohne Ende bleibt wirkungslos.
+function absenceCoversDate(absence, dateStr) {
+  if (!absence?.from || !dateStr || dateStr < absence.from) return false;
+  return absence.to ? dateStr <= absence.to : isInjuryAbsence(absence);
+}
+
+// Bei mehreren gleichzeitigen Eintraegen hat die Verletzung Vorrang: sie ist die
+// relevantere Information fuer Status und Event-Notiz.
 function activeAbsenceOn(playerId, dateStr) {
-  return (state.absences?.[playerId] || []).find((item) => item.from && item.to && dateStr >= item.from && dateStr <= item.to) || null;
+  const active = (state.absences?.[playerId] || []).filter((absence) => absenceCoversDate(absence, dateStr));
+  return active.find(isInjuryAbsence) || active[0] || null;
 }
 
 // Verletzung (Status "Verletzt" + "ca. verletzt bis") und eingetragene Abwesenheiten
-// (Urlaub, Klassenfahrt etc.) fuehren beide dazu, dass ein Spieler fuer Events in diesem
-// Zeitraum automatisch als "Fehlt" vorbelegt wird - siehe applyAutoAbsence/reconcileAbsences.
+// (Verletzung, Urlaub, Klassenfahrt etc.) fuehren beide dazu, dass ein Spieler fuer Events in
+// diesem Zeitraum automatisch als "Fehlt" vorbelegt wird - siehe applyAutoAbsence/reconcileAbsences.
 function unavailabilityReason(player, dateStr) {
   if (!player || !dateStr) return null;
   if (player.status === "Verletzt" && player.injuryUntil && dateStr <= player.injuryUntil) {
     return `Verletzt (ca. bis ${formatDate(player.injuryUntil)})`;
   }
   const absence = activeAbsenceOn(player.id, dateStr);
-  return absence ? `${absence.label} (bis ${formatDate(absence.to)})` : null;
+  if (!absence) return null;
+  return `${absenceTitle(absence)} (${absence.to ? `bis ${formatDate(absence.to)}` : "Ende offen"})`;
 }
 
 // Status-Anzeige (Kader/Profil): eine heute laufende Abwesenheit ueberlagert den manuell
-// gesetzten Status - "Sperre" wird dabei als eigener Grund erkannt, jede andere Abwesenheit
-// (Urlaub, Klassenfahrt etc.) zeigt "Abwesend". Ohne aktive Abwesenheit bleibt es beim
-// manuell gepflegten Status (Fit/Angeschlagen/Verletzt/Pause).
+// gesetzten Status - "Verletzung" und "Sperre" werden dabei als eigener Grund erkannt, jede
+// andere Abwesenheit (Urlaub, Klassenfahrt etc.) zeigt "Abwesend". Ohne aktive Abwesenheit
+// bleibt es beim manuell gepflegten Status (Fit/Angeschlagen/Verletzt/Pause).
 function playerEffectiveStatus(player) {
   const today = new Date().toISOString().slice(0, 10);
   const absence = activeAbsenceOn(player.id, today);
   if (!absence) return player.status;
+  if (isInjuryAbsence(absence)) return "Verletzt";
   return absence.label.trim().toLowerCase().startsWith("sperre") ? "Gesperrt" : "Abwesend";
 }
 
@@ -3091,32 +3146,39 @@ function renderAbsenceList(playerId) {
   $("#absenceList").innerHTML = absences.map((absence) => `
     <article class="development-item">
       <div>
-        <strong>${escapeHtml(absence.label)}</strong>
-        <p>${formatDate(absence.from)} – ${formatDate(absence.to)}</p>
+        ${isInjuryAbsence(absence) ? `<span class="status-pill danger">Verletzung</span>` : ""}
+        <strong>${escapeHtml(absenceTitle(absence))}</strong>
+        <p>${escapeHtml(absencePeriodText(absence))}</p>
       </div>
       <div class="row-actions">
         <button class="ghost-button" data-action="edit-absence" data-id="${absence.id}" type="button">Bearbeiten</button>
         <button class="ghost-button danger" data-action="delete-absence" data-id="${absence.id}" type="button">Löschen</button>
       </div>
     </article>
-  `).join("") || `<p class="muted">Noch keine Abwesenheit für diesen Spieler eingetragen.</p>`;
+  `).join("") || `<p class="muted">Noch keine Abwesenheit oder Verletzung für diesen Spieler eingetragen.</p>`;
 }
 
-const ABSENCE_FIXED_REASONS = ["Urlaub", "Klassenfahrt", "Schule", "Sperre"];
-
 function syncAbsenceReasonField() {
-  const isCustom = $("#absenceReason").value === "Sonstiges";
+  const reason = $("#absenceReason").value;
+  const isCustom = reason === "Sonstiges";
+  const isInjury = reason === ABSENCE_INJURY_REASON;
   $("#absenceCustomReasonField").hidden = !isCustom;
   if (!isCustom) $("#absenceCustomReason").value = "";
+  $("#absenceInjuryDetailField").hidden = !isInjury;
+  if (!isInjury) $("#absenceInjuryDetail").value = "";
+  // Nur bei einer Verletzung darf das Enddatum offen bleiben (siehe absenceCoversDate).
+  $("#absenceInjuryHint").hidden = !isInjury;
+  $("#absenceToLabel").textContent = isInjury ? "Voraussichtlich bis" : "Bis";
+  $("#absenceTo").required = !isInjury;
 }
 
 function resetAbsenceForm() {
   $("#absenceId").value = "";
   $("#absenceReason").value = "";
   $("#absenceCustomReason").value = "";
-  $("#absenceCustomReasonField").hidden = true;
   $("#absenceFrom").value = "";
   $("#absenceTo").value = "";
+  syncAbsenceReasonField();
 }
 
 function saveAbsence(event) {
@@ -3127,10 +3189,13 @@ function saveAbsence(event) {
   state.absences[playerId] ||= [];
   const id = $("#absenceId").value || `ab${crypto.randomUUID()}`;
   const reason = $("#absenceReason").value;
+  const isInjury = reason === ABSENCE_INJURY_REASON;
   const label = reason === "Sonstiges" ? ($("#absenceCustomReason").value.trim() || "Sonstiges") : reason;
   const absence = {
     id,
+    kind: isInjury ? "injury" : "absence",
     label,
+    detail: isInjury ? $("#absenceInjuryDetail").value.trim() : "",
     from: $("#absenceFrom").value,
     to: $("#absenceTo").value
   };
@@ -3149,9 +3214,13 @@ function editAbsence(absenceId) {
   const absence = state.absences?.[playerId]?.find((item) => item.id === absenceId);
   if (!absence) return;
   $("#absenceId").value = absence.id;
-  const isFixedReason = ABSENCE_FIXED_REASONS.includes(absence.label);
-  $("#absenceReason").value = isFixedReason ? absence.label : "Sonstiges";
-  $("#absenceCustomReason").value = isFixedReason ? "" : absence.label;
+  const isInjury = isInjuryAbsence(absence);
+  const isFixedReason = !isInjury && ABSENCE_FIXED_REASONS.includes(absence.label);
+  $("#absenceReason").value = isInjury ? ABSENCE_INJURY_REASON : isFixedReason ? absence.label : "Sonstiges";
+  $("#absenceCustomReason").value = isInjury || isFixedReason ? "" : absence.label;
+  // Aeltere Verletzungen standen als Freitext im Label - der wandert beim Bearbeiten
+  // in die Detailzeile, damit er beim Speichern nicht verloren geht.
+  $("#absenceInjuryDetail").value = isInjury ? (absence.detail || absence.label.replace(/^verletzung\s*[:·-]?\s*/i, "")) : "";
   syncAbsenceReasonField();
   $("#absenceFrom").value = absence.from;
   $("#absenceTo").value = absence.to;
@@ -3160,7 +3229,7 @@ function editAbsence(absenceId) {
 function deleteAbsence(absenceId) {
   const playerId = $("#profilePlayer").value || state.players[0]?.id;
   if (!playerId) return;
-  if (!confirm("Diese Abwesenheit wirklich löschen?")) return;
+  if (!confirm("Diesen Eintrag wirklich löschen?")) return;
   state.absences ||= {};
   state.absences[playerId] = (state.absences?.[playerId] || []).filter((item) => item.id !== absenceId);
   persist();
@@ -4210,7 +4279,7 @@ function handleSquadActionClick(event) {
   if (button.dataset.action === "invite" && player) createInviteCodeForPlayer(player.id);
   if (button.dataset.action === "add-measurement" && player) goToMeasurementForm(player.id);
   if (button.dataset.action === "delete" && player) {
-    if (!confirm(`"${player.name}" wirklich löschen? Alle Bewertungen, der Förderplan und die Abwesenheiten dieses Spielers gehen verloren.`)) return;
+    if (!confirm(`"${player.name}" wirklich löschen? Alle Bewertungen, der Förderplan sowie die Abwesenheiten und Verletzungen dieses Spielers gehen verloren.`)) return;
     cloudDeletePlayer(player.id);
     state.players = state.players.filter((item) => item.id !== player.id);
     state.events.forEach((item) => delete item.ratings?.[player.id]);

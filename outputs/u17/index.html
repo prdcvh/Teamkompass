@@ -430,14 +430,15 @@
             </div>
           </details>
           <details class="control-disclosure development-panel" open>
-            <summary>Abwesenheiten</summary>
+            <summary>Abwesenheiten &amp; Verletzungen</summary>
             <div class="disclosure-body">
-              <span class="muted">Urlaub, Klassenfahrt, Sperre & Co. - Events in diesem Zeitraum werden automatisch auf "Fehlt" gesetzt, der Status zeigt "Abwesend" (bei "Sperre" als Grund "Gesperrt")</span>
+              <span class="muted">Verletzung, Urlaub, Sperre & Co. - Events in diesem Zeitraum werden automatisch auf "Fehlt" gesetzt, der Status zeigt "Abwesend" (bei "Verletzung" den Grund "Verletzt", bei "Sperre" "Gesperrt")</span>
               <form class="development-form" id="absenceForm">
                 <input type="hidden" id="absenceId" />
                 <label>Grund
                   <select id="absenceReason" required>
                     <option value="" disabled selected>Bitte wählen</option>
+                    <option value="Verletzung">Verletzung</option>
                     <option value="Urlaub">Urlaub</option>
                     <option value="Klassenfahrt">Klassenfahrt</option>
                     <option value="Schule">Schule</option>
@@ -445,16 +446,20 @@
                     <option value="Sonstiges">Sonstiges</option>
                   </select>
                 </label>
+                <label id="absenceInjuryDetailField" hidden>Art der Verletzung
+                  <input id="absenceInjuryDetail" maxlength="60" placeholder="z.B. Muskelfaserriss Oberschenkel" />
+                </label>
                 <label id="absenceCustomReasonField" hidden>Details
                   <input id="absenceCustomReason" maxlength="50" placeholder="z.B. Krankenhausaufenthalt" />
                 </label>
                 <div class="form-grid">
                   <label>Von <input id="absenceFrom" type="date" required /></label>
-                  <label>Bis <input id="absenceTo" type="date" required /></label>
+                  <label><span id="absenceToLabel">Bis</span> <input id="absenceTo" type="date" required /></label>
                 </div>
+                <p class="muted" id="absenceInjuryHint" hidden>Rückkehrdatum noch offen? Dann "Voraussichtlich bis" leer lassen - der Spieler bleibt verletzt, bis du das Datum nachträgst oder den Eintrag löschst.</p>
                 <div class="panel-actions">
                   <button class="ghost-button" id="cancelAbsenceBtn" type="button">Zurücksetzen</button>
-                  <button class="primary-button" type="submit">Abwesenheit speichern</button>
+                  <button class="primary-button" type="submit">Eintrag speichern</button>
                 </div>
               </form>
               <div class="development-list" id="absenceList"></div>
