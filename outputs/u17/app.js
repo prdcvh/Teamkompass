@@ -213,6 +213,125 @@ function cssVar(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
+// ---- Diagramme ----
+// Die Zeichenflaechen richten sich nach ihrer tatsaechlichen Breite im Layout
+// statt nach einer festen 980px-Bitmap. Ohne das wuerde die Bitmap auf dem
+// Handy auf gut ein Drittel gestaucht und alle Beschriftungen waeren nur noch
+// wenige Pixel gross.
+function setupChartCanvas(canvas, heightFor) {
+  const fallbackWidth = ($(".main")?.clientWidth || window.innerWidth || 720) - 56;
+  const width = Math.max(Math.round(canvas.clientWidth || fallbackWidth), 240);
+  const height = Math.max(Math.round(typeof heightFor === "function" ? heightFor(width) : heightFor), 150);
+  const ratio = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = Math.round(width * ratio);
+  canvas.height = Math.round(height * ratio);
+  canvas.style.height = `${height}px`;
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  const palette = chartPalette();
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = palette.surface;
+  ctx.fillRect(0, 0, width, height);
+  ctx.textBaseline = "alphabetic";
+  ctx.textAlign = "left";
+  return { ctx, width, height, palette, compact: width < 520 };
+}
+
+function chartFonts(compact) {
+  return compact
+    ? { title: "700 13px system-ui", label: "10px system-ui", value: "700 11px system-ui", legend: "11px system-ui", empty: "12px system-ui" }
+    : { title: "700 18px system-ui", label: "12px system-ui", value: "700 13px system-ui", legend: "13px system-ui", empty: "14px system-ui" };
+}
+
+// Schreibt einen Hinweis mittig in die leere Zeichenflaeche und bricht ihn um.
+function drawChartPlaceholder(chart, text) {
+  const { ctx, width, height, palette, compact } = chart;
+  ctx.fillStyle = palette.muted;
+  ctx.font = chartFonts(compact).empty;
+  ctx.textAlign = "center";
+  const maxWidth = width - 24;
+  const lines = [];
+  let line = "";
+  text.split(" ").forEach((word) => {
+    const candidate = line ? `${line} ${word}` : word;
+    if (ctx.measureText(candidate).width > maxWidth && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = candidate;
+    }
+  });
+  if (line) lines.push(line);
+  const startY = height / 2 - ((lines.length - 1) * 16) / 2 + 4;
+  lines.forEach((entry, index) => ctx.fillText(entry, width / 2, startY + index * 16));
+  ctx.textAlign = "left";
+}
+
+// Gemeinsamer Notenverlauf fuer Spieler- und Teamform (Schulnoten 1 bis 6).
+function drawGradeTrendChart(canvas, title, entries, emptyText) {
+  if (!canvas) return;
+  const chart = setupChartCanvas(canvas, (width) => (width < 520 ? Math.round(width * 0.78) : Math.round(width / 2.7)));
+  const { ctx, width, height, palette, compact } = chart;
+  const font = chartFonts(compact);
+
+  ctx.fillStyle = palette.ink;
+  ctx.font = font.title;
+  ctx.fillText(title, 12, compact ? 18 : 24);
+
+  if (!entries.length) {
+    drawChartPlaceholder(chart, emptyText);
+    return;
+  }
+
+  const left = compact ? 22 : 34;
+  const right = width - (compact ? 10 : 20);
+  const top = compact ? 32 : 46;
+  const bottom = height - (compact ? 24 : 30);
+
+  ctx.font = font.label;
+  for (let grade = 1; grade <= 6; grade += 1) {
+    const y = top + ((grade - 1) * (bottom - top)) / 5;
+    ctx.strokeStyle = palette.line;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(left, y);
+    ctx.lineTo(right, y);
+    ctx.stroke();
+    ctx.fillStyle = palette.muted;
+    ctx.textAlign = "right";
+    ctx.fillText(String(grade), left - 6, y + 3.5);
+  }
+  ctx.textAlign = "left";
+
+  const span = Math.max(entries.length - 1, 1);
+  const points = entries.map((entry, index) => ({
+    x: entries.length === 1 ? (left + right) / 2 : left + (index * (right - left)) / span,
+    y: top + ((Number(entry.grade) - 1) * (bottom - top)) / 5,
+    entry
+  }));
+
+  ctx.strokeStyle = palette.red;
+  ctx.lineWidth = compact ? 2.5 : 4;
+  ctx.beginPath();
+  points.forEach((point, index) => (index ? ctx.lineTo(point.x, point.y) : ctx.moveTo(point.x, point.y)));
+  ctx.stroke();
+
+  // Nur so viele Datumsangaben zeigen, wie nebeneinander lesbar bleiben.
+  const labelStep = Math.max(1, Math.ceil(points.length / Math.max(1, Math.floor((right - left) / (compact ? 42 : 64)))));
+  points.forEach((point, index) => {
+    ctx.fillStyle = point.entry.color || palette.green;
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, compact ? 4.5 : 7, 0, Math.PI * 2);
+    ctx.fill();
+    if (index % labelStep && index !== points.length - 1) return;
+    ctx.fillStyle = palette.muted;
+    ctx.font = font.label;
+    ctx.textAlign = "center";
+    ctx.fillText(point.entry.label, Math.min(Math.max(point.x, left + 12), right - 12), bottom + (compact ? 15 : 19));
+    ctx.textAlign = "left";
+  });
+}
+
 function chartPalette() {
   return {
     surface: cssVar("--field") || "#fbfcfb",
@@ -2217,7 +2336,7 @@ function renderLeaders() {
     .map((player) => ({ player, grade: playerAverageGrade(player.id), events: playerAttendanceCount(player.id) }))
     .filter((item) => item.grade)
     .sort((a, b) => a.grade - b.grade)
-    .slice(0, isMobileViewport() ? undefined : 6);
+    .slice(0, isMobileViewport() ? 5 : 6);
   $("#leaderList").innerHTML = leaders.map(({ player, grade, events }) => `
     <article class="leader-item">
       <div><strong>${escapeHtml(player.name)}</strong><br><small class="muted">${events} Events · ${escapeHtml(positionText(player))}</small></div>
@@ -2300,6 +2419,7 @@ function renderSquad() {
     return `
       <article class="player-card-mobile">
         <div class="player-card-mobile-top">
+          <span class="number-badge">${player.number}</span>
           <strong>${escapeHtml(player.name)}</strong>
           <span class="status-pill ${statusClass}">${escapeHtml(effectiveStatus)}</span>
         </div>
@@ -3041,78 +3161,86 @@ function goToMeasurementForm(playerId) {
 function renderMeasurementChart(player) {
   const canvas = $("#measurementChart");
   if (!canvas) return;
-  const ctx = canvas.getContext("2d");
-  const colors = chartPalette();
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = colors.surface;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = colors.ink;
-  ctx.font = "700 18px system-ui";
-  ctx.fillText(player ? `${player.name} · Größe, Gewicht, BMI` : "Größe, Gewicht, BMI", 58, 28);
-
   const oneYearAgo = new Date();
   oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
   const entries = (player ? playerMeasurements(player.id) : [])
     .filter((item) => item.height && item.weight && new Date(`${item.date}T00:00:00`) >= oneYearAgo);
 
+  const chart = setupChartCanvas(canvas, (width) => (width < 520 ? Math.round(width * 0.82) : Math.round(width / 2.7)));
+  const { ctx, width, height, palette, compact } = chart;
+  const font = chartFonts(compact);
+
+  ctx.fillStyle = palette.ink;
+  ctx.font = font.title;
+  ctx.fillText(player ? `${player.name} · Größe, Gewicht, BMI` : "Größe, Gewicht, BMI", 12, compact ? 18 : 24);
+
   if (entries.length < 2) {
-    ctx.fillStyle = colors.muted;
-    ctx.fillText("Noch nicht genug Messwerte der letzten 12 Monate fuer einen Verlauf (mind. 2 noetig).", 58, 190);
+    drawChartPlaceholder(chart, "Noch nicht genug Messwerte der letzten 12 Monate für einen Verlauf (mindestens 2 nötig).");
     return;
   }
 
-  const top = 54;
-  const bottom = 300;
+  const last = entries[entries.length - 1];
+  const lastBmi = calculateBmi(last.height, last.weight);
   const series = [
-    { label: "Größe (cm)", color: colors.red, values: entries.map((item) => Number(item.height)) },
-    { label: "Gewicht (kg)", color: colors.blue, values: entries.map((item) => Number(item.weight)) },
-    { label: "BMI", color: colors.green, values: entries.map((item) => calculateBmi(item.height, item.weight)) }
+    { label: `Größe ${last.height} cm`, color: palette.red, values: entries.map((item) => Number(item.height)) },
+    { label: `Gewicht ${last.weight} kg`, color: palette.blue, values: entries.map((item) => Number(item.weight)) },
+    { label: `BMI ${gradeLabel(lastBmi ? roundGrade(lastBmi) : null)}`, color: palette.green, values: entries.map((item) => calculateBmi(item.height, item.weight)) }
   ];
-  series.forEach((s) => {
-    const min = Math.min(...s.values);
-    const max = Math.max(...s.values);
-    const range = max - min || 1;
-    s.points = entries.map((entry, index) => ({
-      x: 76 + (index * 850) / Math.max(entries.length - 1, 1),
-      y: bottom - ((s.values[index] - min) / range) * (bottom - top)
-    }));
-  });
-  series.forEach((s) => {
-    ctx.strokeStyle = s.color;
-    ctx.lineWidth = 3;
+
+  // Legende: schmal zweizeilig ueber dem Verlauf, breit einzeilig.
+  const legendRows = compact ? 2 : 1;
+  const legendTop = compact ? 34 : 44;
+  ctx.font = font.legend;
+  series.forEach((item, index) => {
+    const column = compact ? index % 2 : index;
+    const row = compact ? Math.floor(index / 2) : 0;
+    const x = 14 + column * ((width - 24) / (compact ? 2 : 3));
+    const y = legendTop + row * 17;
+    ctx.fillStyle = item.color;
     ctx.beginPath();
-    s.points.forEach((point, index) => index ? ctx.lineTo(point.x, point.y) : ctx.moveTo(point.x, point.y));
+    ctx.arc(x + 4, y - 4, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = palette.ink;
+    ctx.fillText(item.label, x + 14, y, (width - 24) / (compact ? 2 : 3) - 20);
+  });
+
+  const left = 14;
+  const right = width - 14;
+  const top = legendTop + legendRows * 17 + 8;
+  const bottom = height - (compact ? 24 : 28);
+  const span = Math.max(entries.length - 1, 1);
+
+  series.forEach((item) => {
+    const min = Math.min(...item.values);
+    const max = Math.max(...item.values);
+    const range = max - min || 1;
+    const points = entries.map((entry, index) => ({
+      x: left + (index * (right - left)) / span,
+      y: bottom - ((item.values[index] - min) / range) * (bottom - top)
+    }));
+    ctx.strokeStyle = item.color;
+    ctx.lineWidth = compact ? 2 : 3;
+    ctx.beginPath();
+    points.forEach((point, index) => (index ? ctx.lineTo(point.x, point.y) : ctx.moveTo(point.x, point.y)));
     ctx.stroke();
-    s.points.forEach((point) => {
-      ctx.fillStyle = s.color;
+    points.forEach((point) => {
+      ctx.fillStyle = item.color;
       ctx.beginPath();
-      ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
+      ctx.arc(point.x, point.y, compact ? 3.5 : 5, 0, Math.PI * 2);
       ctx.fill();
     });
   });
-  entries.forEach((entry, index) => {
-    ctx.fillStyle = colors.muted;
-    ctx.font = "12px system-ui";
-    ctx.fillText(entry.date.slice(0, 7), 76 + (index * 850) / Math.max(entries.length - 1, 1) - 16, 344);
-  });
 
-  const last = entries[entries.length - 1];
-  const lastBmi = calculateBmi(last.height, last.weight);
-  const legendItems = [
-    { label: `Größe ${last.height} cm`, color: series[0].color },
-    { label: `Gewicht ${last.weight} kg`, color: series[1].color },
-    { label: `BMI ${gradeLabel(lastBmi ? roundGrade(lastBmi) : null)}`, color: series[2].color }
-  ];
-  legendItems.forEach((item, index) => {
-    const x = 58 + index * 260;
-    ctx.fillStyle = item.color;
-    ctx.beginPath();
-    ctx.arc(x, 44, 6, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = colors.ink;
-    ctx.font = "13px system-ui";
-    ctx.fillText(item.label, x + 12, 48);
+  const labelStep = Math.max(1, Math.ceil(entries.length / Math.max(1, Math.floor((right - left) / (compact ? 46 : 70)))));
+  ctx.font = font.label;
+  ctx.fillStyle = palette.muted;
+  ctx.textAlign = "center";
+  entries.forEach((entry, index) => {
+    if (index % labelStep && index !== entries.length - 1) return;
+    const x = left + (index * (right - left)) / span;
+    ctx.fillText(entry.date.slice(0, 7), Math.min(Math.max(x, left + 16), right - 16), bottom + (compact ? 15 : 19));
   });
+  ctx.textAlign = "left";
 }
 
 function renderProfileHeader(player, ratings) {
@@ -3145,50 +3273,12 @@ function renderProfileHeader(player, ratings) {
 }
 
 function renderProfileChart(player, ratings) {
-  const canvas = $("#trendChart");
-  const ctx = canvas.getContext("2d");
-  const colors = chartPalette();
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = colors.surface;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.strokeStyle = colors.line;
-  ctx.lineWidth = 1;
-  for (let grade = 1; grade <= 6; grade += 1) {
-    const y = 54 + (grade - 1) * 54;
-    ctx.beginPath();
-    ctx.moveTo(58, y);
-    ctx.lineTo(940, y);
-    ctx.stroke();
-    ctx.fillStyle = colors.muted;
-    ctx.fillText(String(grade), 28, y + 4);
-  }
-  ctx.fillStyle = colors.ink;
-  ctx.font = "700 18px system-ui";
-  ctx.fillText(player ? `${player.name} · Notenentwicklung` : "Notenentwicklung", 58, 28);
-  if (!ratings.length) {
-    ctx.fillStyle = colors.muted;
-    ctx.fillText("Noch keine benoteten Events vorhanden.", 58, 190);
-    return;
-  }
-  const points = ratings.map((item, index) => ({
-    x: 76 + (index * 850) / Math.max(ratings.length - 1, 1),
-    y: 54 + (Number(item.rating.grade) - 1) * 54,
-    item
-  }));
-  ctx.strokeStyle = colors.red;
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  points.forEach((point, index) => index ? ctx.lineTo(point.x, point.y) : ctx.moveTo(point.x, point.y));
-  ctx.stroke();
-  points.forEach((point) => {
-    ctx.fillStyle = colors.green;
-    ctx.beginPath();
-    ctx.arc(point.x, point.y, 7, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = colors.muted;
-    ctx.font = "12px system-ui";
-    ctx.fillText(point.item.event.date.slice(5), point.x - 16, 344);
-  });
+  drawGradeTrendChart(
+    $("#trendChart"),
+    player ? `${player.name} · Notenentwicklung` : "Notenentwicklung",
+    ratings.map((item) => ({ label: item.event.date.slice(5), grade: Number(item.rating.grade) })),
+    "Noch keine benoteten Events vorhanden."
+  );
 }
 
 function renderProfileHistory(ratings) {
@@ -3463,54 +3553,17 @@ function renderTeamAnalysis() {
 }
 
 function drawTeamTrendChart() {
-  const canvas = $("#teamTrendChart");
-  const ctx = canvas.getContext("2d");
-  const colors = chartPalette();
-  const events = [...state.events]
+  const palette = chartPalette();
+  const entries = [...state.events]
     .sort((a, b) => new Date(a.date) - new Date(b.date))
     .map((event) => ({ event, grade: teamAverageGradeForEvent(event) }))
-    .filter((item) => item.grade);
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = colors.surface;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.strokeStyle = colors.line;
-  ctx.lineWidth = 1;
-  for (let grade = 1; grade <= 6; grade += 1) {
-    const y = 54 + (grade - 1) * 54;
-    ctx.beginPath();
-    ctx.moveTo(58, y);
-    ctx.lineTo(940, y);
-    ctx.stroke();
-    ctx.fillStyle = colors.muted;
-    ctx.fillText(String(grade), 28, y + 4);
-  }
-  ctx.fillStyle = colors.ink;
-  ctx.font = "700 18px system-ui";
-  ctx.fillText("Teamnoten nach Event", 58, 28);
-  if (!events.length) {
-    ctx.fillStyle = colors.muted;
-    ctx.fillText("Noch keine Teamnoten vorhanden.", 58, 190);
-    return;
-  }
-  const points = events.map((item, index) => ({
-    x: 76 + (index * 850) / Math.max(events.length - 1, 1),
-    y: 54 + (Number(item.grade) - 1) * 54,
-    item
-  }));
-  ctx.strokeStyle = colors.red;
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  points.forEach((point, index) => index ? ctx.lineTo(point.x, point.y) : ctx.moveTo(point.x, point.y));
-  ctx.stroke();
-  points.forEach((point) => {
-    ctx.fillStyle = point.item.event.type === "Spiel" ? colors.red : colors.green;
-    ctx.beginPath();
-    ctx.arc(point.x, point.y, 7, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = colors.muted;
-    ctx.font = "12px system-ui";
-    ctx.fillText(point.item.event.date.slice(5), point.x - 16, 344);
-  });
+    .filter((item) => item.grade)
+    .map((item) => ({
+      label: item.event.date.slice(5),
+      grade: Number(item.grade),
+      color: item.event.type === "Spiel" ? palette.red : palette.green
+    }));
+  drawGradeTrendChart($("#teamTrendChart"), "Teamnoten nach Event", entries, "Noch keine Teamnoten vorhanden.");
 }
 
 function drawBirthQuarterChart() {
@@ -3544,73 +3597,105 @@ function drawTrainingFocusChart() {
 }
 
 function drawPieChart(canvas, rows, title) {
-  const ctx = canvas.getContext("2d");
-  const palette = chartPalette();
+  if (!canvas) return;
+  const chart = setupChartCanvas(canvas, (width) =>
+    (width < 520 ? 56 + 2 * 82 + rows.length * 34 : 60 + 2 * 96 + 20));
+  const { ctx, width, height, palette, compact } = chart;
+  const font = chartFonts(compact);
   const colors = [palette.red, palette.green, palette.amber];
   const total = rows.reduce((sum, row) => sum + row.value, 0);
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = palette.surface;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
   ctx.fillStyle = palette.ink;
-  ctx.font = "700 18px system-ui";
-  ctx.fillText(title, 28, 30);
+  ctx.font = font.title;
+  ctx.fillText(title, 12, compact ? 19 : 26);
+
   if (!total) {
-    ctx.fillStyle = palette.muted;
-    ctx.font = "14px system-ui";
-    ctx.fillText("Noch keine Trainings angelegt.", 28, 170);
+    drawChartPlaceholder(chart, "Noch keine Trainings angelegt.");
     return;
   }
+
+  // Schmal: Kreis oben, Legende darunter. Breit: Kreis links, Legende rechts.
+  const radius = compact ? Math.min(width * 0.26, 82) : 96;
+  const centerX = compact ? width / 2 : 20 + radius;
+  const centerY = compact ? 40 + radius : height / 2 + 12;
+
   let startAngle = -Math.PI / 2;
   rows.forEach((row, index) => {
     const slice = (row.value / total) * Math.PI * 2;
     ctx.beginPath();
-    ctx.moveTo(170, 174);
-    ctx.arc(170, 174, 96, startAngle, startAngle + slice);
+    ctx.moveTo(centerX, centerY);
+    ctx.arc(centerX, centerY, radius, startAngle, startAngle + slice);
     ctx.closePath();
     ctx.fillStyle = colors[index % colors.length];
     ctx.fill();
     startAngle += slice;
   });
+
+  const legendX = compact ? 14 : centerX + radius + 28;
+  const legendTop = compact ? centerY + radius + 26 : centerY - ((rows.length - 1) * 46) / 2;
+  const legendStep = compact ? 34 : 46;
+
   rows.forEach((row, index) => {
-    const y = 112 + index * 48;
+    const y = legendTop + index * legendStep;
     const percentage = Math.round((row.value / total) * 100);
     ctx.fillStyle = colors[index % colors.length];
-    ctx.fillRect(340, y - 16, 18, 18);
+    ctx.fillRect(legendX, y - 12, 13, 13);
     ctx.fillStyle = palette.ink;
-    ctx.font = "700 14px system-ui";
-    ctx.fillText(row.label, 372, y);
+    ctx.font = font.value;
+    ctx.fillText(row.label, legendX + 21, y, width - legendX - 30);
     ctx.fillStyle = palette.muted;
-    ctx.font = "13px system-ui";
-    ctx.fillText(`${row.value} Einheiten · ${percentage}%`, 372, y + 20);
+    ctx.font = font.legend;
+    ctx.fillText(`${row.value} Einheiten · ${percentage}%`, legendX + 21, y + 15, width - legendX - 30);
   });
 }
 
 function drawBarChart(canvas, rows, title, color) {
-  const ctx = canvas.getContext("2d");
-  const palette = chartPalette();
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = palette.surface;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  if (!canvas) return;
+  const barHeight = 22;
+  const barGap = 9;
+  const headHeight = 40;
+  const chart = setupChartCanvas(canvas, () => headHeight + Math.max(rows.length, 1) * (barHeight + barGap) + 10);
+  const { ctx, width, palette, compact } = chart;
+  const font = chartFonts(compact);
+
   ctx.fillStyle = palette.ink;
-  ctx.font = "700 18px system-ui";
-  ctx.fillText(title, 28, 30);
+  ctx.font = font.title;
+  ctx.fillText(title, 12, compact ? 19 : 24);
+
+  if (!rows.length) {
+    drawChartPlaceholder(chart, "Noch keine Daten vorhanden.");
+    return;
+  }
+
+  // Beschriftungsspalte an den laengsten Eintrag anpassen, aber gedeckelt.
+  ctx.font = font.label;
+  const labelWidth = Math.min(
+    Math.max(...rows.map((row) => ctx.measureText(row.label).width)) + 10,
+    Math.round(width * 0.34)
+  );
+  const valueWidth = 34;
+  const trackLeft = 12 + labelWidth;
+  const trackRight = width - 12 - valueWidth;
   const max = Math.max(...rows.map((row) => row.value), 1);
-  const barAreaTop = 58;
-  const barHeight = Math.min(34, (canvas.height - 88) / Math.max(rows.length, 1) - 8);
+
   rows.forEach((row, index) => {
-    const y = barAreaTop + index * (barHeight + 10);
-    const width = Math.round((row.value / max) * (canvas.width - 170));
+    const y = headHeight + index * (barHeight + barGap);
     ctx.fillStyle = palette.muted;
-    ctx.font = "12px system-ui";
-    ctx.fillText(row.label, 28, y + barHeight / 2 + 4);
+    ctx.font = font.label;
+    ctx.textAlign = "left";
+    ctx.fillText(row.label, 12, y + barHeight / 2 + 3.5, labelWidth - 10);
+
     ctx.fillStyle = palette.soft;
-    ctx.fillRect(92, y, canvas.width - 130, barHeight);
+    ctx.fillRect(trackLeft, y, Math.max(trackRight - trackLeft, 1), barHeight);
     ctx.fillStyle = color;
-    ctx.fillRect(92, y, width, barHeight);
+    ctx.fillRect(trackLeft, y, Math.max((row.value / max) * (trackRight - trackLeft), row.value ? 3 : 0), barHeight);
+
     ctx.fillStyle = palette.ink;
-    ctx.font = "700 12px system-ui";
-    ctx.fillText(String(row.value), 104 + width, y + barHeight / 2 + 4);
+    ctx.font = font.value;
+    ctx.textAlign = "right";
+    ctx.fillText(String(row.value), width - 12, y + barHeight / 2 + 4);
   });
+  ctx.textAlign = "left";
 }
 
 function exportData() {
@@ -3761,10 +3846,18 @@ if ($("#moreNavTab") && $("#moreSheet")) {
     if (event.target === $("#moreSheet") || event.target.closest(".nav-tab")) $("#moreSheet").close();
   });
 }
+let resizeRedrawTimer = null;
 window.addEventListener("resize", () => {
   if (!isMobileViewport()) mobileAccordionsPrepared = false;
   prepareMobileAccordions();
   renderLeaders();
+  // Diagramme haengen an der Breite ihrer Zeichenflaeche und muessen nach
+  // Drehen des Geraets bzw. Groessenaenderung neu gezeichnet werden.
+  clearTimeout(resizeRedrawTimer);
+  resizeRedrawTimer = setTimeout(() => {
+    if ($("#profilesView")?.classList.contains("active")) drawProfile();
+    if ($("#teamAnalysisView")?.classList.contains("active")) renderTeamAnalysis();
+  }, 180);
 });
 $("#formationPicker").addEventListener("click", (event) => {
   const button = event.target.closest(".formation-option");

@@ -18,10 +18,5 @@ window.TEAMKOMPASS_CONFIG = {
   }
 };
 
-const responsiveStyles = document.createElement("link");
-responsiveStyles.rel = "stylesheet";
-responsiveStyles.href = "./responsive-enhancements.css?v=2";
-document.head.append(responsiveStyles);
-
-window.TEAMKOMPASS_VERSION = "responsive-v2";
+window.TEAMKOMPASS_VERSION = "mobile-v1";
 document.querySelector(".brand strong").textContent = "1. FC Königstein U14";

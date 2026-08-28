@@ -10,8 +10,10 @@
     <meta name="description" content="Sichere Mannschaftsplanung, Spieltagssteuerung und Spielerentwicklung." />
     <link rel="manifest" href="./manifest.webmanifest" />
     <title>TeamKompass | Team, Events und Spielerprofile</title>
-    <link rel="stylesheet" href="./styles.css" />
-    <link rel="stylesheet" href="./responsive-enhancements.css?v=2" />
+    <!-- Gemeinsame Design-Tokens, danach genau EIN Layout-Stylesheet je Geraeteklasse. -->
+    <link rel="stylesheet" href="./base.css" />
+    <link rel="stylesheet" href="./styles.css" media="(min-width: 721px)" />
+    <link rel="stylesheet" href="./mobile.css" media="(max-width: 720px)" />
   </head>
   <body>
     <div class="auth-gate" id="authGate" hidden>
@@ -162,7 +164,7 @@
               <button class="ghost-button" id="heroAnalysisBtn">Team analysieren</button>
             </div>
           </section>
-          <details class="mobile-accordion dashboard-section quick-access-section" open>
+          <details class="mobile-accordion dashboard-section quick-access-section" data-mobile-default-open="true" open>
             <summary>Schnellzugriff</summary>
             <section class="quick-actions-grid" aria-label="Schnellzugriff">
               <button class="quick-action" id="quickEventBtn" type="button">
@@ -187,7 +189,7 @@
               </button>
             </section>
           </details>
-          <details class="mobile-accordion dashboard-section" open>
+          <details class="mobile-accordion dashboard-section" data-mobile-default-open="true" open>
             <summary>Kennzahlen</summary>
             <div class="metrics-grid" id="metricsGrid"></div>
           </details>
