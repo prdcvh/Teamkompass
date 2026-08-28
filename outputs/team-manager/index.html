@@ -59,7 +59,6 @@
           <button class="nav-tab active" data-view="dashboard">Dashboard</button>
           <button class="nav-tab" data-view="squad">Kader</button>
           <button class="nav-tab" data-view="events">Events</button>
-          <button class="nav-tab" data-view="planning">Planung</button>
           <button class="nav-tab" data-view="profiles">Profile</button>
           <button class="nav-tab" data-view="opponents">Gegneranalyse</button>
           <button class="nav-tab" data-view="teamAnalysis">Team</button>
@@ -69,7 +68,6 @@
             <option value="dashboard">Dashboard</option>
             <option value="squad">Kader</option>
             <option value="events">Events</option>
-            <option value="planning">Planung</option>
             <option value="profiles">Profile</option>
             <option value="opponents">Gegneranalyse</option>
             <option value="teamAnalysis">Team</option>
@@ -95,9 +93,9 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="16" rx="2.2"/><path d="M3.5 9.5h17M8 3v3M16 3v3"/><circle cx="8" cy="14" r="1"/><circle cx="12" cy="14" r="1"/><circle cx="16" cy="14" r="1"/></svg>
           <span>Events</span>
         </button>
-        <button class="nav-tab bottom-nav-tab" data-view="planning" type="button">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3.5" width="14" height="17" rx="2"/><path d="M9 3.5V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v.5"/><path d="M8.5 11h7M8.5 15h5"/></svg>
-          <span>Planung</span>
+        <button class="nav-tab bottom-nav-tab" data-view="profiles" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.2" r="3.7"/><path d="M4.5 20c1-4 4-6 7.5-6s6.5 2 7.5 6"/></svg>
+          <span>Profile</span>
         </button>
         <button class="bottom-nav-tab" id="moreNavTab" type="button" aria-haspopup="dialog" aria-controls="moreSheet">
           <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2.1"/><circle cx="12" cy="12" r="2.1"/><circle cx="19" cy="12" r="2.1"/></svg>
@@ -108,10 +106,6 @@
       <dialog id="moreSheet" class="more-sheet" aria-label="Weitere Bereiche">
         <p class="more-sheet-title">Weitere Bereiche</p>
         <div class="more-sheet-list">
-          <button class="nav-tab more-sheet-item" data-view="profiles" type="button">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.2" r="3.7"/><path d="M4.5 20c1-4 4-6 7.5-6s6.5 2 7.5 6"/></svg>
-            <span>Spielerprofile</span>
-          </button>
           <button class="nav-tab more-sheet-item" data-view="opponents" type="button">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="2.4"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/></svg>
             <span>Gegneranalyse</span>

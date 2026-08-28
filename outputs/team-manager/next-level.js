@@ -100,7 +100,7 @@
     const render = () => {
       const query = input.value.trim().toLowerCase();
       const state = appState();
-      const views = [["dashboard", "Dashboard"], ["planning", "Planung"], ["squad", "Kader"], ["events", "Events"], ["profiles", "Profile"], ["opponents", "Gegneranalyse"], ["teamAnalysis", "Teamanalyse"]];
+      const views = [["dashboard", "Dashboard"], ["squad", "Kader"], ["events", "Events"], ["profiles", "Profile"], ["opponents", "Gegneranalyse"], ["teamAnalysis", "Teamanalyse"]];
       const items = [
         ...views.map(([id, label]) => ({ type: "view", id, label, meta: "Bereich" })),
         ...state.players.map((player) => ({ type: "player", id: player.id, label: player.name, meta: `Spieler · Nr. ${player.number}` })),

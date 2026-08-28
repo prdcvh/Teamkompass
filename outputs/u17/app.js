@@ -151,6 +151,9 @@ const views = {
   dashboard: $("#dashboardView"),
   squad: $("#squadView"),
   events: $("#eventsView"),
+  // Der Planungsbereich ist derzeit ueber keine Navigation erreichbar (auf
+  // Wunsch aus den Menues genommen). Markup und Logik bleiben absichtlich
+  // bestehen, damit er sich ohne Neuaufbau wieder einhaengen laesst.
   planning: $("#planningView"),
   profiles: $("#profilesView"),
   opponents: $("#opponentsView"),
@@ -1551,7 +1554,7 @@ function setView(viewName) {
   Object.entries(views).forEach(([name, element]) => element.classList.toggle("active", name === viewName));
   document.querySelectorAll(".nav-tab").forEach((button) => button.classList.toggle("active", button.dataset.view === viewName));
   if ($("#moreNavTab")) {
-    $("#moreNavTab").classList.toggle("active", ["profiles", "opponents", "teamAnalysis"].includes(viewName));
+    $("#moreNavTab").classList.toggle("active", ["opponents", "teamAnalysis"].includes(viewName));
   }
   if ($("#mobileViewSelect")) $("#mobileViewSelect").value = viewName;
   $("#pageTitle").textContent = titles[viewName];
