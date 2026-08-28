@@ -2083,6 +2083,33 @@ dialog > .player-form {
   letter-spacing: -0.01em;
 }
 
+/* Datenschutz-Dialog: auf dem Handy stapeln sich Auswahl und Schaltflaeche,
+   der Verlauf bekommt eine eigene Scrollhoehe im Blatt. */
+.privacy-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.activity-log {
+  display: grid;
+  gap: 8px;
+  max-height: 44dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.activity-log article {
+  display: grid;
+  gap: 2px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.activity-log span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
 /* Aktionsleiste des Dialogs bleibt am unteren Rand erreichbar */
 dialog menu {
   position: sticky;
@@ -2094,6 +2121,12 @@ dialog menu {
   padding: 10px 0 calc(6px + var(--m-safe-b));
   background: var(--panel);
   border-top: 1px solid var(--line);
+}
+
+/* Das Raster ist auf "Abbrechen | Speichern" ausgelegt. Dialoge mit nur einer
+   Schaltflaeche sollen sie ueber die volle Breite zeigen statt schmal links. */
+dialog menu > :only-child {
+  grid-column: 1 / -1;
 }
 
 .position-picker {
