@@ -1,8 +1,32 @@
 // Ergaenzungen, die ohne eigene Ansicht auskommen: die globale Suche
-// (Lupe bzw. Strg/Cmd + K), eine Textzusammenfassung der Diagramme fuer
-// Screenreader und die Registrierung des Service Workers.
+// (Lupe bzw. Strg/Cmd + K), der Datenschutz-Dialog hinter "Aktionen", eine
+// Textzusammenfassung der Diagramme fuer Screenreader und die Registrierung
+// des Service Workers.
 (function initTeamKompassExtras() {
   "use strict";
+
+  // Geraetelokale Einstellungen. Die Aufbewahrungsdauer liest app.js beim
+  // Start aus demselben Schluessel, der Verlauf bleibt rein lokal.
+  const workspaceKey = "teamkompass-workspace-v1";
+  const defaultWorkspace = { retentionDays: 90, activity: [] };
+  let workspace = loadWorkspace();
+
+  function loadWorkspace() {
+    try {
+      const stored = JSON.parse(localStorage.getItem(workspaceKey) || "{}");
+      return {
+        retentionDays: Number(stored.retentionDays) || defaultWorkspace.retentionDays,
+        activity: Array.isArray(stored.activity) ? stored.activity : []
+      };
+    } catch { return structuredClone(defaultWorkspace); }
+  }
+
+  function saveWorkspace(action) {
+    if (action) workspace.activity.unshift({ id: crypto.randomUUID(), at: new Date().toISOString(), action });
+    workspace.activity = workspace.activity.slice(0, 100);
+    localStorage.setItem(workspaceKey, JSON.stringify(workspace));
+    renderPrivacy();
+  }
 
   function appState() {
     return window.TeamKompass?.getState?.() || { players: [], events: [], developmentPlans: {}, lineup: { assignments: {} } };
@@ -10,6 +34,52 @@
 
   function escape(value) {
     return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]));
+  }
+
+  // Jedes Element einzeln pruefen: der Dialog ist optional, ein fehlendes
+  // Feld darf die uebrigen nicht mit abraeumen.
+  function renderPrivacy() {
+    const retention = document.querySelector("#retentionDays");
+    if (retention) retention.value = String(workspace.retentionDays);
+    const log = document.querySelector("#activityLog");
+    if (!log) return;
+    log.innerHTML = workspace.activity.map((item) => `<article><strong>${escape(item.action)}</strong><span>${new Date(item.at).toLocaleString("de-DE")}</span></article>`).join("") || `<p class="muted">Noch keine lokalen Aktivitäten protokolliert.</p>`;
+  }
+
+  function installPrivacyDialog() {
+    const dialog = document.querySelector("#privacyDialog");
+    if (!dialog) return;
+    document.querySelector("#privacyBtn")?.addEventListener("click", () => {
+      renderPrivacy();
+      dialog.showModal();
+    });
+    document.querySelector("#closePrivacyDialogBtn")?.addEventListener("click", () => dialog.close());
+    document.querySelector("#cancelPrivacyDialogBtn")?.addEventListener("click", () => dialog.close());
+    dialog.addEventListener("click", (event) => { if (event.target === dialog) dialog.close(); });
+    document.querySelector("#retentionDays")?.addEventListener("change", (event) => {
+      workspace.retentionDays = Number(event.target.value);
+      saveWorkspace(`Lokale Aufbewahrung auf ${workspace.retentionDays} Tage gesetzt`);
+    });
+    document.querySelector("#clearLocalCacheBtn")?.addEventListener("click", () => {
+      if (!confirm("Lokalen Zwischenspeicher auf diesem Gerät löschen? Cloud-Daten bleiben erhalten.")) return;
+      ["teamkompass-data-v1", "teamkompass-data-v2"].forEach((key) => localStorage.removeItem(key));
+      workspace.activity.unshift({ id: crypto.randomUUID(), at: new Date().toISOString(), action: "Lokalen Zwischenspeicher gelöscht" });
+      localStorage.setItem(workspaceKey, JSON.stringify(workspace));
+      location.reload();
+    });
+  }
+
+  // Speist den Aktivitaetsverlauf im Datenschutz-Dialog.
+  function installActivityCapture() {
+    const actions = new Map([
+      ["playerForm", "Spielerprofil gespeichert"], ["eventForm", "Event gespeichert"],
+      ["developmentPlanForm", "Entwicklungsziel gespeichert"], ["absenceForm", "Abwesenheit gespeichert"],
+      ["measurementForm", "Messwert gespeichert"], ["opponentForm", "Gegnerprofil gespeichert"]
+    ]);
+    document.addEventListener("submit", (event) => {
+      const action = actions.get(event.target.id);
+      if (action) saveWorkspace(action);
+    }, true);
   }
 
   function installCommandPalette() {
@@ -66,6 +136,8 @@
     summary.textContent = `Textzusammenfassung der Diagramme: ${state.players.length} Spieler, ${state.events.length} Events. Detaillierte Werte stehen zusätzlich in den Profil-, Kader- und Eventlisten.`;
   }
 
+  installPrivacyDialog();
+  installActivityCapture();
   installCommandPalette();
   installAccessibleChartSummaries();
   if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("./service-worker.js").catch(console.error);

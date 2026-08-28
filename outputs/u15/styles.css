@@ -1856,6 +1856,35 @@ menu {
   justify-content: flex-end;
 }
 
+/* Datenschutz-Dialog: Aufbewahrungsdauer und Loeschen nebeneinander,
+   der Verlauf darunter scrollbar statt den Dialog zu strecken. */
+.privacy-grid {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.activity-log {
+  display: grid;
+  gap: 10px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.activity-log article {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.activity-log span {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .nav-tab,
   .primary-button,

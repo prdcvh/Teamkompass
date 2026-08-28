@@ -69,6 +69,31 @@ test("der ausgebaute Planungsbereich hinterlaesst keine Reste", async () => {
   }
 });
 
+test("die Datenschutz-Bedienelemente sind ueber das Aktionen-Menue erreichbar", async () => {
+  for (const team of teams) {
+    const html = await read(`outputs/${team}/index.html`);
+    // Der Einstieg muss im Aktionen-Menue der Kopfzeile liegen, nicht in einer Ansicht.
+    const actionMenu = html.slice(html.indexOf('<div class="action-menu-list">'), html.indexOf("</details>"));
+    assert.ok(actionMenu.includes('id="privacyBtn"'), `${team}: Einstieg fehlt im Aktionen-Menue`);
+    assert.match(html, /<dialog id="privacyDialog">/);
+    for (const control of ["retentionDays", "clearLocalCacheBtn", "activityLog"]) {
+      assert.ok(html.includes(`id="${control}"`), `${team}: Bedienelement ${control} fehlt`);
+    }
+  }
+
+  // Der Dialog ist optional: die Render-Funktion muss jedes Element einzeln pruefen.
+  const nextLevel = await read("outputs/team-manager/next-level.js");
+  assert.match(nextLevel, /const dialog = document\.querySelector\("#privacyDialog"\);\s*\n\s*if \(!dialog\) return;/);
+  assert.match(nextLevel, /if \(retention\) retention\.value/);
+  assert.match(nextLevel, /if \(!log\) return;/);
+
+  // Die Aufbewahrungsdauer wirkt beim App-Start und ist wieder einstellbar -
+  // beide Seiten muessen denselben Schluessel benutzen.
+  const app = await read("outputs/team-manager/app.js");
+  assert.match(app, /teamkompass-workspace-v1/);
+  assert.match(nextLevel, /workspaceKey = "teamkompass-workspace-v1"/);
+});
+
 test("Handy- und Desktop-Stylesheet sind sauber getrennt", async () => {
   const html = await read("outputs/team-manager/index.html");
   // base.css gilt immer, die beiden Layout-Stylesheets schliessen einander aus.
