@@ -145,6 +145,17 @@ const FORMATION_PRESETS = [
 let state = loadState();
 let mobileAccordionsPrepared = false;
 const $ = (selector) => document.querySelector(selector);
+
+// Haengt einen Listener nur an, wenn es das Element wirklich gibt.
+// Ohne diese Pruefung reisst eine einzige fehlende Schaltflaeche das Laden
+// der gesamten App ab - etwa wenn ein Browser nach einem Update noch eine
+// aeltere index.html aus seinem Zwischenspeicher ausliefert, das frische
+// app.js aber schon geladen hat.
+function on(selector, type, handler, options) {
+  const element = $(selector);
+  if (element) element.addEventListener(type, handler, options);
+  return element;
+}
 const standardPositions = ["TW", "IV", "LIB", "LV", "RV", "DM", "ZM", "OM", "LM", "RM", "LA", "RA", "HS", "ST"];
 
 const views = {
@@ -3919,10 +3930,10 @@ function safeRender(fn, label) {
 }
 
 document.querySelectorAll(".nav-tab").forEach((button) => button.addEventListener("click", () => setView(button.dataset.view)));
-$("#mobileViewSelect").addEventListener("change", (event) => setView(event.target.value));
+on("#mobileViewSelect", "change", (event) => setView(event.target.value));
 if ($("#moreNavTab") && $("#moreSheet")) {
-  $("#moreNavTab").addEventListener("click", () => $("#moreSheet").showModal());
-  $("#moreSheet").addEventListener("click", (event) => {
+  on("#moreNavTab", "click", () => $("#moreSheet").showModal());
+  on("#moreSheet", "click", (event) => {
     if (event.target === $("#moreSheet") || event.target.closest(".nav-tab")) $("#moreSheet").close();
   });
 }
@@ -3941,13 +3952,13 @@ window.addEventListener("resize", () => {
     if ($("#teamAnalysisView")?.classList.contains("active")) renderTeamAnalysis();
   }, 180);
 });
-$("#formationPicker").addEventListener("click", (event) => {
+on("#formationPicker", "click", (event) => {
   const button = event.target.closest(".formation-option");
   if (!button) return;
   applyFormationPreset(Number(button.dataset.formationIndex));
 });
 
-$("#pitch").addEventListener("click", (event) => {
+on("#pitch", "click", (event) => {
   const zoneEl = event.target.closest(".pitch-zone");
   if (!zoneEl) return;
   const chip = event.target.closest(".pitch-player");
@@ -4075,14 +4086,14 @@ document.addEventListener("pointercancel", (event) => {
   endPitchDrag(event, true);
 });
 
-$("#substituteSearch").addEventListener("input", renderSubstituteList);
-$("#closeSubstituteDialogBtn").addEventListener("click", () => $("#substituteDialog").close());
-$("#cancelSubstituteDialogBtn").addEventListener("click", () => $("#substituteDialog").close());
-$("#removeFromPitchBtn").addEventListener("click", () => {
+on("#substituteSearch", "input", renderSubstituteList);
+on("#closeSubstituteDialogBtn", "click", () => $("#substituteDialog").close());
+on("#cancelSubstituteDialogBtn", "click", () => $("#substituteDialog").close());
+on("#removeFromPitchBtn", "click", () => {
   if (pitchSubstituteTarget?.playerId) removePlayerFromPitch(pitchSubstituteTarget.playerId);
   $("#substituteDialog").close();
 });
-$("#substituteList").addEventListener("click", (event) => {
+on("#substituteList", "click", (event) => {
   const button = event.target.closest(".substitute-option");
   if (!button || !pitchSubstituteTarget) return;
   const pickedId = button.dataset.playerId;
@@ -4094,92 +4105,92 @@ $("#substituteList").addEventListener("click", (event) => {
   $("#substituteDialog").close();
 });
 
-$("#searchInput").addEventListener("input", renderSquad);
-$("#positionFilter").addEventListener("change", renderSquad);
-$("#squadSort").addEventListener("change", renderSquad);
-$("#addPlayerTop").addEventListener("click", () => openPlayerDialog());
-$("#closeDialogBtn").addEventListener("click", () => $("#playerDialog").close());
-$("#cancelDialogBtn").addEventListener("click", () => $("#playerDialog").close());
-$("#playerForm").addEventListener("submit", savePlayer);
-$("#playerStatus").addEventListener("change", syncPlayerInjuryField);
-$("#positionOptions").addEventListener("change", () => $("#playerCustomPositions").setCustomValidity(""));
-$("#playerCustomPositions").addEventListener("input", () => $("#playerCustomPositions").setCustomValidity(""));
-$("#playerNumber").addEventListener("input", () => $("#playerNumber").setCustomValidity(""));
-$("#exportBtn").addEventListener("click", exportData);
-$("#themeToggle").addEventListener("click", toggleTheme);
-$("#newEventBtn").addEventListener("click", openEventDialog);
-$("#heroEventBtn").addEventListener("click", () => {
+on("#searchInput", "input", renderSquad);
+on("#positionFilter", "change", renderSquad);
+on("#squadSort", "change", renderSquad);
+on("#addPlayerTop", "click", () => openPlayerDialog());
+on("#closeDialogBtn", "click", () => $("#playerDialog").close());
+on("#cancelDialogBtn", "click", () => $("#playerDialog").close());
+on("#playerForm", "submit", savePlayer);
+on("#playerStatus", "change", syncPlayerInjuryField);
+on("#positionOptions", "change", () => $("#playerCustomPositions").setCustomValidity(""));
+on("#playerCustomPositions", "input", () => $("#playerCustomPositions").setCustomValidity(""));
+on("#playerNumber", "input", () => $("#playerNumber").setCustomValidity(""));
+on("#exportBtn", "click", exportData);
+on("#themeToggle", "click", toggleTheme);
+on("#newEventBtn", "click", openEventDialog);
+on("#heroEventBtn", "click", () => {
   setView("events");
   openEventDialog();
 });
-$("#heroAnalysisBtn").addEventListener("click", () => setView("teamAnalysis"));
-$("#quickEventBtn").addEventListener("click", () => {
+on("#heroAnalysisBtn", "click", () => setView("teamAnalysis"));
+on("#quickEventBtn", "click", () => {
   setView("events");
   openEventDialog();
 });
-$("#quickPlayerBtn").addEventListener("click", () => openPlayerDialog());
-$("#quickProfileBtn").addEventListener("click", () => setView("profiles"));
-$("#quickOpponentBtn").addEventListener("click", () => setView("opponents"));
-$("#eventForm").addEventListener("submit", saveEvent);
-$("#eventType").addEventListener("change", syncEventGameFields);
-$("#closeEventDialogBtn").addEventListener("click", () => $("#eventDialog").close());
-$("#cancelEventDialogBtn").addEventListener("click", () => $("#eventDialog").close());
-$("#eventSelect").addEventListener("change", (event) => {
+on("#quickPlayerBtn", "click", () => openPlayerDialog());
+on("#quickProfileBtn", "click", () => setView("profiles"));
+on("#quickOpponentBtn", "click", () => setView("opponents"));
+on("#eventForm", "submit", saveEvent);
+on("#eventType", "change", syncEventGameFields);
+on("#closeEventDialogBtn", "click", () => $("#eventDialog").close());
+on("#cancelEventDialogBtn", "click", () => $("#eventDialog").close());
+on("#eventSelect", "change", (event) => {
   state.selectedEventId = event.target.value;
   persist();
   renderEvents();
 });
-$("#ratingFilter").addEventListener("change", renderRatingTable);
-$("#deleteEventBtn").addEventListener("click", deleteSelectedEvent);
-$("#selectedEventIntensity").addEventListener("change", (event) => updateSelectedEventMeta("intensity", event.target.value));
-$("#selectedGoalsFor").addEventListener("change", (event) => updateSelectedEventMeta("goalsFor", event.target.value));
-$("#selectedGoalsAgainst").addEventListener("change", (event) => updateSelectedEventMeta("goalsAgainst", event.target.value));
-$("#selectedMatchDuration").addEventListener("change", (event) => updateSelectedEventMeta("matchDuration", event.target.value));
-$("#selectedTrainingFocus").addEventListener("change", (event) => updateSelectedEventMeta("trainingFocus", event.target.value));
-$("#profilePlayer").addEventListener("change", () => {
+on("#ratingFilter", "change", renderRatingTable);
+on("#deleteEventBtn", "click", deleteSelectedEvent);
+on("#selectedEventIntensity", "change", (event) => updateSelectedEventMeta("intensity", event.target.value));
+on("#selectedGoalsFor", "change", (event) => updateSelectedEventMeta("goalsFor", event.target.value));
+on("#selectedGoalsAgainst", "change", (event) => updateSelectedEventMeta("goalsAgainst", event.target.value));
+on("#selectedMatchDuration", "change", (event) => updateSelectedEventMeta("matchDuration", event.target.value));
+on("#selectedTrainingFocus", "change", (event) => updateSelectedEventMeta("trainingFocus", event.target.value));
+on("#profilePlayer", "change", () => {
   resetDevelopmentPlanForm();
   resetAbsenceForm();
   resetMeasurementForm();
   drawProfile();
 });
-$("#profilePdfBtn").addEventListener("click", downloadProfilePdf);
-$("#developmentPlanForm").addEventListener("submit", saveDevelopmentPlan);
-$("#cancelDevelopmentPlanBtn").addEventListener("click", resetDevelopmentPlanForm);
-$("#absenceForm").addEventListener("submit", saveAbsence);
-$("#cancelAbsenceBtn").addEventListener("click", resetAbsenceForm);
-$("#absenceReason").addEventListener("change", syncAbsenceReasonField);
-$("#measurementForm").addEventListener("submit", saveMeasurement);
-$("#cancelMeasurementBtn").addEventListener("click", resetMeasurementForm);
-$("#opponentForm").addEventListener("submit", saveOpponent);
-$("#cancelOpponentBtn").addEventListener("click", resetOpponentForm);
-$("#opponentSearch").addEventListener("input", (event) => {
+on("#profilePdfBtn", "click", downloadProfilePdf);
+on("#developmentPlanForm", "submit", saveDevelopmentPlan);
+on("#cancelDevelopmentPlanBtn", "click", resetDevelopmentPlanForm);
+on("#absenceForm", "submit", saveAbsence);
+on("#cancelAbsenceBtn", "click", resetAbsenceForm);
+on("#absenceReason", "change", syncAbsenceReasonField);
+on("#measurementForm", "submit", saveMeasurement);
+on("#cancelMeasurementBtn", "click", resetMeasurementForm);
+on("#opponentForm", "submit", saveOpponent);
+on("#cancelOpponentBtn", "click", resetOpponentForm);
+on("#opponentSearch", "input", (event) => {
   opponentFilter = event.target.value;
   renderOpponentAnalysis();
 });
 
-$("#developmentPlanList").addEventListener("click", (event) => {
+on("#developmentPlanList", "click", (event) => {
   const button = event.target.closest("button");
   if (!button) return;
   if (button.dataset.action === "edit-plan") editDevelopmentPlan(button.dataset.id);
   if (button.dataset.action === "delete-plan") deleteDevelopmentPlan(button.dataset.id);
 });
-$("#developmentPlanList").addEventListener("submit", saveSelfReflection);
+on("#developmentPlanList", "submit", saveSelfReflection);
 
-$("#absenceList").addEventListener("click", (event) => {
+on("#absenceList", "click", (event) => {
   const button = event.target.closest("button");
   if (!button) return;
   if (button.dataset.action === "edit-absence") editAbsence(button.dataset.id);
   if (button.dataset.action === "delete-absence") deleteAbsence(button.dataset.id);
 });
 
-$("#opponentList").addEventListener("click", (event) => {
+on("#opponentList", "click", (event) => {
   const button = event.target.closest("button");
   if (!button) return;
   if (button.dataset.action === "edit-opponent") editOpponent(button.dataset.id);
   if (button.dataset.action === "delete-opponent") deleteOpponent(button.dataset.id);
 });
 
-$("#measurementList").addEventListener("click", (event) => {
+on("#measurementList", "click", (event) => {
   const button = event.target.closest("button");
   if (!button) return;
   if (button.dataset.action === "edit-measurement") editMeasurement(button.dataset.id);
@@ -4210,9 +4221,9 @@ function handleSquadActionClick(event) {
     renderAll();
   }
 }
-$("#playerTable").addEventListener("click", handleSquadActionClick);
-$("#playerCardsMobile").addEventListener("click", handleSquadActionClick);
-$("#addPlayerFabMobile").addEventListener("click", () => openPlayerDialog());
+on("#playerTable", "click", handleSquadActionClick);
+on("#playerCardsMobile", "click", handleSquadActionClick);
+on("#addPlayerFabMobile", "click", () => openPlayerDialog());
 
 function handleEventListClick(event) {
   const card = event.target.closest("[data-event-id]");
@@ -4223,10 +4234,10 @@ function handleEventListClick(event) {
   setEventStep("rate");
 }
 
-$("#eventList").addEventListener("click", handleEventListClick);
-$("#pastEventsList").addEventListener("click", handleEventListClick);
-$("#eventsBackBtn").addEventListener("click", () => setEventStep("list"));
-$("#formationPicker").addEventListener("change", (event) => {
+on("#eventList", "click", handleEventListClick);
+on("#pastEventsList", "click", handleEventListClick);
+on("#eventsBackBtn", "click", () => setEventStep("list"));
+on("#formationPicker", "change", (event) => {
   const select = event.target.closest("#formationSelect");
   if (!select || select.value === "") return;
   applyFormationPreset(Number(select.value));
@@ -4238,75 +4249,75 @@ document.addEventListener("click", (event) => {
   });
 });
 
-$("#ratingTable").addEventListener("change", (event) => {
+on("#ratingTable", "change", (event) => {
   const input = event.target.closest(".rating-input");
   if (!input) return;
   updateRating(input.dataset.playerId, input.dataset.field, input.value);
 });
 
-$("#ratingTable").addEventListener("input", (event) => {
+on("#ratingTable", "input", (event) => {
   const input = event.target.closest(".rating-note");
   if (!input) return;
   updateRating(input.dataset.playerId, input.dataset.field, input.value, false);
 });
 
-$("#ratingTable").addEventListener("click", (event) => {
+on("#ratingTable", "click", (event) => {
   const chip = event.target.closest(".chip-button");
   if (!chip) return;
   updateRating(chip.dataset.playerId, chip.dataset.field, chip.dataset.value);
 });
 
-$("#ratingStepper").addEventListener("click", (event) => {
+on("#ratingStepper", "click", (event) => {
   const chip = event.target.closest(".chip-button");
   if (chip) {
     updateRating(chip.dataset.playerId, chip.dataset.field, chip.dataset.value);
   }
 });
 
-$("#ratingStepper").addEventListener("change", (event) => {
+on("#ratingStepper", "change", (event) => {
   const input = event.target.closest(".rating-input");
   if (!input) return;
   updateRating(input.dataset.playerId, input.dataset.field, input.value);
 });
 
-$("#ratingStepper").addEventListener("input", (event) => {
+on("#ratingStepper", "input", (event) => {
   const input = event.target.closest(".rating-note");
   if (!input) return;
   updateRating(input.dataset.playerId, input.dataset.field, input.value, false);
 });
 
-$("#eventSearch").addEventListener("input", (event) => {
+on("#eventSearch", "input", (event) => {
   eventFilter.query = event.target.value;
   renderEvents();
 });
 
-$("#eventTypeFilter").addEventListener("change", (event) => {
+on("#eventTypeFilter", "change", (event) => {
   eventFilter.type = event.target.value;
   renderEvents();
 });
 
-$("#stepperPrevBtn").addEventListener("click", () => {
+on("#stepperPrevBtn", "click", () => {
   ratingStepperIndex = Math.max(0, ratingStepperIndex - 1);
   renderRatingTable();
 });
 
-$("#stepperNextBtn").addEventListener("click", () => {
+on("#stepperNextBtn", "click", () => {
   ratingStepperIndex += 1;
   renderRatingTable();
 });
 
-$("#stepperJump").addEventListener("change", (event) => {
+on("#stepperJump", "change", (event) => {
   ratingStepperIndex = Number(event.target.value);
   renderRatingTable();
 });
 
-$("#trainerLoginForm").addEventListener("submit", handleTrainerLogin);
-$("#playerLoginForm").addEventListener("submit", handlePlayerLogin);
-$("#signOutBtn").addEventListener("click", handleSignOut);
-$("#migrateDataBtn").addEventListener("click", migrateLegacyBlobToCollections);
-$("#addTrainerBtn").addEventListener("click", createTrainerAccount);
-$("#addMedicalBtn").addEventListener("click", createMedicalAccount);
-$("#accessManagerList").addEventListener("click", (event) => {
+on("#trainerLoginForm", "submit", handleTrainerLogin);
+on("#playerLoginForm", "submit", handlePlayerLogin);
+on("#signOutBtn", "click", handleSignOut);
+on("#migrateDataBtn", "click", migrateLegacyBlobToCollections);
+on("#addTrainerBtn", "click", createTrainerAccount);
+on("#addMedicalBtn", "click", createMedicalAccount);
+on("#accessManagerList", "click", (event) => {
   const button = event.target.closest("button[data-action='revoke-access']");
   if (!button) return;
   revokeAccess(button.dataset.uid);
