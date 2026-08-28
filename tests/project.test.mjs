@@ -8,7 +8,7 @@ const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 const hash = (value) => createHash("sha256").update(value).digest("hex");
 
 test("alle Team-Instanzen verwenden dieselbe App-Basis", async () => {
-  for (const file of ["app.js", "index.html", "styles.css", "next-level.js"]) {
+  for (const file of ["app.js", "index.html", "styles.css", "base.css", "mobile.css", "next-level.js"]) {
     const hashes = await Promise.all(teams.map(async (team) => hash(await read(`outputs/${team}/${file}`))));
     assert.equal(new Set(hashes).size, 1, `${file} ist zwischen den Teams divergiert`);
   }
@@ -45,9 +45,63 @@ test("Hosting setzt grundlegende Browser-Sicherheitsheader", async () => {
   }
 });
 
-test("PWA-Dateien und Planungsansicht sind eingebunden", async () => {
+test("PWA-Dateien und alle Ansichten sind eingebunden", async () => {
   const html = await read("outputs/team-manager/index.html");
   assert.match(html, /manifest\.webmanifest/);
-  assert.match(html, /id="planningView"/);
   assert.match(html, /next-level\.js/);
+  for (const view of ["dashboardView", "squadView", "eventsView", "profilesView", "opponentsView", "teamAnalysisView"]) {
+    assert.match(html, new RegExp(`id="${view}"`), `${view} fehlt`);
+  }
+});
+
+test("der ausgebaute Planungsbereich hinterlaesst keine Reste", async () => {
+  for (const team of teams) {
+    for (const file of ["index.html", "app.js", "next-level.js"]) {
+      const content = await read(`outputs/${team}/${file}`);
+      assert.ok(!content.includes("planningView"), `${team}/${file}: planningView noch vorhanden`);
+      assert.ok(!/data-view="planning"/.test(content), `${team}/${file}: Navigationseintrag noch vorhanden`);
+      assert.ok(!content.includes("renderOperations"), `${team}/${file}: Planungs-Rendering noch vorhanden`);
+    }
+    // Der Zugriff auf die frueher dort gepflegte Aufbewahrungsdauer bleibt
+    // bewusst bestehen, damit gespeicherte Werte weiter respektiert werden.
+    const app = await read(`outputs/${team}/app.js`);
+    assert.match(app, /teamkompass-workspace-v1/);
+  }
+});
+
+test("Handy- und Desktop-Stylesheet sind sauber getrennt", async () => {
+  const html = await read("outputs/team-manager/index.html");
+  // base.css gilt immer, die beiden Layout-Stylesheets schliessen einander aus.
+  assert.match(html, /<link rel="stylesheet" href="\.\/base\.css" \/>/);
+  assert.match(html, /href="\.\/styles\.css" media="\(min-width: 721px\)"/);
+  assert.match(html, /href="\.\/mobile\.css" media="\(max-width: 720px\)"/);
+  assert.doesNotMatch(html, /responsive-enhancements\.css/);
+
+  // Im Desktop-Stylesheet duerfen keine Handy-Breakpoints mehr stehen -
+  // die waeren dort wirkungslos und wuerden nur Verwirrung stiften.
+  const desktop = await read("outputs/team-manager/styles.css");
+  assert.doesNotMatch(desktop, /@media \(max-width: (720|480)px\)/);
+
+  // Rollenrechte sind Verhalten, kein Layout: sie muessen in base.css stehen,
+  // sonst greifen sie je nach Bildschirmbreite nicht.
+  const base = await read("outputs/team-manager/base.css");
+  for (const rule of ["body.role-player", "body.role-parent", "body.role-medical", "body.role-trainer-cloud", "body.auth-locked"]) {
+    assert.ok(base.includes(rule), `${rule} fehlt in base.css`);
+    assert.ok(!desktop.includes(rule), `${rule} steht noch in styles.css`);
+  }
+});
+
+test("Service Worker und Hosting kennen die neuen Stylesheets", async () => {
+  const worker = await read("outputs/team-manager/service-worker.js");
+  assert.match(worker, /\.\/base\.css/);
+  assert.match(worker, /\.\/mobile\.css/);
+  assert.doesNotMatch(worker, /responsive-enhancements/);
+
+  const hosting = JSON.parse(await read("firebase.json"));
+  for (const site of hosting.hosting) {
+    const sources = site.headers.map((entry) => entry.source);
+    assert.ok(sources.includes("/base.css"), `${site.target}: /base.css ohne no-cache-Header`);
+    assert.ok(sources.includes("/mobile.css"), `${site.target}: /mobile.css ohne no-cache-Header`);
+    assert.ok(!sources.includes("/responsive-enhancements.css"), `${site.target}: alter Stylesheet-Header noch vorhanden`);
+  }
 });

@@ -10,8 +10,10 @@
     <meta name="description" content="Sichere Mannschaftsplanung, Spieltagssteuerung und Spielerentwicklung." />
     <link rel="manifest" href="./manifest.webmanifest" />
     <title>TeamKompass | Team, Events und Spielerprofile</title>
-    <link rel="stylesheet" href="./styles.css" />
-    <link rel="stylesheet" href="./responsive-enhancements.css?v=2" />
+    <!-- Gemeinsame Design-Tokens, danach genau EIN Layout-Stylesheet je Geraeteklasse. -->
+    <link rel="stylesheet" href="./base.css" />
+    <link rel="stylesheet" href="./styles.css" media="(min-width: 721px)" />
+    <link rel="stylesheet" href="./mobile.css" media="(max-width: 720px)" />
   </head>
   <body>
     <div class="auth-gate" id="authGate" hidden>
@@ -57,7 +59,6 @@
           <button class="nav-tab active" data-view="dashboard">Dashboard</button>
           <button class="nav-tab" data-view="squad">Kader</button>
           <button class="nav-tab" data-view="events">Events</button>
-          <button class="nav-tab" data-view="planning">Planung</button>
           <button class="nav-tab" data-view="profiles">Profile</button>
           <button class="nav-tab" data-view="opponents">Gegneranalyse</button>
           <button class="nav-tab" data-view="teamAnalysis">Team</button>
@@ -67,7 +68,6 @@
             <option value="dashboard">Dashboard</option>
             <option value="squad">Kader</option>
             <option value="events">Events</option>
-            <option value="planning">Planung</option>
             <option value="profiles">Profile</option>
             <option value="opponents">Gegneranalyse</option>
             <option value="teamAnalysis">Team</option>
@@ -93,9 +93,9 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="16" rx="2.2"/><path d="M3.5 9.5h17M8 3v3M16 3v3"/><circle cx="8" cy="14" r="1"/><circle cx="12" cy="14" r="1"/><circle cx="16" cy="14" r="1"/></svg>
           <span>Events</span>
         </button>
-        <button class="nav-tab bottom-nav-tab" data-view="planning" type="button">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3.5" width="14" height="17" rx="2"/><path d="M9 3.5V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v.5"/><path d="M8.5 11h7M8.5 15h5"/></svg>
-          <span>Planung</span>
+        <button class="nav-tab bottom-nav-tab" data-view="profiles" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.2" r="3.7"/><path d="M4.5 20c1-4 4-6 7.5-6s6.5 2 7.5 6"/></svg>
+          <span>Profile</span>
         </button>
         <button class="bottom-nav-tab" id="moreNavTab" type="button" aria-haspopup="dialog" aria-controls="moreSheet">
           <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2.1"/><circle cx="12" cy="12" r="2.1"/><circle cx="19" cy="12" r="2.1"/></svg>
@@ -106,10 +106,6 @@
       <dialog id="moreSheet" class="more-sheet" aria-label="Weitere Bereiche">
         <p class="more-sheet-title">Weitere Bereiche</p>
         <div class="more-sheet-list">
-          <button class="nav-tab more-sheet-item" data-view="profiles" type="button">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.2" r="3.7"/><path d="M4.5 20c1-4 4-6 7.5-6s6.5 2 7.5 6"/></svg>
-            <span>Spielerprofile</span>
-          </button>
           <button class="nav-tab more-sheet-item" data-view="opponents" type="button">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="2.4"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/></svg>
             <span>Gegneranalyse</span>
@@ -162,7 +158,7 @@
               <button class="ghost-button" id="heroAnalysisBtn">Team analysieren</button>
             </div>
           </section>
-          <details class="mobile-accordion dashboard-section quick-access-section" open>
+          <details class="mobile-accordion dashboard-section quick-access-section" data-mobile-default-open="true" open>
             <summary>Schnellzugriff</summary>
             <section class="quick-actions-grid" aria-label="Schnellzugriff">
               <button class="quick-action" id="quickEventBtn" type="button">
@@ -187,7 +183,7 @@
               </button>
             </section>
           </details>
-          <details class="mobile-accordion dashboard-section" open>
+          <details class="mobile-accordion dashboard-section" data-mobile-default-open="true" open>
             <summary>Kennzahlen</summary>
             <div class="metrics-grid" id="metricsGrid"></div>
           </details>
@@ -203,10 +199,13 @@
               </div>
               <div class="formation-picker" id="formationPicker"></div>
               <div class="pitch" id="pitch"></div>
-              <div class="panel-head">
-                <span class="muted">Bank - per Drag &amp; Drop oder Klick auf eine Position im Feld einwechseln</span>
-              </div>
-              <div class="pitch-bench" id="pitchBench"></div>
+              <details class="control-disclosure bench-disclosure" id="benchDisclosure" open>
+                <summary>Bank <span class="bench-count" id="benchCount"></span></summary>
+                <div class="disclosure-body">
+                  <span class="muted">Per Drag &amp; Drop oder Klick auf eine Position im Feld einwechseln</span>
+                  <div class="pitch-bench" id="pitchBench"></div>
+                </div>
+              </details>
             </section>
             <section class="panel">
               <div class="panel-head">
@@ -271,7 +270,7 @@
 
         <section class="view" id="eventsView">
           <div class="split-layout events-layout">
-            <section class="panel">
+            <section class="panel events-list-panel">
               <div class="panel-head">
                 <h2>Events</h2>
                 <button class="primary-button" id="newEventBtn">Event anlegen</button>
@@ -293,6 +292,10 @@
               </details>
             </section>
             <section class="panel event-editor">
+              <button class="events-back-btn" id="eventsBackBtn" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg>
+                <span>Alle Events</span>
+              </button>
               <div class="panel-head">
                 <div>
                   <h2 id="eventEditorTitle">Event bewerten</h2>
@@ -345,6 +348,7 @@
                 </table>
               </div>
               <div class="rating-stepper" id="ratingStepper" hidden>
+                <p class="rating-progress" id="ratingProgress" aria-live="polite"></p>
                 <div class="rating-stepper-nav">
                   <button type="button" class="icon-button" id="stepperPrevBtn" aria-label="Vorheriger Spieler">‹</button>
                   <div class="rating-stepper-position">
@@ -355,48 +359,6 @@
                 </div>
                 <div class="rating-stepper-card" id="stepperCard"></div>
               </div>
-            </section>
-          </div>
-        </section>
-
-        <section class="view" id="planningView">
-          <div class="operations-grid">
-            <section class="panel operations-hero">
-              <div class="panel-head">
-                <div><span class="eyebrow">Diese Woche</span><h2>Coach Cockpit</h2></div>
-                <button class="primary-button" id="planningNewEventBtn" type="button">Event planen</button>
-              </div>
-              <div class="operations-summary" id="operationsSummary"></div>
-            </section>
-            <section class="panel">
-              <div class="panel-head"><h2>Handlungsbedarf</h2><span class="muted">nach Priorität</span></div>
-              <div class="action-feed" id="actionFeed"></div>
-            </section>
-            <section class="panel operations-week">
-              <div class="panel-head"><h2>7-Tage-Plan</h2><span class="muted">Training, Spiel und Regeneration</span></div>
-              <div class="week-timeline" id="weekTimeline"></div>
-            </section>
-            <section class="panel">
-              <div class="panel-head"><h2>Wochenfokus</h2><span class="muted">gemeinsame Leitlinie</span></div>
-              <form class="development-form" id="weeklyFocusForm">
-                <label>Fokus <input id="weeklyFocus" maxlength="80" placeholder="z.B. nach Ballverlust sofort Zentrum schließen" /></label>
-                <label>Erfolgskriterium <textarea id="weeklySuccess" rows="3" maxlength="240" placeholder="Woran erkennen wir Fortschritt?"></textarea></label>
-                <button class="primary-button" type="submit">Wochenfokus speichern</button>
-              </form>
-            </section>
-            <section class="panel">
-              <div class="panel-head"><h2>Matchday-Cockpit</h2><span class="muted" id="matchdayStatus">nächstes Spiel</span></div>
-              <div id="matchdayCockpit"></div>
-            </section>
-            <section class="panel privacy-panel">
-              <div class="panel-head"><h2>Datenschutz &amp; Nachvollziehbarkeit</h2><span class="muted">Privacy by Design</span></div>
-              <div class="privacy-grid">
-                <label>Lokale Aufbewahrung
-                  <select id="retentionDays"><option value="30">30 Tage</option><option value="90">90 Tage</option><option value="180">180 Tage</option><option value="365">1 Jahr</option></select>
-                </label>
-                <button class="ghost-button" id="clearLocalCacheBtn" type="button">Lokalen Zwischenspeicher löschen</button>
-              </div>
-              <details class="control-disclosure"><summary>Aktivitätsverlauf</summary><div class="activity-log" id="activityLog"></div></details>
             </section>
           </div>
         </section>

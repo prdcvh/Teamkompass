@@ -145,13 +145,23 @@ const FORMATION_PRESETS = [
 let state = loadState();
 let mobileAccordionsPrepared = false;
 const $ = (selector) => document.querySelector(selector);
+
+// Haengt einen Listener nur an, wenn es das Element wirklich gibt.
+// Ohne diese Pruefung reisst eine einzige fehlende Schaltflaeche das Laden
+// der gesamten App ab - etwa wenn ein Browser nach einem Update noch eine
+// aeltere index.html aus seinem Zwischenspeicher ausliefert, das frische
+// app.js aber schon geladen hat.
+function on(selector, type, handler, options) {
+  const element = $(selector);
+  if (element) element.addEventListener(type, handler, options);
+  return element;
+}
 const standardPositions = ["TW", "IV", "LIB", "LV", "RV", "DM", "ZM", "OM", "LM", "RM", "LA", "RA", "HS", "ST"];
 
 const views = {
   dashboard: $("#dashboardView"),
   squad: $("#squadView"),
   events: $("#eventsView"),
-  planning: $("#planningView"),
   profiles: $("#profilesView"),
   opponents: $("#opponentsView"),
   teamAnalysis: $("#teamAnalysisView")
@@ -173,7 +183,6 @@ const titles = {
   dashboard: "Dashboard",
   squad: "Kader",
   events: "Events und Bewertungen",
-  planning: "Planung",
   profiles: "Spielerprofile",
   opponents: "Gegneranalyse",
   teamAnalysis: "Teamanalyse"
@@ -213,6 +222,125 @@ function cssVar(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
+// ---- Diagramme ----
+// Die Zeichenflaechen richten sich nach ihrer tatsaechlichen Breite im Layout
+// statt nach einer festen 980px-Bitmap. Ohne das wuerde die Bitmap auf dem
+// Handy auf gut ein Drittel gestaucht und alle Beschriftungen waeren nur noch
+// wenige Pixel gross.
+function setupChartCanvas(canvas, heightFor) {
+  const fallbackWidth = ($(".main")?.clientWidth || window.innerWidth || 720) - 56;
+  const width = Math.max(Math.round(canvas.clientWidth || fallbackWidth), 240);
+  const height = Math.max(Math.round(typeof heightFor === "function" ? heightFor(width) : heightFor), 150);
+  const ratio = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = Math.round(width * ratio);
+  canvas.height = Math.round(height * ratio);
+  canvas.style.height = `${height}px`;
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  const palette = chartPalette();
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = palette.surface;
+  ctx.fillRect(0, 0, width, height);
+  ctx.textBaseline = "alphabetic";
+  ctx.textAlign = "left";
+  return { ctx, width, height, palette, compact: width < 520 };
+}
+
+function chartFonts(compact) {
+  return compact
+    ? { title: "700 13px system-ui", label: "10px system-ui", value: "700 11px system-ui", legend: "11px system-ui", empty: "12px system-ui" }
+    : { title: "700 18px system-ui", label: "12px system-ui", value: "700 13px system-ui", legend: "13px system-ui", empty: "14px system-ui" };
+}
+
+// Schreibt einen Hinweis mittig in die leere Zeichenflaeche und bricht ihn um.
+function drawChartPlaceholder(chart, text) {
+  const { ctx, width, height, palette, compact } = chart;
+  ctx.fillStyle = palette.muted;
+  ctx.font = chartFonts(compact).empty;
+  ctx.textAlign = "center";
+  const maxWidth = width - 24;
+  const lines = [];
+  let line = "";
+  text.split(" ").forEach((word) => {
+    const candidate = line ? `${line} ${word}` : word;
+    if (ctx.measureText(candidate).width > maxWidth && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = candidate;
+    }
+  });
+  if (line) lines.push(line);
+  const startY = height / 2 - ((lines.length - 1) * 16) / 2 + 4;
+  lines.forEach((entry, index) => ctx.fillText(entry, width / 2, startY + index * 16));
+  ctx.textAlign = "left";
+}
+
+// Gemeinsamer Notenverlauf fuer Spieler- und Teamform (Schulnoten 1 bis 6).
+function drawGradeTrendChart(canvas, title, entries, emptyText) {
+  if (!canvas) return;
+  const chart = setupChartCanvas(canvas, (width) => (width < 520 ? Math.round(width * 0.78) : Math.round(width / 2.7)));
+  const { ctx, width, height, palette, compact } = chart;
+  const font = chartFonts(compact);
+
+  ctx.fillStyle = palette.ink;
+  ctx.font = font.title;
+  ctx.fillText(title, 12, compact ? 18 : 24);
+
+  if (!entries.length) {
+    drawChartPlaceholder(chart, emptyText);
+    return;
+  }
+
+  const left = compact ? 22 : 34;
+  const right = width - (compact ? 10 : 20);
+  const top = compact ? 32 : 46;
+  const bottom = height - (compact ? 24 : 30);
+
+  ctx.font = font.label;
+  for (let grade = 1; grade <= 6; grade += 1) {
+    const y = top + ((grade - 1) * (bottom - top)) / 5;
+    ctx.strokeStyle = palette.line;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(left, y);
+    ctx.lineTo(right, y);
+    ctx.stroke();
+    ctx.fillStyle = palette.muted;
+    ctx.textAlign = "right";
+    ctx.fillText(String(grade), left - 6, y + 3.5);
+  }
+  ctx.textAlign = "left";
+
+  const span = Math.max(entries.length - 1, 1);
+  const points = entries.map((entry, index) => ({
+    x: entries.length === 1 ? (left + right) / 2 : left + (index * (right - left)) / span,
+    y: top + ((Number(entry.grade) - 1) * (bottom - top)) / 5,
+    entry
+  }));
+
+  ctx.strokeStyle = palette.red;
+  ctx.lineWidth = compact ? 2.5 : 4;
+  ctx.beginPath();
+  points.forEach((point, index) => (index ? ctx.lineTo(point.x, point.y) : ctx.moveTo(point.x, point.y)));
+  ctx.stroke();
+
+  // Nur so viele Datumsangaben zeigen, wie nebeneinander lesbar bleiben.
+  const labelStep = Math.max(1, Math.ceil(points.length / Math.max(1, Math.floor((right - left) / (compact ? 42 : 64)))));
+  points.forEach((point, index) => {
+    ctx.fillStyle = point.entry.color || palette.green;
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, compact ? 4.5 : 7, 0, Math.PI * 2);
+    ctx.fill();
+    if (index % labelStep && index !== points.length - 1) return;
+    ctx.fillStyle = palette.muted;
+    ctx.font = font.label;
+    ctx.textAlign = "center";
+    ctx.fillText(point.entry.label, Math.min(Math.max(point.x, left + 12), right - 12), bottom + (compact ? 15 : 19));
+    ctx.textAlign = "left";
+  });
+}
+
 function chartPalette() {
   return {
     surface: cssVar("--field") || "#fbfcfb",
@@ -230,6 +358,9 @@ function chartPalette() {
 
 function loadState() {
   try {
+    // Der frueher im Planungsbereich einstellbare Wert wird weiter respektiert,
+    // damit bestehende Installationen ihre Aufbewahrungsdauer behalten. Ohne
+    // gespeicherten Wert gelten 90 Tage.
     const workspace = JSON.parse(localStorage.getItem("teamkompass-workspace-v1") || "{}");
     const retentionMs = Number(workspace.retentionDays || 90) * 86400000;
     const stamp = Number(localStorage.getItem(cacheStampKey) || Date.now());
@@ -1432,7 +1563,7 @@ function setView(viewName) {
   Object.entries(views).forEach(([name, element]) => element.classList.toggle("active", name === viewName));
   document.querySelectorAll(".nav-tab").forEach((button) => button.classList.toggle("active", button.dataset.view === viewName));
   if ($("#moreNavTab")) {
-    $("#moreNavTab").classList.toggle("active", ["profiles", "opponents", "teamAnalysis"].includes(viewName));
+    $("#moreNavTab").classList.toggle("active", ["opponents", "teamAnalysis"].includes(viewName));
   }
   if ($("#mobileViewSelect")) $("#mobileViewSelect").value = viewName;
   $("#pageTitle").textContent = titles[viewName];
@@ -1441,6 +1572,7 @@ function setView(viewName) {
     renderSquad();
     if (isCloudTrainer()) renderAccessManager();
   }
+  if (viewName === "events") setEventStep("list");
   if (viewName === "profiles") drawProfile();
   if (viewName === "opponents") renderOpponentAnalysis();
   if (viewName === "teamAnalysis") renderTeamAnalysis();
@@ -1460,6 +1592,15 @@ function prepareMobileAccordions() {
     section.open = section.dataset.mobileDefaultOpen === "true";
   });
   mobileAccordionsPrepared = true;
+}
+
+// Auf dem Handy ist der Event-Tab zweistufig: erst die Liste, dann die
+// Bewertung eines Events. Auf dem Desktop stehen beide Panels nebeneinander,
+// dort ignoriert das CSS dieses Attribut.
+function setEventStep(step) {
+  const view = $("#eventsView");
+  if (!view) return;
+  view.dataset.step = step === "rate" && selectedEvent() ? "rate" : "list";
 }
 
 function selectedEvent() {
@@ -2135,11 +2276,36 @@ function renderFormationPicker() {
     preview.filled === bestFilled && preview.grade !== null && (best === null || preview.grade < best) ? preview.grade : best
   ), null);
   const recommendedIndex = previews.findIndex((preview) => preview.filled === bestFilled && preview.grade === bestGrade);
-  $("#formationPicker").innerHTML = previews.map((preview, index) => {
+  const options = previews.map((preview, index) => {
     const name = formationNameFromPreset(FORMATION_PRESETS[index]);
     const recommended = index === recommendedIndex;
     return { preview, name, recommended };
-  }).map(({ preview, name, recommended }, index) => `
+  });
+
+  // Auf dem Handy waere eine Kartenreihe zum Querscrollen; dort ist eine
+  // Auswahlliste schneller und zeigt alle Formationen auf einen Blick.
+  if (isMobileViewport()) {
+    const currentName = formationNameFromAssignments(state.lineup?.assignments || {});
+    const isKnown = options.some(({ name }) => name === currentName);
+    // Passt die aktuelle Aufstellung zu keiner Vorlage, steht sie als
+    // nicht auswaehlbarer Hinweis oben - sonst waere unklar, was gerade steht.
+    const placeholder = currentName === "Keine Aufstellung"
+      ? "Formation wählen"
+      : `Eigene Aufstellung · ${currentName}`;
+    $("#formationPicker").innerHTML = `
+      <label class="formation-select-label">
+        <span>Formation</span>
+        <select id="formationSelect" aria-label="Formation wählen">
+          ${isKnown ? "" : `<option value="" selected>${escapeHtml(placeholder)}</option>`}
+          ${options.map(({ preview, name, recommended }, index) => `
+            <option value="${index}" ${isKnown && name === currentName ? "selected" : ""}>${name} · Ø ${gradeLabel(preview.grade)} · ${preview.filled}/${preview.total}${recommended ? " · empfohlen" : ""}</option>
+          `).join("")}
+        </select>
+      </label>`;
+    return;
+  }
+
+  $("#formationPicker").innerHTML = options.map(({ preview, name, recommended }, index) => `
     <button type="button" class="formation-option ${recommended ? "recommended" : ""}" data-formation-index="${index}">
       ${recommended ? `<span class="formation-badge">Empfohlen</span>` : ""}
       <strong>${name}</strong>
@@ -2150,13 +2316,31 @@ function renderFormationPicker() {
 
 function renderPitchBench() {
   const onPitch = new Set(Object.values(state.lineup.assignments).flat());
-  const bench = state.players.filter((player) => !onPitch.has(player.id));
+  // Beste Note zuerst (1 ist die beste Schulnote), noch unbewertete Spieler
+  // ans Ende und dort nach Rueckennummer.
+  const bench = state.players
+    .filter((player) => !onPitch.has(player.id))
+    .sort((a, b) => {
+      const gradeA = playerAverageGrade(a.id);
+      const gradeB = playerAverageGrade(b.id);
+      if (gradeA && gradeB && gradeA !== gradeB) return gradeA - gradeB;
+      if (gradeA && !gradeB) return -1;
+      if (!gradeA && gradeB) return 1;
+      return a.number - b.number;
+    });
+
+  const counter = $("#benchCount");
+  if (counter) counter.textContent = bench.length ? `${bench.length} Spieler` : "leer";
+
   $("#pitchBench").innerHTML = bench.length
     ? bench.map((player) => `
         <button type="button" class="bench-player" data-player-id="${player.id}">
           <span class="number-badge">${player.number}</span>
-          <span>${escapeHtml(player.name.split(" ")[0])}</span>
-          <small class="muted">${positionText(player)}</small>
+          <span class="bench-player-name">
+            <strong>${escapeHtml(player.name)}</strong>
+            <small class="muted">${positionText(player)}</small>
+          </span>
+          <span class="bench-player-grade">${gradeLabel(playerAverageGrade(player.id))}</span>
         </button>
       `).join("")
     : `<p class="muted">Alle Spieler stehen auf dem Feld.</p>`;
@@ -2217,7 +2401,7 @@ function renderLeaders() {
     .map((player) => ({ player, grade: playerAverageGrade(player.id), events: playerAttendanceCount(player.id) }))
     .filter((item) => item.grade)
     .sort((a, b) => a.grade - b.grade)
-    .slice(0, isMobileViewport() ? undefined : 6);
+    .slice(0, isMobileViewport() ? 5 : 6);
   $("#leaderList").innerHTML = leaders.map(({ player, grade, events }) => `
     <article class="leader-item">
       <div><strong>${escapeHtml(player.name)}</strong><br><small class="muted">${events} Events · ${escapeHtml(positionText(player))}</small></div>
@@ -2300,6 +2484,7 @@ function renderSquad() {
     return `
       <article class="player-card-mobile">
         <div class="player-card-mobile-top">
+          <span class="number-badge">${player.number}</span>
           <strong>${escapeHtml(player.name)}</strong>
           <span class="status-pill ${statusClass}">${escapeHtml(effectiveStatus)}</span>
         </div>
@@ -2309,10 +2494,15 @@ function renderSquad() {
           <span class="player-card-mobile-grade">${gradeLabel(playerAverageGrade(player.id))}</span>
         </div>
         <div class="player-card-mobile-actions">
-          <button class="ghost-button" data-action="profile" data-id="${player.id}">Profil</button>
-          <button class="ghost-button" data-action="edit" data-id="${player.id}">Bearbeiten</button>
-          <button class="ghost-button" data-action="invite" data-id="${player.id}">Einladen</button>
-          <button class="ghost-button danger" data-action="delete" data-id="${player.id}" type="button">Löschen</button>
+          <button class="ghost-button" data-action="profile" data-id="${player.id}">Profil öffnen</button>
+          <details class="card-menu" name="squadCardMenu">
+            <summary aria-label="Weitere Aktionen für ${escapeHtml(player.name)}"><span aria-hidden="true">···</span></summary>
+            <div class="card-menu-list">
+              <button class="ghost-button" data-action="edit" data-id="${player.id}">Bearbeiten</button>
+              <button class="ghost-button" data-action="invite" data-id="${player.id}">Einladen</button>
+              <button class="ghost-button danger" data-action="delete" data-id="${player.id}" type="button">Löschen</button>
+            </div>
+          </details>
         </div>
       </article>
     `;
@@ -2398,6 +2588,9 @@ function renderEvents() {
     pastToggle.hidden = false;
     $("#pastEventsSummary").textContent = `Vergangene Events (${past.length})`;
     $("#pastEventsList").innerHTML = eventCardsHtml(past);
+    // Ohne anstehende Events waere die Liste sonst leer, obwohl es Events
+    // gibt - dann sind die vergangenen von vornherein aufgeklappt.
+    if (!upcoming.length) pastToggle.open = true;
   } else {
     pastToggle.hidden = true;
     pastToggle.open = false;
@@ -2572,6 +2765,23 @@ function renderRatingStepper(event, players, matchDuration) {
   $("#stepperNextBtn").disabled = ratingStepperIndex === players.length - 1;
   $("#stepperCard").className = `rating-stepper-card attendance-${attendance}`;
   $("#stepperCard").innerHTML = renderRatingCard(player, event, matchDuration);
+
+  const progress = $("#ratingProgress");
+  if (progress) {
+    // Fertig ist, wer eine Gesamtnote hat oder bewusst als fehlend bzw.
+    // nicht im Kader markiert wurde - beides braucht keine Teilnoten mehr.
+    const done = state.players.filter((item) => {
+      const entry = event.ratings?.[item.id] || {};
+      return Boolean(calculatedGrade(entry)) || ["absent", "excluded"].includes(entry.attendance);
+    }).length;
+    const total = state.players.length;
+    const share = total ? Math.round((done / total) * 100) : 0;
+    progress.innerHTML = total
+      ? `<span class="rating-progress-label">${done} von ${total} Spielern erfasst</span>
+         <span class="rating-progress-track"><span style="width:${share}%"></span></span>`
+      : "";
+    progress.dataset.complete = String(total > 0 && done === total);
+  }
 }
 
 function escapeHtml(value) {
@@ -2701,6 +2911,7 @@ function saveEvent(event) {
   cloudSaveEvent(newEvent);
   renderAll();
   setView("events");
+  setEventStep("rate");
 }
 
 function updateRating(playerId, field, value, rerender = true) {
@@ -3041,78 +3252,86 @@ function goToMeasurementForm(playerId) {
 function renderMeasurementChart(player) {
   const canvas = $("#measurementChart");
   if (!canvas) return;
-  const ctx = canvas.getContext("2d");
-  const colors = chartPalette();
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = colors.surface;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = colors.ink;
-  ctx.font = "700 18px system-ui";
-  ctx.fillText(player ? `${player.name} · Größe, Gewicht, BMI` : "Größe, Gewicht, BMI", 58, 28);
-
   const oneYearAgo = new Date();
   oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
   const entries = (player ? playerMeasurements(player.id) : [])
     .filter((item) => item.height && item.weight && new Date(`${item.date}T00:00:00`) >= oneYearAgo);
 
+  const chart = setupChartCanvas(canvas, (width) => (width < 520 ? Math.round(width * 0.82) : Math.round(width / 2.7)));
+  const { ctx, width, height, palette, compact } = chart;
+  const font = chartFonts(compact);
+
+  ctx.fillStyle = palette.ink;
+  ctx.font = font.title;
+  ctx.fillText(player ? `${player.name} · Größe, Gewicht, BMI` : "Größe, Gewicht, BMI", 12, compact ? 18 : 24);
+
   if (entries.length < 2) {
-    ctx.fillStyle = colors.muted;
-    ctx.fillText("Noch nicht genug Messwerte der letzten 12 Monate fuer einen Verlauf (mind. 2 noetig).", 58, 190);
+    drawChartPlaceholder(chart, "Noch nicht genug Messwerte der letzten 12 Monate für einen Verlauf (mindestens 2 nötig).");
     return;
   }
 
-  const top = 54;
-  const bottom = 300;
+  const last = entries[entries.length - 1];
+  const lastBmi = calculateBmi(last.height, last.weight);
   const series = [
-    { label: "Größe (cm)", color: colors.red, values: entries.map((item) => Number(item.height)) },
-    { label: "Gewicht (kg)", color: colors.blue, values: entries.map((item) => Number(item.weight)) },
-    { label: "BMI", color: colors.green, values: entries.map((item) => calculateBmi(item.height, item.weight)) }
+    { label: `Größe ${last.height} cm`, color: palette.red, values: entries.map((item) => Number(item.height)) },
+    { label: `Gewicht ${last.weight} kg`, color: palette.blue, values: entries.map((item) => Number(item.weight)) },
+    { label: `BMI ${gradeLabel(lastBmi ? roundGrade(lastBmi) : null)}`, color: palette.green, values: entries.map((item) => calculateBmi(item.height, item.weight)) }
   ];
-  series.forEach((s) => {
-    const min = Math.min(...s.values);
-    const max = Math.max(...s.values);
-    const range = max - min || 1;
-    s.points = entries.map((entry, index) => ({
-      x: 76 + (index * 850) / Math.max(entries.length - 1, 1),
-      y: bottom - ((s.values[index] - min) / range) * (bottom - top)
-    }));
-  });
-  series.forEach((s) => {
-    ctx.strokeStyle = s.color;
-    ctx.lineWidth = 3;
+
+  // Legende: schmal zweizeilig ueber dem Verlauf, breit einzeilig.
+  const legendRows = compact ? 2 : 1;
+  const legendTop = compact ? 34 : 44;
+  ctx.font = font.legend;
+  series.forEach((item, index) => {
+    const column = compact ? index % 2 : index;
+    const row = compact ? Math.floor(index / 2) : 0;
+    const x = 14 + column * ((width - 24) / (compact ? 2 : 3));
+    const y = legendTop + row * 17;
+    ctx.fillStyle = item.color;
     ctx.beginPath();
-    s.points.forEach((point, index) => index ? ctx.lineTo(point.x, point.y) : ctx.moveTo(point.x, point.y));
+    ctx.arc(x + 4, y - 4, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = palette.ink;
+    ctx.fillText(item.label, x + 14, y, (width - 24) / (compact ? 2 : 3) - 20);
+  });
+
+  const left = 14;
+  const right = width - 14;
+  const top = legendTop + legendRows * 17 + 8;
+  const bottom = height - (compact ? 24 : 28);
+  const span = Math.max(entries.length - 1, 1);
+
+  series.forEach((item) => {
+    const min = Math.min(...item.values);
+    const max = Math.max(...item.values);
+    const range = max - min || 1;
+    const points = entries.map((entry, index) => ({
+      x: left + (index * (right - left)) / span,
+      y: bottom - ((item.values[index] - min) / range) * (bottom - top)
+    }));
+    ctx.strokeStyle = item.color;
+    ctx.lineWidth = compact ? 2 : 3;
+    ctx.beginPath();
+    points.forEach((point, index) => (index ? ctx.lineTo(point.x, point.y) : ctx.moveTo(point.x, point.y)));
     ctx.stroke();
-    s.points.forEach((point) => {
-      ctx.fillStyle = s.color;
+    points.forEach((point) => {
+      ctx.fillStyle = item.color;
       ctx.beginPath();
-      ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
+      ctx.arc(point.x, point.y, compact ? 3.5 : 5, 0, Math.PI * 2);
       ctx.fill();
     });
   });
-  entries.forEach((entry, index) => {
-    ctx.fillStyle = colors.muted;
-    ctx.font = "12px system-ui";
-    ctx.fillText(entry.date.slice(0, 7), 76 + (index * 850) / Math.max(entries.length - 1, 1) - 16, 344);
-  });
 
-  const last = entries[entries.length - 1];
-  const lastBmi = calculateBmi(last.height, last.weight);
-  const legendItems = [
-    { label: `Größe ${last.height} cm`, color: series[0].color },
-    { label: `Gewicht ${last.weight} kg`, color: series[1].color },
-    { label: `BMI ${gradeLabel(lastBmi ? roundGrade(lastBmi) : null)}`, color: series[2].color }
-  ];
-  legendItems.forEach((item, index) => {
-    const x = 58 + index * 260;
-    ctx.fillStyle = item.color;
-    ctx.beginPath();
-    ctx.arc(x, 44, 6, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = colors.ink;
-    ctx.font = "13px system-ui";
-    ctx.fillText(item.label, x + 12, 48);
+  const labelStep = Math.max(1, Math.ceil(entries.length / Math.max(1, Math.floor((right - left) / (compact ? 46 : 70)))));
+  ctx.font = font.label;
+  ctx.fillStyle = palette.muted;
+  ctx.textAlign = "center";
+  entries.forEach((entry, index) => {
+    if (index % labelStep && index !== entries.length - 1) return;
+    const x = left + (index * (right - left)) / span;
+    ctx.fillText(entry.date.slice(0, 7), Math.min(Math.max(x, left + 16), right - 16), bottom + (compact ? 15 : 19));
   });
+  ctx.textAlign = "left";
 }
 
 function renderProfileHeader(player, ratings) {
@@ -3145,50 +3364,12 @@ function renderProfileHeader(player, ratings) {
 }
 
 function renderProfileChart(player, ratings) {
-  const canvas = $("#trendChart");
-  const ctx = canvas.getContext("2d");
-  const colors = chartPalette();
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = colors.surface;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.strokeStyle = colors.line;
-  ctx.lineWidth = 1;
-  for (let grade = 1; grade <= 6; grade += 1) {
-    const y = 54 + (grade - 1) * 54;
-    ctx.beginPath();
-    ctx.moveTo(58, y);
-    ctx.lineTo(940, y);
-    ctx.stroke();
-    ctx.fillStyle = colors.muted;
-    ctx.fillText(String(grade), 28, y + 4);
-  }
-  ctx.fillStyle = colors.ink;
-  ctx.font = "700 18px system-ui";
-  ctx.fillText(player ? `${player.name} · Notenentwicklung` : "Notenentwicklung", 58, 28);
-  if (!ratings.length) {
-    ctx.fillStyle = colors.muted;
-    ctx.fillText("Noch keine benoteten Events vorhanden.", 58, 190);
-    return;
-  }
-  const points = ratings.map((item, index) => ({
-    x: 76 + (index * 850) / Math.max(ratings.length - 1, 1),
-    y: 54 + (Number(item.rating.grade) - 1) * 54,
-    item
-  }));
-  ctx.strokeStyle = colors.red;
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  points.forEach((point, index) => index ? ctx.lineTo(point.x, point.y) : ctx.moveTo(point.x, point.y));
-  ctx.stroke();
-  points.forEach((point) => {
-    ctx.fillStyle = colors.green;
-    ctx.beginPath();
-    ctx.arc(point.x, point.y, 7, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = colors.muted;
-    ctx.font = "12px system-ui";
-    ctx.fillText(point.item.event.date.slice(5), point.x - 16, 344);
-  });
+  drawGradeTrendChart(
+    $("#trendChart"),
+    player ? `${player.name} · Notenentwicklung` : "Notenentwicklung",
+    ratings.map((item) => ({ label: item.event.date.slice(5), grade: Number(item.rating.grade) })),
+    "Noch keine benoteten Events vorhanden."
+  );
 }
 
 function renderProfileHistory(ratings) {
@@ -3463,54 +3644,17 @@ function renderTeamAnalysis() {
 }
 
 function drawTeamTrendChart() {
-  const canvas = $("#teamTrendChart");
-  const ctx = canvas.getContext("2d");
-  const colors = chartPalette();
-  const events = [...state.events]
+  const palette = chartPalette();
+  const entries = [...state.events]
     .sort((a, b) => new Date(a.date) - new Date(b.date))
     .map((event) => ({ event, grade: teamAverageGradeForEvent(event) }))
-    .filter((item) => item.grade);
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = colors.surface;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.strokeStyle = colors.line;
-  ctx.lineWidth = 1;
-  for (let grade = 1; grade <= 6; grade += 1) {
-    const y = 54 + (grade - 1) * 54;
-    ctx.beginPath();
-    ctx.moveTo(58, y);
-    ctx.lineTo(940, y);
-    ctx.stroke();
-    ctx.fillStyle = colors.muted;
-    ctx.fillText(String(grade), 28, y + 4);
-  }
-  ctx.fillStyle = colors.ink;
-  ctx.font = "700 18px system-ui";
-  ctx.fillText("Teamnoten nach Event", 58, 28);
-  if (!events.length) {
-    ctx.fillStyle = colors.muted;
-    ctx.fillText("Noch keine Teamnoten vorhanden.", 58, 190);
-    return;
-  }
-  const points = events.map((item, index) => ({
-    x: 76 + (index * 850) / Math.max(events.length - 1, 1),
-    y: 54 + (Number(item.grade) - 1) * 54,
-    item
-  }));
-  ctx.strokeStyle = colors.red;
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  points.forEach((point, index) => index ? ctx.lineTo(point.x, point.y) : ctx.moveTo(point.x, point.y));
-  ctx.stroke();
-  points.forEach((point) => {
-    ctx.fillStyle = point.item.event.type === "Spiel" ? colors.red : colors.green;
-    ctx.beginPath();
-    ctx.arc(point.x, point.y, 7, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = colors.muted;
-    ctx.font = "12px system-ui";
-    ctx.fillText(point.item.event.date.slice(5), point.x - 16, 344);
-  });
+    .filter((item) => item.grade)
+    .map((item) => ({
+      label: item.event.date.slice(5),
+      grade: Number(item.grade),
+      color: item.event.type === "Spiel" ? palette.red : palette.green
+    }));
+  drawGradeTrendChart($("#teamTrendChart"), "Teamnoten nach Event", entries, "Noch keine Teamnoten vorhanden.");
 }
 
 function drawBirthQuarterChart() {
@@ -3544,73 +3688,105 @@ function drawTrainingFocusChart() {
 }
 
 function drawPieChart(canvas, rows, title) {
-  const ctx = canvas.getContext("2d");
-  const palette = chartPalette();
+  if (!canvas) return;
+  const chart = setupChartCanvas(canvas, (width) =>
+    (width < 520 ? 56 + 2 * 82 + rows.length * 34 : 60 + 2 * 96 + 20));
+  const { ctx, width, height, palette, compact } = chart;
+  const font = chartFonts(compact);
   const colors = [palette.red, palette.green, palette.amber];
   const total = rows.reduce((sum, row) => sum + row.value, 0);
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = palette.surface;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
   ctx.fillStyle = palette.ink;
-  ctx.font = "700 18px system-ui";
-  ctx.fillText(title, 28, 30);
+  ctx.font = font.title;
+  ctx.fillText(title, 12, compact ? 19 : 26);
+
   if (!total) {
-    ctx.fillStyle = palette.muted;
-    ctx.font = "14px system-ui";
-    ctx.fillText("Noch keine Trainings angelegt.", 28, 170);
+    drawChartPlaceholder(chart, "Noch keine Trainings angelegt.");
     return;
   }
+
+  // Schmal: Kreis oben, Legende darunter. Breit: Kreis links, Legende rechts.
+  const radius = compact ? Math.min(width * 0.26, 82) : 96;
+  const centerX = compact ? width / 2 : 20 + radius;
+  const centerY = compact ? 40 + radius : height / 2 + 12;
+
   let startAngle = -Math.PI / 2;
   rows.forEach((row, index) => {
     const slice = (row.value / total) * Math.PI * 2;
     ctx.beginPath();
-    ctx.moveTo(170, 174);
-    ctx.arc(170, 174, 96, startAngle, startAngle + slice);
+    ctx.moveTo(centerX, centerY);
+    ctx.arc(centerX, centerY, radius, startAngle, startAngle + slice);
     ctx.closePath();
     ctx.fillStyle = colors[index % colors.length];
     ctx.fill();
     startAngle += slice;
   });
+
+  const legendX = compact ? 14 : centerX + radius + 28;
+  const legendTop = compact ? centerY + radius + 26 : centerY - ((rows.length - 1) * 46) / 2;
+  const legendStep = compact ? 34 : 46;
+
   rows.forEach((row, index) => {
-    const y = 112 + index * 48;
+    const y = legendTop + index * legendStep;
     const percentage = Math.round((row.value / total) * 100);
     ctx.fillStyle = colors[index % colors.length];
-    ctx.fillRect(340, y - 16, 18, 18);
+    ctx.fillRect(legendX, y - 12, 13, 13);
     ctx.fillStyle = palette.ink;
-    ctx.font = "700 14px system-ui";
-    ctx.fillText(row.label, 372, y);
+    ctx.font = font.value;
+    ctx.fillText(row.label, legendX + 21, y, width - legendX - 30);
     ctx.fillStyle = palette.muted;
-    ctx.font = "13px system-ui";
-    ctx.fillText(`${row.value} Einheiten · ${percentage}%`, 372, y + 20);
+    ctx.font = font.legend;
+    ctx.fillText(`${row.value} Einheiten · ${percentage}%`, legendX + 21, y + 15, width - legendX - 30);
   });
 }
 
 function drawBarChart(canvas, rows, title, color) {
-  const ctx = canvas.getContext("2d");
-  const palette = chartPalette();
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = palette.surface;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  if (!canvas) return;
+  const barHeight = 22;
+  const barGap = 9;
+  const headHeight = 40;
+  const chart = setupChartCanvas(canvas, () => headHeight + Math.max(rows.length, 1) * (barHeight + barGap) + 10);
+  const { ctx, width, palette, compact } = chart;
+  const font = chartFonts(compact);
+
   ctx.fillStyle = palette.ink;
-  ctx.font = "700 18px system-ui";
-  ctx.fillText(title, 28, 30);
+  ctx.font = font.title;
+  ctx.fillText(title, 12, compact ? 19 : 24);
+
+  if (!rows.length) {
+    drawChartPlaceholder(chart, "Noch keine Daten vorhanden.");
+    return;
+  }
+
+  // Beschriftungsspalte an den laengsten Eintrag anpassen, aber gedeckelt.
+  ctx.font = font.label;
+  const labelWidth = Math.min(
+    Math.max(...rows.map((row) => ctx.measureText(row.label).width)) + 10,
+    Math.round(width * 0.34)
+  );
+  const valueWidth = 34;
+  const trackLeft = 12 + labelWidth;
+  const trackRight = width - 12 - valueWidth;
   const max = Math.max(...rows.map((row) => row.value), 1);
-  const barAreaTop = 58;
-  const barHeight = Math.min(34, (canvas.height - 88) / Math.max(rows.length, 1) - 8);
+
   rows.forEach((row, index) => {
-    const y = barAreaTop + index * (barHeight + 10);
-    const width = Math.round((row.value / max) * (canvas.width - 170));
+    const y = headHeight + index * (barHeight + barGap);
     ctx.fillStyle = palette.muted;
-    ctx.font = "12px system-ui";
-    ctx.fillText(row.label, 28, y + barHeight / 2 + 4);
+    ctx.font = font.label;
+    ctx.textAlign = "left";
+    ctx.fillText(row.label, 12, y + barHeight / 2 + 3.5, labelWidth - 10);
+
     ctx.fillStyle = palette.soft;
-    ctx.fillRect(92, y, canvas.width - 130, barHeight);
+    ctx.fillRect(trackLeft, y, Math.max(trackRight - trackLeft, 1), barHeight);
     ctx.fillStyle = color;
-    ctx.fillRect(92, y, width, barHeight);
+    ctx.fillRect(trackLeft, y, Math.max((row.value / max) * (trackRight - trackLeft), row.value ? 3 : 0), barHeight);
+
     ctx.fillStyle = palette.ink;
-    ctx.font = "700 12px system-ui";
-    ctx.fillText(String(row.value), 104 + width, y + barHeight / 2 + 4);
+    ctx.font = font.value;
+    ctx.textAlign = "right";
+    ctx.fillText(String(row.value), width - 12, y + barHeight / 2 + 4);
   });
+  ctx.textAlign = "left";
 }
 
 function exportData() {
@@ -3754,25 +3930,35 @@ function safeRender(fn, label) {
 }
 
 document.querySelectorAll(".nav-tab").forEach((button) => button.addEventListener("click", () => setView(button.dataset.view)));
-$("#mobileViewSelect").addEventListener("change", (event) => setView(event.target.value));
+on("#mobileViewSelect", "change", (event) => setView(event.target.value));
 if ($("#moreNavTab") && $("#moreSheet")) {
-  $("#moreNavTab").addEventListener("click", () => $("#moreSheet").showModal());
-  $("#moreSheet").addEventListener("click", (event) => {
+  on("#moreNavTab", "click", () => $("#moreSheet").showModal());
+  on("#moreSheet", "click", (event) => {
     if (event.target === $("#moreSheet") || event.target.closest(".nav-tab")) $("#moreSheet").close();
   });
 }
+let resizeRedrawTimer = null;
 window.addEventListener("resize", () => {
   if (!isMobileViewport()) mobileAccordionsPrepared = false;
   prepareMobileAccordions();
   renderLeaders();
+  // Die Formationsauswahl sieht je nach Geraeteklasse anders aus.
+  if ($("#dashboardView")?.classList.contains("active")) renderFormationPicker();
+  // Diagramme haengen an der Breite ihrer Zeichenflaeche und muessen nach
+  // Drehen des Geraets bzw. Groessenaenderung neu gezeichnet werden.
+  clearTimeout(resizeRedrawTimer);
+  resizeRedrawTimer = setTimeout(() => {
+    if ($("#profilesView")?.classList.contains("active")) drawProfile();
+    if ($("#teamAnalysisView")?.classList.contains("active")) renderTeamAnalysis();
+  }, 180);
 });
-$("#formationPicker").addEventListener("click", (event) => {
+on("#formationPicker", "click", (event) => {
   const button = event.target.closest(".formation-option");
   if (!button) return;
   applyFormationPreset(Number(button.dataset.formationIndex));
 });
 
-$("#pitch").addEventListener("click", (event) => {
+on("#pitch", "click", (event) => {
   const zoneEl = event.target.closest(".pitch-zone");
   if (!zoneEl) return;
   const chip = event.target.closest(".pitch-player");
@@ -3900,14 +4086,14 @@ document.addEventListener("pointercancel", (event) => {
   endPitchDrag(event, true);
 });
 
-$("#substituteSearch").addEventListener("input", renderSubstituteList);
-$("#closeSubstituteDialogBtn").addEventListener("click", () => $("#substituteDialog").close());
-$("#cancelSubstituteDialogBtn").addEventListener("click", () => $("#substituteDialog").close());
-$("#removeFromPitchBtn").addEventListener("click", () => {
+on("#substituteSearch", "input", renderSubstituteList);
+on("#closeSubstituteDialogBtn", "click", () => $("#substituteDialog").close());
+on("#cancelSubstituteDialogBtn", "click", () => $("#substituteDialog").close());
+on("#removeFromPitchBtn", "click", () => {
   if (pitchSubstituteTarget?.playerId) removePlayerFromPitch(pitchSubstituteTarget.playerId);
   $("#substituteDialog").close();
 });
-$("#substituteList").addEventListener("click", (event) => {
+on("#substituteList", "click", (event) => {
   const button = event.target.closest(".substitute-option");
   if (!button || !pitchSubstituteTarget) return;
   const pickedId = button.dataset.playerId;
@@ -3919,92 +4105,92 @@ $("#substituteList").addEventListener("click", (event) => {
   $("#substituteDialog").close();
 });
 
-$("#searchInput").addEventListener("input", renderSquad);
-$("#positionFilter").addEventListener("change", renderSquad);
-$("#squadSort").addEventListener("change", renderSquad);
-$("#addPlayerTop").addEventListener("click", () => openPlayerDialog());
-$("#closeDialogBtn").addEventListener("click", () => $("#playerDialog").close());
-$("#cancelDialogBtn").addEventListener("click", () => $("#playerDialog").close());
-$("#playerForm").addEventListener("submit", savePlayer);
-$("#playerStatus").addEventListener("change", syncPlayerInjuryField);
-$("#positionOptions").addEventListener("change", () => $("#playerCustomPositions").setCustomValidity(""));
-$("#playerCustomPositions").addEventListener("input", () => $("#playerCustomPositions").setCustomValidity(""));
-$("#playerNumber").addEventListener("input", () => $("#playerNumber").setCustomValidity(""));
-$("#exportBtn").addEventListener("click", exportData);
-$("#themeToggle").addEventListener("click", toggleTheme);
-$("#newEventBtn").addEventListener("click", openEventDialog);
-$("#heroEventBtn").addEventListener("click", () => {
+on("#searchInput", "input", renderSquad);
+on("#positionFilter", "change", renderSquad);
+on("#squadSort", "change", renderSquad);
+on("#addPlayerTop", "click", () => openPlayerDialog());
+on("#closeDialogBtn", "click", () => $("#playerDialog").close());
+on("#cancelDialogBtn", "click", () => $("#playerDialog").close());
+on("#playerForm", "submit", savePlayer);
+on("#playerStatus", "change", syncPlayerInjuryField);
+on("#positionOptions", "change", () => $("#playerCustomPositions").setCustomValidity(""));
+on("#playerCustomPositions", "input", () => $("#playerCustomPositions").setCustomValidity(""));
+on("#playerNumber", "input", () => $("#playerNumber").setCustomValidity(""));
+on("#exportBtn", "click", exportData);
+on("#themeToggle", "click", toggleTheme);
+on("#newEventBtn", "click", openEventDialog);
+on("#heroEventBtn", "click", () => {
   setView("events");
   openEventDialog();
 });
-$("#heroAnalysisBtn").addEventListener("click", () => setView("teamAnalysis"));
-$("#quickEventBtn").addEventListener("click", () => {
+on("#heroAnalysisBtn", "click", () => setView("teamAnalysis"));
+on("#quickEventBtn", "click", () => {
   setView("events");
   openEventDialog();
 });
-$("#quickPlayerBtn").addEventListener("click", () => openPlayerDialog());
-$("#quickProfileBtn").addEventListener("click", () => setView("profiles"));
-$("#quickOpponentBtn").addEventListener("click", () => setView("opponents"));
-$("#eventForm").addEventListener("submit", saveEvent);
-$("#eventType").addEventListener("change", syncEventGameFields);
-$("#closeEventDialogBtn").addEventListener("click", () => $("#eventDialog").close());
-$("#cancelEventDialogBtn").addEventListener("click", () => $("#eventDialog").close());
-$("#eventSelect").addEventListener("change", (event) => {
+on("#quickPlayerBtn", "click", () => openPlayerDialog());
+on("#quickProfileBtn", "click", () => setView("profiles"));
+on("#quickOpponentBtn", "click", () => setView("opponents"));
+on("#eventForm", "submit", saveEvent);
+on("#eventType", "change", syncEventGameFields);
+on("#closeEventDialogBtn", "click", () => $("#eventDialog").close());
+on("#cancelEventDialogBtn", "click", () => $("#eventDialog").close());
+on("#eventSelect", "change", (event) => {
   state.selectedEventId = event.target.value;
   persist();
   renderEvents();
 });
-$("#ratingFilter").addEventListener("change", renderRatingTable);
-$("#deleteEventBtn").addEventListener("click", deleteSelectedEvent);
-$("#selectedEventIntensity").addEventListener("change", (event) => updateSelectedEventMeta("intensity", event.target.value));
-$("#selectedGoalsFor").addEventListener("change", (event) => updateSelectedEventMeta("goalsFor", event.target.value));
-$("#selectedGoalsAgainst").addEventListener("change", (event) => updateSelectedEventMeta("goalsAgainst", event.target.value));
-$("#selectedMatchDuration").addEventListener("change", (event) => updateSelectedEventMeta("matchDuration", event.target.value));
-$("#selectedTrainingFocus").addEventListener("change", (event) => updateSelectedEventMeta("trainingFocus", event.target.value));
-$("#profilePlayer").addEventListener("change", () => {
+on("#ratingFilter", "change", renderRatingTable);
+on("#deleteEventBtn", "click", deleteSelectedEvent);
+on("#selectedEventIntensity", "change", (event) => updateSelectedEventMeta("intensity", event.target.value));
+on("#selectedGoalsFor", "change", (event) => updateSelectedEventMeta("goalsFor", event.target.value));
+on("#selectedGoalsAgainst", "change", (event) => updateSelectedEventMeta("goalsAgainst", event.target.value));
+on("#selectedMatchDuration", "change", (event) => updateSelectedEventMeta("matchDuration", event.target.value));
+on("#selectedTrainingFocus", "change", (event) => updateSelectedEventMeta("trainingFocus", event.target.value));
+on("#profilePlayer", "change", () => {
   resetDevelopmentPlanForm();
   resetAbsenceForm();
   resetMeasurementForm();
   drawProfile();
 });
-$("#profilePdfBtn").addEventListener("click", downloadProfilePdf);
-$("#developmentPlanForm").addEventListener("submit", saveDevelopmentPlan);
-$("#cancelDevelopmentPlanBtn").addEventListener("click", resetDevelopmentPlanForm);
-$("#absenceForm").addEventListener("submit", saveAbsence);
-$("#cancelAbsenceBtn").addEventListener("click", resetAbsenceForm);
-$("#absenceReason").addEventListener("change", syncAbsenceReasonField);
-$("#measurementForm").addEventListener("submit", saveMeasurement);
-$("#cancelMeasurementBtn").addEventListener("click", resetMeasurementForm);
-$("#opponentForm").addEventListener("submit", saveOpponent);
-$("#cancelOpponentBtn").addEventListener("click", resetOpponentForm);
-$("#opponentSearch").addEventListener("input", (event) => {
+on("#profilePdfBtn", "click", downloadProfilePdf);
+on("#developmentPlanForm", "submit", saveDevelopmentPlan);
+on("#cancelDevelopmentPlanBtn", "click", resetDevelopmentPlanForm);
+on("#absenceForm", "submit", saveAbsence);
+on("#cancelAbsenceBtn", "click", resetAbsenceForm);
+on("#absenceReason", "change", syncAbsenceReasonField);
+on("#measurementForm", "submit", saveMeasurement);
+on("#cancelMeasurementBtn", "click", resetMeasurementForm);
+on("#opponentForm", "submit", saveOpponent);
+on("#cancelOpponentBtn", "click", resetOpponentForm);
+on("#opponentSearch", "input", (event) => {
   opponentFilter = event.target.value;
   renderOpponentAnalysis();
 });
 
-$("#developmentPlanList").addEventListener("click", (event) => {
+on("#developmentPlanList", "click", (event) => {
   const button = event.target.closest("button");
   if (!button) return;
   if (button.dataset.action === "edit-plan") editDevelopmentPlan(button.dataset.id);
   if (button.dataset.action === "delete-plan") deleteDevelopmentPlan(button.dataset.id);
 });
-$("#developmentPlanList").addEventListener("submit", saveSelfReflection);
+on("#developmentPlanList", "submit", saveSelfReflection);
 
-$("#absenceList").addEventListener("click", (event) => {
+on("#absenceList", "click", (event) => {
   const button = event.target.closest("button");
   if (!button) return;
   if (button.dataset.action === "edit-absence") editAbsence(button.dataset.id);
   if (button.dataset.action === "delete-absence") deleteAbsence(button.dataset.id);
 });
 
-$("#opponentList").addEventListener("click", (event) => {
+on("#opponentList", "click", (event) => {
   const button = event.target.closest("button");
   if (!button) return;
   if (button.dataset.action === "edit-opponent") editOpponent(button.dataset.id);
   if (button.dataset.action === "delete-opponent") deleteOpponent(button.dataset.id);
 });
 
-$("#measurementList").addEventListener("click", (event) => {
+on("#measurementList", "click", (event) => {
   const button = event.target.closest("button");
   if (!button) return;
   if (button.dataset.action === "edit-measurement") editMeasurement(button.dataset.id);
@@ -4035,9 +4221,9 @@ function handleSquadActionClick(event) {
     renderAll();
   }
 }
-$("#playerTable").addEventListener("click", handleSquadActionClick);
-$("#playerCardsMobile").addEventListener("click", handleSquadActionClick);
-$("#addPlayerFabMobile").addEventListener("click", () => openPlayerDialog());
+on("#playerTable", "click", handleSquadActionClick);
+on("#playerCardsMobile", "click", handleSquadActionClick);
+on("#addPlayerFabMobile", "click", () => openPlayerDialog());
 
 function handleEventListClick(event) {
   const card = event.target.closest("[data-event-id]");
@@ -4045,80 +4231,93 @@ function handleEventListClick(event) {
   state.selectedEventId = card.dataset.eventId;
   persist();
   renderEvents();
+  setEventStep("rate");
 }
 
-$("#eventList").addEventListener("click", handleEventListClick);
-$("#pastEventsList").addEventListener("click", handleEventListClick);
+on("#eventList", "click", handleEventListClick);
+on("#pastEventsList", "click", handleEventListClick);
+on("#eventsBackBtn", "click", () => setEventStep("list"));
+on("#formationPicker", "change", (event) => {
+  const select = event.target.closest("#formationSelect");
+  if (!select || select.value === "") return;
+  applyFormationPreset(Number(select.value));
+});
+// Ein offenes Kartenmenue schliesst sich, sobald daneben getippt wird.
+document.addEventListener("click", (event) => {
+  document.querySelectorAll(".card-menu[open]").forEach((menu) => {
+    if (!menu.contains(event.target)) menu.open = false;
+  });
+});
 
-$("#ratingTable").addEventListener("change", (event) => {
+on("#ratingTable", "change", (event) => {
   const input = event.target.closest(".rating-input");
   if (!input) return;
   updateRating(input.dataset.playerId, input.dataset.field, input.value);
 });
 
-$("#ratingTable").addEventListener("input", (event) => {
+on("#ratingTable", "input", (event) => {
   const input = event.target.closest(".rating-note");
   if (!input) return;
   updateRating(input.dataset.playerId, input.dataset.field, input.value, false);
 });
 
-$("#ratingTable").addEventListener("click", (event) => {
+on("#ratingTable", "click", (event) => {
   const chip = event.target.closest(".chip-button");
   if (!chip) return;
   updateRating(chip.dataset.playerId, chip.dataset.field, chip.dataset.value);
 });
 
-$("#ratingStepper").addEventListener("click", (event) => {
+on("#ratingStepper", "click", (event) => {
   const chip = event.target.closest(".chip-button");
   if (chip) {
     updateRating(chip.dataset.playerId, chip.dataset.field, chip.dataset.value);
   }
 });
 
-$("#ratingStepper").addEventListener("change", (event) => {
+on("#ratingStepper", "change", (event) => {
   const input = event.target.closest(".rating-input");
   if (!input) return;
   updateRating(input.dataset.playerId, input.dataset.field, input.value);
 });
 
-$("#ratingStepper").addEventListener("input", (event) => {
+on("#ratingStepper", "input", (event) => {
   const input = event.target.closest(".rating-note");
   if (!input) return;
   updateRating(input.dataset.playerId, input.dataset.field, input.value, false);
 });
 
-$("#eventSearch").addEventListener("input", (event) => {
+on("#eventSearch", "input", (event) => {
   eventFilter.query = event.target.value;
   renderEvents();
 });
 
-$("#eventTypeFilter").addEventListener("change", (event) => {
+on("#eventTypeFilter", "change", (event) => {
   eventFilter.type = event.target.value;
   renderEvents();
 });
 
-$("#stepperPrevBtn").addEventListener("click", () => {
+on("#stepperPrevBtn", "click", () => {
   ratingStepperIndex = Math.max(0, ratingStepperIndex - 1);
   renderRatingTable();
 });
 
-$("#stepperNextBtn").addEventListener("click", () => {
+on("#stepperNextBtn", "click", () => {
   ratingStepperIndex += 1;
   renderRatingTable();
 });
 
-$("#stepperJump").addEventListener("change", (event) => {
+on("#stepperJump", "change", (event) => {
   ratingStepperIndex = Number(event.target.value);
   renderRatingTable();
 });
 
-$("#trainerLoginForm").addEventListener("submit", handleTrainerLogin);
-$("#playerLoginForm").addEventListener("submit", handlePlayerLogin);
-$("#signOutBtn").addEventListener("click", handleSignOut);
-$("#migrateDataBtn").addEventListener("click", migrateLegacyBlobToCollections);
-$("#addTrainerBtn").addEventListener("click", createTrainerAccount);
-$("#addMedicalBtn").addEventListener("click", createMedicalAccount);
-$("#accessManagerList").addEventListener("click", (event) => {
+on("#trainerLoginForm", "submit", handleTrainerLogin);
+on("#playerLoginForm", "submit", handlePlayerLogin);
+on("#signOutBtn", "click", handleSignOut);
+on("#migrateDataBtn", "click", migrateLegacyBlobToCollections);
+on("#addTrainerBtn", "click", createTrainerAccount);
+on("#addMedicalBtn", "click", createMedicalAccount);
+on("#accessManagerList", "click", (event) => {
   const button = event.target.closest("button[data-action='revoke-access']");
   if (!button) return;
   revokeAccess(button.dataset.uid);
@@ -4126,22 +4325,11 @@ $("#accessManagerList").addEventListener("click", (event) => {
 
 window.TeamKompass = Object.freeze({
   getState: () => structuredClone(state),
-  newEvent: () => openEventDialog(),
-  saveWorkspace: async (workspace) => {
-    if (!isCloudTrainer()) return false;
-    await firestoreModule.setDoc(teamDoc("meta", "operations"), { ...workspace, updatedAt: firestoreModule.serverTimestamp() }, { merge: true });
-    return true;
-  },
-  subscribeWorkspace: (callback) => {
-    if (!isCloudTrainer()) return () => {};
-    return firestoreModule.onSnapshot(teamDoc("meta", "operations"), (snapshot) => {
-      if (snapshot.exists()) callback(snapshot.data());
-    }, console.error);
-  },
   openEvent: (eventId) => {
     if (state.events.some((event) => event.id === eventId)) state.selectedEventId = eventId;
     setView("events");
     renderEvents();
+    setEventStep("rate");
   },
   openPlayer: (playerId) => {
     if ($("#profilePlayer")) $("#profilePlayer").value = playerId;
@@ -4152,6 +4340,7 @@ window.TeamKompass = Object.freeze({
 
 applyTeamBrand();
 initTheme();
+setEventStep("list");
 prepareMobileAccordions();
 renderAll();
 initDataStore();

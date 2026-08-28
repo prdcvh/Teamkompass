@@ -1,5 +1,5 @@
-const CACHE = "teamkompass-shell-v1";
-const SHELL = ["./", "./index.html", "./styles.css", "./responsive-enhancements.css", "./app.js", "./next-level.js", "./manifest.webmanifest", "./assets/club-logo.png"];
+const CACHE = "teamkompass-shell-v2";
+const SHELL = ["./", "./index.html", "./base.css", "./styles.css", "./mobile.css", "./app.js", "./next-level.js", "./manifest.webmanifest", "./assets/club-logo.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)));
@@ -17,5 +17,13 @@ self.addEventListener("fetch", (event) => {
     const copy = response.clone();
     caches.open(CACHE).then((cache) => cache.put(event.request, copy));
     return response;
-  }).catch(() => caches.match(event.request).then((cached) => cached || caches.match("./index.html"))));
+  }).catch(async () => {
+    const cached = await caches.match(event.request);
+    if (cached) return cached;
+    // Die Shell nur bei echten Seitenaufrufen nachreichen. Frueher bekam auch
+    // ein fehlgeschlagener Skript- oder Stylesheet-Aufruf die index.html
+    // zurueck - also HTML statt JavaScript, was die App still zerlegt hat.
+    if (event.request.mode === "navigate") return caches.match("./index.html");
+    return Response.error();
+  }));
 });
