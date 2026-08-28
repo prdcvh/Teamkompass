@@ -2109,3 +2109,58 @@ menu {
   color: var(--muted);
   font-size: 0.85rem;
 }
+
+/* --------------------------------------------------------------------------
+   Elemente, die nur die Handy-Ansicht braucht bzw. anders nutzt.
+   -------------------------------------------------------------------------- */
+
+/* Zurueck-Knopf gehoert zum zweistufigen Handy-Ablauf; auf dem Desktop stehen
+   Liste und Bewertung nebeneinander. */
+.events-back-btn {
+  display: none;
+}
+
+/* Die Bank ist auf dem Desktop keine Klappbox, sondern schlicht ein Abschnitt. */
+.bench-disclosure {
+  margin-bottom: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.bench-disclosure > summary {
+  padding: 0;
+  background: none;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.bench-count {
+  margin-right: auto;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.bench-count::before { content: "· "; }
+
+.bench-player-name {
+  display: grid;
+  gap: 1px;
+}
+
+.bench-player-name strong {
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.bench-player-name small {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.bench-player-grade {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}

@@ -205,10 +205,13 @@
               </div>
               <div class="formation-picker" id="formationPicker"></div>
               <div class="pitch" id="pitch"></div>
-              <div class="panel-head">
-                <span class="muted">Bank - per Drag &amp; Drop oder Klick auf eine Position im Feld einwechseln</span>
-              </div>
-              <div class="pitch-bench" id="pitchBench"></div>
+              <details class="control-disclosure bench-disclosure" id="benchDisclosure" open>
+                <summary>Bank <span class="bench-count" id="benchCount"></span></summary>
+                <div class="disclosure-body">
+                  <span class="muted">Per Drag &amp; Drop oder Klick auf eine Position im Feld einwechseln</span>
+                  <div class="pitch-bench" id="pitchBench"></div>
+                </div>
+              </details>
             </section>
             <section class="panel">
               <div class="panel-head">
@@ -273,7 +276,7 @@
 
         <section class="view" id="eventsView">
           <div class="split-layout events-layout">
-            <section class="panel">
+            <section class="panel events-list-panel">
               <div class="panel-head">
                 <h2>Events</h2>
                 <button class="primary-button" id="newEventBtn">Event anlegen</button>
@@ -295,6 +298,10 @@
               </details>
             </section>
             <section class="panel event-editor">
+              <button class="events-back-btn" id="eventsBackBtn" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg>
+                <span>Alle Events</span>
+              </button>
               <div class="panel-head">
                 <div>
                   <h2 id="eventEditorTitle">Event bewerten</h2>
@@ -347,6 +354,7 @@
                 </table>
               </div>
               <div class="rating-stepper" id="ratingStepper" hidden>
+                <p class="rating-progress" id="ratingProgress" aria-live="polite"></p>
                 <div class="rating-stepper-nav">
                   <button type="button" class="icon-button" id="stepperPrevBtn" aria-label="Vorheriger Spieler">‹</button>
                   <div class="rating-stepper-position">

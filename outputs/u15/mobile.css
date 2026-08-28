@@ -920,64 +920,16 @@ details.opponent-details-toggle {
   font-weight: 800;
 }
 
+/* Die Formation wird ueber eine Auswahlliste gewechselt - eine Kartenreihe
+   zum Querscrollen zeigt auf dem Handy immer nur zwei Optionen gleichzeitig.
+   Das Markup dafuer erzeugt renderFormationPicker() geraeteabhaengig. */
 .formation-picker {
-  display: flex;
-  gap: 8px;
-  margin: 0 -14px;
-  padding: 2px 14px 6px;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  overscroll-behavior-x: contain;
-  scrollbar-width: none;
+  display: block;
 }
 
-.formation-picker::-webkit-scrollbar { display: none; }
-
-.formation-option {
-  position: relative;
+.formation-select-label {
   display: grid;
-  align-content: start;
-  gap: 3px;
-  flex: 0 0 auto;
-  width: 152px;
-  padding: 11px 12px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--panel);
-  color: var(--ink);
-  text-align: left;
-  scroll-snap-align: start;
-}
-
-.formation-option strong {
-  font-size: 0.98rem;
-  font-weight: 800;
-}
-
-.formation-option > span:not(.formation-badge) {
-  color: var(--muted);
-  font-size: 0.7rem;
-  line-height: 1.3;
-}
-
-.formation-option.recommended {
-  border-color: var(--green);
-  background: var(--soft-green);
-  padding-top: 24px;
-}
-
-.formation-badge {
-  position: absolute;
-  top: 7px;
-  left: 12px;
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: var(--green);
-  color: #fff;
-  font-size: 0.6rem;
-  font-weight: 800;
-  letter-spacing: var(--track-eyebrow);
-  text-transform: uppercase;
+  gap: 5px;
 }
 
 .pitch {
@@ -1087,39 +1039,57 @@ details.opponent-details-toggle {
   pointer-events: none;
 }
 
-.pitch-bench {
-  display: flex;
-  gap: 8px;
-  margin: 0 -14px;
-  padding: 2px 14px 4px;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scrollbar-width: none;
-}
-
-.pitch-bench::-webkit-scrollbar { display: none; }
-
-.bench-player {
-  display: grid;
-  flex: 0 0 auto;
-  width: 78px;
-  justify-items: center;
-  gap: 2px;
-  padding: 9px 6px;
-  border: 1px dashed var(--line);
-  border-radius: 13px;
-  background: var(--panel-2);
-  color: var(--ink);
-}
-
-.bench-player > span {
+/* Bank: vollstaendige Liste nach Note sortiert statt Querscroller.
+   Standardmaessig zugeklappt - dafuer sorgt prepareMobileAccordions(). */
+.bench-count {
+  margin-right: auto;
+  color: var(--muted);
   font-size: 0.78rem;
   font-weight: 700;
 }
 
-.bench-player small {
+.bench-count::before { content: "· "; }
+
+.pitch-bench {
+  display: grid;
+  gap: 6px;
+}
+
+.bench-player {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-2);
+  color: var(--ink);
+  text-align: left;
+}
+
+.bench-player-name {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.bench-player-name strong {
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.bench-player-name small {
   color: var(--muted);
-  font-size: 0.64rem;
+  font-size: 0.72rem;
+}
+
+.bench-player-grade {
+  font-size: 0.98rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
 }
 
 /* --- Formkurve --- */
@@ -1267,31 +1237,80 @@ details.opponent-details-toggle {
   font-weight: 600;
 }
 
-/* Festes Raster: so kann "Loeschen" nie in eine eigene, breite Zeile
-   rutschen und damit wichtiger aussehen als "Profil". */
+/* Eine sichtbare Hauptaktion pro Karte; Bearbeiten, Einladen und Loeschen
+   liegen im Ueberlaufmenue. Bei elf Spielern spart das 33 Schaltflaechen. */
 .player-card-mobile-actions {
   display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 6px;
   padding-top: 9px;
   border-top: 1px solid var(--line);
 }
 
-.player-card-mobile-actions .ghost-button {
+.player-card-mobile-actions > .ghost-button {
   min-width: 0;
-  min-height: 40px;
-  padding: 0 7px;
-  border-radius: 10px;
-  font-size: 0.78rem;
-  font-weight: 700;
+  min-height: 42px;
+  border-color: var(--red);
+  border-radius: 11px;
+  color: var(--red);
+  font-size: 0.86rem;
+  font-weight: 800;
 }
 
-/* "Profil" ist die Hauptaktion der Karte und bleibt als einzige farbig */
-.player-card-mobile-actions .ghost-button:first-child {
+.card-menu {
+  position: relative;
+}
+
+.card-menu[open] {
+  z-index: 6;
+}
+
+.card-menu > summary {
+  display: grid;
+  width: 48px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  list-style: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.card-menu > summary::-webkit-details-marker { display: none; }
+.card-menu > summary::marker { content: ""; }
+
+.card-menu[open] > summary {
   border-color: var(--red);
   color: var(--red);
-  font-weight: 800;
+}
+
+.card-menu-list {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  display: grid;
+  gap: 6px;
+  width: max-content;
+  min-width: 176px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: var(--m-lift);
+}
+
+.card-menu-list .ghost-button {
+  justify-content: flex-start;
+  width: 100%;
+  min-height: 44px;
+  font-size: 0.9rem;
 }
 
 .fab-mobile {
@@ -1326,6 +1345,36 @@ details.opponent-details-toggle {
 
 /* ---- 08 Events und Bewertung -------------------------------------------- */
 
+/* Der Tab ist auf dem Handy zweistufig: erst die Liste, dann die Bewertung
+   genau eines Events. Beides gleichzeitig zu stapeln hiess vorher, an Liste,
+   Suche, Filtern und Eventdetails vorbeizuscrollen, bevor die erste Note kam.
+   setEventStep() in app.js setzt das Attribut; der Desktop ignoriert es. */
+#eventsView[data-step="list"] .event-editor,
+#eventsView[data-step="rate"] .events-list-panel {
+  display: none;
+}
+
+.events-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  justify-self: start;
+  min-height: 40px;
+  margin: -2px 0 2px -8px;
+  padding: 0 10px 0 6px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--red);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.events-back-btn svg {
+  width: 19px;
+  height: 19px;
+}
+
 .events-layout,
 .split-layout {
   display: grid;
@@ -1352,12 +1401,12 @@ details.opponent-details-toggle {
   text-transform: uppercase;
 }
 
-/* Kompakte Eventkarte: Typ und Titel oben, alle Randdaten in einer Zeile */
+/* Eventkarte gestapelt: Typ, dann Titel ueber die volle Breite, dann die
+   Randdaten. Nebeneinander bricht der Titel sonst neben der Typ-Pille um. */
 .event-card {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 2px 9px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 3px;
   padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 13px;
@@ -1367,19 +1416,17 @@ details.opponent-details-toggle {
 }
 
 .event-card .event-type {
-  grid-row: 1;
+  justify-self: start;
 }
 
 .event-card strong {
-  grid-row: 1;
-  font-size: 0.94rem;
+  font-size: 0.96rem;
   font-weight: 800;
-  line-height: 1.2;
+  line-height: 1.25;
 }
 
 .event-card small,
 .event-card > span:not(.event-type) {
-  grid-column: 1 / -1;
   color: var(--muted);
   font-size: 0.74rem;
   line-height: 1.35;
@@ -1422,10 +1469,11 @@ details.opponent-details-toggle {
   display: grid;
   grid-template-columns: 1fr;
   gap: 10px;
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--panel-2);
+}
+
+/* Das Event steht bereits im Titel und ist ueber "Alle Events" wechselbar. */
+.rating-toolbar > label:first-child {
+  display: none;
 }
 
 /* "Event loeschen" bleibt erreichbar, draengt sich aber nicht auf */
@@ -1498,6 +1546,54 @@ details.opponent-details-toggle {
   font-size: 15px;
   font-weight: 700;
   text-align: center;
+}
+
+/* Fortschritt der Bewertungsrunde - steht bewusst ueber der Navigation,
+   damit er nicht mit der Positionsanzeige "1 / 11" verwechselt wird. */
+.rating-progress {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0 2px;
+}
+
+.rating-progress:empty {
+  display: none;
+}
+
+.rating-progress-label {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.rating-progress-track {
+  display: block;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--soft-neutral);
+}
+
+.rating-progress-track > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--red);
+  transition: width 0.2s ease;
+}
+
+.rating-progress[data-complete="true"] .rating-progress-label {
+  color: var(--green);
+}
+
+.rating-progress[data-complete="true"] .rating-progress-label::after {
+  content: " · vollständig";
+}
+
+.rating-progress[data-complete="true"] .rating-progress-track > span {
+  background: var(--green);
 }
 
 .rating-stepper-card {

@@ -1560,6 +1560,7 @@ function setView(viewName) {
     renderSquad();
     if (isCloudTrainer()) renderAccessManager();
   }
+  if (viewName === "events") setEventStep("list");
   if (viewName === "profiles") drawProfile();
   if (viewName === "opponents") renderOpponentAnalysis();
   if (viewName === "teamAnalysis") renderTeamAnalysis();
@@ -1579,6 +1580,15 @@ function prepareMobileAccordions() {
     section.open = section.dataset.mobileDefaultOpen === "true";
   });
   mobileAccordionsPrepared = true;
+}
+
+// Auf dem Handy ist der Event-Tab zweistufig: erst die Liste, dann die
+// Bewertung eines Events. Auf dem Desktop stehen beide Panels nebeneinander,
+// dort ignoriert das CSS dieses Attribut.
+function setEventStep(step) {
+  const view = $("#eventsView");
+  if (!view) return;
+  view.dataset.step = step === "rate" && selectedEvent() ? "rate" : "list";
 }
 
 function selectedEvent() {
@@ -2254,11 +2264,36 @@ function renderFormationPicker() {
     preview.filled === bestFilled && preview.grade !== null && (best === null || preview.grade < best) ? preview.grade : best
   ), null);
   const recommendedIndex = previews.findIndex((preview) => preview.filled === bestFilled && preview.grade === bestGrade);
-  $("#formationPicker").innerHTML = previews.map((preview, index) => {
+  const options = previews.map((preview, index) => {
     const name = formationNameFromPreset(FORMATION_PRESETS[index]);
     const recommended = index === recommendedIndex;
     return { preview, name, recommended };
-  }).map(({ preview, name, recommended }, index) => `
+  });
+
+  // Auf dem Handy waere eine Kartenreihe zum Querscrollen; dort ist eine
+  // Auswahlliste schneller und zeigt alle Formationen auf einen Blick.
+  if (isMobileViewport()) {
+    const currentName = formationNameFromAssignments(state.lineup?.assignments || {});
+    const isKnown = options.some(({ name }) => name === currentName);
+    // Passt die aktuelle Aufstellung zu keiner Vorlage, steht sie als
+    // nicht auswaehlbarer Hinweis oben - sonst waere unklar, was gerade steht.
+    const placeholder = currentName === "Keine Aufstellung"
+      ? "Formation wählen"
+      : `Eigene Aufstellung · ${currentName}`;
+    $("#formationPicker").innerHTML = `
+      <label class="formation-select-label">
+        <span>Formation</span>
+        <select id="formationSelect" aria-label="Formation wählen">
+          ${isKnown ? "" : `<option value="" selected>${escapeHtml(placeholder)}</option>`}
+          ${options.map(({ preview, name, recommended }, index) => `
+            <option value="${index}" ${isKnown && name === currentName ? "selected" : ""}>${name} · Ø ${gradeLabel(preview.grade)} · ${preview.filled}/${preview.total}${recommended ? " · empfohlen" : ""}</option>
+          `).join("")}
+        </select>
+      </label>`;
+    return;
+  }
+
+  $("#formationPicker").innerHTML = options.map(({ preview, name, recommended }, index) => `
     <button type="button" class="formation-option ${recommended ? "recommended" : ""}" data-formation-index="${index}">
       ${recommended ? `<span class="formation-badge">Empfohlen</span>` : ""}
       <strong>${name}</strong>
@@ -2269,13 +2304,31 @@ function renderFormationPicker() {
 
 function renderPitchBench() {
   const onPitch = new Set(Object.values(state.lineup.assignments).flat());
-  const bench = state.players.filter((player) => !onPitch.has(player.id));
+  // Beste Note zuerst (1 ist die beste Schulnote), noch unbewertete Spieler
+  // ans Ende und dort nach Rueckennummer.
+  const bench = state.players
+    .filter((player) => !onPitch.has(player.id))
+    .sort((a, b) => {
+      const gradeA = playerAverageGrade(a.id);
+      const gradeB = playerAverageGrade(b.id);
+      if (gradeA && gradeB && gradeA !== gradeB) return gradeA - gradeB;
+      if (gradeA && !gradeB) return -1;
+      if (!gradeA && gradeB) return 1;
+      return a.number - b.number;
+    });
+
+  const counter = $("#benchCount");
+  if (counter) counter.textContent = bench.length ? `${bench.length} Spieler` : "leer";
+
   $("#pitchBench").innerHTML = bench.length
     ? bench.map((player) => `
         <button type="button" class="bench-player" data-player-id="${player.id}">
           <span class="number-badge">${player.number}</span>
-          <span>${escapeHtml(player.name.split(" ")[0])}</span>
-          <small class="muted">${positionText(player)}</small>
+          <span class="bench-player-name">
+            <strong>${escapeHtml(player.name)}</strong>
+            <small class="muted">${positionText(player)}</small>
+          </span>
+          <span class="bench-player-grade">${gradeLabel(playerAverageGrade(player.id))}</span>
         </button>
       `).join("")
     : `<p class="muted">Alle Spieler stehen auf dem Feld.</p>`;
@@ -2429,10 +2482,15 @@ function renderSquad() {
           <span class="player-card-mobile-grade">${gradeLabel(playerAverageGrade(player.id))}</span>
         </div>
         <div class="player-card-mobile-actions">
-          <button class="ghost-button" data-action="profile" data-id="${player.id}">Profil</button>
-          <button class="ghost-button" data-action="edit" data-id="${player.id}">Bearbeiten</button>
-          <button class="ghost-button" data-action="invite" data-id="${player.id}">Einladen</button>
-          <button class="ghost-button danger" data-action="delete" data-id="${player.id}" type="button">Löschen</button>
+          <button class="ghost-button" data-action="profile" data-id="${player.id}">Profil öffnen</button>
+          <details class="card-menu" name="squadCardMenu">
+            <summary aria-label="Weitere Aktionen für ${escapeHtml(player.name)}"><span aria-hidden="true">···</span></summary>
+            <div class="card-menu-list">
+              <button class="ghost-button" data-action="edit" data-id="${player.id}">Bearbeiten</button>
+              <button class="ghost-button" data-action="invite" data-id="${player.id}">Einladen</button>
+              <button class="ghost-button danger" data-action="delete" data-id="${player.id}" type="button">Löschen</button>
+            </div>
+          </details>
         </div>
       </article>
     `;
@@ -2518,6 +2576,9 @@ function renderEvents() {
     pastToggle.hidden = false;
     $("#pastEventsSummary").textContent = `Vergangene Events (${past.length})`;
     $("#pastEventsList").innerHTML = eventCardsHtml(past);
+    // Ohne anstehende Events waere die Liste sonst leer, obwohl es Events
+    // gibt - dann sind die vergangenen von vornherein aufgeklappt.
+    if (!upcoming.length) pastToggle.open = true;
   } else {
     pastToggle.hidden = true;
     pastToggle.open = false;
@@ -2692,6 +2753,23 @@ function renderRatingStepper(event, players, matchDuration) {
   $("#stepperNextBtn").disabled = ratingStepperIndex === players.length - 1;
   $("#stepperCard").className = `rating-stepper-card attendance-${attendance}`;
   $("#stepperCard").innerHTML = renderRatingCard(player, event, matchDuration);
+
+  const progress = $("#ratingProgress");
+  if (progress) {
+    // Fertig ist, wer eine Gesamtnote hat oder bewusst als fehlend bzw.
+    // nicht im Kader markiert wurde - beides braucht keine Teilnoten mehr.
+    const done = state.players.filter((item) => {
+      const entry = event.ratings?.[item.id] || {};
+      return Boolean(calculatedGrade(entry)) || ["absent", "excluded"].includes(entry.attendance);
+    }).length;
+    const total = state.players.length;
+    const share = total ? Math.round((done / total) * 100) : 0;
+    progress.innerHTML = total
+      ? `<span class="rating-progress-label">${done} von ${total} Spielern erfasst</span>
+         <span class="rating-progress-track"><span style="width:${share}%"></span></span>`
+      : "";
+    progress.dataset.complete = String(total > 0 && done === total);
+  }
 }
 
 function escapeHtml(value) {
@@ -2821,6 +2899,7 @@ function saveEvent(event) {
   cloudSaveEvent(newEvent);
   renderAll();
   setView("events");
+  setEventStep("rate");
 }
 
 function updateRating(playerId, field, value, rerender = true) {
@@ -3851,6 +3930,8 @@ window.addEventListener("resize", () => {
   if (!isMobileViewport()) mobileAccordionsPrepared = false;
   prepareMobileAccordions();
   renderLeaders();
+  // Die Formationsauswahl sieht je nach Geraeteklasse anders aus.
+  if ($("#dashboardView")?.classList.contains("active")) renderFormationPicker();
   // Diagramme haengen an der Breite ihrer Zeichenflaeche und muessen nach
   // Drehen des Geraets bzw. Groessenaenderung neu gezeichnet werden.
   clearTimeout(resizeRedrawTimer);
@@ -4138,10 +4219,23 @@ function handleEventListClick(event) {
   state.selectedEventId = card.dataset.eventId;
   persist();
   renderEvents();
+  setEventStep("rate");
 }
 
 $("#eventList").addEventListener("click", handleEventListClick);
 $("#pastEventsList").addEventListener("click", handleEventListClick);
+$("#eventsBackBtn").addEventListener("click", () => setEventStep("list"));
+$("#formationPicker").addEventListener("change", (event) => {
+  const select = event.target.closest("#formationSelect");
+  if (!select || select.value === "") return;
+  applyFormationPreset(Number(select.value));
+});
+// Ein offenes Kartenmenue schliesst sich, sobald daneben getippt wird.
+document.addEventListener("click", (event) => {
+  document.querySelectorAll(".card-menu[open]").forEach((menu) => {
+    if (!menu.contains(event.target)) menu.open = false;
+  });
+});
 
 $("#ratingTable").addEventListener("change", (event) => {
   const input = event.target.closest(".rating-input");
@@ -4235,6 +4329,7 @@ window.TeamKompass = Object.freeze({
     if (state.events.some((event) => event.id === eventId)) state.selectedEventId = eventId;
     setView("events");
     renderEvents();
+    setEventStep("rate");
   },
   openPlayer: (playerId) => {
     if ($("#profilePlayer")) $("#profilePlayer").value = playerId;
@@ -4245,6 +4340,7 @@ window.TeamKompass = Object.freeze({
 
 applyTeamBrand();
 initTheme();
+setEventStep("list");
 prepareMobileAccordions();
 renderAll();
 initDataStore();
