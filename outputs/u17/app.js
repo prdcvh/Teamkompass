@@ -151,10 +151,6 @@ const views = {
   dashboard: $("#dashboardView"),
   squad: $("#squadView"),
   events: $("#eventsView"),
-  // Der Planungsbereich ist derzeit ueber keine Navigation erreichbar (auf
-  // Wunsch aus den Menues genommen). Markup und Logik bleiben absichtlich
-  // bestehen, damit er sich ohne Neuaufbau wieder einhaengen laesst.
-  planning: $("#planningView"),
   profiles: $("#profilesView"),
   opponents: $("#opponentsView"),
   teamAnalysis: $("#teamAnalysisView")
@@ -176,7 +172,6 @@ const titles = {
   dashboard: "Dashboard",
   squad: "Kader",
   events: "Events und Bewertungen",
-  planning: "Planung",
   profiles: "Spielerprofile",
   opponents: "Gegneranalyse",
   teamAnalysis: "Teamanalyse"
@@ -352,6 +347,9 @@ function chartPalette() {
 
 function loadState() {
   try {
+    // Der frueher im Planungsbereich einstellbare Wert wird weiter respektiert,
+    // damit bestehende Installationen ihre Aufbewahrungsdauer behalten. Ohne
+    // gespeicherten Wert gelten 90 Tage.
     const workspace = JSON.parse(localStorage.getItem("teamkompass-workspace-v1") || "{}");
     const retentionMs = Number(workspace.retentionDays || 90) * 86400000;
     const stamp = Number(localStorage.getItem(cacheStampKey) || Date.now());
@@ -4316,18 +4314,6 @@ $("#accessManagerList").addEventListener("click", (event) => {
 
 window.TeamKompass = Object.freeze({
   getState: () => structuredClone(state),
-  newEvent: () => openEventDialog(),
-  saveWorkspace: async (workspace) => {
-    if (!isCloudTrainer()) return false;
-    await firestoreModule.setDoc(teamDoc("meta", "operations"), { ...workspace, updatedAt: firestoreModule.serverTimestamp() }, { merge: true });
-    return true;
-  },
-  subscribeWorkspace: (callback) => {
-    if (!isCloudTrainer()) return () => {};
-    return firestoreModule.onSnapshot(teamDoc("meta", "operations"), (snapshot) => {
-      if (snapshot.exists()) callback(snapshot.data());
-    }, console.error);
-  },
   openEvent: (eventId) => {
     if (state.events.some((event) => event.id === eventId)) state.selectedEventId = eventId;
     setView("events");

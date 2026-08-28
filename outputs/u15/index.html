@@ -363,48 +363,6 @@
           </div>
         </section>
 
-        <section class="view" id="planningView">
-          <div class="operations-grid">
-            <section class="panel operations-hero">
-              <div class="panel-head">
-                <div><span class="eyebrow">Diese Woche</span><h2>Coach Cockpit</h2></div>
-                <button class="primary-button" id="planningNewEventBtn" type="button">Event planen</button>
-              </div>
-              <div class="operations-summary" id="operationsSummary"></div>
-            </section>
-            <section class="panel">
-              <div class="panel-head"><h2>Handlungsbedarf</h2><span class="muted">nach Priorität</span></div>
-              <div class="action-feed" id="actionFeed"></div>
-            </section>
-            <section class="panel operations-week">
-              <div class="panel-head"><h2>7-Tage-Plan</h2><span class="muted">Training, Spiel und Regeneration</span></div>
-              <div class="week-timeline" id="weekTimeline"></div>
-            </section>
-            <section class="panel">
-              <div class="panel-head"><h2>Wochenfokus</h2><span class="muted">gemeinsame Leitlinie</span></div>
-              <form class="development-form" id="weeklyFocusForm">
-                <label>Fokus <input id="weeklyFocus" maxlength="80" placeholder="z.B. nach Ballverlust sofort Zentrum schließen" /></label>
-                <label>Erfolgskriterium <textarea id="weeklySuccess" rows="3" maxlength="240" placeholder="Woran erkennen wir Fortschritt?"></textarea></label>
-                <button class="primary-button" type="submit">Wochenfokus speichern</button>
-              </form>
-            </section>
-            <section class="panel">
-              <div class="panel-head"><h2>Matchday-Cockpit</h2><span class="muted" id="matchdayStatus">nächstes Spiel</span></div>
-              <div id="matchdayCockpit"></div>
-            </section>
-            <section class="panel privacy-panel">
-              <div class="panel-head"><h2>Datenschutz &amp; Nachvollziehbarkeit</h2><span class="muted">Privacy by Design</span></div>
-              <div class="privacy-grid">
-                <label>Lokale Aufbewahrung
-                  <select id="retentionDays"><option value="30">30 Tage</option><option value="90">90 Tage</option><option value="180">180 Tage</option><option value="365">1 Jahr</option></select>
-                </label>
-                <button class="ghost-button" id="clearLocalCacheBtn" type="button">Lokalen Zwischenspeicher löschen</button>
-              </div>
-              <details class="control-disclosure"><summary>Aktivitätsverlauf</summary><div class="activity-log" id="activityLog"></div></details>
-            </section>
-          </div>
-        </section>
-
         <section class="view" id="profilesView">
           <div class="profile-layout">
             <section class="panel profile-summary">

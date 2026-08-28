@@ -6,13 +6,13 @@
    bewusst NICHT. Gemeinsame Design-Tokens kommen aus base.css.
 
    Aufbau:
-     01 Tokens            07 Kader
-     02 Grundgeruest      08 Events + Bewertung
-     03 Kopfbereich       09 Planung
-     04 Bottom-Nav        10 Profile
-     05 Bausteine         11 Gegneranalyse
-     06 Dashboard         12 Teamanalyse
-                          13 Dialoge  14 Login  15 Feinschliff
+     01 Tokens            08 Events + Bewertung
+     02 Grundgeruest      09 Profile
+     03 Kopfbereich       10 Gegneranalyse
+     04 Bottom-Nav        11 Teamanalyse
+     05 Bausteine         12 Dialoge
+     06 Dashboard         13 Anmeldung
+     07 Kader             14 Feinschliff
    ========================================================================== */
 
 /* ---- 01 Tokens ---------------------------------------------------------- */
@@ -1694,159 +1694,7 @@ details.opponent-details-toggle {
   width: 100%;
 }
 
-/* ---- 09 Planung --------------------------------------------------------- */
-
-.operations-grid {
-  display: grid;
-  gap: var(--m-gap);
-}
-
-.operations-summary {
-  display: grid;
-  gap: 8px;
-}
-
-.operations-summary article,
-.matchday-score {
-  display: grid;
-  gap: 3px;
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: 13px;
-  background: var(--panel-2);
-}
-
-.operations-summary span,
-.operations-summary small,
-.matchday-score span,
-.matchday-score small {
-  color: var(--muted);
-  font-size: 0.76rem;
-}
-
-.operations-summary strong,
-.matchday-score strong {
-  font-size: 1.02rem;
-  font-weight: 800;
-  line-height: 1.25;
-}
-
-.action-feed,
-.activity-log {
-  display: grid;
-  gap: 8px;
-}
-
-.action-item {
-  padding: 11px 13px;
-  border: 1px solid var(--line);
-  border-left: 4px solid var(--line);
-  border-radius: 12px;
-  background: var(--panel-2);
-}
-
-.action-item strong { font-size: 0.94rem; font-weight: 800; }
-.action-item p { margin: 4px 0 0; color: var(--muted); font-size: 0.82rem; line-height: 1.4; }
-.action-item.high   { border-left-color: var(--red); }
-.action-item.medium { border-left-color: var(--amber); }
-.action-item.ok     { border-left-color: var(--green); }
-
-/* Der 7-Tage-Plan laeuft auf dem Handy senkrecht statt seitlich */
-.week-timeline {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 6px;
-}
-
-.week-day {
-  display: grid;
-  grid-template-columns: 62px minmax(0, 1fr);
-  align-items: center;
-  gap: 4px 10px;
-  min-height: 52px;
-  padding: 9px 12px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--panel-2);
-}
-
-.week-day > div {
-  display: grid;
-  gap: 0;
-}
-
-.week-day > div strong {
-  font-size: 0.88rem;
-  font-weight: 800;
-}
-
-.week-day > div span {
-  color: var(--muted);
-  font-size: 0.72rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.week-day > .muted {
-  font-size: 0.8rem;
-}
-
-.week-day button {
-  display: grid;
-  gap: 2px;
-  padding: 8px 10px;
-  border: 0;
-  border-radius: 9px;
-  background: var(--soft-red);
-  color: inherit;
-  text-align: left;
-}
-
-.week-day button strong { font-size: 0.86rem; }
-.week-day button small  { color: var(--muted); font-size: 0.72rem; }
-.week-day.has-event { border-color: color-mix(in srgb, var(--red) 40%, var(--line)); }
-
-.matchday-checks {
-  display: grid;
-  gap: 8px;
-  margin: 12px 0;
-}
-
-.matchday-checks span {
-  position: relative;
-  padding-left: 24px;
-  font-size: 0.86rem;
-}
-
-.matchday-checks span::before {
-  position: absolute;
-  left: 0;
-  content: "○";
-  color: var(--muted);
-}
-
-.matchday-checks span.done::before {
-  content: "✓";
-  color: var(--green);
-  font-weight: 800;
-}
-
-.privacy-grid {
-  display: grid;
-  gap: 10px;
-  margin-bottom: 12px;
-}
-
-.activity-log article {
-  display: grid;
-  gap: 2px;
-  padding: 9px 0;
-  border-bottom: 1px solid var(--line);
-}
-
-.activity-log strong { font-size: 0.86rem; }
-.activity-log span   { color: var(--muted); font-size: 0.74rem; }
-
-/* ---- 10 Profile --------------------------------------------------------- */
+/* ---- 09 Profile --------------------------------------------------------- */
 
 .profile-layout,
 .profile-deep-grid {
@@ -2071,7 +1919,7 @@ canvas {
   font-variant-numeric: tabular-nums;
 }
 
-/* ---- 11 Gegneranalyse --------------------------------------------------- */
+/* ---- 10 Gegneranalyse --------------------------------------------------- */
 
 .opponent-layout {
   display: grid;
@@ -2135,7 +1983,7 @@ canvas {
 
 .opponent-detail-grid p { margin: 3px 0 0; font-size: 0.86rem; line-height: 1.45; }
 
-/* ---- 12 Teamanalyse ----------------------------------------------------- */
+/* ---- 11 Teamanalyse ----------------------------------------------------- */
 
 .team-analysis-layout,
 .team-chart-grid {
@@ -2171,7 +2019,7 @@ canvas {
   line-height: 1.4;
 }
 
-/* ---- 13 Dialoge --------------------------------------------------------- */
+/* ---- 12 Dialoge --------------------------------------------------------- */
 
 /* Alle Dialoge sind auf dem Handy Blaetter, die von unten hereinkommen. */
 dialog {
@@ -2360,7 +2208,7 @@ dialog menu {
 #commandResults button strong { font-size: 0.92rem; font-weight: 700; }
 #commandResults span { flex: 0 0 auto; color: var(--muted); font-size: 0.74rem; }
 
-/* ---- 14 Anmeldung ------------------------------------------------------- */
+/* ---- 13 Anmeldung ------------------------------------------------------- */
 
 .auth-gate {
   position: fixed;
@@ -2417,7 +2265,7 @@ dialog menu {
   background: var(--line);
 }
 
-/* ---- 15 Feinschliff ----------------------------------------------------- */
+/* ---- 14 Feinschliff ----------------------------------------------------- */
 
 /* Muss nach allen display-Regeln stehen, damit versteckte Felder
    (z.B. "verletzt bis", "Abmelden") wirklich verborgen bleiben. */

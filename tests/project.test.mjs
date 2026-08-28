@@ -45,11 +45,28 @@ test("Hosting setzt grundlegende Browser-Sicherheitsheader", async () => {
   }
 });
 
-test("PWA-Dateien und Planungsansicht sind eingebunden", async () => {
+test("PWA-Dateien und alle Ansichten sind eingebunden", async () => {
   const html = await read("outputs/team-manager/index.html");
   assert.match(html, /manifest\.webmanifest/);
-  assert.match(html, /id="planningView"/);
   assert.match(html, /next-level\.js/);
+  for (const view of ["dashboardView", "squadView", "eventsView", "profilesView", "opponentsView", "teamAnalysisView"]) {
+    assert.match(html, new RegExp(`id="${view}"`), `${view} fehlt`);
+  }
+});
+
+test("der ausgebaute Planungsbereich hinterlaesst keine Reste", async () => {
+  for (const team of teams) {
+    for (const file of ["index.html", "app.js", "next-level.js"]) {
+      const content = await read(`outputs/${team}/${file}`);
+      assert.ok(!content.includes("planningView"), `${team}/${file}: planningView noch vorhanden`);
+      assert.ok(!/data-view="planning"/.test(content), `${team}/${file}: Navigationseintrag noch vorhanden`);
+      assert.ok(!content.includes("renderOperations"), `${team}/${file}: Planungs-Rendering noch vorhanden`);
+    }
+    // Der Zugriff auf die frueher dort gepflegte Aufbewahrungsdauer bleibt
+    // bewusst bestehen, damit gespeicherte Werte weiter respektiert werden.
+    const app = await read(`outputs/${team}/app.js`);
+    assert.match(app, /teamkompass-workspace-v1/);
+  }
 });
 
 test("Handy- und Desktop-Stylesheet sind sauber getrennt", async () => {
