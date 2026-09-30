@@ -130,3 +130,37 @@ test("Service Worker und Hosting kennen die neuen Stylesheets", async () => {
     assert.ok(!sources.includes("/responsive-enhancements.css"), `${site.target}: alter Stylesheet-Header noch vorhanden`);
   }
 });
+
+test("alle Cloud-Schreibfunktionen setzen die Sync-Anzeige zurueck (Erfolg und Fehler)", async () => {
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    const start = app.indexOf("async function cloudWrite(");
+    const end = app.indexOf("// ---- Auth-Gate (Login)");
+    assert.ok(start > 0 && end > start, `${team}: cloudWrite fehlt`);
+    const names = ["cloudSaveDevelopmentPlan", "cloudDeleteDevelopmentPlan", "cloudSaveAbsence", "cloudDeleteAbsence", "cloudSaveMeasurement", "cloudDeleteMeasurement", "cloudSaveLineup", "cloudSaveOpponent", "cloudDeleteOpponent"];
+    const build = (fail) => {
+      const calls = [];
+      const firestoreModule = {
+        setDoc: async () => { if (fail) throw new Error("boom"); },
+        deleteDoc: async () => { if (fail) throw new Error("boom"); }
+      };
+      const api = new Function("isCloudTrainer", "firestoreModule", "teamDoc", "cloudWriteSucceeded", "cloudWriteFailed", `${app.slice(start, end)}; return { ${names.join(", ")} };`)(
+        () => true, firestoreModule, () => "ref", () => calls.push("ok"), () => calls.push("fail")
+      );
+      return { api, calls };
+    };
+    for (const fail of [false, true]) {
+      const { api, calls } = build(fail);
+      await api.cloudSaveDevelopmentPlan("p", { id: "x" });
+      await api.cloudDeleteDevelopmentPlan("p", "x");
+      await api.cloudSaveAbsence("p", { id: "x" });
+      await api.cloudDeleteAbsence("p", "x");
+      await api.cloudSaveMeasurement("p", { id: "x" });
+      await api.cloudDeleteMeasurement("p", "x");
+      await api.cloudSaveLineup({});
+      await api.cloudSaveOpponent({ id: "x" });
+      await api.cloudDeleteOpponent("x");
+      assert.deepEqual(calls, Array(names.length).fill(fail ? "fail" : "ok"), `${team}: Sync-Status ${fail ? "Fehler" : "Erfolg"} nicht fuer alle gesetzt`);
+    }
+  }
+});
