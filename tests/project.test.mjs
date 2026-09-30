@@ -210,3 +210,18 @@ test("Ansichten sind je Rolle gesperrt (setView) und die Suche zeigt nur erlaubt
     assert.match(nextLevel, /allowedViews\?\.\(\)/, `${team}: Befehlspalette filtert nicht nach Rolle`);
   }
 });
+
+test("Spieler und Eltern sehen keine Bearbeiten-/Loeschen-Buttons bei Abwesenheiten und Messwerten", async () => {
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    const css = await read(`outputs/${team}/base.css`);
+    for (const action of ["edit-plan", "edit-absence", "edit-measurement"]) {
+      assert.match(app, new RegExp(`\\$\\{canManageRecords\\(\\) \\? \`<div class="row-actions">\\s*<button[^>]*data-action="${action}"`), `${team}: ${action}-Buttons werden ungeprueft gerendert`);
+    }
+    for (const role of ["player", "parent"]) {
+      for (const list of ["#absenceList", "#measurementList"]) {
+        assert.ok(css.includes(`body.role-${role} ${list} .row-actions`), `${team}: ${role} ${list} nicht per CSS ausgeblendet`);
+      }
+    }
+  }
+});
