@@ -130,3 +130,10 @@ test("Service Worker und Hosting kennen die neuen Stylesheets", async () => {
     assert.ok(!sources.includes("/responsive-enhancements.css"), `${site.target}: alter Stylesheet-Header noch vorhanden`);
   }
 });
+
+test("Eltern-Zugang laedt die Bewertungen des verknuepften Spielers", async () => {
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    assert.match(app, /\["player", "parent"\]\.includes\(currentRole\) && currentPlayerId\) syncPlayerRatingListeners\(eventIds\)/, `${team}: Eltern erhalten keine Bewertungs-Listener`);
+  }
+});
