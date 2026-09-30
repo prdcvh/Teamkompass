@@ -153,3 +153,10 @@ test("Abmelden entfernt den lokalen Teamstand; Nicht-Trainer-Rollen cachen nicht
     assert.equal((app.match(/localStorage\.setItem\(storageKey/g) || []).length, 2, `${team}: ungeschuetzter Schreibzugriff auf den Cache`);
   }
 });
+
+test("Eltern-Zugang laedt die Bewertungen des verknuepften Spielers", async () => {
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    assert.match(app, /\["player", "parent"\]\.includes\(currentRole\) && currentPlayerId\) syncPlayerRatingListeners\(eventIds\)/, `${team}: Eltern erhalten keine Bewertungs-Listener`);
+  }
+});
