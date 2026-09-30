@@ -192,3 +192,21 @@ test("neue Spiele starten ohne Ergebnis (Felder leer, nicht 0)", async () => {
     assert.doesNotMatch(app, /goalsFor === "" \? 0/, `${team}: Bewertungsbereich zeigt leeres Ergebnis als 0`);
   }
 });
+
+test("Ansichten sind je Rolle gesperrt (setView) und die Suche zeigt nur erlaubte Bereiche", async () => {
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    const nextLevel = await read(`outputs/${team}/next-level.js`);
+    const start = app.indexOf("function allowedViews()");
+    const end = app.indexOf("function setView(");
+    assert.ok(start > 0 && end > start, `${team}: allowedViews fehlt`);
+    const allowedFor = (role) => new Function("currentRole", "views", `${app.slice(start, end)}; return allowedViews();`)(role, { dashboard: 1, squad: 1, events: 1, profiles: 1, opponents: 1, teamAnalysis: 1 });
+    assert.deepEqual(allowedFor("player"), ["profiles"]);
+    assert.deepEqual(allowedFor("parent"), ["profiles"]);
+    assert.deepEqual(allowedFor("medical"), ["squad", "profiles"]);
+    assert.equal(allowedFor("trainer").length, 6);
+    assert.match(app, /function setView\(viewName\) \{\s*if \(!allowedViews\(\)\.includes\(viewName\)\) return;/, `${team}: setView prueft die Rolle nicht`);
+    assert.match(app, /openEvent: \(eventId\) => \{\s*if \(!allowedViews\(\)\.includes\("events"\)\) return;/, `${team}: openEvent prueft die Rolle nicht`);
+    assert.match(nextLevel, /allowedViews\?\.\(\)/, `${team}: Befehlspalette filtert nicht nach Rolle`);
+  }
+});
