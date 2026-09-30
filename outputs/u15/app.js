@@ -1996,8 +1996,25 @@ function gameEvents() {
   return state.events.filter((event) => event.type === "Spiel");
 }
 
+function hasScore(value) {
+  return value !== null && value !== undefined && String(value).trim() !== "" && Number.isFinite(Number(value));
+}
+
+// Leeres Ergebnisfeld = "noch kein Ergebnis" (nicht 0).
+function scoreOrEmpty(value) {
+  return hasScore(value) ? Number(value) : "";
+}
+
+function localIsoDate(date = new Date()) {
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+// Ein Ergebnis zaehlt nur, wenn beide Werte eingetragen sind und das Spiel nicht in der
+// Zukunft liegt (ein vorab angelegtes Spiel mit 0:0 ist kein Unentschieden).
 function gameResult(event) {
-  if (event.type !== "Spiel" || event.goalsFor === "" || event.goalsAgainst === "") return null;
+  if (event.type !== "Spiel" || !hasScore(event.goalsFor) || !hasScore(event.goalsAgainst)) return null;
+  if (event.date && event.date > localIsoDate()) return null;
   const goalsFor = Number(event.goalsFor);
   const goalsAgainst = Number(event.goalsAgainst);
   return {
@@ -2744,8 +2761,8 @@ function renderRatingTable() {
   $("#eventEditorMeta").textContent = `${event.type} · ${event.date}${result ? ` · Ergebnis ${result.goalsFor}:${result.goalsAgainst}` : ""} · Intensität ${intensityLabel(event.intensity)}${event.location ? ` · ${event.location}` : ""}`;
   if (matchDuration) $("#eventEditorMeta").textContent += ` · ${matchDuration} Min.`;
   $("#selectedEventIntensity").value = String(event.intensity || 2);
-  $("#selectedGoalsFor").value = event.goalsFor === "" ? 0 : event.goalsFor;
-  $("#selectedGoalsAgainst").value = event.goalsAgainst === "" ? 0 : event.goalsAgainst;
+  $("#selectedGoalsFor").value = hasScore(event.goalsFor) ? event.goalsFor : "";
+  $("#selectedGoalsAgainst").value = hasScore(event.goalsAgainst) ? event.goalsAgainst : "";
   $("#selectedMatchDuration").value = matchDuration || 90;
   $("#selectedTrainingFocus").value = event.trainingFocus || "Eigener Ballbesitz";
   $("#selectedGoalsFor").disabled = event.type !== "Spiel";
@@ -2984,8 +3001,8 @@ function openEventDialog() {
   $("#eventLocation").value = "";
   $("#eventTrainingFocus").value = "Eigener Ballbesitz";
   $("#eventOpponent").value = "";
-  $("#eventGoalsFor").value = 0;
-  $("#eventGoalsAgainst").value = 0;
+  $("#eventGoalsFor").value = "";
+  $("#eventGoalsAgainst").value = "";
   $("#eventMatchDuration").value = 90;
   $("#eventNotes").value = "";
   syncEventGameFields();
@@ -3015,8 +3032,8 @@ function saveEvent(event) {
     location: $("#eventLocation").value.trim(),
     trainingFocus: $("#eventType").value === "Training" ? $("#eventTrainingFocus").value : "",
     opponent: $("#eventOpponent").value.trim(),
-    goalsFor: $("#eventType").value === "Spiel" ? Number($("#eventGoalsFor").value) : "",
-    goalsAgainst: $("#eventType").value === "Spiel" ? Number($("#eventGoalsAgainst").value) : "",
+    goalsFor: $("#eventType").value === "Spiel" ? scoreOrEmpty($("#eventGoalsFor").value) : "",
+    goalsAgainst: $("#eventType").value === "Spiel" ? scoreOrEmpty($("#eventGoalsAgainst").value) : "",
     matchDuration: $("#eventType").value === "Spiel" ? Number($("#eventMatchDuration").value || 90) : "",
     notes: $("#eventNotes").value.trim(),
     ratings: {}
@@ -3076,7 +3093,7 @@ function updateSelectedEventMeta(field, value) {
   if (field === "intensity") event[field] = numericValue;
   else if (field === "trainingFocus") event[field] = event.type === "Training" ? value : "";
   else if (field === "matchDuration") event[field] = event.type === "Spiel" ? Math.max(1, numericValue || 90) : "";
-  else event[field] = event.type === "Spiel" ? numericValue : "";
+  else event[field] = event.type === "Spiel" ? scoreOrEmpty(value) : "";
   persist();
   cloudSaveEvent(event);
   renderEvents();
