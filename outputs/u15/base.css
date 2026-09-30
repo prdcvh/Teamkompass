@@ -122,10 +122,14 @@ body.role-player #addPlayerTop,
 body.role-player #exportBtn,
 body.role-player .development-form,
 body.role-player #developmentPlanList .row-actions,
+body.role-player #absenceList .row-actions,
+body.role-player #measurementList .row-actions,
 body.role-parent #addPlayerTop,
 body.role-parent #exportBtn,
 body.role-parent .development-form,
-body.role-parent #developmentPlanList .row-actions {
+body.role-parent #developmentPlanList .row-actions,
+body.role-parent #absenceList .row-actions,
+body.role-parent #measurementList .row-actions {
   display: none;
 }
 

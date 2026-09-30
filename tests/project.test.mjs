@@ -130,3 +130,18 @@ test("Service Worker und Hosting kennen die neuen Stylesheets", async () => {
     assert.ok(!sources.includes("/responsive-enhancements.css"), `${site.target}: alter Stylesheet-Header noch vorhanden`);
   }
 });
+
+test("Spieler und Eltern sehen keine Bearbeiten-/Loeschen-Buttons bei Abwesenheiten und Messwerten", async () => {
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    const css = await read(`outputs/${team}/base.css`);
+    for (const action of ["edit-plan", "edit-absence", "edit-measurement"]) {
+      assert.match(app, new RegExp(`\\$\\{canManageRecords\\(\\) \\? \`<div class="row-actions">\\s*<button[^>]*data-action="${action}"`), `${team}: ${action}-Buttons werden ungeprueft gerendert`);
+    }
+    for (const role of ["player", "parent"]) {
+      for (const list of ["#absenceList", "#measurementList"]) {
+        assert.ok(css.includes(`body.role-${role} ${list} .row-actions`), `${team}: ${role} ${list} nicht per CSS ausgeblendet`);
+      }
+    }
+  }
+});

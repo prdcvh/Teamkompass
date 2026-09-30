@@ -731,6 +731,12 @@ function isCloudActive() {
   return Boolean(firestoreDb);
 }
 
+// Spieler, Eltern und der medizinische Zugang lesen nur: Bearbeiten/Loeschen gehoert nicht
+// in ihre Oberflaeche (Firestore lehnt die Schreibzugriffe ohnehin ab).
+function canManageRecords() {
+  return !["player", "parent", "medical"].includes(currentRole);
+}
+
 function isCloudTrainer() {
   return isCloudActive() && currentRole === "trainer";
 }
@@ -3047,10 +3053,10 @@ function renderDevelopmentPlans(playerId) {
         ${plan.coachReview ? `<p><strong>Trainerreview:</strong> ${escapeHtml(plan.coachReview)}</p>` : ""}
         ${currentRole === "player" ? `<form class="self-reflection-form" data-plan-id="${escapeHtml(plan.id)}"><label>Meine Reflexion<textarea rows="2" maxlength="400">${escapeHtml(plan.selfReflection)}</textarea></label><button class="primary-button" type="submit">Reflexion speichern</button></form>` : ""}
       </div>
-      <div class="row-actions">
+      ${canManageRecords() ? `<div class="row-actions">
         <button class="ghost-button" data-action="edit-plan" data-id="${plan.id}" type="button">Bearbeiten</button>
         <button class="ghost-button danger" data-action="delete-plan" data-id="${plan.id}" type="button">Löschen</button>
-      </div>
+      </div>` : ""}
     </article>
   `).join("") || `<p class="muted">Noch kein Förderplan für diesen Spieler angelegt.</p>`;
 }
@@ -3150,10 +3156,10 @@ function renderAbsenceList(playerId) {
         <strong>${escapeHtml(absenceTitle(absence))}</strong>
         <p>${escapeHtml(absencePeriodText(absence))}</p>
       </div>
-      <div class="row-actions">
+      ${canManageRecords() ? `<div class="row-actions">
         <button class="ghost-button" data-action="edit-absence" data-id="${absence.id}" type="button">Bearbeiten</button>
         <button class="ghost-button danger" data-action="delete-absence" data-id="${absence.id}" type="button">Löschen</button>
-      </div>
+      </div>` : ""}
     </article>
   `).join("") || `<p class="muted">Noch keine Abwesenheit oder Verletzung für diesen Spieler eingetragen.</p>`;
 }
@@ -3247,10 +3253,10 @@ function renderMeasurementList(playerId) {
           <strong>${formatDate(measurement.date)}</strong>
           <p>${measurement.height || "–"} cm · ${measurement.weight || "–"} kg${bmi ? ` · BMI ${roundGrade(bmi)}` : ""}</p>
         </div>
-        <div class="row-actions">
+        ${canManageRecords() ? `<div class="row-actions">
           <button class="ghost-button" data-action="edit-measurement" data-id="${measurement.id}" type="button">Bearbeiten</button>
           <button class="ghost-button danger" data-action="delete-measurement" data-id="${measurement.id}" type="button">Löschen</button>
-        </div>
+        </div>` : ""}
       </article>
     `;
   }).join("") || `<p class="muted">Noch keine Messwerte für diesen Spieler eingetragen.</p>`;
