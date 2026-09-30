@@ -130,3 +130,35 @@ test("Service Worker und Hosting kennen die neuen Stylesheets", async () => {
     assert.ok(!sources.includes("/responsive-enhancements.css"), `${site.target}: alter Stylesheet-Header noch vorhanden`);
   }
 });
+
+test("Spielergebnis: leer und Zukunft zaehlen nicht, nur eingetragene vergangene Ergebnisse", async () => {
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    const start = app.indexOf("function hasScore(");
+    const end = app.indexOf("function teamAverageGradeForEvent(");
+    assert.ok(start > 0 && end > start, `${team}: Ergebnis-Funktionen nicht gefunden`);
+    const { gameResult, scoreOrEmpty } = new Function(`${app.slice(start, end)}; return { gameResult, scoreOrEmpty };`)();
+    const past = "2020-01-01";
+    const future = "2999-01-01";
+    assert.equal(gameResult({ type: "Spiel", date: past, goalsFor: "", goalsAgainst: "" }), null);
+    assert.equal(gameResult({ type: "Spiel", date: past, goalsFor: 2, goalsAgainst: "" }), null);
+    assert.equal(gameResult({ type: "Spiel", date: future, goalsFor: 0, goalsAgainst: 0 }), null, "Zukunfts-0:0 darf nicht zaehlen");
+    assert.equal(gameResult({ type: "Training", date: past, goalsFor: 1, goalsAgainst: 0 }), null);
+    assert.equal(gameResult({ type: "Spiel", date: past, goalsFor: 0, goalsAgainst: 0 }).outcome, "Unentschieden");
+    assert.equal(gameResult({ type: "Spiel", date: past, goalsFor: 3, goalsAgainst: 1 }).outcome, "Sieg");
+    assert.equal(scoreOrEmpty(""), "");
+    assert.equal(scoreOrEmpty("  "), "");
+    assert.equal(scoreOrEmpty("0"), 0);
+    assert.equal(scoreOrEmpty("4"), 4);
+  }
+});
+
+test("neue Spiele starten ohne Ergebnis (Felder leer, nicht 0)", async () => {
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    const html = await read(`outputs/${team}/index.html`);
+    assert.doesNotMatch(html, /id="event(GoalsFor|GoalsAgainst)"[^>]*value="0"/, `${team}: Ergebnisfeld ist mit 0 vorbelegt`);
+    assert.doesNotMatch(app, /\$\("#event(GoalsFor|GoalsAgainst)"\)\.value = 0/, `${team}: Dialog setzt Ergebnis auf 0`);
+    assert.doesNotMatch(app, /goalsFor === "" \? 0/, `${team}: Bewertungsbereich zeigt leeres Ergebnis als 0`);
+  }
+});
