@@ -733,7 +733,7 @@ function cloudWriteFailed(error, label) {
 //   firestore.rules im Repo-Root.
 // ---------------------------------------------------------------------------
 let currentUser = null;
-let currentRole = null; // "trainer" | "player" | null
+let currentRole = null; // "trainer" | "player" | "parent" | "medical" | null
 let currentPlayerId = null;
 let authModule = null;
 let authInstance = null;
@@ -912,7 +912,7 @@ function startCloudSync() {
     cloudCache.events = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
     const eventIds = cloudCache.events.map((event) => event.id);
     if (currentRole === "trainer") syncRatingListeners(eventIds);
-    else if (currentRole === "player" && currentPlayerId) syncPlayerRatingListeners(eventIds);
+    else if (["player", "parent"].includes(currentRole) && currentPlayerId) syncPlayerRatingListeners(eventIds);
     rebuildStateFromCloudCache();
   }, (error) => console.error("events sync", error)));
 
