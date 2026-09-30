@@ -2075,7 +2075,7 @@ function renderMetrics() {
   const teamGrade = gradedRatings.length ? roundGrade(gradedRatings.reduce((sum, grade) => sum + grade, 0) / gradedRatings.length) : null;
   const highRiskPlayers = state.players.filter((player) => ["reduzieren", "aussetzen"].includes(playerInjuryRisk(player.id).tier)).length;
   const stats = teamStats();
-  const nextEvent = sortedEvents().find((event) => new Date(event.date) >= startOfToday());
+  const nextEvent = nextUpcomingEvent();
   const metrics = [
     ["Kader", state.players.length],
     ["Fit", fitPlayers],
@@ -2086,7 +2086,15 @@ function renderMetrics() {
     ["Belastung hoch", highRiskPlayers]
   ];
   $("#metricsGrid").innerHTML = metrics.map(([label, value]) => `<article class="metric"><span>${label}</span><strong>${value}</strong></article>`).join("");
-  if (nextEvent) $("#metricsGrid").innerHTML += `<article class="metric metric-wide"><span>Nächstes Event</span><strong>${nextEvent.date}</strong><small>${nextEvent.title}</small></article>`;
+  if (nextEvent) $("#metricsGrid").innerHTML += `<article class="metric metric-wide"><span>Nächstes Event</span><strong>${formatDate(nextEvent.date)}</strong><small>${escapeHtml(nextEvent.title)}</small></article>`;
+}
+
+// Zeitlich naechstes Event ab heute (sortedEvents() ist absteigend sortiert).
+function nextUpcomingEvent() {
+  const today = startOfToday();
+  return state.events
+    .filter((event) => event.date && new Date(`${event.date}T00:00:00`) >= today)
+    .sort((a, b) => new Date(`${a.date}T00:00:00`) - new Date(`${b.date}T00:00:00`))[0] || null;
 }
 
 function startOfToday() {
