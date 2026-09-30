@@ -1589,7 +1589,16 @@ async function migrateLegacyBlobToCollections() {
   }
 }
 
+// Ansichten, die die aktuelle Rolle oeffnen darf. Die Navigation blendet die uebrigen nur
+// per CSS aus - diese Liste ist die Sperre fuer alle Wege (Suche, Schnellzugriffe, Auswahl).
+function allowedViews() {
+  if (["player", "parent"].includes(currentRole)) return ["profiles"];
+  if (currentRole === "medical") return ["squad", "profiles"];
+  return Object.keys(views);
+}
+
 function setView(viewName) {
+  if (!allowedViews().includes(viewName)) return;
   Object.entries(views).forEach(([name, element]) => element.classList.toggle("active", name === viewName));
   document.querySelectorAll(".nav-tab").forEach((button) => button.classList.toggle("active", button.dataset.view === viewName));
   if ($("#moreNavTab")) {
@@ -4394,13 +4403,17 @@ on("#accessManagerList", "click", (event) => {
 
 window.TeamKompass = Object.freeze({
   getState: () => structuredClone(state),
+  allowedViews: () => allowedViews(),
   openEvent: (eventId) => {
+    if (!allowedViews().includes("events")) return;
     if (state.events.some((event) => event.id === eventId)) state.selectedEventId = eventId;
     setView("events");
     renderEvents();
     setEventStep("rate");
   },
   openPlayer: (playerId) => {
+    if (["player", "parent"].includes(currentRole) && playerId !== currentPlayerId) return;
+    if (!allowedViews().includes("profiles")) return;
     if ($("#profilePlayer")) $("#profilePlayer").value = playerId;
     setView("profiles");
     drawProfile();
