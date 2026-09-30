@@ -1200,94 +1200,61 @@ async function cloudSaveRating(eventId, playerId, rating) {
   }
 }
 
-async function cloudSaveDevelopmentPlan(playerId, plan) {
+// Gemeinsamer Rahmen fuer alle Cloud-Schreibvorgaenge: setzt die Sync-Anzeige nach
+// Erfolg ("Cloud synchronisiert") bzw. Fehler ("Speichern fehlgeschlagen") zurueck.
+async function cloudWrite(errorLabel, write) {
   if (!isCloudTrainer()) return;
   try {
-    await firestoreModule.setDoc(teamDoc("players", playerId, "developmentPlans", plan.id), { ...plan, playerId });
+    await write();
+    cloudWriteSucceeded();
   } catch (error) {
-    console.error(error);
-    alert(`Foerderplan konnte nicht in der Cloud gespeichert werden - die Aenderung geht sonst verloren.${cloudErrorSuffix(error)}`);
+    cloudWriteFailed(error, errorLabel);
   }
 }
 
-async function cloudDeleteDevelopmentPlan(playerId, planId) {
-  if (!isCloudTrainer()) return;
-  try {
-    await firestoreModule.deleteDoc(teamDoc("players", playerId, "developmentPlans", planId));
-  } catch (error) {
-    console.error(error);
-    alert(`Foerderplan konnte nicht aus der Cloud geloescht werden.${cloudErrorSuffix(error)}`);
-  }
+function cloudSaveDevelopmentPlan(playerId, plan) {
+  return cloudWrite("Foerderplan konnte nicht in der Cloud gespeichert werden - die Aenderung geht sonst verloren.",
+    () => firestoreModule.setDoc(teamDoc("players", playerId, "developmentPlans", plan.id), { ...plan, playerId }));
 }
 
-async function cloudSaveAbsence(playerId, absence) {
-  if (!isCloudTrainer()) return;
-  try {
-    await firestoreModule.setDoc(teamDoc("players", playerId, "absences", absence.id), { ...absence, playerId });
-  } catch (error) {
-    console.error(error);
-    alert(`Abwesenheit konnte nicht in der Cloud gespeichert werden - die Aenderung geht sonst verloren.${cloudErrorSuffix(error)}`);
-  }
+function cloudDeleteDevelopmentPlan(playerId, planId) {
+  return cloudWrite("Foerderplan konnte nicht aus der Cloud geloescht werden.",
+    () => firestoreModule.deleteDoc(teamDoc("players", playerId, "developmentPlans", planId)));
 }
 
-async function cloudDeleteAbsence(playerId, absenceId) {
-  if (!isCloudTrainer()) return;
-  try {
-    await firestoreModule.deleteDoc(teamDoc("players", playerId, "absences", absenceId));
-  } catch (error) {
-    console.error(error);
-    alert(`Abwesenheit konnte nicht aus der Cloud geloescht werden.${cloudErrorSuffix(error)}`);
-  }
+function cloudSaveAbsence(playerId, absence) {
+  return cloudWrite("Abwesenheit konnte nicht in der Cloud gespeichert werden - die Aenderung geht sonst verloren.",
+    () => firestoreModule.setDoc(teamDoc("players", playerId, "absences", absence.id), { ...absence, playerId }));
 }
 
-async function cloudSaveMeasurement(playerId, measurement) {
-  if (!isCloudTrainer()) return;
-  try {
-    await firestoreModule.setDoc(teamDoc("players", playerId, "measurements", measurement.id), { ...measurement, playerId });
-  } catch (error) {
-    console.error(error);
-    alert(`Messung konnte nicht in der Cloud gespeichert werden - die Aenderung geht sonst verloren.${cloudErrorSuffix(error)}`);
-  }
+function cloudDeleteAbsence(playerId, absenceId) {
+  return cloudWrite("Abwesenheit konnte nicht aus der Cloud geloescht werden.",
+    () => firestoreModule.deleteDoc(teamDoc("players", playerId, "absences", absenceId)));
 }
 
-async function cloudDeleteMeasurement(playerId, measurementId) {
-  if (!isCloudTrainer()) return;
-  try {
-    await firestoreModule.deleteDoc(teamDoc("players", playerId, "measurements", measurementId));
-  } catch (error) {
-    console.error(error);
-    alert(`Messung konnte nicht aus der Cloud geloescht werden.${cloudErrorSuffix(error)}`);
-  }
+function cloudSaveMeasurement(playerId, measurement) {
+  return cloudWrite("Messung konnte nicht in der Cloud gespeichert werden - die Aenderung geht sonst verloren.",
+    () => firestoreModule.setDoc(teamDoc("players", playerId, "measurements", measurement.id), { ...measurement, playerId }));
 }
 
-async function cloudSaveLineup(lineup) {
-  if (!isCloudTrainer()) return;
-  try {
-    await firestoreModule.setDoc(teamDoc("meta", "lineup"), lineup);
-  } catch (error) {
-    console.error(error);
-    alert(`Aufstellung konnte nicht in der Cloud gespeichert werden - die Aenderung geht sonst verloren.${cloudErrorSuffix(error)}`);
-  }
+function cloudDeleteMeasurement(playerId, measurementId) {
+  return cloudWrite("Messung konnte nicht aus der Cloud geloescht werden.",
+    () => firestoreModule.deleteDoc(teamDoc("players", playerId, "measurements", measurementId)));
 }
 
-async function cloudSaveOpponent(opponent) {
-  if (!isCloudTrainer()) return;
-  try {
-    await firestoreModule.setDoc(teamDoc("opponents", opponent.id), opponent);
-  } catch (error) {
-    console.error(error);
-    alert(`Gegner konnte nicht in der Cloud gespeichert werden - die Aenderung geht sonst verloren.${cloudErrorSuffix(error)}`);
-  }
+function cloudSaveLineup(lineup) {
+  return cloudWrite("Aufstellung konnte nicht in der Cloud gespeichert werden - die Aenderung geht sonst verloren.",
+    () => firestoreModule.setDoc(teamDoc("meta", "lineup"), lineup));
 }
 
-async function cloudDeleteOpponent(opponentId) {
-  if (!isCloudTrainer()) return;
-  try {
-    await firestoreModule.deleteDoc(teamDoc("opponents", opponentId));
-  } catch (error) {
-    console.error(error);
-    alert(`Gegner konnte nicht aus der Cloud geloescht werden.${cloudErrorSuffix(error)}`);
-  }
+function cloudSaveOpponent(opponent) {
+  return cloudWrite("Gegner konnte nicht in der Cloud gespeichert werden - die Aenderung geht sonst verloren.",
+    () => firestoreModule.setDoc(teamDoc("opponents", opponent.id), opponent));
+}
+
+function cloudDeleteOpponent(opponentId) {
+  return cloudWrite("Gegner konnte nicht aus der Cloud geloescht werden.",
+    () => firestoreModule.deleteDoc(teamDoc("opponents", opponentId)));
 }
 
 // ---- Auth-Gate (Login), Einladungscodes ----
