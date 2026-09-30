@@ -225,3 +225,20 @@ test("Spieler und Eltern sehen keine Bearbeiten-/Loeschen-Buttons bei Abwesenhei
     }
   }
 });
+
+test("Dashboard zeigt das zeitlich naechste Event im deutschen Datumsformat", async () => {
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    const start = app.indexOf("function nextUpcomingEvent()");
+    const end = start + app.slice(start).indexOf("\n}\n") + 3;
+    assert.ok(start > 0 && end > start, `${team}: nextUpcomingEvent fehlt`);
+    const startOfToday = () => { const date = new Date(); date.setHours(0, 0, 0, 0); return date; };
+    const iso = (offset) => { const date = new Date(); date.setDate(date.getDate() + offset); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`; };
+    const state = { events: [{ id: "far", date: iso(30) }, { id: "past", date: iso(-3) }, { id: "next", date: iso(2) }, { id: "today", date: iso(0) }] };
+    const nextUpcomingEvent = new Function("state", "startOfToday", `${app.slice(start, end)}; return nextUpcomingEvent;`)(state, startOfToday);
+    assert.equal(nextUpcomingEvent().id, "today");
+    state.events.splice(3, 1);
+    assert.equal(nextUpcomingEvent().id, "next");
+    assert.match(app, /<strong>\$\{formatDate\(nextEvent\.date\)\}<\/strong><small>\$\{escapeHtml\(nextEvent\.title\)\}<\/small>/, `${team}: Datum/Titel nicht formatiert bzw. escaped`);
+  }
+});
