@@ -675,10 +675,29 @@ function scoreToGrade(record) {
   return 6;
 }
 
-function persist() {
-  state = normalizeState(state);
+// Lokaler Zwischenspeicher fuer den Teamstand. Spieler, Eltern und der medizinische
+// Zugang cachen nichts: sie sehen (medizinisch: alle) personenbezogene Daten von
+// Minderjaehrigen, die nicht auf dem Geraet zurueckbleiben sollen.
+function canCacheLocally() {
+  return !["player", "parent", "medical"].includes(currentRole);
+}
+
+function writeLocalCache() {
+  if (!canCacheLocally()) return;
   localStorage.setItem(storageKey, JSON.stringify(state));
   localStorage.setItem(cacheStampKey, String(Date.now()));
+}
+
+// Entfernt den gesamten lokal gespeicherten Teamstand (Abmelden, Konto-Wechsel).
+function clearLocalTeamData() {
+  [storageKey, legacyStorageKey, cacheStampKey].forEach((key) => {
+    try { localStorage.removeItem(key); } catch { /* Speicher gesperrt: nichts zu loeschen. */ }
+  });
+}
+
+function persist() {
+  state = normalizeState(state);
+  writeLocalCache();
   if (isCloudTrainer()) setSyncState("pending", "Wird gespeichert …");
   if (legacyBlobMode) {
     scheduleLegacyCloudSave();
@@ -826,6 +845,13 @@ async function handleAuthStateChanged(user) {
   if (!user) {
     currentRole = null;
     currentPlayerId = null;
+    // Ohne Anmeldung darf kein Teamstand im Browser bleiben - weder im Speicher noch lokal.
+    clearLocalTeamData();
+    if (state.players.length || state.events.length) {
+      Object.assign(cloudCache, { players: [], events: [], ratings: {}, developmentPlans: {}, absences: {}, measurements: {}, opponents: [], lineup: null });
+      state = normalizeState({ players: [], events: [], opponents: [] });
+      renderAll();
+    }
     await showAuthGate();
     return;
   }
@@ -1085,7 +1111,7 @@ function rebuildStateFromCloudCache() {
     opponents: cloudCache.opponents,
     selectedEventId: state.selectedEventId
   });
-  localStorage.setItem(storageKey, JSON.stringify(state));
+  writeLocalCache();
   // Sobald einmal echte Spieler in der neuen Struktur angekommen sind, macht die
   // Migration aus dem alten Blob-Dokument keinen Sinn mehr - im Gegenteil, sie wuerde
   // neuere Aenderungen wieder mit dem laengst veralteten alten Dokument ueberschreiben.
@@ -1451,6 +1477,9 @@ function authErrorMessage(error) {
 async function handleSignOut() {
   if (!authInstance) return;
   await authModule.signOut(authInstance);
+  clearLocalTeamData();
+  // Neu laden setzt auch Rollen-Oberflaeche und Zwischenzustaende der vorigen Sitzung zurueck.
+  location.reload();
 }
 
 // Erspart das bisher fehleranfaellige manuelle Anlegen in der Firebase-Konsole
@@ -3162,7 +3191,7 @@ async function saveSelfReflection(event) {
   if (!plan) return;
   plan.selfReflection = event.target.querySelector("textarea").value.trim();
   plan.selfReflectionAt = new Date().toISOString();
-  localStorage.setItem(storageKey, JSON.stringify(state));
+  writeLocalCache();
   try {
     await firestoreModule.setDoc(teamDoc("players", currentPlayerId, "developmentPlans", planId), {
       selfReflection: plan.selfReflection,
