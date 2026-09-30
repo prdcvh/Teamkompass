@@ -163,3 +163,11 @@ body.role-trainer-cloud [data-action="invite"] {
 body.role-trainer-cloud #accessManagerPanel {
   display: block;
 }
+
+/* Startzustand im Rollen-Modus: keine Formulare, bis Firebase geladen ist (bzw. gar nicht, wenn es ausfaellt). */
+.auth-gate .auth-gate-status { display: none; margin: 0; color: var(--muted); }
+.auth-gate.is-loading .auth-gate-status { display: block; }
+.auth-gate.is-loading .auth-gate-form,
+.auth-gate.is-loading hr,
+.auth-gate.is-failed .auth-gate-form,
+.auth-gate.is-failed hr { display: none; }

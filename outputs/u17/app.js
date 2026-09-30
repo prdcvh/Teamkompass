@@ -364,7 +364,16 @@ function chartPalette() {
   };
 }
 
+// Rollen-Modus: Ohne Anmeldung darf weder der lokale Zwischenspeicher noch die
+// Demo-Datenbasis in die Oberflaeche gelangen - die Daten kommen erst nach der
+// Rollenpruefung aus der Cloud.
+function isRoleModeConfigured() {
+  const config = window.TEAMKOMPASS_CONFIG || {};
+  return config.storage === "firebase" && Boolean(config.enableRoles);
+}
+
 function loadState() {
+  if (isRoleModeConfigured()) return normalizeState({ players: [], events: [], opponents: [] });
   try {
     // Der frueher im Planungsbereich einstellbare Wert wird weiter respektiert,
     // damit bestehende Installationen ihre Aufbewahrungsdauer behalten. Ohne
@@ -770,6 +779,7 @@ async function initDataStore() {
     firestoreDb = null;
     $("#storageState").textContent = "Cloud nicht erreichbar";
     console.error(error);
+    if (isRoleModeConfigured()) showAuthGateError("Die Anmeldung ist gerade nicht erreichbar (offline oder Netzwerkfehler). Es werden keine Teamdaten angezeigt. Bitte Verbindung pruefen und die Seite neu laden.");
   }
 }
 
@@ -1257,8 +1267,32 @@ function showAuthGate() {
   const gate = $("#authGate");
   if (!gate) return;
   gate.hidden = false;
+  gate.classList.remove("is-loading", "is-failed");
   document.body.classList.add("auth-locked");
   $("#authGateError").textContent = "";
+}
+
+// Sperrzustand direkt beim Start (vor dem ersten Rendern): Maske ohne Formulare,
+// bis Firebase die Anmeldung geklaert hat.
+function showAuthGateLoading() {
+  const gate = $("#authGate");
+  if (!gate) return;
+  gate.hidden = false;
+  gate.classList.add("is-loading");
+  gate.classList.remove("is-failed");
+  document.body.classList.add("auth-locked");
+  $("#authGateError").textContent = "";
+}
+
+// Firebase/Anmeldung nicht verfuegbar: Maske bleibt zu, nur die Fehlermeldung ist sichtbar.
+function showAuthGateError(message) {
+  const gate = $("#authGate");
+  if (!gate) return;
+  gate.hidden = false;
+  gate.classList.remove("is-loading");
+  gate.classList.add("is-failed");
+  document.body.classList.add("auth-locked");
+  $("#authGateError").textContent = message;
 }
 
 function hideAuthGate() {
@@ -4411,5 +4445,6 @@ applyTeamBrand();
 initTheme();
 setEventStep("list");
 prepareMobileAccordions();
+if (isRoleModeConfigured()) showAuthGateLoading();
 renderAll();
 initDataStore();
