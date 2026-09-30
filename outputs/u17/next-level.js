@@ -92,11 +92,13 @@
     const render = () => {
       const query = input.value.trim().toLowerCase();
       const state = appState();
-      const views = [["dashboard", "Dashboard"], ["squad", "Kader"], ["events", "Events"], ["profiles", "Profile"], ["opponents", "Gegneranalyse"], ["teamAnalysis", "Teamanalyse"]];
+      // Nur Bereiche der eigenen Rolle; Events nur, wenn die Rolle den Bereich "Events" oeffnen darf.
+      const allowed = window.TeamKompass?.allowedViews?.() || [];
+      const views = [["dashboard", "Dashboard"], ["squad", "Kader"], ["events", "Events"], ["profiles", "Profile"], ["opponents", "Gegneranalyse"], ["teamAnalysis", "Teamanalyse"]].filter(([id]) => allowed.includes(id));
       const items = [
         ...views.map(([id, label]) => ({ type: "view", id, label, meta: "Bereich" })),
-        ...state.players.map((player) => ({ type: "player", id: player.id, label: player.name, meta: `Spieler · Nr. ${player.number}` })),
-        ...state.events.map((event) => ({ type: "event", id: event.id, label: event.title, meta: `${event.type} · ${event.date}` }))
+        ...(allowed.includes("profiles") ? state.players : []).map((player) => ({ type: "player", id: player.id, label: player.name, meta: `Spieler · Nr. ${player.number}` })),
+        ...(allowed.includes("events") ? state.events : []).map((event) => ({ type: "event", id: event.id, label: event.title, meta: `${event.type} · ${event.date}` }))
       ].filter((item) => !query || `${item.label} ${item.meta}`.toLowerCase().includes(query)).slice(0, 12);
       results.innerHTML = items.map((item) => `<button type="button" data-type="${item.type}" data-id="${escape(item.id)}"><strong>${escape(item.label)}</strong><span>${escape(item.meta)}</span></button>`).join("") || `<p class="muted">Kein Treffer.</p>`;
     };
