@@ -60,3 +60,33 @@ fail on every future merge to `main`, not just this one. Hold that PR and
 say so explicitly instead of auto-merging; merge once the repo owner
 confirms the site (and the team's first trainer account, per
 `FIREBASE_SETUP.md` §6) exists.
+
+## Scrum workflow (Jira)
+
+Work is planned in Scrum. The repo owner is the **Product Owner**; Claude
+acts as the **development team** (and facilitates: proposes sprint plans,
+keeps the board current, reports at sprint end).
+
+- Backlog/board: Jira project `SCRUM` ("Teamkompass") on
+  `pascalrdcvh.atlassian.net`, board 1. Epics: SCRUM-5 Sicherheit &
+  Datenschutz, SCRUM-6 Bugs, SCRUM-7 Neue Funktionen, SCRUM-8 Technik &
+  Wartung. Bugs are `Task` + label `bug` (the project has no Bug type),
+  features are `Story`.
+- **The PO decides** priorities, sprint scope and sprint goal. Claude
+  proposes, never reshuffles the sprint on its own. Work only on tickets in
+  the active sprint unless the PO says otherwise.
+- New findings (bugs, ideas, tech debt spotted while working) become
+  backlog tickets under the matching epic — not silently fixed in an
+  unrelated PR and not pulled into the sprint without the PO.
+- Unclear or contradictory acceptance criteria → ask the PO before
+  building, don't guess.
+- Ticket flow: `Zu erledigen` → `In Bearbeitung` (when starting) →
+  `In Überprüfung` (PR open) → `Erledigt` (merged to `main`, i.e. live).
+  Put the key in the PR title and commits (`SCRUM-15: …`) and comment the PR
+  link plus a short "what changed / how to check" on the ticket.
+- **Definition of Done:** acceptance criteria met; change applied to every
+  app copy (see "Repo layout"); `npm run verify` green, with a test for the
+  fix where the logic is testable; PR merged per the merge workflow below;
+  ticket updated as above.
+- Sprint end: summarize done / not done for the PO (Sprint Review); the PO
+  accepts and decides where unfinished tickets go.
