@@ -130,3 +130,15 @@ test("Service Worker und Hosting kennen die neuen Stylesheets", async () => {
     assert.ok(!sources.includes("/responsive-enhancements.css"), `${site.target}: alter Stylesheet-Header noch vorhanden`);
   }
 });
+
+test("Rollen-Modus sperrt die Oberflaeche vor dem ersten Rendern und laedt keine lokalen Daten", async () => {
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    // Ohne Anmeldung weder localStorage-Zwischenspeicher noch Demo-Daten.
+    assert.match(app, /function loadState\(\) \{\s*if \(isRoleModeConfigured\(\)\) return normalizeState\(\{ players: \[\], events: \[\], opponents: \[\] \}\);/, `${team}: loadState liefert im Rollen-Modus nicht leer`);
+    // Sperre steht vor dem ersten renderAll() des Starts.
+    assert.match(app, /if \(isRoleModeConfigured\(\)\) showAuthGateLoading\(\);\s*renderAll\(\);\s*initDataStore\(\);/, `${team}: Login-Sperre fehlt vor dem ersten Rendern`);
+    // Fehlschlag beim Laden von Firebase zeigt die Maske mit Fehlermeldung statt der App.
+    assert.match(app, /Cloud nicht erreichbar[\s\S]{0,200}showAuthGateError\(/, `${team}: Fehlerfall zeigt keine Login-Sperre`);
+  }
+});
