@@ -142,3 +142,14 @@ test("Rollen-Modus sperrt die Oberflaeche vor dem ersten Rendern und laedt keine
     assert.match(app, /Cloud nicht erreichbar[\s\S]{0,200}showAuthGateError\(/, `${team}: Fehlerfall zeigt keine Login-Sperre`);
   }
 });
+
+test("Abmelden entfernt den lokalen Teamstand; Nicht-Trainer-Rollen cachen nicht", async () => {
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    assert.match(app, /function clearLocalTeamData\(\) \{\s*\[storageKey, legacyStorageKey, cacheStampKey\]/, `${team}: Loeschfunktion fehlt`);
+    assert.match(app, /async function handleSignOut\(\) \{[\s\S]*?signOut\(authInstance\);\s*clearLocalTeamData\(\);[\s\S]*?location\.reload\(\);/, `${team}: Abmelden leert den Cache nicht`);
+    assert.match(app, /if \(!user\) \{[\s\S]{0,200}clearLocalTeamData\(\);/, `${team}: fehlende Anmeldung raeumt den Cache nicht auf`);
+    assert.match(app, /\["player", "parent", "medical"\]\.includes\(currentRole\)/, `${team}: Nicht-Trainer-Rollen duerfen nicht cachen`);
+    assert.equal((app.match(/localStorage\.setItem\(storageKey/g) || []).length, 2, `${team}: ungeschuetzter Schreibzugriff auf den Cache`);
+  }
+});
