@@ -98,6 +98,24 @@ keeps the board current, reports at sprint end).
   app copy (see "Repo layout"); `npm run verify` green, with a test for the
   fix where the logic is testable; PR merged per the merge workflow below;
   ticket updated as above.
+- **Working hours (standing instruction from the PO, 2026-10-01).** The PO
+  keeps a free coding window of about 5 hours every day, and wants to review
+  tickets in the morning. So: Claude does its development work **at night**
+  (a scheduled night session, starting around 22:30 Europe/Berlin, finished by
+  about 06:30). During the day Claude does **not** start new tickets and does
+  **not** push or merge to `main` — not even right after the PO approves
+  tickets — unless the PO explicitly asks in chat. Answering questions and
+  small Jira housekeeping are fine at any time.
+- **Night-session rules.** Work the active sprint, critical tickets first,
+  following everything in this file. Nobody can be asked at night, so
+  anything that needs a PO decision (changes to `firestore.rules` or auth with
+  uncertain real-world effect, new hosting targets, unclear acceptance
+  criteria) stays a **Draft PR**, the ticket goes to `In Überprüfung` with a
+  comment saying exactly what the PO has to decide. Everything else follows
+  the normal merge workflow. Finish with a short report (what is done, what
+  waits for the PO).
+- **Morning reminder.** A scheduled job (07:49 Europe/Berlin, daily) pushes
+  the list of tickets in `In Überprüfung` and Draft PRs waiting for the PO.
 - **Sprint rollover is automatic.** As soon as every ticket of the active
   sprint is `Erledigt`, Claude closes the sprint and starts the next one
   without asking (tool: `manageJiraSprint` via the Atlassian MCP `discover`/
