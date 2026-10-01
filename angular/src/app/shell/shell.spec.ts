@@ -1,6 +1,7 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
+import { AuthService } from '../core/auth.service';
 import { LayoutService } from '../core/layout.service';
 import type { Role } from '../core/role';
 import { SessionService } from '../core/session.service';
@@ -14,7 +15,11 @@ describe('Shell (in der App)', () => {
   async function render(role: Role = 'trainer') {
     await TestBed.configureTestingModule({
       imports: [App],
-      providers: [provideRouter(routes), { provide: LayoutService, useValue: { isMobile } }],
+      providers: [
+        provideRouter(routes),
+        { provide: LayoutService, useValue: { isMobile } },
+        { provide: AuthService, useValue: { whenResolved: () => Promise.resolve(), status: () => 'ready' } },
+      ],
     }).compileComponents();
     TestBed.inject(SessionService).role.set(role);
     const fixture = TestBed.createComponent(App);

@@ -1,0 +1,187 @@
+:host {
+  display: block;
+}
+
+.login {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 100vh;
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--tk-space-4);
+  padding: var(--tk-space-6) 15%;
+  color: #fff;
+  background: #241d1f;
+}
+
+.badge {
+  align-self: flex-start;
+  padding: 6px 14px;
+  background: #d8072e;
+  border-radius: var(--tk-radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+h1 {
+  margin: 0;
+  font-size: 34px;
+}
+
+.claim {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.lead,
+.meta {
+  margin: 0;
+  max-width: 300px;
+  color: #cfc8ca;
+  font-size: var(--tk-text-md);
+}
+
+.meta {
+  margin-top: var(--tk-space-6);
+  font-size: var(--tk-text-sm);
+}
+
+.form-area {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: min(100%, 520px);
+  padding: var(--tk-space-6);
+  margin: 0 auto;
+}
+
+h2 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.sub {
+  margin: 6px 0 var(--tk-space-4);
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+.tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--tk-space-2);
+  margin-bottom: var(--tk-space-4);
+}
+
+.tabs button {
+  min-height: 40px;
+  color: var(--tk-ink);
+  background: var(--tk-surface);
+  border: 1px solid var(--tk-line);
+  border-radius: var(--tk-radius-md);
+  font-weight: 600;
+}
+
+.tabs button.on {
+  color: #fff;
+  background: var(--tk-red);
+  border-color: var(--tk-red);
+}
+
+.card {
+  padding: var(--tk-space-5);
+  background: var(--tk-surface);
+  border: 1px solid var(--tk-line);
+  border-radius: var(--tk-radius-lg);
+}
+
+form {
+  display: grid;
+  gap: var(--tk-space-3);
+}
+
+h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.hint {
+  margin: 0;
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+.error {
+  margin: var(--tk-space-3) 0 0;
+  color: var(--tk-red);
+  font-size: var(--tk-text-sm);
+  font-weight: 600;
+}
+
+/* Handy: dunkler Hintergrund, Marke oben, Formular als Karte (Figma 01 Login) */
+@media (max-width: 720px) {
+  .login {
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(#3a0f19, #171314 70%);
+  }
+
+  .brand {
+    align-items: center;
+    padding: 72px var(--tk-space-4) var(--tk-space-4);
+    text-align: center;
+    background: transparent;
+  }
+
+  .badge {
+    align-self: center;
+  }
+
+  .claim,
+  .lead {
+    display: none;
+  }
+
+  .meta {
+    margin: 0;
+    font-size: var(--tk-text-lg);
+  }
+
+  .form-area {
+    width: 100%;
+    padding: 0 var(--tk-space-4) var(--tk-space-6);
+  }
+
+  h2,
+  .sub {
+    display: none;
+  }
+
+  .tabs {
+    padding: 4px;
+    background: rgb(255 255 255 / 10%);
+    border-radius: var(--tk-radius-lg);
+  }
+
+  .tabs button {
+    color: #fff;
+    background: transparent;
+    border: 0;
+  }
+
+  .tabs button.on {
+    color: #241d1f;
+    background: #fff;
+  }
+}
+
+/* Felder sind in Figma leicht grau abgesetzt */
+.card .tk-input {
+  background: var(--tk-bg);
+}

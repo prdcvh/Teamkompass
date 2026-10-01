@@ -1,0 +1,49 @@
+<div class="login">
+  <section class="brand" aria-label="TeamKompass">
+    <span class="badge" aria-hidden="true">TK</span>
+    <h1>TeamKompass</h1>
+    <p class="claim">Dein Team.<br />Deine Richtung.</p>
+    <p class="lead">Plane deine Saison, begleite die Entwicklung deiner Spieler und bereite jedes Spiel vor.</p>
+    <p class="meta">{{ club }} · {{ team }}</p>
+  </section>
+
+  <section class="form-area">
+    <h2>Willkommen zurück</h2>
+    <p class="sub">Melde dich bei deiner Mannschaft an.</p>
+
+    <div class="tabs" role="tablist" aria-label="Anmeldeart">
+      <button type="button" role="tab" [attr.aria-selected]="tab() === 'trainer'" [class.on]="tab() === 'trainer'" (click)="select('trainer')">Trainer</button>
+      <button type="button" role="tab" [attr.aria-selected]="tab() === 'code'" [class.on]="tab() === 'code'" (click)="select('code')">Spieler / Eltern</button>
+    </div>
+
+    <div class="card">
+      @if (tab() === 'trainer') {
+        <form (ngSubmit)="submitTrainer()" #trainerForm="ngForm">
+          <h3>Trainer-Login</h3>
+          <label class="tk-label">
+            E-Mail
+            <input class="tk-input" type="email" name="email" autocomplete="username" required [(ngModel)]="email" />
+          </label>
+          <label class="tk-label">
+            Passwort
+            <input class="tk-input" type="password" name="password" autocomplete="current-password" required [(ngModel)]="password" />
+          </label>
+          <button tkButton variant="primary" type="submit" [disabled]="auth.busy()">Anmelden</button>
+        </form>
+      } @else {
+        <form (ngSubmit)="submitCode()" #codeForm="ngForm">
+          <h3>Spieler- oder Elternzugang</h3>
+          <p class="hint">Gib den persönlichen Einladungscode ein, den du von deinem Trainer bekommen hast.</p>
+          <label class="tk-label">
+            Einladungscode
+            <input class="tk-input" type="text" name="code" autocomplete="off" autocapitalize="off" spellcheck="false" required [(ngModel)]="code" />
+          </label>
+          <button tkButton variant="primary" type="submit" [disabled]="auth.busy()">Zugang öffnen</button>
+        </form>
+      }
+      @if (auth.error()) {
+        <p class="error" role="alert">{{ auth.error() }}</p>
+      }
+    </div>
+  </section>
+</div>
