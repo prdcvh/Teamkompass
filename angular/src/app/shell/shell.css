@@ -1,0 +1,20 @@
+.shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+main {
+  flex: 1;
+  min-width: 0;
+  padding: var(--tk-space-6);
+}
+
+[data-variant='mobile'] main {
+  padding: var(--tk-space-4) var(--tk-space-4) 124px;
+}
+
+[data-variant='focused'] main {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: var(--tk-space-4);
+}

@@ -1,0 +1,49 @@
+<tk-dialog title="Weitere Bereiche" [open]="open()" (closed)="closed.emit()">
+  @for (group of groups; track group.title) {
+    <section>
+      <h3>{{ group.title }}</h3>
+      <ul>
+        @for (item of group.items; track item.path) {
+          <li>
+            <a [routerLink]="item.path" (click)="closed.emit()">
+              <span class="icon"><tk-icon [name]="item.icon" /></span>
+              <span class="text">
+                <strong>{{ item.label }}</strong>
+                @if (item.hint) {
+                  <small>{{ item.hint }}</small>
+                }
+              </span>
+              <tk-icon name="chevron-right" />
+            </a>
+          </li>
+        }
+      </ul>
+    </section>
+  }
+
+  <section>
+    <h3>App</h3>
+    <ul>
+      <li>
+        <label class="row">
+          <span class="icon"><tk-icon name="moon" /></span>
+          <span class="text"><strong>Darkmode</strong></span>
+          <input type="checkbox" role="switch" [checked]="theme.dark()" (change)="theme.toggle()" />
+        </label>
+      </li>
+      <li>
+        <a [routerLink]="privacy.path" (click)="closed.emit()">
+          <span class="icon"><tk-icon [name]="privacy.icon" /></span>
+          <span class="text"><strong>{{ privacy.label }}</strong></span>
+          <tk-icon name="chevron-right" />
+        </a>
+      </li>
+      <li>
+        <a class="danger" routerLink="/abmelden" (click)="closed.emit()">
+          <span class="icon"><tk-icon name="logout" /></span>
+          <span class="text"><strong>Abmelden</strong></span>
+        </a>
+      </li>
+    </ul>
+  </section>
+</tk-dialog>

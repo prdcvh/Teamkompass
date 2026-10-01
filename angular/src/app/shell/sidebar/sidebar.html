@@ -1,0 +1,36 @@
+<nav aria-label="Hauptnavigation">
+  <div class="brand">
+    <span class="badge" aria-hidden="true">TK</span>
+    <div>
+      <strong>TeamKompass</strong>
+      <small>{{ club }} · {{ team }}</small>
+    </div>
+  </div>
+
+  <p class="group">Mannschaft</p>
+  <ul>
+    @for (item of items; track item.path) {
+      <li>
+        <a [routerLink]="item.path" routerLinkActive="active" ariaCurrentWhenActive="page">
+          <tk-icon [name]="item.icon" />
+          {{ item.label }}
+        </a>
+      </li>
+    }
+  </ul>
+
+  <div class="foot">
+    <div class="season">
+      <small>Saison</small>
+      <strong>{{ season }}</strong>
+    </div>
+    <a class="privacy" routerLink="/einstellungen" routerLinkActive="active">Einstellungen &amp; Datenschutz</a>
+    <div class="user">
+      <span class="badge" aria-hidden="true">{{ session.initials() }}</span>
+      <div>
+        <strong>{{ session.displayName() }}</strong>
+        <small>Trainer · <a routerLink="/abmelden">Abmelden</a></small>
+      </div>
+    </div>
+  </div>
+</nav>

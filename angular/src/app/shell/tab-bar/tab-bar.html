@@ -1,0 +1,12 @@
+<nav aria-label="Hauptnavigation">
+  @for (item of items; track item.path) {
+    <a [routerLink]="item.path" routerLinkActive="active" ariaCurrentWhenActive="page">
+      <span class="pill"><tk-icon [name]="item.icon" /></span>
+      {{ item.label }}
+    </a>
+  }
+  <button type="button" [class.active]="moreActive()" (click)="moreRequested.emit()">
+    <span class="pill"><tk-icon name="more" /></span>
+    Mehr
+  </button>
+</nav>

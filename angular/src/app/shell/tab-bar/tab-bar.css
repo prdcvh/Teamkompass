@@ -1,0 +1,52 @@
+:host {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 10;
+  background: color-mix(in srgb, var(--tk-surface) 94%, transparent);
+  border-top: 1px solid var(--tk-line);
+  backdrop-filter: blur(10px);
+}
+
+nav {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--tk-space-2) var(--tk-space-2) calc(var(--tk-space-2) + env(safe-area-inset-bottom));
+}
+
+a,
+button {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: center;
+  width: 72px;
+  padding: 0;
+  color: var(--tk-placeholder);
+  background: none;
+  border: 0;
+  font-size: var(--tk-text-xs);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.pill {
+  display: flex;
+  padding: 4px 16px;
+  border-radius: var(--tk-radius-lg);
+}
+
+.pill tk-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.active {
+  color: var(--tk-red);
+  font-weight: 700;
+}
+
+.active .pill {
+  background: var(--tk-soft-red);
+}
