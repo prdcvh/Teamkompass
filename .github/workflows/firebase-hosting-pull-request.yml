@@ -16,6 +16,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Install Angular dependencies
+        run: npm ci --prefix angular
       - name: Verify application
         run: npm run verify
       - uses: FirebaseExtended/action-hosting-deploy@v0
