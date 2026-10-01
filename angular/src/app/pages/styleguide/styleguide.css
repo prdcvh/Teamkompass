@@ -1,0 +1,25 @@
+main {
+  display: grid;
+  gap: var(--tk-space-6);
+  max-width: 880px;
+  margin: 0 auto;
+  padding: var(--tk-space-6) var(--tk-space-4);
+}
+
+h1 {
+  margin: 0;
+  font-size: var(--tk-text-title);
+}
+
+h2 {
+  margin: 0 0 var(--tk-space-3);
+  font-size: var(--tk-text-lg);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tk-space-3);
+  align-items: center;
+  margin-bottom: var(--tk-space-3);
+}

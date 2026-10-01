@@ -1,0 +1,55 @@
+:host {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--tk-space-2);
+  min-height: 40px;
+  padding: 0 var(--tk-space-4);
+  border: 1px solid transparent;
+  border-radius: var(--tk-radius-md);
+  font-weight: 600;
+  font-size: var(--tk-text-md);
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+:host([data-size='sm']) {
+  min-height: 32px;
+  padding: 0 var(--tk-space-3);
+  font-size: var(--tk-text-sm);
+}
+
+:host([data-variant='primary']) {
+  color: var(--tk-on-red);
+  background: var(--tk-red);
+}
+
+:host([data-variant='primary']:hover) {
+  background: var(--tk-red-dark);
+}
+
+:host([data-variant='neutral']) {
+  color: var(--tk-ink);
+  background: var(--tk-surface);
+  border-color: var(--tk-line);
+}
+
+:host([data-variant='ghost']) {
+  color: var(--tk-muted);
+  background: transparent;
+}
+
+:host([disabled]),
+:host([aria-disabled='true']) {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+@media (pointer: coarse) {
+  :host {
+    min-height: var(--tk-touch);
+  }
+}

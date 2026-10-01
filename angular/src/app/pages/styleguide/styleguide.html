@@ -1,0 +1,53 @@
+<main>
+  <p class="tk-eyebrow">Entwicklung</p>
+  <h1>Styleguide</h1>
+
+  <section>
+    <h2>Buttons</h2>
+    <div class="row">
+      <button tkButton variant="primary">+ Spieler anlegen</button>
+      <button tkButton variant="neutral">Zugänge verwalten</button>
+      <button tkButton variant="ghost">Abbrechen</button>
+      <button tkButton variant="primary" size="sm">Klein</button>
+      <button tkButton variant="neutral" disabled>Deaktiviert</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Chips und Status</h2>
+    <div class="row">
+      <tk-chip>Ø 2,1</tk-chip>
+      <tk-chip tone="green">Fit</tk-chip>
+      <tk-chip tone="amber">Angeschlagen</tk-chip>
+      <tk-chip tone="blue">Beobachten</tk-chip>
+      <tk-chip tone="red">Verletzt</tk-chip>
+    </div>
+    <div class="row">
+      @for (status of statuses; track status) {
+        <tk-status [label]="status" />
+      }
+    </div>
+  </section>
+
+  <section>
+    <h2>Karte und Formular</h2>
+    <tk-card>
+      <label class="tk-label">
+        Suche
+        <input class="tk-input" type="search" placeholder="Name, Position, Status" />
+      </label>
+    </tk-card>
+  </section>
+
+  <section>
+    <h2>Dialog</h2>
+    <button tkButton variant="primary" (click)="dialogOpen.set(true)">Dialog öffnen</button>
+    <tk-dialog title="Spieler anlegen" [open]="dialogOpen()" (closed)="dialogOpen.set(false)">
+      <label class="tk-label">
+        Name
+        <input class="tk-input" type="text" />
+      </label>
+      <button tkButton variant="primary" (click)="dialogOpen.set(false)">Speichern</button>
+    </tk-dialog>
+  </section>
+</main>

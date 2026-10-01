@@ -1,0 +1,57 @@
+dialog {
+  width: min(560px, calc(100vw - 28px));
+  padding: 0;
+  color: var(--tk-ink);
+  background: transparent;
+  border: 0;
+}
+
+dialog::backdrop {
+  background: rgb(20 15 17 / 55%);
+  backdrop-filter: blur(5px);
+}
+
+.panel {
+  display: grid;
+  gap: var(--tk-space-4);
+  padding: var(--tk-space-5);
+  background: var(--tk-surface);
+  border-radius: var(--tk-radius-lg);
+  box-shadow: 0 24px 80px rgb(0 0 0 / 28%);
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tk-space-3);
+}
+
+h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.close {
+  width: 36px;
+  height: 36px;
+  color: var(--tk-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  font-size: 24px;
+  line-height: 1;
+}
+
+@media (max-width: 720px) {
+  dialog {
+    width: 100vw;
+    max-width: 100vw;
+    margin: auto 0 0;
+  }
+
+  .panel {
+    padding-bottom: calc(var(--tk-space-5) + env(safe-area-inset-bottom));
+    border-radius: var(--tk-radius-xl) var(--tk-radius-xl) 0 0;
+  }
+}
