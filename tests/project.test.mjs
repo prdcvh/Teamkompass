@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import test from "node:test";
+import { collectionKey, mapPath, mapValue, parseArgs } from "../scripts/copy-team-lib.mjs";
 
 const teams = ["team-manager", "u15", "u17"];
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
@@ -275,4 +276,38 @@ test("alle Cloud-Schreibfunktionen setzen die Sync-Anzeige zurueck (Erfolg und F
       assert.deepEqual(calls, Array(names.length).fill(fail ? "fail" : "ok"), `${team}: Sync-Status ${fail ? "Fehler" : "Erfolg"} nicht fuer alle gesetzt`);
     }
   }
+});
+
+test("copy-team: Pfad-Mapping mein-team -> U14 und Schutz vor fremden Pfaden", () => {
+  assert.equal(mapPath("teams/mein-team", "mein-team", "U14"), "teams/U14");
+  assert.equal(mapPath("teams/mein-team/events/e1/ratings/p1", "mein-team", "U14"), "teams/U14/events/e1/ratings/p1");
+  assert.throws(() => mapPath("teams/mein-team2/players/p1", "mein-team", "U14"));
+  assert.throws(() => mapPath("teams/U17/players/p1", "mein-team", "U14"));
+  assert.equal(collectionKey("teams/mein-team/events/e1/ratings/p1", "mein-team"), "events/ratings");
+  assert.equal(collectionKey("teams/mein-team", "mein-team"), "(Team-Dokument)");
+});
+
+test("copy-team: Argumente, Dry-Run und Overwrite", () => {
+  assert.deepEqual(parseArgs(["mein-team", "U14"]), { from: "mein-team", to: "U14", dryRun: false, overwrite: false });
+  assert.deepEqual(parseArgs(["a", "b", "--dry-run", "--overwrite"]), { from: "a", to: "b", dryRun: true, overwrite: true });
+  assert.throws(() => parseArgs(["a"]));
+  assert.throws(() => parseArgs(["a", "a"]));
+  assert.throws(() => parseArgs(["a", "b/c"]));
+  assert.throws(() => parseArgs(["a", "b", "--force"]));
+});
+
+test("copy-team: Referenzen werden aufs Zielteam umgebogen, Timestamps bleiben", () => {
+  class Ref { constructor(path) { this.path = path; } }
+  const helpers = { isRef: (value) => value instanceof Ref, makeRef: (path) => new Ref(path) };
+  class Timestamp {}
+  const stamp = new Timestamp();
+  const mapped = mapValue({ ref: new Ref("teams/mein-team/players/p1"), list: [new Ref("teams/mein-team/players/p2")], at: stamp, n: 3 }, "mein-team", "U14", helpers);
+  assert.equal(mapped.ref.path, "teams/U14/players/p1");
+  assert.equal(mapped.list[0].path, "teams/U14/players/p2");
+  assert.equal(mapped.at, stamp);
+  assert.equal(mapped.n, 3);
+});
+
+test("copy-team: Service-Account-Schluessel sind per .gitignore ausgeschlossen", async () => {
+  assert.match(await read(".gitignore"), /service-account/);
 });
