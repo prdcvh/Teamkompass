@@ -29,6 +29,12 @@ build step, no bundler, no test suite.
   `.github/workflows/firestore-rules-deploy.yml`). Trainer role gets
   full read/write; player role is restricted to their own profile/ratings.
   Already generic per `teamId`, so a new team never needs rule changes.
+- `angular/`: the in-progress Angular rewrite (see Jira epic SCRUM-40). Own
+  `package.json`, built separately; `npm run verify` also lints, builds and
+  tests it. It is **not** one of the copies above and is not deployed until
+  its hosting target (`u14`, site `teamkompass-u14`) exists. Its test team
+  is `teamId: U14`, data copied from `mein-team` — never write to
+  `mein-team` from there.
 
 **A feature request against "the app" almost always means every copy**
 (root + every `outputs/*` team folder), not just root — root being out of
@@ -72,12 +78,16 @@ keeps the board current, reports at sprint end).
   Datenschutz, SCRUM-6 Bugs, SCRUM-7 Neue Funktionen, SCRUM-8 Technik &
   Wartung. Bugs are `Task` + label `bug` (the project has no Bug type),
   features are `Story`.
-- **The PO decides** priorities, sprint scope and sprint goal. Claude
-  proposes, never reshuffles the sprint on its own. Work only on tickets in
-  the active sprint unless the PO says otherwise.
-- New findings (bugs, ideas, tech debt spotted while working) become
-  backlog tickets under the matching epic — not silently fixed in an
-  unrelated PR and not pulled into the sprint without the PO.
+- **Claude decides sprint scope and goal** (standing instruction from the PO,
+  2026-10-01). The PO still owns the product direction and can change any
+  sprint at any time; an explicit PO instruction always wins. Work only on
+  tickets in the active sprint, plus critical findings (see below).
+- **Critical findings are fixed promptly.** Anything affecting data
+  protection, security, data loss or wrong core numbers (marks, workload,
+  availability) gets priority `High`, goes into the active sprint
+  immediately and is worked next — it does not wait for the next sprint.
+  Everything else spotted while working becomes a backlog ticket under the
+  matching epic — not silently fixed in an unrelated PR.
 - Unclear or contradictory acceptance criteria → ask the PO before
   building, don't guess.
 - Ticket flow: `Zu erledigen` → `In Bearbeitung` (when starting) →
@@ -88,5 +98,31 @@ keeps the board current, reports at sprint end).
   app copy (see "Repo layout"); `npm run verify` green, with a test for the
   fix where the logic is testable; PR merged per the merge workflow below;
   ticket updated as above.
-- Sprint end: summarize done / not done for the PO (Sprint Review); the PO
-  accepts and decides where unfinished tickets go.
+- **Working hours (standing instruction from the PO, 2026-10-01).** The PO
+  keeps a free coding window of about 5 hours every day, and wants to review
+  tickets in the morning. So: Claude does its development work **at night**
+  (a scheduled night session, starting around 22:30 Europe/Berlin, finished by
+  about 06:30). During the day Claude does **not** start new tickets and does
+  **not** push or merge to `main` — not even right after the PO approves
+  tickets — unless the PO explicitly asks in chat. Answering questions and
+  small Jira housekeeping are fine at any time.
+- **Night-session rules.** Work the active sprint, critical tickets first,
+  following everything in this file. Nobody can be asked at night, so
+  anything that needs a PO decision (changes to `firestore.rules` or auth with
+  uncertain real-world effect, new hosting targets, unclear acceptance
+  criteria) stays a **Draft PR**, the ticket goes to `In Überprüfung` with a
+  comment saying exactly what the PO has to decide. Everything else follows
+  the normal merge workflow. Finish with a short report (what is done, what
+  waits for the PO).
+- **Morning reminder.** A scheduled job (07:49 Europe/Berlin, daily) pushes
+  the list of tickets in `In Überprüfung` and Draft PRs waiting for the PO.
+- **Sprint rollover is automatic.** As soon as every ticket of the active
+  sprint is `Erledigt`, Claude closes the sprint and starts the next one
+  without asking (tool: `manageJiraSprint` via the Atlassian MCP `discover`/
+  `executeDestructive`; board 1, create or reuse the next future sprint).
+  Next sprint = a name with a short goal, two weeks, filled with the
+  highest-priority backlog tickets (critical ones first, then the running
+  epic), unfinished tickets carried over. Tell the PO in one short Sprint
+  Review: done / not done / what the new sprint contains. Claude only acts
+  during an open session; if a session finds a finished sprint, it does the
+  rollover first.
