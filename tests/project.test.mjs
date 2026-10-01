@@ -276,3 +276,15 @@ test("alle Cloud-Schreibfunktionen setzen die Sync-Anzeige zurueck (Erfolg und F
     }
   }
 });
+
+test("Events lassen sich nachtraeglich bearbeiten, Bewertungen bleiben erhalten", async () => {
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    const html = await read(`outputs/${team}/index.html`);
+    assert.match(html, /id="editEventBtn"/);
+    assert.match(html, /id="eventId"/);
+    assert.match(app, /ratings: existing\?\.ratings \|\| \{\}/, `${team}: Bewertungen muessen beim Bearbeiten erhalten bleiben`);
+    assert.match(app, /existing\?\.id \|\| `e\$\{crypto\.randomUUID\(\)\}`/);
+    assert.match(app, /applyAutoAbsence\(newEvent\)/);
+  }
+});
