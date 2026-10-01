@@ -276,3 +276,28 @@ test("alle Cloud-Schreibfunktionen setzen die Sync-Anzeige zurueck (Erfolg und F
     }
   }
 });
+
+test("interne Trainer-Notizen liegen in einem eigenen, nur für Trainer lesbaren Pfad", async () => {
+  const rules = await read("firestore.rules");
+  const block = rules.match(/match \/privateNotes\/\{playerId\} \{([\s\S]*?)\n        \}/);
+  assert.ok(block, "Regel für events/{eventId}/privateNotes fehlt");
+  assert.match(block[1], /allow read, write: if isTrainer\(\);/);
+  assert.doesNotMatch(block[1], /isPlayerFor|isMedical|isTeamMember|"player"|"parent"/);
+
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    // Das Event-Dokument ist für alle Teammitglieder lesbar: interne Notizen dürfen dort nie landen.
+    assert.match(app, /const \{ ratings, privateNotes, \.\.\.meta \} = event;/, `${team}: cloudSaveEvent schreibt interne Notizen ins Event`);
+    // Das Bewertungsdokument liest der Spieler selbst: auch dort keine interne Notiz.
+    assert.match(app, /teamDoc\("events", eventId, "privateNotes", playerId\)/, `${team}: privateNotes-Pfad fehlt`);
+    assert.doesNotMatch(app, /ratings\[[^\]]+\]\.privateNote/, `${team}: interne Notiz im Bewertungsobjekt`);
+    // Spieler/Eltern laden den Pfad gar nicht erst.
+    assert.match(app, /if \(currentRole === "trainer"\) \{\s*syncRatingListeners\(eventIds\);\s*syncPrivateNoteListeners\(eventIds\);/, `${team}: privateNotes werden nicht nur für Trainer geladen`);
+  }
+});
+
+test("Löschen von Events und Spielern entfernt auch die internen Notizen", async () => {
+  const app = await read("outputs/team-manager/app.js");
+  assert.match(app, /teamCollection\("events", event\.id, "privateNotes"\)/);
+  assert.match(app, /getDoc\(teamDoc\("events", event\.id, "privateNotes", playerId\)\)/);
+});
