@@ -1,0 +1,131 @@
+:host {
+  display: block;
+  width: 240px;
+  flex: none;
+  background: var(--tk-surface);
+  border-right: 1px solid var(--tk-line);
+}
+
+nav {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--tk-space-3);
+  min-height: 100vh;
+  padding: var(--tk-space-5);
+}
+
+.brand,
+.user {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.badge {
+  display: grid;
+  place-items: center;
+  min-width: 38px;
+  height: 28px;
+  padding: 0 6px;
+  color: var(--tk-on-red);
+  background: var(--tk-red);
+  border-radius: var(--tk-radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.brand strong {
+  display: block;
+  font-size: 17px;
+}
+
+small {
+  display: block;
+  color: var(--tk-muted);
+  font-size: 10px;
+}
+
+.group {
+  margin: var(--tk-space-4) 0 0;
+  color: var(--tk-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: var(--tk-track-eyebrow);
+  text-transform: uppercase;
+}
+
+ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+ul a {
+  display: flex;
+  gap: var(--tk-space-3);
+  align-items: center;
+  min-height: 46px;
+  padding: 0 var(--tk-space-3);
+  color: var(--tk-muted);
+  border-radius: 9px;
+  font-size: var(--tk-text-md);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+ul a:hover {
+  background: var(--tk-surface-2);
+}
+
+ul a.active {
+  color: var(--tk-red);
+  background: var(--tk-soft-red-nav);
+  font-weight: 600;
+}
+
+.foot {
+  display: grid;
+  gap: var(--tk-space-3);
+  margin-top: auto;
+}
+
+.season {
+  display: grid;
+  gap: 6px;
+  padding: var(--tk-space-3);
+  background: var(--tk-bg);
+  border-radius: var(--tk-radius-md);
+}
+
+.season small {
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.season strong {
+  font-size: 15px;
+}
+
+.privacy {
+  padding: 10px;
+  color: var(--tk-muted);
+  font-size: var(--tk-text-xs);
+  text-decoration: none;
+}
+
+.privacy.active {
+  color: var(--tk-red);
+}
+
+.user strong {
+  display: block;
+  font-size: 12px;
+}
+
+.user small a {
+  color: inherit;
+}

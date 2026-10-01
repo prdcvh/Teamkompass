@@ -2,6 +2,8 @@
 // liegt in firestore.rules. Dieselbe Konfiguration nutzen die bestehenden Team-Apps.
 export const environment = {
   teamId: 'U14',
+  clubName: '1. FC Königstein',
+  teamLabel: 'U14',
   teamName: '1. FC Königstein U14',
   firebase: {
     apiKey: 'AIzaSyCJbajbFdiUFumwIGFN-UXxsg353Y4JgT0',

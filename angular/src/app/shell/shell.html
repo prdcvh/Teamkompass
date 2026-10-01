@@ -1,0 +1,12 @@
+<div class="shell" [attr.data-variant]="variant()">
+  @if (variant() === 'desktop') {
+    <tk-sidebar />
+  }
+  <main>
+    <router-outlet />
+  </main>
+  @if (variant() === 'mobile') {
+    <tk-tab-bar [moreActive]="moreActive()" (moreRequested)="moreOpen.set(true)" />
+    <tk-more-sheet [open]="moreOpen()" (closed)="moreOpen.set(false)" />
+  }
+</div>
