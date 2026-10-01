@@ -1,1 +1,12 @@
-<router-outlet />
+<!-- Bis der Anmeldezustand feststeht (und wenn Firebase nicht erreichbar ist) werden keine Teamdaten gezeigt. -->
+@switch (auth.status()) {
+  @case ('loading') {
+    <p class="boot" role="status">Anmeldung wird geprüft …</p>
+  }
+  @case ('unavailable') {
+    <p class="boot" role="alert">{{ auth.error() }}</p>
+  }
+  @default {
+    <router-outlet />
+  }
+}

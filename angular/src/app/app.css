@@ -1,0 +1,9 @@
+.boot {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  margin: 0;
+  padding: var(--tk-space-4);
+  color: var(--tk-muted);
+  text-align: center;
+}
