@@ -1,0 +1,121 @@
+/* TeamKompass Design-Tokens. Quelle: Figma "TeamKompass – Desktop-/Mobile-Prototyp";
+   die Werte entsprechen den Tokens der bisherigen App (outputs/team-manager/base.css),
+   damit alte und neue Oberfläche gleich aussehen. Dunkles Design wie bisher über
+   data-theme="dark" oder die Systemeinstellung. */
+
+:root {
+  /* Flächen */
+  --tk-bg: #f7f7f5;
+  --tk-surface: #ffffff;
+  --tk-surface-2: #f6f4f3;
+  --tk-field: #e9e7ec;
+  --tk-row-alt: #fcfbfb;
+  --tk-line: #e4dcde;
+
+  /* Text */
+  --tk-ink: #241d1f;
+  --tk-muted: #70686b;
+  --tk-placeholder: #8a8285;
+
+  /* Marke und Status */
+  --tk-red: #d8072e;
+  --tk-red-dark: #a90624;
+  --tk-green: #08714f;
+  --tk-amber: #c9862f;
+  --tk-blue: #1f4f72;
+  --tk-soft-red: #ffe9ee;
+  --tk-soft-red-nav: #fff0f3;
+  --tk-soft-green: #e6f5eb;
+  --tk-soft-amber: #fff3cf;
+  --tk-soft-blue: #e5eef5;
+  --tk-soft-neutral: #e9e7ec;
+  --tk-on-red: #ffffff;
+
+  /* Form */
+  --tk-radius-sm: 8px;
+  --tk-radius-md: 10px;
+  --tk-radius-lg: 16px;
+  --tk-radius-xl: 18px;
+  --tk-radius-pill: 999px;
+
+  /* Abstände (8er-Raster wie in Figma: space-200 = 8, space-300 = 12) */
+  --tk-space-1: 4px;
+  --tk-space-2: 8px;
+  --tk-space-3: 12px;
+  --tk-space-4: 16px;
+  --tk-space-5: 22px;
+  --tk-space-6: 32px;
+
+  /* Schrift */
+  --tk-font: 'Inter Variable', Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --tk-text-xs: 11px;
+  --tk-text-sm: 13px;
+  --tk-text-md: 14px;
+  --tk-text-lg: 16px;
+  --tk-text-title: 28px;
+  --tk-track-eyebrow: 0.06em;
+
+  /* Schatten und Fokus */
+  --tk-shadow-card: 0 6px 18px rgba(36, 28, 31, 0.07);
+  --tk-shadow-fab: 0 8px 20px rgba(168, 5, 36, 0.35);
+  --tk-focus-ring: 0 0 0 3px rgba(216, 7, 46, 0.18);
+
+  /* Mindestgröße für Touch-Ziele (Mobile) */
+  --tk-touch: 44px;
+
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --tk-bg: #111615;
+  --tk-surface: #19211f;
+  --tk-surface-2: #1e2624;
+  --tk-field: #262931;
+  --tk-row-alt: #1b2422;
+  --tk-line: #34413d;
+  --tk-ink: #f4f2ef;
+  --tk-muted: #b6abae;
+  --tk-placeholder: #8f8588;
+  --tk-red: #f04462;
+  --tk-red-dark: #ff8da0;
+  --tk-green: #22a775;
+  --tk-amber: #e0a64f;
+  --tk-blue: #7fb1d4;
+  --tk-soft-red: #3a1821;
+  --tk-soft-red-nav: #351820;
+  --tk-soft-green: #173126;
+  --tk-soft-amber: #352918;
+  --tk-soft-blue: #1c2b36;
+  --tk-soft-neutral: #262931;
+  --tk-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 26px rgba(0, 0, 0, 0.34);
+  --tk-focus-ring: 0 0 0 3px rgba(240, 68, 98, 0.24);
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --tk-bg: #111615;
+    --tk-surface: #19211f;
+    --tk-surface-2: #1e2624;
+    --tk-field: #262931;
+    --tk-row-alt: #1b2422;
+    --tk-line: #34413d;
+    --tk-ink: #f4f2ef;
+    --tk-muted: #b6abae;
+    --tk-placeholder: #8f8588;
+    --tk-red: #f04462;
+    --tk-red-dark: #ff8da0;
+    --tk-green: #22a775;
+    --tk-amber: #e0a64f;
+    --tk-blue: #7fb1d4;
+    --tk-soft-red: #3a1821;
+    --tk-soft-red-nav: #351820;
+    --tk-soft-green: #173126;
+    --tk-soft-amber: #352918;
+    --tk-soft-blue: #1c2b36;
+    --tk-soft-neutral: #262931;
+    --tk-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 26px rgba(0, 0, 0, 0.34);
+    --tk-focus-ring: 0 0 0 3px rgba(240, 68, 98, 0.24);
+    color-scheme: dark;
+  }
+}

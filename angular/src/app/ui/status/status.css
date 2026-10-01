@@ -1,0 +1,32 @@
+:host {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--tk-muted);
+  font-size: var(--tk-text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+:host([data-tone='green']) {
+  color: var(--tk-green);
+}
+
+:host([data-tone='amber']) {
+  color: var(--tk-amber);
+}
+
+:host([data-tone='blue']) {
+  color: var(--tk-blue);
+}
+
+:host([data-tone='red']) {
+  color: var(--tk-red);
+}

@@ -1,0 +1,31 @@
+:host {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: var(--tk-radius-pill);
+  color: var(--tk-ink);
+  background: var(--tk-soft-neutral);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+:host([data-tone='red']) {
+  color: var(--tk-red);
+  background: var(--tk-soft-red);
+}
+
+:host([data-tone='green']) {
+  color: var(--tk-green);
+  background: var(--tk-soft-green);
+}
+
+:host([data-tone='amber']) {
+  color: var(--tk-amber);
+  background: var(--tk-soft-amber);
+}
+
+:host([data-tone='blue']) {
+  color: var(--tk-blue);
+  background: var(--tk-soft-blue);
+}

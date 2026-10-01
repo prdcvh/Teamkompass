@@ -1,0 +1,15 @@
+:host {
+  display: block;
+  padding: var(--tk-space-5);
+  background: var(--tk-surface);
+  border: 1px solid var(--tk-line);
+  border-radius: var(--tk-radius-lg);
+}
+
+@media (max-width: 720px) {
+  :host {
+    padding: var(--tk-space-4);
+    border-radius: var(--tk-radius-xl);
+    box-shadow: var(--tk-shadow-card);
+  }
+}
