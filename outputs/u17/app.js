@@ -3091,7 +3091,9 @@ function saveEvent(event) {
     goalsAgainst: $("#eventType").value === "Spiel" ? scoreOrEmpty($("#eventGoalsAgainst").value) : "",
     matchDuration: $("#eventType").value === "Spiel" ? Number($("#eventMatchDuration").value || 90) : "",
     notes: $("#eventNotes").value.trim(),
-    ratings: existing?.ratings || {}
+    ratings: existing?.ratings || {},
+    // Interne Trainer-Notizen (SCRUM-14) beim Bearbeiten nicht verwerfen.
+    privateNotes: existing?.privateNotes || {}
   };
   // Datum geaendert (oder neues Event): Abwesenheiten fuer das (neue) Datum vorbelegen.
   applyAutoAbsence(newEvent);
