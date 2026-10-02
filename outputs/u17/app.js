@@ -3041,18 +3041,23 @@ function savePlayer(event) {
   renderAll();
 }
 
-function openEventDialog() {
-  $("#eventTitle").value = "";
-  $("#eventType").value = "Training";
-  $("#eventDate").valueAsDate = new Date();
-  $("#eventIntensity").value = "2";
-  $("#eventLocation").value = "";
-  $("#eventTrainingFocus").value = "Eigener Ballbesitz";
-  $("#eventOpponent").value = "";
-  $("#eventGoalsFor").value = "";
-  $("#eventGoalsAgainst").value = "";
-  $("#eventMatchDuration").value = 90;
-  $("#eventNotes").value = "";
+function openEventDialog(existing) {
+  const editing = existing && existing.id ? existing : null;
+  $("#eventDialogTitle").textContent = editing ? "Event bearbeiten" : "Event anlegen";
+  $("#eventSubmitBtn").textContent = editing ? "Änderungen speichern" : "Event speichern";
+  $("#eventId").value = editing?.id || "";
+  $("#eventTitle").value = editing?.title || "";
+  $("#eventType").value = editing?.type || "Training";
+  if (editing) $("#eventDate").value = editing.date;
+  else $("#eventDate").valueAsDate = new Date();
+  $("#eventIntensity").value = String(editing?.intensity || 2);
+  $("#eventLocation").value = editing?.location || "";
+  $("#eventTrainingFocus").value = editing?.trainingFocus || "Eigener Ballbesitz";
+  $("#eventOpponent").value = editing?.opponent || "";
+  $("#eventGoalsFor").value = hasScore(editing?.goalsFor) ? editing.goalsFor : "";
+  $("#eventGoalsAgainst").value = hasScore(editing?.goalsAgainst) ? editing.goalsAgainst : "";
+  $("#eventMatchDuration").value = editing?.matchDuration || 90;
+  $("#eventNotes").value = editing?.notes || "";
   syncEventGameFields();
   $("#eventDialog").showModal();
 }
@@ -3071,8 +3076,10 @@ function syncEventGameFields() {
 
 function saveEvent(event) {
   event.preventDefault();
+  const editId = $("#eventId").value;
+  const existing = editId ? state.events.find((item) => item.id === editId) : null;
   const newEvent = {
-    id: `e${crypto.randomUUID()}`,
+    id: existing?.id || `e${crypto.randomUUID()}`,
     type: $("#eventType").value,
     title: $("#eventTitle").value.trim(),
     date: $("#eventDate").value,
@@ -3084,17 +3091,23 @@ function saveEvent(event) {
     goalsAgainst: $("#eventType").value === "Spiel" ? scoreOrEmpty($("#eventGoalsAgainst").value) : "",
     matchDuration: $("#eventType").value === "Spiel" ? Number($("#eventMatchDuration").value || 90) : "",
     notes: $("#eventNotes").value.trim(),
-    ratings: {}
+    ratings: existing?.ratings || {},
+    // Interne Trainer-Notizen (SCRUM-14) beim Bearbeiten nicht verwerfen.
+    privateNotes: existing?.privateNotes || {}
   };
+  // Datum geaendert (oder neues Event): Abwesenheiten fuer das (neue) Datum vorbelegen.
   applyAutoAbsence(newEvent);
-  state.events.push(newEvent);
+  if (existing) state.events[state.events.indexOf(existing)] = newEvent;
+  else state.events.push(newEvent);
   state.selectedEventId = newEvent.id;
   $("#eventDialog").close();
   persist();
   cloudSaveEvent(newEvent);
   renderAll();
-  setView("events");
-  setEventStep("rate");
+  if (!existing) {
+    setView("events");
+    setEventStep("rate");
+  }
 }
 
 function updateRating(playerId, field, value, rerender = true) {
@@ -4325,7 +4338,7 @@ on("#playerCustomPositions", "input", () => $("#playerCustomPositions").setCusto
 on("#playerNumber", "input", () => $("#playerNumber").setCustomValidity(""));
 on("#exportBtn", "click", exportData);
 on("#themeToggle", "click", toggleTheme);
-on("#newEventBtn", "click", openEventDialog);
+on("#newEventBtn", "click", () => openEventDialog());
 on("#heroEventBtn", "click", () => {
   setView("events");
   openEventDialog();
@@ -4349,6 +4362,10 @@ on("#eventSelect", "change", (event) => {
 });
 on("#ratingFilter", "change", renderRatingTable);
 on("#deleteEventBtn", "click", deleteSelectedEvent);
+on("#editEventBtn", "click", () => {
+  const event = selectedEvent();
+  if (event) openEventDialog(event);
+});
 on("#selectedEventIntensity", "change", (event) => updateSelectedEventMeta("intensity", event.target.value));
 on("#selectedGoalsFor", "change", (event) => updateSelectedEventMeta("goalsFor", event.target.value));
 on("#selectedGoalsAgainst", "change", (event) => updateSelectedEventMeta("goalsAgainst", event.target.value));

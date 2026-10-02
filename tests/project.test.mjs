@@ -301,3 +301,25 @@ test("Löschen von Events und Spielern entfernt auch die internen Notizen", asyn
   assert.match(app, /teamCollection\("events", event\.id, "privateNotes"\)/);
   assert.match(app, /getDoc\(teamDoc\("events", event\.id, "privateNotes", playerId\)\)/);
 });
+
+test("Events lassen sich nachtraeglich bearbeiten, Bewertungen bleiben erhalten", async () => {
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    const html = await read(`outputs/${team}/index.html`);
+    assert.match(html, /id="editEventBtn"/);
+    assert.match(html, /id="eventId"/);
+    assert.match(app, /ratings: existing\?\.ratings \|\| \{\}/, `${team}: Bewertungen muessen beim Bearbeiten erhalten bleiben`);
+    assert.match(app, /existing\?\.id \|\| `e\$\{crypto\.randomUUID\(\)\}`/);
+    assert.match(app, /applyAutoAbsence\(newEvent\)/);
+  }
+});
+
+test("Event bearbeiten behaelt die internen Trainer-Notizen", async () => {
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    const start = app.indexOf("function saveEvent(");
+    const body = app.slice(start, app.indexOf("\n}\n", start));
+    assert.match(body, /ratings: existing\?\.ratings \|\| \{\}/, `${team}: Bewertungen gehen beim Bearbeiten verloren`);
+    assert.match(body, /privateNotes: existing\?\.privateNotes \|\| \{\}/, `${team}: interne Notizen gehen beim Bearbeiten verloren`);
+  }
+});

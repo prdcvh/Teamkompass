@@ -2353,3 +2353,16 @@ p.muted {
     scroll-behavior: auto !important;
   }
 }
+
+/* Bearbeiten + Loeschen nebeneinander, gleich kompakt */
+.event-editor .panel-head .button-row {
+  margin-left: auto;
+  flex-wrap: nowrap;
+}
+
+.event-editor .panel-head .button-row .ghost-button {
+  min-height: 34px;
+  padding: 0 11px;
+  font-size: 0.74rem;
+  margin-left: 0;
+}
