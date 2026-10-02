@@ -1,0 +1,134 @@
+form {
+  display: grid;
+  gap: var(--tk-space-4);
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+fieldset {
+  display: grid;
+  gap: var(--tk-space-3);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+legend {
+  padding: 0;
+  margin-bottom: var(--tk-space-2);
+  font-size: var(--tk-text-sm);
+  font-weight: 600;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--tk-space-3);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tk-space-2);
+}
+
+.position {
+  min-width: 52px;
+  min-height: 36px;
+  padding: 0 var(--tk-space-3);
+  color: var(--tk-ink);
+  background: var(--tk-surface);
+  border: 1px solid var(--tk-line);
+  border-radius: var(--tk-radius-pill);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.position[aria-pressed='true'] {
+  color: var(--tk-on-red);
+  background: var(--tk-red);
+  border-color: var(--tk-red);
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2px;
+  padding: 2px;
+  background: var(--tk-field);
+  border-radius: var(--tk-radius-md);
+}
+
+.segmented button {
+  min-height: var(--tk-touch);
+  color: var(--tk-muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--tk-radius-sm);
+  font-size: var(--tk-text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.segmented button[aria-checked='true'] {
+  color: var(--tk-ink);
+  background: var(--tk-surface);
+  box-shadow: var(--tk-shadow-card);
+}
+
+.error {
+  color: var(--tk-red);
+  font-size: var(--tk-text-sm);
+  font-weight: 400;
+}
+
+[aria-invalid='true'] {
+  border-color: var(--tk-red);
+}
+
+menu {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--tk-space-2);
+  margin: 0;
+  padding: 0;
+}
+
+.delete {
+  margin-right: auto;
+  color: var(--tk-red);
+}
+
+button,
+input,
+select {
+  touch-action: manipulation;
+}
+
+@media (max-width: 720px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .position {
+    min-height: var(--tk-touch);
+  }
+
+  menu button {
+    min-height: var(--tk-touch);
+  }
+
+  form {
+    max-height: 78vh;
+  }
+
+  /* Schaltflächen bleiben beim Scrollen des langen Formulars sichtbar */
+  menu {
+    position: sticky;
+    bottom: 0;
+    padding-top: var(--tk-space-2);
+    background: var(--tk-surface);
+  }
+}

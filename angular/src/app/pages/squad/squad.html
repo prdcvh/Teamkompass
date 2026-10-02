@@ -1,0 +1,185 @@
+<section class="page" [attr.data-variant]="mobile() ? 'mobile' : 'desktop'">
+  <header class="head">
+    <div>
+      <p class="tk-eyebrow">{{ mobile() ? 'Mannschaft' : '1. FC Königstein / Trainerbereich' }}</p>
+      <h1>Kader</h1>
+      <p class="meta">{{ squad.players().length }} Spieler</p>
+    </div>
+    @if (squad.canWrite() && !mobile()) {
+      <button tkButton variant="primary" type="button" (click)="openNew()">+ Spieler anlegen</button>
+    }
+  </header>
+
+  <p class="sync" role="status" [attr.data-state]="sync.state()">
+    {{ sync.label() }}
+    @if (sync.detail()) {
+      <span class="detail"> – {{ sync.detail() }}</span>
+    }
+  </p>
+
+  @if (squad.load() === 'error') {
+    <div class="notice" role="alert">
+      <p>{{ squad.error() }}</p>
+      <button tkButton type="button" (click)="retry()">Erneut versuchen</button>
+    </div>
+  } @else if (squad.load() !== 'ready') {
+    <p class="muted" role="status">Kader wird geladen …</p>
+  } @else {
+    <section class="metrics" aria-label="Verfügbarkeit">
+      <div><span class="count">{{ counts().Fit }}</span><span class="label"><span class="dot" data-tone="green"></span>Fit</span></div>
+      <div><span class="count">{{ counts().Angeschlagen }}</span><span class="label"><span class="dot" data-tone="amber"></span>Angeschlagen</span></div>
+      <div><span class="count">{{ counts().Verletzt }}</span><span class="label"><span class="dot" data-tone="red"></span>Verletzt</span></div>
+      <div><span class="count">{{ counts().Pause }}</span><span class="label"><span class="dot" data-tone="neutral"></span>Pause</span></div>
+    </section>
+
+    <div class="filters">
+      <label class="search">
+        <span class="tk-sr-only">Spieler suchen</span>
+        <input
+          class="tk-input"
+          type="search"
+          placeholder="Name, Position, Status"
+          [value]="query()"
+          (input)="query.set(valueOf($event))"
+        />
+      </label>
+      <label>
+        <span class="tk-sr-only">Position filtern</span>
+        <select class="tk-input" [value]="position()" (change)="position.set(valueOf($event))">
+          <option value="all" [selected]="position() === 'all'">Alle Positionen</option>
+          @for (option of positionFilterOptions(); track option) {
+            <option [value]="option" [selected]="position() === option">{{ option }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        <span class="tk-sr-only">Status filtern</span>
+        <select class="tk-input" [value]="status()" (change)="status.set(valueOf($event))">
+          <option value="all" [selected]="status() === 'all'">Alle Status</option>
+          @for (option of statusOptions; track option) {
+            <option [value]="option" [selected]="status() === option">{{ option }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        <span class="tk-sr-only">Sortieren nach</span>
+        <select class="tk-input" [value]="sort()" (change)="sort.set($any(valueOf($event)))">
+          @for (option of sortOptions; track option.key) {
+            <option [value]="option.key" [selected]="sort() === option.key">{{ option.label }}</option>
+          }
+        </select>
+      </label>
+      @if (squad.canWrite() && !mobile()) {
+        <a tkButton routerLink="/zugaenge">Zugänge verwalten</a>
+      }
+    </div>
+
+    @if (squad.canWrite() && mobile()) {
+      <a class="access-card" routerLink="/zugaenge">
+        <tk-icon name="key" />
+        <span><strong>Spieler-Zugänge verwalten</strong><small>Einladungscodes für Spieler und Eltern</small></span>
+        <tk-icon name="chevron-right" />
+      </a>
+    }
+
+    @if (visible().length === 0) {
+      <tk-card>
+        <div class="empty">
+          @if (squad.players().length === 0) {
+            <p>Noch keine Spieler im Kader.</p>
+            @if (squad.canWrite()) {
+              <button tkButton variant="primary" type="button" (click)="openNew()">+ Spieler anlegen</button>
+            }
+          } @else {
+            <p>Kein Spieler passt zu den Filtern.</p>
+            <button tkButton type="button" (click)="resetFilters()">Filter zurücksetzen</button>
+          }
+        </div>
+      </tk-card>
+    } @else if (mobile()) {
+      @for (group of groups(); track group.title) {
+        <h2 class="group">{{ group.title }} · {{ group.players.length }}</h2>
+        <tk-card>
+          <ul class="cards">
+            @for (player of group.players; track player.id) {
+              <li>
+                <button
+                  type="button"
+                  class="player-card"
+                  [disabled]="!squad.canWrite()"
+                  [attr.aria-label]="squad.canWrite() ? 'Spieler bearbeiten: ' + player.name : null"
+                  (click)="openEdit(player)"
+                >
+                  <span class="number">{{ player.number }}</span>
+                  <span class="who">
+                    <strong>{{ player.name }}</strong>
+                    <small>{{ positionText(player) }} · {{ age(player) }} J.</small>
+                  </span>
+                  <tk-status [label]="player.status" />
+                </button>
+              </li>
+            }
+          </ul>
+        </tk-card>
+      }
+    } @else {
+      <tk-card>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Spieler</th>
+                <th scope="col">Position</th>
+                <th scope="col">Alter</th>
+                <th scope="col">Status</th>
+                @if (squad.canWrite()) {
+                  <th scope="col"><span class="tk-sr-only">Aktionen</span></th>
+                }
+              </tr>
+            </thead>
+            <tbody>
+              @for (player of visible(); track player.id) {
+                <tr>
+                  <td><strong>{{ player.number }} · {{ player.name }}</strong></td>
+                  <td>{{ positionText(player) }}</td>
+                  <td>{{ age(player) }}</td>
+                  <td><tk-status [label]="player.status" /></td>
+                  @if (squad.canWrite()) {
+                    <td>
+                      <div class="actions">
+                        <button tkButton size="sm" type="button" (click)="openEdit(player)" [attr.aria-label]="'Bearbeiten: ' + player.name">Bearbeiten</button>
+                        <button tkButton size="sm" type="button" class="danger" (click)="askDelete(player)" [attr.aria-label]="'Löschen: ' + player.name">Löschen</button>
+                      </div>
+                    </td>
+                  }
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </tk-card>
+    }
+  }
+
+  @if (squad.canWrite() && mobile()) {
+    <button type="button" class="fab" aria-label="Spieler anlegen" (click)="openNew()"><tk-icon name="plus" /></button>
+  }
+</section>
+
+@if (squad.canWrite()) {
+  <tk-player-dialog [open]="dialogOpen()" [player]="editing()" (closed)="closeDialog()" (deleteRequested)="askDelete($event)" />
+
+  <tk-dialog [open]="deleting() !== null" title="Spieler löschen?" (closed)="cancelDelete()">
+    <p>
+      „{{ deleting()?.name }}“ wird mit allen Bewertungen, Entwicklungsplänen, Abwesenheiten und Messwerten gelöscht. Das lässt sich nicht
+      rückgängig machen.
+    </p>
+    @if (deleteFailed()) {
+      <p class="error" role="alert">Löschen fehlgeschlagen. Bitte Verbindung prüfen und erneut versuchen.</p>
+    }
+    <div class="confirm-actions">
+      <button tkButton type="button" (click)="cancelDelete()">Abbrechen</button>
+      <button tkButton type="button" variant="primary" (click)="confirmDelete()">Endgültig löschen</button>
+    </div>
+  </tk-dialog>
+}

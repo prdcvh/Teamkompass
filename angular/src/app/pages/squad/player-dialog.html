@@ -1,0 +1,161 @@
+<tk-dialog [open]="open()" [title]="title()" (closed)="closed.emit()">
+  <form (submit)="submit($event)" novalidate>
+    <label class="tk-label">
+      Vor- und Nachname
+      <input
+        class="tk-input"
+        name="name"
+        autocomplete="off"
+        maxlength="60"
+        placeholder="Vor- und Nachname"
+        [value]="draft().name"
+        [attr.aria-invalid]="errors().name ? 'true' : null"
+        [attr.aria-describedby]="errors().name ? 'err-name' : null"
+        (input)="patch({ name: value($event) })"
+      />
+      @if (errors().name) {
+        <span class="error" id="err-name" role="alert">{{ errors().name }}</span>
+      }
+    </label>
+
+    <fieldset>
+      <legend>Positionen</legend>
+      <div class="chips">
+        @for (position of positions; track position) {
+          <button
+            type="button"
+            class="position"
+            [attr.aria-pressed]="draft().positions.includes(position)"
+            (click)="togglePosition(position)"
+          >
+            {{ position }}
+          </button>
+        }
+      </div>
+      <label class="tk-label">
+        Weitere Positionen
+        <input
+          class="tk-input"
+          name="customPositions"
+          autocomplete="off"
+          placeholder="z. B. Hybrid-8, Libero"
+          [value]="draft().customPositions"
+          (input)="patch({ customPositions: value($event) })"
+        />
+      </label>
+      @if (errors().positions) {
+        <span class="error" role="alert">{{ errors().positions }}</span>
+      }
+    </fieldset>
+
+    <div class="grid">
+      <label class="tk-label">
+        Rückennummer
+        <input
+          class="tk-input"
+          name="number"
+          type="number"
+          inputmode="numeric"
+          min="1"
+          max="99"
+          [value]="draft().number"
+          [attr.aria-invalid]="errors().number ? 'true' : null"
+          [attr.aria-describedby]="errors().number ? 'err-number' : null"
+          (input)="patch({ number: value($event) })"
+        />
+        @if (errors().number) {
+          <span class="error" id="err-number" role="alert">{{ errors().number }}</span>
+        }
+      </label>
+      <label class="tk-label">
+        Geburtsdatum
+        <input
+          class="tk-input"
+          name="birthdate"
+          type="date"
+          [max]="today"
+          [value]="draft().birthdate"
+          [attr.aria-invalid]="errors().birthdate ? 'true' : null"
+          [attr.aria-describedby]="errors().birthdate ? 'err-birthdate' : null"
+          (input)="patch({ birthdate: value($event) })"
+        />
+        @if (errors().birthdate) {
+          <span class="error" id="err-birthdate" role="alert">{{ errors().birthdate }}</span>
+        }
+      </label>
+    </div>
+
+    <fieldset>
+      <legend>Status</legend>
+      @if (mobile()) {
+        <div class="segmented" role="radiogroup" aria-label="Status">
+          @for (status of statuses; track status) {
+            <button
+              type="button"
+              role="radio"
+              [attr.aria-checked]="draft().status === status"
+              (click)="setStatus(status)"
+            >
+              {{ status }}
+            </button>
+          }
+        </div>
+      } @else {
+        <select class="tk-input" name="status" aria-label="Status" [value]="draft().status" (change)="setStatus(value($event))">
+          @for (status of statuses; track status) {
+            <option [value]="status" [selected]="draft().status === status">{{ status }}</option>
+          }
+        </select>
+      }
+      @if (draft().status === 'Verletzt') {
+        <label class="tk-label">
+          Ca. verletzt bis
+          <input
+            class="tk-input"
+            name="injuryUntil"
+            type="date"
+            [value]="draft().injuryUntil"
+            [attr.aria-invalid]="errors().injuryUntil ? 'true' : null"
+            (input)="patch({ injuryUntil: value($event) })"
+          />
+          @if (errors().injuryUntil) {
+            <span class="error" role="alert">{{ errors().injuryUntil }}</span>
+          }
+        </label>
+      }
+    </fieldset>
+
+    <div class="grid">
+      <label class="tk-label">
+        Datennutzung
+        <select class="tk-input" name="consentStatus" [value]="draft().consentStatus" (change)="patch({ consentStatus: $any(value($event)) })">
+          @for (consent of consents; track consent[0]) {
+            <option [value]="consent[0]" [selected]="draft().consentStatus === consent[0]">{{ consent[1] }}</option>
+          }
+        </select>
+      </label>
+      <label class="tk-label">
+        Dokumentiert am
+        <input
+          class="tk-input"
+          name="consentDate"
+          type="date"
+          [value]="draft().consentDate"
+          [attr.aria-invalid]="errors().consentDate ? 'true' : null"
+          (input)="patch({ consentDate: value($event) })"
+        />
+        @if (errors().consentDate) {
+          <span class="error" role="alert">{{ errors().consentDate }}</span>
+        }
+      </label>
+    </div>
+
+    <menu>
+      @if (editing()) {
+        <button tkButton type="button" variant="neutral" class="delete" (click)="askDelete()">Spieler löschen</button>
+      }
+      <button tkButton type="button" variant="neutral" (click)="closed.emit()">Abbrechen</button>
+      <button tkButton type="submit" variant="primary">Speichern</button>
+    </menu>
+  </form>
+</tk-dialog>
