@@ -76,6 +76,18 @@ export class PlayerDialog {
     this.patch({ status: status as PlayerStatus });
   }
 
+  /** Pfeiltasten wechseln den Status in der Auswahlleiste (Radiogruppe: nur der gewählte Eintrag ist per Tab erreichbar). */
+  protected moveStatus(event: KeyboardEvent): void {
+    const step = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 0;
+    if (step === 0) return;
+    event.preventDefault();
+    const index = PLAYER_STATUSES.indexOf(this.draft().status);
+    const next = PLAYER_STATUSES[(index + step + PLAYER_STATUSES.length) % PLAYER_STATUSES.length];
+    this.setStatus(next);
+    const group = (event.currentTarget as HTMLElement).parentElement;
+    queueMicrotask(() => group?.querySelectorAll<HTMLElement>('[role="radio"]')[PLAYER_STATUSES.indexOf(next)]?.focus());
+  }
+
   protected submit(event: Event): void {
     event.preventDefault();
     const errors = this.squad.save(this.draft());

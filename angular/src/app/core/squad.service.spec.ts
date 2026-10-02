@@ -114,7 +114,7 @@ describe('SquadService', () => {
     squad.save(draft());
     const sync = TestBed.inject(SyncService);
     await vi.waitFor(() => expect(sync.state()).toBe('error'));
-    expect(sync.detail()).toContain('Spieler konnte nicht gespeichert werden');
+    expect(sync.detail()).toContain('konnte nicht gespeichert werden');
   });
 
   it('löscht einen Spieler und meldet Fehler', async () => {
@@ -159,5 +159,31 @@ describe('SquadService', () => {
     await Promise.resolve();
     expect(firebase.playerWatchers).toBe(0);
     expect(squad.players()).toEqual([]);
+  });
+
+  it('lässt vor dem vollständigen Laden nichts speichern (Rückennummern-Prüfung wäre sonst wirkungslos)', () => {
+    const squad = setup();
+    expect(squad.canEdit()).toBe(false);
+    expect(squad.save(draft({ number: '9' })).name).toContain('noch nicht geladen');
+    expect(firebase.calls.some((call) => call.startsWith('savePlayer'))).toBe(false);
+  });
+
+  it('lässt einen Schreibfehler sichtbar, auch wenn danach der zurückgerollte Snapshot eintrifft', async () => {
+    const squad = setup();
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    squad.start();
+    await vi.waitFor(() => expect(squad.load()).toBe('ready'));
+    firebase.savePlayerError = { code: 'permission-denied' };
+    squad.save(draft());
+    const sync = TestBed.inject(SyncService);
+    await vi.waitFor(() => expect(sync.state()).toBe('error'));
+    firebase.emitPlayers({ fromCache: false, hasPendingWrites: false }); // Firestore rollt zurück und meldet neu
+    expect(sync.state()).toBe('error');
+    expect(sync.detail()).toContain('„Neu Neumann“');
+    // Erst ein erfolgreicher Schreibvorgang nimmt den Fehler zurück.
+    firebase.savePlayerError = null;
+    squad.save(draft());
+    await vi.waitFor(() => expect(sync.state()).toBe('saved'));
+    expect(sync.detail()).toBe('');
   });
 });

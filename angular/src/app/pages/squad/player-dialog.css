@@ -21,6 +21,12 @@ legend {
   font-weight: 600;
 }
 
+.field {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
 .grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

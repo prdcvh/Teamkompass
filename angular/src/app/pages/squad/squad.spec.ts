@@ -154,6 +154,28 @@ describe('Squad (Kader-Seite)', () => {
       await vi.waitFor(() => expect(firebase.players.has('p3')).toBe(false));
     });
 
+    it('zeigt „verletzt bis“ und die Datennutzung', async () => {
+      const fixture = await render();
+      firebase.players.set('p3', { ...firebase.players.get('p3'), injuryUntil: '2026-11-01', consentStatus: 'granted' });
+      firebase.emitPlayers();
+      fixture.detectChanges();
+      const row = qa(fixture, 'tbody tr').find((r) => text(r).includes('Jan Braun'))!;
+      expect(text(row)).toContain('bis 01.11.2026');
+      expect(text(row)).toContain('Einwilligung dokumentiert');
+      expect(text(qa(fixture, 'tbody tr')[0])).toContain('Einwilligung offen');
+    });
+
+    it('verhindert Doppelklick beim Löschen', async () => {
+      const fixture = await render();
+      qa<HTMLButtonElement>(fixture, 'tbody tr')[0].querySelectorAll('button')[1].click();
+      fixture.detectChanges();
+      const confirm = qa<HTMLButtonElement>(fixture, '.confirm-actions button')[1];
+      confirm.click();
+      confirm.click();
+      await vi.waitFor(() => expect(firebase.players.has('p1')).toBe(false));
+      expect(firebase.calls.filter((c) => c === 'deletePlayer:p1')).toHaveLength(1);
+    });
+
     it('meldet einen Ladefehler mit Wiederholen-Schaltfläche', async () => {
       vi.spyOn(console, 'error').mockImplementation(() => undefined);
       const fixture = await render();
@@ -192,6 +214,22 @@ describe('Squad (Kader-Seite)', () => {
       fixture.detectChanges();
       expect(radios[0].getAttribute('aria-checked')).toBe('true');
       expect(q(fixture, 'input[name="injuryUntil"]')).toBeNull();
+    });
+
+    it('bedient die Status-Auswahl per Pfeiltasten (nur der gewählte Eintrag ist per Tab erreichbar)', async () => {
+      const fixture = await render('trainer', true);
+      qa<HTMLButtonElement>(fixture, '.player-card')[0].click();
+      fixture.detectChanges();
+      const radios = () => qa<HTMLButtonElement>(fixture, '[role="radio"]');
+      expect(radios().map((r) => r.getAttribute('tabindex'))).toEqual(['0', '-1', '-1', '-1']);
+      radios()[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
+      fixture.detectChanges();
+      expect(radios()[1].getAttribute('aria-checked')).toBe('true');
+      expect(radios().map((r) => r.getAttribute('tabindex'))).toEqual(['-1', '0', '-1', '-1']);
+      radios()[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, cancelable: true }));
+      radios()[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, cancelable: true }));
+      fixture.detectChanges();
+      expect(radios()[3].getAttribute('aria-checked')).toBe('true'); // springt von Fit nach Pause
     });
 
     it('legt über den Knopf einen Spieler an', async () => {

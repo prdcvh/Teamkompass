@@ -30,6 +30,8 @@ export class SquadService {
   readonly load = signal<SquadLoad>('idle');
   readonly error = signal('');
   readonly canWrite = computed(() => this.session.role() === 'trainer');
+  /** Anlegen/Ändern erst, wenn der ganze Kader da ist – sonst ließe sich die Rückennummern-Prüfung umgehen. */
+  readonly canEdit = computed(() => this.canWrite() && this.load() === 'ready');
 
   private unsubscribe: (() => void) | null = null;
   /** Erhöht bei jedem start/stop, damit ein spät eintreffendes Abo eines alten Laufs verworfen wird. */
@@ -46,6 +48,7 @@ export class SquadService {
   start(): void {
     if (this.unsubscribe || this.load() === 'loading') return;
     const generation = ++this.generation;
+    this.sync.clearError();
     this.load.set('loading');
     this.error.set('');
     this.firebase
@@ -88,21 +91,26 @@ export class SquadService {
    */
   save(draft: PlayerDraft): PlayerErrors {
     if (!this.canWrite()) return { name: 'Nur Trainer dürfen Spieler ändern.' };
+    if (this.load() !== 'ready') return { name: 'Der Kader ist noch nicht geladen. Bitte kurz warten und erneut versuchen.' };
     const errors = validateDraft(draft, this.players());
     if (Object.keys(errors).length > 0) return errors;
     const id = draft.id ?? `p${crypto.randomUUID()}`;
     const player = playerFromDraft(draft, id);
-    this.sync.state.set('syncing');
-    void this.firebase.savePlayer(id, docFromPlayer(player)).catch((error) => this.failWrite(error, 'Spieler konnte nicht gespeichert werden.'));
+    if (!this.sync.isFailed()) this.sync.state.set('syncing');
+    void this.firebase
+      .savePlayer(id, docFromPlayer(player))
+      .then(() => this.sync.clearError())
+      .catch((error) => this.failWrite(error, `„${player.name}“ konnte nicht gespeichert werden.`));
     return {};
   }
 
   /** Löscht den Spieler (inkl. Bewertungen). Rückgabe: erfolgreich? */
   async remove(id: string): Promise<boolean> {
-    if (!this.canWrite()) return false;
-    this.sync.state.set('syncing');
+    if (!this.canEdit()) return false;
+    if (!this.sync.isFailed()) this.sync.state.set('syncing');
     try {
       await this.firebase.deletePlayer(id);
+      this.sync.clearError();
       return true;
     } catch (error) {
       this.failWrite(error, 'Spieler konnte nicht vollständig gelöscht werden.');

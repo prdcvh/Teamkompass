@@ -5,7 +5,7 @@
       <h1>Kader</h1>
       <p class="meta">{{ squad.players().length }} Spieler</p>
     </div>
-    @if (squad.canWrite() && !mobile()) {
+    @if (squad.canEdit() && !mobile()) {
       <button tkButton variant="primary" type="button" (click)="openNew()">+ Spieler anlegen</button>
     }
   </header>
@@ -113,7 +113,7 @@
                   <span class="number">{{ player.number }}</span>
                   <span class="who">
                     <strong>{{ player.name }}</strong>
-                    <small>{{ positionText(player) }} · {{ age(player) }} J.</small>
+                    <small>{{ positionText(player) }} · {{ age(player) }} J.@if (injuryNote(player); as note) { · {{ note }}}</small>
                   </span>
                   <tk-status [label]="player.status" />
                 </button>
@@ -132,6 +132,7 @@
                 <th scope="col">Position</th>
                 <th scope="col">Alter</th>
                 <th scope="col">Status</th>
+                <th scope="col">Datennutzung</th>
                 @if (squad.canWrite()) {
                   <th scope="col"><span class="tk-sr-only">Aktionen</span></th>
                 }
@@ -143,7 +144,13 @@
                   <td><strong>{{ player.number }} · {{ player.name }}</strong></td>
                   <td>{{ positionText(player) }}</td>
                   <td>{{ age(player) }}</td>
-                  <td><tk-status [label]="player.status" /></td>
+                  <td>
+                    <tk-status [label]="player.status" />
+                    @if (injuryNote(player); as note) {
+                      <small class="note">{{ note }}</small>
+                    }
+                  </td>
+                  <td>{{ consentLabel(player) }}</td>
                   @if (squad.canWrite()) {
                     <td>
                       <div class="actions">
@@ -161,7 +168,7 @@
     }
   }
 
-  @if (squad.canWrite() && mobile()) {
+  @if (squad.canEdit() && mobile()) {
     <button type="button" class="fab" aria-label="Spieler anlegen" (click)="openNew()"><tk-icon name="plus" /></button>
   }
 </section>
@@ -179,7 +186,7 @@
     }
     <div class="confirm-actions">
       <button tkButton type="button" (click)="cancelDelete()">Abbrechen</button>
-      <button tkButton type="button" variant="primary" (click)="confirmDelete()">Endgültig löschen</button>
+      <button tkButton type="button" variant="primary" [disabled]="deleteBusy()" (click)="confirmDelete()">{{ deleteBusy() ? 'Löscht …' : 'Endgültig löschen' }}</button>
     </div>
   </tk-dialog>
 }

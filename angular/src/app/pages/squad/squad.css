@@ -122,6 +122,11 @@ td {
   justify-content: flex-end;
 }
 
+.note {
+  display: block;
+  color: var(--tk-muted);
+}
+
 .danger {
   color: var(--tk-red);
 }
@@ -167,10 +172,6 @@ td {
   border: 0;
   text-align: left;
   cursor: pointer;
-}
-
-.player-card:disabled {
-  cursor: default;
 }
 
 .number {

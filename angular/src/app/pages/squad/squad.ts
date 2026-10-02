@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } 
 import { RouterLink } from '@angular/router';
 import { LayoutService } from '../../core/layout.service';
 import {
+  CONSENT_LABELS,
   PLAYER_STATUSES,
   type Player,
   SORT_OPTIONS,
@@ -9,6 +10,7 @@ import {
   STANDARD_POSITIONS,
   ageFromBirthdate,
   filterPlayers,
+  formatDate,
   groupByLine,
   positionText,
   sortPlayers,
@@ -59,8 +61,10 @@ export class Squad implements OnInit {
   /** Positionen aus den Spielerdaten (auch eigene), damit sich jede vorhandene Position filtern lässt. */
   protected readonly positionFilterOptions = computed(() => {
     const own = this.squad.players().flatMap((player) => player.positions);
-    return [...new Set([...STANDARD_POSITIONS, ...own])];
+    const selected = this.position() === 'all' ? [] : [this.position()]; // bleibt wählbar, auch wenn der letzte Spieler gelöscht wurde
+    return [...new Set([...STANDARD_POSITIONS, ...own, ...selected])];
   });
+  protected readonly deleteBusy = signal(false);
   protected readonly filtering = computed(() => this.query().trim() !== '' || this.position() !== 'all' || this.status() !== 'all');
 
   ngOnInit(): void {
@@ -73,6 +77,15 @@ export class Squad implements OnInit {
   }
 
   protected positionText = positionText;
+
+  protected consentLabel(player: Player): string {
+    return CONSENT_LABELS[player.consentStatus];
+  }
+
+  /** „bis 01.12.2026“ bei verletzten Spielern mit Datum. */
+  protected injuryNote(player: Player): string {
+    return player.status === 'Verletzt' && player.injuryUntil ? `bis ${formatDate(player.injuryUntil)}` : '';
+  }
 
   protected valueOf(event: Event): string {
     return (event.target as HTMLInputElement | HTMLSelectElement).value;
@@ -106,9 +119,16 @@ export class Squad implements OnInit {
   protected async confirmDelete(): Promise<void> {
     const player = this.deleting();
     if (!player) return;
-    const ok = await this.squad.remove(player.id);
-    if (ok) this.deleting.set(null);
-    else this.deleteFailed.set(true);
+    if (this.deleteBusy()) return; // Doppelklick: nur ein Löschlauf
+    this.deleteBusy.set(true);
+    this.deleteFailed.set(false);
+    try {
+      const ok = await this.squad.remove(player.id);
+      if (ok) this.deleting.set(null);
+      else this.deleteFailed.set(true);
+    } finally {
+      this.deleteBusy.set(false);
+    }
   }
 
   protected resetFilters(): void {

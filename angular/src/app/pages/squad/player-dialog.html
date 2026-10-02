@@ -1,5 +1,6 @@
 <tk-dialog [open]="open()" [title]="title()" (closed)="closed.emit()">
   <form (submit)="submit($event)" novalidate>
+    <div class="field">
     <label class="tk-label">
       Vor- und Nachname
       <input
@@ -13,12 +14,13 @@
         [attr.aria-describedby]="errors().name ? 'err-name' : null"
         (input)="patch({ name: value($event) })"
       />
-      @if (errors().name) {
-        <span class="error" id="err-name" role="alert">{{ errors().name }}</span>
-      }
     </label>
+    @if (errors().name) {
+      <span class="error" id="err-name" role="alert">{{ errors().name }}</span>
+    }
+    </div>
 
-    <fieldset>
+    <fieldset [attr.aria-describedby]="errors().positions ? 'err-positions' : null">
       <legend>Positionen</legend>
       <div class="chips">
         @for (position of positions; track position) {
@@ -44,11 +46,12 @@
         />
       </label>
       @if (errors().positions) {
-        <span class="error" role="alert">{{ errors().positions }}</span>
+        <span class="error" id="err-positions" role="alert">{{ errors().positions }}</span>
       }
     </fieldset>
 
     <div class="grid">
+      <div class="field">
       <label class="tk-label">
         Rückennummer
         <input
@@ -63,10 +66,12 @@
           [attr.aria-describedby]="errors().number ? 'err-number' : null"
           (input)="patch({ number: value($event) })"
         />
-        @if (errors().number) {
-          <span class="error" id="err-number" role="alert">{{ errors().number }}</span>
-        }
       </label>
+      @if (errors().number) {
+        <span class="error" id="err-number" role="alert">{{ errors().number }}</span>
+      }
+      </div>
+      <div class="field">
       <label class="tk-label">
         Geburtsdatum
         <input
@@ -79,10 +84,11 @@
           [attr.aria-describedby]="errors().birthdate ? 'err-birthdate' : null"
           (input)="patch({ birthdate: value($event) })"
         />
-        @if (errors().birthdate) {
-          <span class="error" id="err-birthdate" role="alert">{{ errors().birthdate }}</span>
-        }
       </label>
+      @if (errors().birthdate) {
+        <span class="error" id="err-birthdate" role="alert">{{ errors().birthdate }}</span>
+      }
+      </div>
     </div>
 
     <fieldset>
@@ -94,6 +100,8 @@
               type="button"
               role="radio"
               [attr.aria-checked]="draft().status === status"
+              [attr.tabindex]="draft().status === status ? 0 : -1"
+              (keydown)="moveStatus($event)"
               (click)="setStatus(status)"
             >
               {{ status }}
@@ -108,6 +116,7 @@
         </select>
       }
       @if (draft().status === 'Verletzt') {
+        <div class="field">
         <label class="tk-label">
           Ca. verletzt bis
           <input
@@ -116,12 +125,14 @@
             type="date"
             [value]="draft().injuryUntil"
             [attr.aria-invalid]="errors().injuryUntil ? 'true' : null"
+            [attr.aria-describedby]="errors().injuryUntil ? 'err-injury' : null"
             (input)="patch({ injuryUntil: value($event) })"
           />
-          @if (errors().injuryUntil) {
-            <span class="error" role="alert">{{ errors().injuryUntil }}</span>
-          }
         </label>
+        @if (errors().injuryUntil) {
+          <span class="error" id="err-injury" role="alert">{{ errors().injuryUntil }}</span>
+        }
+        </div>
       }
     </fieldset>
 
@@ -134,6 +145,7 @@
           }
         </select>
       </label>
+      <div class="field">
       <label class="tk-label">
         Dokumentiert am
         <input
@@ -142,12 +154,14 @@
           type="date"
           [value]="draft().consentDate"
           [attr.aria-invalid]="errors().consentDate ? 'true' : null"
+          [attr.aria-describedby]="errors().consentDate ? 'err-consent' : null"
           (input)="patch({ consentDate: value($event) })"
         />
-        @if (errors().consentDate) {
-          <span class="error" role="alert">{{ errors().consentDate }}</span>
-        }
       </label>
+      @if (errors().consentDate) {
+        <span class="error" id="err-consent" role="alert">{{ errors().consentDate }}</span>
+      }
+      </div>
     </div>
 
     <menu>

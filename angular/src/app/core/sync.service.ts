@@ -16,6 +16,8 @@ export class SyncService {
   readonly state = signal<SyncState>('idle');
   readonly lastSyncedAt = signal<Date | null>(null);
   readonly detail = signal('');
+  /** Ein Fehler bleibt stehen, bis ein späterer Schreibvorgang gelingt: ein Snapshot nach dem Zurückrollen darf ihn nicht überdecken. */
+  private sticky = false;
 
   readonly label = computed(() => {
     switch (this.state()) {
@@ -36,6 +38,10 @@ export class SyncService {
 
   /** Übernimmt den Zustand eines Echtzeit-Snapshots. Ein Fehler bleibt sichtbar, bis ein Snapshot ohne Fehler folgt. */
   applySnapshot(meta: SnapshotMeta, now: Date = new Date()): void {
+    if (this.sticky) {
+      if (!meta.fromCache && !meta.hasPendingWrites) this.lastSyncedAt.set(now);
+      return;
+    }
     this.detail.set('');
     if (meta.fromCache) this.state.set('offline');
     else if (meta.hasPendingWrites) this.state.set('syncing');
@@ -45,12 +51,26 @@ export class SyncService {
     }
   }
 
+  isFailed(): boolean {
+    return this.sticky;
+  }
+
   fail(detail: string): void {
+    this.sticky = true;
     this.state.set('error');
     this.detail.set(detail);
   }
 
+  /** Nach einem erfolgreichen Schreibvorgang oder neuem Laden: Fehleranzeige zurücknehmen. */
+  clearError(): void {
+    if (!this.sticky) return;
+    this.sticky = false;
+    this.detail.set('');
+    this.state.set('saved');
+  }
+
   reset(): void {
+    this.sticky = false;
     this.state.set('idle');
     this.lastSyncedAt.set(null);
     this.detail.set('');
