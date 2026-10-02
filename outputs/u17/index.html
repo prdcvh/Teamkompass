@@ -303,7 +303,10 @@
                   <h2 id="eventEditorTitle">Event bewerten</h2>
                   <span class="muted" id="eventEditorMeta">Training oder Spiel auswählen</span>
                 </div>
-                <button class="ghost-button danger" id="deleteEventBtn" type="button">Event löschen</button>
+                <div class="button-row">
+                  <button class="ghost-button" id="editEventBtn" type="button">Event bearbeiten</button>
+                  <button class="ghost-button danger" id="deleteEventBtn" type="button">Event löschen</button>
+                </div>
               </div>
               <div class="rating-toolbar">
                 <label>
@@ -665,8 +668,9 @@
 
     <dialog id="eventDialog">
       <form class="player-form" id="eventForm">
+        <input id="eventId" type="hidden" />
         <div class="dialog-head">
-          <h2>Event anlegen</h2>
+          <h2 id="eventDialogTitle">Event anlegen</h2>
           <button class="icon-button" type="button" id="closeEventDialogBtn" aria-label="Schließen">×</button>
         </div>
         <label>Titel <input id="eventTitle" required maxlength="60" placeholder="z.B. Training Dienstag oder Heimspiel U17" /></label>
@@ -701,7 +705,7 @@
         <label>Notiz <textarea id="eventNotes" rows="3" placeholder="Schwerpunkt, Ergebnis, Belastung, Besonderheiten"></textarea></label>
         <menu>
           <button class="ghost-button" type="button" id="cancelEventDialogBtn">Abbrechen</button>
-          <button class="primary-button" type="submit">Event speichern</button>
+          <button class="primary-button" type="submit" id="eventSubmitBtn">Event speichern</button>
         </menu>
       </form>
     </dialog>
