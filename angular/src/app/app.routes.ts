@@ -31,7 +31,7 @@ export const routes: Routes = [
         children: [
           { path: '', pathMatch: 'full', redirectTo: 'start' },
           { path: 'start', loadComponent: () => import('./pages/home/home').then((m) => m.Home) },
-          { path: 'kader', loadComponent: placeholder, data: { title: 'Kader' } },
+          { path: 'kader', loadComponent: () => import('./pages/squad/squad').then((m) => m.Squad) },
           { path: 'events', loadComponent: placeholder, data: { title: 'Events' } },
           { path: 'profile', loadComponent: placeholder, data: { title: 'Spielerprofile' } },
           { path: 'teamanalyse', loadComponent: placeholder, data: { title: 'Teamanalyse' } },

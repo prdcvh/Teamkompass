@@ -29,6 +29,21 @@ export interface InviteRecord {
   readonly expiresAtRaw?: unknown;
 }
 
+/** Rohes Dokument aus einer Sammlung (ID + Felder). */
+export interface RawDoc {
+  readonly id: string;
+  readonly data: Readonly<Record<string, unknown>>;
+}
+
+/** Zustand eines Echtzeit-Snapshots: Cache-Stand (offline) und noch nicht bestätigte lokale Änderungen. */
+export interface SnapshotMeta {
+  readonly fromCache: boolean;
+  readonly hasPendingWrites: boolean;
+}
+
+/** Unterkollektionen eines Spielers, die beim Löschen mitgehen (Entwicklungspläne, Abwesenheiten, Messwerte). */
+const PLAYER_SUBCOLLECTIONS = ['developmentPlans', 'absences', 'measurements'] as const;
+
 const ROLES: readonly Role[] = ['trainer', 'player', 'parent', 'medical'];
 
 /**
@@ -130,5 +145,55 @@ export class FirebaseService {
     });
     batch.delete(doc(db, 'teams', environment.teamId, 'invites', code));
     await batch.commit();
+  }
+
+  /**
+   * Echtzeit-Abo auf alle Spieler des Teams. Die Regeln erlauben Lesen für Trainer und Medizin
+   * (Spieler/Eltern nur das eigene Profil); ein Fehler (z. B. permission-denied) kommt über `onError`.
+   */
+  async watchPlayers(
+    onData: (docs: RawDoc[], meta: SnapshotMeta) => void,
+    onError: (error: unknown) => void,
+  ): Promise<() => void> {
+    const { db } = await this.init();
+    const { collection, onSnapshot } = await import('firebase/firestore');
+    return onSnapshot(
+      collection(db, 'teams', environment.teamId, 'players'),
+      { includeMetadataChanges: true },
+      (snapshot) =>
+        onData(
+          snapshot.docs.map((entry) => ({ id: entry.id, data: entry.data() })),
+          { fromCache: snapshot.metadata.fromCache, hasPendingWrites: snapshot.metadata.hasPendingWrites },
+        ),
+      onError,
+    );
+  }
+
+  /** Legt einen Spieler an oder aktualisiert ihn (merge: unbekannte Felder älterer Versionen bleiben erhalten). */
+  async savePlayer(id: string, data: Readonly<Record<string, unknown>>): Promise<void> {
+    const { db } = await this.init();
+    const { doc, setDoc } = await import('firebase/firestore');
+    await setDoc(doc(db, 'teams', environment.teamId, 'players', id), data, { merge: true });
+  }
+
+  /** Löscht den Spieler samt Unterdaten und seiner Bewertungen in allen Events (in Blöcken, Limit 500 je Schreibvorgang). */
+  async deletePlayer(id: string): Promise<void> {
+    const { db } = await this.init();
+    const { collection, doc, getDocs, writeBatch } = await import('firebase/firestore');
+    const base = ['teams', environment.teamId] as const;
+    const [events, ...children] = await Promise.all([
+      getDocs(collection(db, ...base, 'events')),
+      ...PLAYER_SUBCOLLECTIONS.map((name) => getDocs(collection(db, ...base, 'players', id, name))),
+    ]);
+    const refs = [
+      ...children.flatMap((snapshot) => snapshot.docs.map((entry) => entry.ref)),
+      ...events.docs.map((event) => doc(db, ...base, 'events', event.id, 'ratings', id)),
+      doc(db, ...base, 'players', id), // zuletzt: bricht ein Block ab, bleibt der Spieler sichtbar und der Löschversuch wiederholbar
+    ];
+    for (let offset = 0; offset < refs.length; offset += 450) {
+      const batch = writeBatch(db);
+      refs.slice(offset, offset + 450).forEach((ref) => batch.delete(ref));
+      await batch.commit();
+    }
   }
 }
