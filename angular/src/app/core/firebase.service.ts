@@ -176,7 +176,7 @@ export class FirebaseService {
     await setDoc(doc(db, 'teams', environment.teamId, 'players', id), data, { merge: true });
   }
 
-  /** Löscht den Spieler samt Unterdaten und seiner Bewertungen in allen Events (in Blöcken, Limit 500 je Schreibvorgang). */
+  /** Löscht den Spieler samt Unterdaten, Bewertungen und internen Notizen in allen Events (in Blöcken, Limit 500 je Schreibvorgang). */
   async deletePlayer(id: string): Promise<void> {
     const { db } = await this.init();
     const { collection, doc, getDocs, writeBatch } = await import('firebase/firestore');
@@ -188,6 +188,8 @@ export class FirebaseService {
     const refs = [
       ...children.flatMap((snapshot) => snapshot.docs.map((entry) => entry.ref)),
       ...events.docs.map((event) => doc(db, ...base, 'events', event.id, 'ratings', id)),
+      // Interne Trainer-Notizen (SCRUM-14) liegen getrennt von der Bewertung.
+      ...events.docs.map((event) => doc(db, ...base, 'events', event.id, 'privateNotes', id)),
       doc(db, ...base, 'players', id), // zuletzt: bricht ein Block ab, bleibt der Spieler sichtbar und der Löschversuch wiederholbar
     ];
     for (let offset = 0; offset < refs.length; offset += 450) {
