@@ -170,6 +170,13 @@ service cloud.firestore {
           allow read: if isTrainer() || (isTeamMember() && memberDoc().data.role in ["player", "parent"] && resource.data.playerId == memberDoc().data.get('playerId', null));
           allow write: if isTrainer();
         }
+
+        // Interne Trainer-Notizen zu einer Bewertung. Bewusst ein eigener Pfad: das
+        // Bewertungsdokument darf der Spieler/das Elternteil komplett lesen, dieser Pfad
+        // nie (kein Eintrag fuer player/parent/medical).
+        match /privateNotes/{playerId} {
+          allow read, write: if isTrainer();
+        }
       }
 
       match /opponents/{opponentId} {

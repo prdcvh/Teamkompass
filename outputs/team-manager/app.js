@@ -584,6 +584,11 @@ function normalizeEvent(event) {
   Object.entries(event.ratings || {}).forEach(([playerId, rating]) => {
     ratings[playerId] = normalizeRating(rating);
   });
+  // Interne Trainer-Notizen je Spieler (nur Text). Bei Spielern/Eltern ist das immer leer.
+  const privateNotes = {};
+  Object.entries(event.privateNotes || {}).forEach(([playerId, note]) => {
+    if (typeof note === "string" && note) privateNotes[playerId] = note;
+  });
   const isGame = event.type === "Spiel";
   return {
     intensity: 2,
@@ -594,6 +599,7 @@ function normalizeEvent(event) {
     matchDuration: isGame ? 90 : "",
     ...event,
     ratings,
+    privateNotes,
     intensity: Number(event.intensity || 2),
     goalsFor: event.goalsFor ?? "",
     goalsAgainst: event.goalsAgainst ?? "",
@@ -748,12 +754,14 @@ let cloudUnsubscribers = [];
 // Pro-Event- bzw. pro-Spieler-Listener fuer ratings/developmentPlans (siehe startCloudSync):
 // eventId/playerId -> unsubscribe-Funktion.
 let ratingListeners = {};
+// Interne Trainer-Notizen (nur Trainer duerfen den Pfad lesen, siehe firestore.rules).
+let privateNoteListeners = {};
 let planListeners = {};
 let absenceListeners = {};
 let measurementListeners = {};
 let legacyBlobMode = false;
 let legacyCloudSaveTimer = null;
-const cloudCache = { players: [], events: [], ratings: {}, developmentPlans: {}, absences: {}, measurements: {}, opponents: [], lineup: null };
+const cloudCache = { players: [], events: [], ratings: {}, privateNotes: {}, developmentPlans: {}, absences: {}, measurements: {}, opponents: [], lineup: null };
 
 function isCloudActive() {
   return Boolean(firestoreDb);
@@ -854,7 +862,7 @@ async function handleAuthStateChanged(user) {
     // Ohne Anmeldung darf kein Teamstand im Browser bleiben - weder im Speicher noch lokal.
     clearLocalTeamData();
     if (state.players.length || state.events.length) {
-      Object.assign(cloudCache, { players: [], events: [], ratings: {}, developmentPlans: {}, absences: {}, measurements: {}, opponents: [], lineup: null });
+      Object.assign(cloudCache, { players: [], events: [], ratings: {}, privateNotes: {}, developmentPlans: {}, absences: {}, measurements: {}, opponents: [], lineup: null });
       state = normalizeState({ players: [], events: [], opponents: [] });
       renderAll();
     }
@@ -907,6 +915,7 @@ function startCloudSync() {
   cloudCache.players = [];
   cloudCache.events = [];
   cloudCache.ratings = {};
+  cloudCache.privateNotes = {};
   cloudCache.developmentPlans = {};
   cloudCache.absences = {};
   cloudCache.measurements = {};
@@ -917,7 +926,10 @@ function startCloudSync() {
   cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("events"), (snapshot) => {
     cloudCache.events = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
     const eventIds = cloudCache.events.map((event) => event.id);
-    if (currentRole === "trainer") syncRatingListeners(eventIds);
+    if (currentRole === "trainer") {
+      syncRatingListeners(eventIds);
+      syncPrivateNoteListeners(eventIds);
+    }
     else if (["player", "parent"].includes(currentRole) && currentPlayerId) syncPlayerRatingListeners(eventIds);
     rebuildStateFromCloudCache();
   }, (error) => console.error("events sync", error)));
@@ -1004,6 +1016,31 @@ function syncRatingListeners(eventIds) {
         rebuildStateFromCloudCache();
       },
       (error) => console.error("ratings sync", eventId, error)
+    );
+  });
+}
+
+// Interne Notizen: eigener, nur fuer Trainer lesbarer Pfad events/{id}/privateNotes/{playerId}.
+// Sie duerfen nie im Bewertungs- oder Event-Dokument landen, die jedes Teammitglied bzw.
+// der jeweilige Spieler lesen darf.
+function syncPrivateNoteListeners(eventIds) {
+  const idSet = new Set(eventIds);
+  Object.keys(privateNoteListeners).forEach((eventId) => {
+    if (idSet.has(eventId)) return;
+    privateNoteListeners[eventId]();
+    delete privateNoteListeners[eventId];
+    delete cloudCache.privateNotes[eventId];
+  });
+  eventIds.forEach((eventId) => {
+    if (privateNoteListeners[eventId]) return;
+    privateNoteListeners[eventId] = firestoreModule.onSnapshot(
+      teamCollection("events", eventId, "privateNotes"),
+      (snapshot) => {
+        cloudCache.privateNotes[eventId] = {};
+        snapshot.forEach((docSnap) => { cloudCache.privateNotes[eventId][docSnap.id] = docSnap.data().note || ""; });
+        rebuildStateFromCloudCache();
+      },
+      (error) => console.error("private notes sync", eventId, error)
     );
   });
 }
@@ -1097,6 +1134,8 @@ function stopCloudSync() {
   cloudUnsubscribers = [];
   Object.values(ratingListeners).forEach((unsubscribe) => unsubscribe());
   ratingListeners = {};
+  Object.values(privateNoteListeners).forEach((unsubscribe) => unsubscribe());
+  privateNoteListeners = {};
   Object.values(planListeners).forEach((unsubscribe) => unsubscribe());
   planListeners = {};
   Object.values(absenceListeners).forEach((unsubscribe) => unsubscribe());
@@ -1106,7 +1145,7 @@ function stopCloudSync() {
 }
 
 function rebuildStateFromCloudCache() {
-  const events = cloudCache.events.map((event) => ({ ...event, ratings: cloudCache.ratings[event.id] || {} }));
+  const events = cloudCache.events.map((event) => ({ ...event, ratings: cloudCache.ratings[event.id] || {}, privateNotes: cloudCache.privateNotes[event.id] || {} }));
   state = normalizeState({
     players: cloudCache.players,
     events,
@@ -1152,6 +1191,8 @@ async function cloudDeletePlayer(playerId) {
     const refs = childSnapshots.flatMap((snapshot) => snapshot.docs.map((docSnap) => docSnap.ref));
     const ratingSnapshots = await Promise.all(state.events.map((event) => firestoreModule.getDoc(teamDoc("events", event.id, "ratings", playerId))));
     refs.push(...ratingSnapshots.filter((snapshot) => snapshot.exists()).map((snapshot) => snapshot.ref));
+    const privateNoteSnapshots = await Promise.all(state.events.map((event) => firestoreModule.getDoc(teamDoc("events", event.id, "privateNotes", playerId))));
+    refs.push(...privateNoteSnapshots.filter((snapshot) => snapshot.exists()).map((snapshot) => snapshot.ref));
     refs.push(teamDoc("players", playerId));
     await commitDeleteRefs(refs);
     cloudWriteSucceeded();
@@ -1170,7 +1211,8 @@ async function commitDeleteRefs(refs) {
 
 async function cloudSaveEvent(event) {
   if (!isCloudTrainer()) return;
-  const { ratings, ...meta } = event;
+  // Weder Bewertungen noch interne Notizen gehoeren ins Event-Dokument (fuer alle Teammitglieder lesbar).
+  const { ratings, privateNotes, ...meta } = event;
   try {
     await firestoreModule.setDoc(teamDoc("events", event.id), meta, { merge: true });
     cloudWriteSucceeded();
@@ -1182,8 +1224,11 @@ async function cloudSaveEvent(event) {
 async function cloudDeleteEvent(event) {
   if (!isCloudTrainer()) return;
   try {
-    const ratings = await firestoreModule.getDocs(teamCollection("events", event.id, "ratings"));
-    await commitDeleteRefs([...ratings.docs.map((docSnap) => docSnap.ref), teamDoc("events", event.id)]);
+    const [ratings, privateNotes] = await Promise.all([
+      firestoreModule.getDocs(teamCollection("events", event.id, "ratings")),
+      firestoreModule.getDocs(teamCollection("events", event.id, "privateNotes"))
+    ]);
+    await commitDeleteRefs([...ratings.docs.map((docSnap) => docSnap.ref), ...privateNotes.docs.map((docSnap) => docSnap.ref), teamDoc("events", event.id)]);
     cloudWriteSucceeded();
   } catch (error) {
     cloudWriteFailed(error, "Event konnte nicht vollständig aus der Cloud gelöscht werden.");
@@ -1197,6 +1242,16 @@ async function cloudSaveRating(eventId, playerId, rating) {
     cloudWriteSucceeded();
   } catch (error) {
     cloudWriteFailed(error, "Bewertung konnte nicht in der Cloud gespeichert werden – die Änderung ist nur lokal sichtbar.");
+  }
+}
+
+async function cloudSavePrivateNote(eventId, playerId, note) {
+  if (!isCloudTrainer()) return;
+  try {
+    await firestoreModule.setDoc(teamDoc("events", eventId, "privateNotes", playerId), { playerId, note }, { merge: true });
+    cloudWriteSucceeded();
+  } catch (error) {
+    cloudWriteFailed(error, "Interne Notiz konnte nicht in der Cloud gespeichert werden – die Änderung ist nur lokal sichtbar.");
   }
 }
 
@@ -2790,7 +2845,8 @@ function renderRatingTable() {
         <td data-label="Entscheidungsfindung">${gradeSelectHtml(player.id, "tactics", rating.tactics)}</td>
         <td data-label="Lernfähigkeit">${gradeSelectHtml(player.id, "comprehension", rating.comprehension)}</td>
         ${gameFields}
-        <td data-label="Notiz"><input class="rating-note" data-player-id="${player.id}" data-field="note" value="${escapeHtml(rating.note || "")}" placeholder="Kurznotiz" /></td>
+        <td data-label="Feedback an Spieler (sichtbar)"><input class="rating-note" data-player-id="${player.id}" data-field="note" value="${escapeHtml(rating.note || "")}" placeholder="Sichtbar für Spieler/Eltern" /></td>
+        ${canManageRecords() ? `<td data-label="Interne Notiz (nur Trainer)"><input class="rating-note rating-private-note" data-player-id="${player.id}" value="${escapeHtml(event.privateNotes?.[player.id] || "")}" placeholder="Nur für Trainer" /></td>` : ""}
       </tr>
     `;
   }).join("");
@@ -2808,7 +2864,8 @@ function renderRatingTableHead(isGame) {
     <th>Entscheidungsfindung</th>
     <th>Lernfähigkeit</th>
     ${isGame ? "<th>Min.</th><th>Tore</th><th>Vorlagen</th>" : ""}
-    <th>Notiz</th>
+    <th title="Diese Notiz sehen Spieler und Eltern in ihrem Profil">Feedback an Spieler (sichtbar)</th>
+    ${canManageRecords() ? '<th title="Nur für Trainer sichtbar, Spieler und Eltern bekommen sie nie zu sehen">Interne Notiz (nur Trainer)</th>' : ""}
   `;
 }
 
@@ -2870,7 +2927,8 @@ function renderRatingCard(player, event, matchDuration) {
       `).join("")}
     </div>
     ${gameFields}
-    <label class="rating-card-field">Notiz <input class="rating-note" data-player-id="${player.id}" data-field="note" value="${escapeHtml(rating.note || "")}" placeholder="Kurznotiz" /></label>
+    <label class="rating-card-field">Feedback an Spieler (sichtbar) <input class="rating-note" data-player-id="${player.id}" data-field="note" value="${escapeHtml(rating.note || "")}" placeholder="Sichtbar für Spieler/Eltern" /></label>
+    ${canManageRecords() ? `<label class="rating-card-field">Interne Notiz (nur Trainer) <input class="rating-note rating-private-note" data-player-id="${player.id}" value="${escapeHtml(event.privateNotes?.[player.id] || "")}" placeholder="Nur für Trainer" /></label>` : ""}
   `;
 }
 
@@ -3063,6 +3121,16 @@ function updateRating(playerId, field, value, rerender = true) {
   persist();
   cloudSaveRating(event.id, playerId, event.ratings[playerId]);
   if (rerender) renderEvents();
+}
+
+function updatePrivateNote(playerId, value) {
+  const event = selectedEvent();
+  if (!event) return;
+  event.privateNotes ||= {};
+  if (value) event.privateNotes[playerId] = value;
+  else delete event.privateNotes[playerId];
+  persist();
+  cloudSavePrivateNote(event.id, playerId, value);
 }
 
 function deleteSelectedEvent() {
@@ -4397,7 +4465,8 @@ on("#ratingTable", "change", (event) => {
 on("#ratingTable", "input", (event) => {
   const input = event.target.closest(".rating-note");
   if (!input) return;
-  updateRating(input.dataset.playerId, input.dataset.field, input.value, false);
+  if (input.classList.contains("rating-private-note")) updatePrivateNote(input.dataset.playerId, input.value);
+  else updateRating(input.dataset.playerId, input.dataset.field, input.value, false);
 });
 
 on("#ratingTable", "click", (event) => {
@@ -4422,7 +4491,8 @@ on("#ratingStepper", "change", (event) => {
 on("#ratingStepper", "input", (event) => {
   const input = event.target.closest(".rating-note");
   if (!input) return;
-  updateRating(input.dataset.playerId, input.dataset.field, input.value, false);
+  if (input.classList.contains("rating-private-note")) updatePrivateNote(input.dataset.playerId, input.value);
+  else updateRating(input.dataset.playerId, input.dataset.field, input.value, false);
 });
 
 on("#eventSearch", "input", (event) => {
