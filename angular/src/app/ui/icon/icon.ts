@@ -20,6 +20,7 @@ const ICONS = {
   logout: ['M10 5H5v14h5', 'M15 8l4 4-4 4', 'M19 12H9'],
   'chevron-right': ['M9 6l6 6-6 6'],
   close: ['M6 6l12 12', 'M18 6L6 18'],
+  plus: ['M12 5v14', 'M5 12h14'],
 } as const satisfies Record<string, readonly string[]>;
 
 export type IconName = keyof typeof ICONS;

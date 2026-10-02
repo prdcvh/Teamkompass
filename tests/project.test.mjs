@@ -358,3 +358,11 @@ test("copy-team: Referenzen werden aufs Zielteam umgebogen, Timestamps bleiben",
 test("copy-team: Service-Account-Schluessel sind per .gitignore ausgeschlossen", async () => {
   assert.match(await read(".gitignore"), /service-account/);
 });
+
+test("Angular: Spieler loeschen entfernt auch die internen Trainer-Notizen", async () => {
+  const service = await read("angular/src/app/core/firebase.service.ts");
+  const start = service.indexOf("async deletePlayer(");
+  const body = service.slice(start, service.indexOf("\n  }\n", start));
+  assert.match(body, /'events', event\.id, 'ratings', id\)/);
+  assert.match(body, /'events', event\.id, 'privateNotes', id\)/, "interne Notizen des Spielers bleiben beim Loeschen zurueck");
+});

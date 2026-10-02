@@ -1,4 +1,11 @@
-import { FirebaseService, type FirebaseUser, type InviteRecord, type MemberRecord } from './firebase.service';
+import {
+  FirebaseService,
+  type FirebaseUser,
+  type InviteRecord,
+  type MemberRecord,
+  type RawDoc,
+  type SnapshotMeta,
+} from './firebase.service';
 
 /** Ersatz für das Firebase-SDK in Tests: speichert Aufrufe und liefert vorgegebene Antworten. */
 export class FakeFirebase implements Pick<FirebaseService, keyof FirebaseService> {
@@ -58,5 +65,60 @@ export class FakeFirebase implements Pick<FirebaseService, keyof FirebaseService
     if (error) throw error;
     this.members.set(uid, { role: invite.role, playerId: invite.playerId });
     this.invites.delete(code);
+  }
+
+  // --- Spieler (Echtzeit-Abo wie bei Firestore: lokale Schreibvorgänge melden sofort einen neuen Stand) ---
+  players = new Map<string, Record<string, unknown>>();
+  playersMeta: SnapshotMeta = { fromCache: false, hasPendingWrites: false };
+  watchPlayersError: unknown = null;
+  savePlayerError: unknown = null;
+  deletePlayerError: unknown = null;
+  playerWatchers = 0;
+  private playersListener: ((docs: RawDoc[], meta: SnapshotMeta) => void) | null = null;
+  private playersErrorListener: ((error: unknown) => void) | null = null;
+
+  async watchPlayers(
+    onData: (docs: RawDoc[], meta: SnapshotMeta) => void,
+    onError: (error: unknown) => void,
+  ): Promise<() => void> {
+    this.calls.push('watchPlayers');
+    if (this.watchPlayersError) throw this.watchPlayersError;
+    this.playerWatchers += 1;
+    this.playersListener = onData;
+    this.playersErrorListener = onError;
+    this.emitPlayers();
+    return () => {
+      this.playerWatchers -= 1;
+      this.playersListener = null;
+      this.playersErrorListener = null;
+    };
+  }
+
+  /** Test-Hilfe: sendet den aktuellen Spielerstand an den Abonnenten. */
+  emitPlayers(meta: SnapshotMeta = this.playersMeta): void {
+    this.playersMeta = meta;
+    this.playersListener?.(
+      [...this.players].map(([id, data]) => ({ id, data })),
+      meta,
+    );
+  }
+
+  /** Test-Hilfe: Abo-Fehler (z. B. permission-denied). */
+  failPlayers(error: unknown): void {
+    this.playersErrorListener?.(error);
+  }
+
+  async savePlayer(id: string, data: Readonly<Record<string, unknown>>): Promise<void> {
+    this.calls.push(`savePlayer:${id}`);
+    if (this.savePlayerError) throw this.savePlayerError;
+    this.players.set(id, { ...this.players.get(id), ...data });
+    this.emitPlayers();
+  }
+
+  async deletePlayer(id: string): Promise<void> {
+    this.calls.push(`deletePlayer:${id}`);
+    if (this.deletePlayerError) throw this.deletePlayerError;
+    this.players.delete(id);
+    this.emitPlayers();
   }
 }
