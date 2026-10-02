@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import test from "node:test";
+import { collectionKey, mapPath, mapValue, parseArgs } from "../scripts/copy-team-lib.mjs";
 
 const teams = ["team-manager", "u15", "u17"];
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
@@ -307,4 +308,93 @@ test("Angular-Target u14: Output, SPA-Rewrite, Caching, CSP und Deploy-Schritt",
   const deploy = await read(".github/workflows/firebase-hosting-merge.yml");
   assert.match(deploy, /target: u14/);
   assert.match(deploy, /npm run verify/, "Der Angular-Build laeuft ueber verify vor dem Deploy");
+});
+
+test("interne Trainer-Notizen liegen in einem eigenen, nur für Trainer lesbaren Pfad", async () => {
+  const rules = await read("firestore.rules");
+  const block = rules.match(/match \/privateNotes\/\{playerId\} \{([\s\S]*?)\n        \}/);
+  assert.ok(block, "Regel für events/{eventId}/privateNotes fehlt");
+  assert.match(block[1], /allow read, write: if isTrainer\(\);/);
+  assert.doesNotMatch(block[1], /isPlayerFor|isMedical|isTeamMember|"player"|"parent"/);
+
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    // Das Event-Dokument ist für alle Teammitglieder lesbar: interne Notizen dürfen dort nie landen.
+    assert.match(app, /const \{ ratings, privateNotes, \.\.\.meta \} = event;/, `${team}: cloudSaveEvent schreibt interne Notizen ins Event`);
+    // Das Bewertungsdokument liest der Spieler selbst: auch dort keine interne Notiz.
+    assert.match(app, /teamDoc\("events", eventId, "privateNotes", playerId\)/, `${team}: privateNotes-Pfad fehlt`);
+    assert.doesNotMatch(app, /ratings\[[^\]]+\]\.privateNote/, `${team}: interne Notiz im Bewertungsobjekt`);
+    // Spieler/Eltern laden den Pfad gar nicht erst.
+    assert.match(app, /if \(currentRole === "trainer"\) \{\s*syncRatingListeners\(eventIds\);\s*syncPrivateNoteListeners\(eventIds\);/, `${team}: privateNotes werden nicht nur für Trainer geladen`);
+  }
+});
+
+test("Löschen von Events und Spielern entfernt auch die internen Notizen", async () => {
+  const app = await read("outputs/team-manager/app.js");
+  assert.match(app, /teamCollection\("events", event\.id, "privateNotes"\)/);
+  assert.match(app, /getDoc\(teamDoc\("events", event\.id, "privateNotes", playerId\)\)/);
+});
+
+test("Events lassen sich nachtraeglich bearbeiten, Bewertungen bleiben erhalten", async () => {
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    const html = await read(`outputs/${team}/index.html`);
+    assert.match(html, /id="editEventBtn"/);
+    assert.match(html, /id="eventId"/);
+    assert.match(app, /ratings: existing\?\.ratings \|\| \{\}/, `${team}: Bewertungen muessen beim Bearbeiten erhalten bleiben`);
+    assert.match(app, /existing\?\.id \|\| `e\$\{crypto\.randomUUID\(\)\}`/);
+    assert.match(app, /applyAutoAbsence\(newEvent\)/);
+  }
+});
+
+test("Event bearbeiten behaelt die internen Trainer-Notizen", async () => {
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    const start = app.indexOf("function saveEvent(");
+    const body = app.slice(start, app.indexOf("\n}\n", start));
+    assert.match(body, /ratings: existing\?\.ratings \|\| \{\}/, `${team}: Bewertungen gehen beim Bearbeiten verloren`);
+    assert.match(body, /privateNotes: existing\?\.privateNotes \|\| \{\}/, `${team}: interne Notizen gehen beim Bearbeiten verloren`);
+  }
+});
+
+test("copy-team: Pfad-Mapping mein-team -> U14 und Schutz vor fremden Pfaden", () => {
+  assert.equal(mapPath("teams/mein-team", "mein-team", "U14"), "teams/U14");
+  assert.equal(mapPath("teams/mein-team/events/e1/ratings/p1", "mein-team", "U14"), "teams/U14/events/e1/ratings/p1");
+  assert.throws(() => mapPath("teams/mein-team2/players/p1", "mein-team", "U14"));
+  assert.throws(() => mapPath("teams/U17/players/p1", "mein-team", "U14"));
+  assert.equal(collectionKey("teams/mein-team/events/e1/ratings/p1", "mein-team"), "events/ratings");
+  assert.equal(collectionKey("teams/mein-team", "mein-team"), "(Team-Dokument)");
+});
+
+test("copy-team: Argumente, Dry-Run und Overwrite", () => {
+  assert.deepEqual(parseArgs(["mein-team", "U14"]), { from: "mein-team", to: "U14", dryRun: false, overwrite: false });
+  assert.deepEqual(parseArgs(["a", "b", "--dry-run", "--overwrite"]), { from: "a", to: "b", dryRun: true, overwrite: true });
+  assert.throws(() => parseArgs(["a"]));
+  assert.throws(() => parseArgs(["a", "a"]));
+  assert.throws(() => parseArgs(["a", "b/c"]));
+  assert.throws(() => parseArgs(["a", "b", "--force"]));
+});
+
+test("copy-team: Referenzen werden aufs Zielteam umgebogen, Timestamps bleiben", () => {
+  class Ref { constructor(path) { this.path = path; } }
+  const helpers = { isRef: (value) => value instanceof Ref, makeRef: (path) => new Ref(path) };
+  class Timestamp {}
+  const stamp = new Timestamp();
+  const mapped = mapValue({ ref: new Ref("teams/mein-team/players/p1"), list: [new Ref("teams/mein-team/players/p2")], at: stamp, n: 3 }, "mein-team", "U14", helpers);
+  assert.equal(mapped.ref.path, "teams/U14/players/p1");
+  assert.equal(mapped.list[0].path, "teams/U14/players/p2");
+  assert.equal(mapped.at, stamp);
+  assert.equal(mapped.n, 3);
+});
+
+test("copy-team: Service-Account-Schluessel sind per .gitignore ausgeschlossen", async () => {
+  assert.match(await read(".gitignore"), /service-account/);
+});
+
+test("Angular: Spieler loeschen entfernt auch die internen Trainer-Notizen", async () => {
+  const service = await read("angular/src/app/core/firebase.service.ts");
+  const start = service.indexOf("async deletePlayer(");
+  const body = service.slice(start, service.indexOf("\n  }\n", start));
+  assert.match(body, /'events', event\.id, 'ratings', id\)/);
+  assert.match(body, /'events', event\.id, 'privateNotes', id\)/, "interne Notizen des Spielers bleiben beim Loeschen zurueck");
 });

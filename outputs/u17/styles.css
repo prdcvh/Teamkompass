@@ -2110,3 +2110,11 @@ menu {
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
+
+/* Aktionen im Kopf des Event-Editors (Bearbeiten / Loeschen) */
+.panel-head .button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}

@@ -176,6 +176,29 @@ Fuer eine weitere Mannschaft dieselben Schritte mit einer weiteren `teamId`, ein
 Hosting-Target und einem weiteren `outputs/<team>`-Ordner wiederholen.
 
 
+## 7. Daten in ein neues Team kopieren (`scripts/copy-team.mjs`)
+
+Kopiert rekursiv alles unter `teams/<quelle>` nach `teams/<ziel>`: Spieler samt
+Entwicklungsplaenen/Abwesenheiten/Messwerten, Events samt Bewertungen, Gegner, `meta/*`,
+`members` (gleiche Auth-UIDs, bestehende Trainer-Logins funktionieren also auch im Ziel) und
+`invites`. Typen (Timestamps usw.) bleiben erhalten, Dokument-Referenzen werden auf das Zielteam
+umgebogen. Die **Quelle wird nie veraendert**. Gedacht fuer die Angular-Instanz
+(`mein-team` -> `U14`); die Live-App bleibt auf `mein-team`.
+
+Ausfuehrung nur durch den Product Owner (braucht Admin-Zugang):
+
+1. Firebase Console -> Projekteinstellungen -> Dienstkonten -> "Neuen privaten Schluessel generieren".
+   Die JSON-Datei **ausserhalb des Repos** ablegen (Namensmuster `service-account*.json` ist
+   zusaetzlich per `.gitignore` ausgeschlossen). Nach dem Lauf loeschen bzw. den Schluessel
+   in der Konsole widerrufen.
+2. Einmalig: `npm install --no-save firebase-admin`
+3. Trockenlauf (schreibt nichts, zeigt Anzahl je Collection):
+   `GOOGLE_APPLICATION_CREDENTIALS=/pfad/key.json node scripts/copy-team.mjs mein-team U14 --dry-run`
+4. Echter Lauf: gleicher Aufruf ohne `--dry-run`. Ist `teams/U14` schon belegt, bricht das
+   Skript ab; fuer den erneuten Abgleich beim Cutover `--overwrite` anhaengen
+   (gleichnamige Dokumente werden ueberschrieben, zusaetzliche Ziel-Dokumente bleiben bestehen).
+
+
 ## 8. Angular-Instanz U14 (`angular/`, Hosting-Target `u14`)
 
 Die Angular-Neuentwicklung (Jira-Epic SCRUM-40) wird als eigene Hosting-Site
