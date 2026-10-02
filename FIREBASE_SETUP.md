@@ -174,3 +174,29 @@ Code moeglich). Am Beispiel U15, `teamkompass-u15`:**
 
 Fuer eine weitere Mannschaft dieselben Schritte mit einer weiteren `teamId`, einem weiteren
 Hosting-Target und einem weiteren `outputs/<team>`-Ordner wiederholen.
+
+
+## 8. Angular-Instanz U14 (`angular/`, Hosting-Target `u14`)
+
+Die Angular-Neuentwicklung (Jira-Epic SCRUM-40) wird als eigene Hosting-Site
+`teamkompass-u14` veroeffentlicht, getrennt von der Live-App. Sie nutzt `teamId: "U14"`
+(`angular/src/environments/environment.ts`), nie `mein-team`.
+
+- `.firebaserc` / `firebase.json`: Target `u14` -> Site `teamkompass-u14`, Public =
+  `angular/dist/teamkompass-angular/browser` (Output von `npm --prefix angular run build`),
+  SPA-Rewrite auf `/index.html`, dieselben Security-Header wie die anderen Targets.
+  Gehashte Dateien (`main-*.js`, `chunk-*.js`, `styles-*.css`, `media/*`) sind ein Jahr
+  cachebar (`immutable`), alles andere inkl. `index.html` wird immer revalidiert.
+- `angular.json`: `inlineCritical: false`, weil Angulars Inline-`onload` fuer kritisches CSS
+  unter der CSP (`script-src 'self'`) blockiert wuerde und die Seite sonst ungestylt bliebe.
+- `.github/workflows/firebase-hosting-merge.yml`: Der Angular-Build laeuft bereits in
+  `npm run verify`; danach deployt ein eigener Schritt `target: u14` (als letzter Schritt,
+  damit ein Problem dort die Live-Teams nicht aufhaelt).
+- Fuer Pull-Request-Vorschauen wird das Target nicht gebaut (es gibt dafuer noch keine Site).
+
+**Einmalig vor dem Merge (nur Product Owner):**
+1. Site anlegen: `firebase hosting:sites:create teamkompass-u14 --project teamkompass-b8aac`
+   (oder Firebase Console -> Hosting -> "Website hinzufuegen").
+2. Daten kopieren (Abschnitt 7): `node scripts/copy-team.mjs mein-team U14`.
+3. Erst danach den PR nach `main` mergen; vorher schlaegt der neue Deploy-Schritt bei jedem
+   Merge fehl. Die App ist danach unter `https://teamkompass-u14.web.app` erreichbar.

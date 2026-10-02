@@ -123,7 +123,8 @@ test("Service Worker und Hosting kennen die neuen Stylesheets", async () => {
   assert.doesNotMatch(worker, /responsive-enhancements/);
 
   const hosting = JSON.parse(await read("firebase.json"));
-  for (const site of hosting.hosting) {
+  // u14 ist die Angular-App (gehashte Assets), sie hat diese Dateien nicht.
+  for (const site of hosting.hosting.filter((entry) => entry.target !== "u14")) {
     const sources = site.headers.map((entry) => entry.source);
     assert.ok(sources.includes("/base.css"), `${site.target}: /base.css ohne no-cache-Header`);
     assert.ok(sources.includes("/mobile.css"), `${site.target}: /mobile.css ohne no-cache-Header`);
@@ -275,4 +276,35 @@ test("alle Cloud-Schreibfunktionen setzen die Sync-Anzeige zurueck (Erfolg und F
       assert.deepEqual(calls, Array(names.length).fill(fail ? "fail" : "ok"), `${team}: Sync-Status ${fail ? "Fehler" : "Erfolg"} nicht fuer alle gesetzt`);
     }
   }
+});
+
+test("Angular-Target u14: Output, SPA-Rewrite, Caching, CSP und Deploy-Schritt", async () => {
+  const config = JSON.parse(await read("firebase.json"));
+  const target = config.hosting.find((entry) => entry.target === "u14");
+  assert.ok(target, "Hosting-Target u14 fehlt");
+  assert.equal(target.public, "angular/dist/teamkompass-angular/browser");
+  assert.deepEqual(target.rewrites, [{ source: "**", destination: "/index.html" }]);
+
+  const headerFor = (source, key) => target.headers.find((entry) => entry.source === source)?.headers.find((header) => header.key === key)?.value;
+  const csp = headerFor("**", "Content-Security-Policy");
+  assert.match(csp, /script-src 'self'/);
+  assert.doesNotMatch(csp, /script-src[^;]*'unsafe-(inline|eval)'/, "Skripte duerfen nicht inline/eval laufen");
+  assert.match(csp, /frame-ancestors 'none'/);
+  assert.match(headerFor("/index.html", "Cache-Control"), /no-cache/);
+  assert.match(headerFor("**", "Cache-Control"), /no-cache/, "Deep-Link-Antworten (index.html per Rewrite) muessen revalidieren");
+  assert.match(headerFor("/@(main|chunk|polyfills|styles)-*.@(js|css)", "Cache-Control"), /immutable/);
+  assert.match(headerFor("/media/**", "Cache-Control"), /immutable/);
+
+  // Das Build-Verzeichnis kommt aus angular.json; ohne diese Uebereinstimmung deployt Hosting ins Leere.
+  const angular = JSON.parse(await read("angular/angular.json"));
+  const build = angular.projects["teamkompass-angular"].architect.build;
+  assert.equal(`angular/dist/teamkompass-angular/${build.options.outputPath ?? "browser"}`.replace(/\/$/, ""), target.public);
+  // Inline-onload fuer kritisches CSS wuerde von der CSP blockiert (Seite bliebe ungestylt).
+  assert.equal(build.configurations.production.optimization.styles.inlineCritical, false);
+
+  const firebaserc = JSON.parse(await read(".firebaserc"));
+  assert.deepEqual(firebaserc.targets["teamkompass-b8aac"].hosting.u14, ["teamkompass-u14"]);
+  const deploy = await read(".github/workflows/firebase-hosting-merge.yml");
+  assert.match(deploy, /target: u14/);
+  assert.match(deploy, /npm run verify/, "Der Angular-Build laeuft ueber verify vor dem Deploy");
 });
