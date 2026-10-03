@@ -2132,8 +2132,19 @@ function profileSkillAverages(ratings) {
   });
 }
 
+// Fuer Anwesenheits- und Einsatzquoten zaehlt ein Event nur, wenn es nicht in der Zukunft liegt
+// und die Anwesenheit des Spielers schon gesetzt ist (nicht "Offen"). Im Voraus angelegte oder
+// noch nicht bewertete Termine duerfen die Quote nicht verwaessern.
+function countsForPlayerStats(event, playerId) {
+  const attendance = event.ratings?.[playerId]?.attendance || "open";
+  if (attendance === "open") return false;
+  return Boolean(event.date) && new Date(`${event.date}T00:00:00`) <= startOfToday();
+}
+
 function profileAvailability(playerId) {
-  const relevant = state.events.map((event) => event.ratings?.[playerId]?.attendance || "open");
+  const relevant = state.events
+    .filter((event) => countsForPlayerStats(event, playerId))
+    .map((event) => event.ratings[playerId].attendance);
   const total = Math.max(relevant.length, 1);
   const present = relevant.filter((value) => value === "present").length;
   const limited = relevant.filter((value) => value === "limited").length;
@@ -2148,7 +2159,8 @@ function profileAvailability(playerId) {
 }
 
 function playerGameStats(playerId) {
-  const games = gameEvents();
+  // Nur gezaehlte Spiele; "Nicht im Kader" zaehlt weder als moegliche Einsatzzeit noch als Spiel.
+  const games = gameEvents().filter((event) => countsForPlayerStats(event, playerId) && event.ratings[playerId].attendance !== "excluded");
   const gameRatings = games
     .map((event) => ({ event, rating: event.ratings?.[playerId] }))
     .filter(({ rating }) => rating && rating.attendance !== "absent" && rating.attendance !== "excluded");

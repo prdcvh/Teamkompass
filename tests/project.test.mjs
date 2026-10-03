@@ -366,3 +366,61 @@ test("Angular: Spieler loeschen entfernt auch die internen Trainer-Notizen", asy
   assert.match(body, /'events', event\.id, 'ratings', id\)/);
   assert.match(body, /'events', event\.id, 'privateNotes', id\)/, "interne Notizen des Spielers bleiben beim Loeschen zurueck");
 });
+
+// Zieht Funktionen aus app.js (ein Browser-Skript ohne Exporte) und führt sie mit Testdaten aus.
+function loadFunctions(source, names, context) {
+  const code = names.map((name) => {
+    const start = source.indexOf(`function ${name}(`);
+    assert.notEqual(start, -1, `function ${name} nicht gefunden`);
+    const end = source.indexOf("\n}\n", start);
+    return source.slice(start, end + 3);
+  }).join("\n");
+  return new Function(...Object.keys(context), `${code}\nreturn { ${names.join(", ")} };`)(...Object.values(context));
+}
+
+test("Anwesenheits- und Einsatzquote zählen keine zukünftigen oder ungesetzten Events", async () => {
+  for (const team of teams) {
+    const source = await read(`outputs/${team}/app.js`);
+    const day = (offset) => {
+      const date = new Date();
+      date.setDate(date.getDate() + offset);
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    };
+    const state = { events: [] };
+    const add = (type, offset, attendance, extra = {}) => state.events.push({ id: `e${state.events.length}`, type, date: day(offset), matchDuration: 90, ratings: attendance ? { p1: { attendance, ...extra } } : {} });
+    add("Training", -3, "present");
+    add("Training", -2, "present");
+    add("Training", -1, "absent");
+    add("Training", 0, "limited");
+    add("Training", -4, "open");        // vergangen, aber noch nicht bewertet
+    add("Training", -5, null);          // vergangen, keine Bewertung angelegt
+    for (let i = 1; i <= 10; i += 1) add("Training", i, "open"); // im Voraus angelegt
+    add("Training", 2, "absent");       // zukünftige automatische Abwesenheit
+    add("Spiel", -6, "present", { minutes: 90 });
+    add("Spiel", -7, "excluded");       // Nicht im Kader
+    add("Spiel", -8, "present", { minutes: 45 });
+    add("Spiel", 3, "open");            // zukünftiges Spiel
+    add("Spiel", 4, "present", { minutes: 90 }); // fälschlich schon gesetztes Zukunftsspiel
+    const fns = loadFunctions(source, ["startOfToday", "gameEvents", "roundGrade", "countsForPlayerStats", "profileAvailability", "playerGameStats"], { state });
+
+    const [present, limited, absent, excluded] = fns.profileAvailability("p1");
+    // Gezählt: 4 Trainings + 3 Spiele (inkl. Nicht im Kader) = 7 Events
+    assert.equal(present.display, "4/7", `${team}: Anwesend`);
+    assert.equal(limited.display, "1/7", `${team}: Teilweise`);
+    assert.equal(absent.display, "1/7", `${team}: Fehlt`);
+    assert.equal(excluded.display, "1/7", `${team}: Nicht im Kader`);
+
+    const stats = fns.playerGameStats("p1");
+    assert.equal(stats.games, 2, `${team}: Spiele ohne Nicht-im-Kader und Zukunft`);
+    assert.equal(stats.possibleMinutes, 180, `${team}: mögliche Minuten`);
+    assert.equal(stats.minutes, 135, `${team}: gespielte Minuten`);
+    assert.equal(stats.appearanceRate, 75, `${team}: Einsatzquote`);
+
+    // Zukünftige Events ändern nichts
+    const before = JSON.stringify([fns.profileAvailability("p1"), fns.playerGameStats("p1")]);
+    add("Training", 20, "open");
+    add("Spiel", 21, "present", { minutes: 90 });
+    assert.equal(JSON.stringify([fns.profileAvailability("p1"), fns.playerGameStats("p1")]), before, `${team}: Zukunft verändert die Quote`);
+  }
+});
+
