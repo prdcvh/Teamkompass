@@ -621,6 +621,8 @@ function normalizeRating(rating = {}) {
     assists: rating.assists ?? "",
     note: rating.note || ""
   };
+  // Von der Abwesenheits-Automatik gesetzt und seither nicht angefasst (siehe applyAutoAbsence).
+  if (rating.autoAbsence === true) normalized.autoAbsence = true;
   normalized.grade = calculatedGrade(normalized);
   return normalized;
 }
@@ -1983,30 +1985,35 @@ function hasRatingData(rating) {
     .some((field) => rating[field] !== "" && rating[field] != null);
 }
 
-// Ueberschreibt nur Ratings, die noch komplett unbearbeitet sind ("open" ohne jede
-// weitere Eingabe) - sowohl eine manuell gesetzte Anwesenheit als auch bereits
-// eingetragene Teilnoten/Notizen bleiben immer unangetastet.
+function blankRating() {
+  return { attendance: "open", grade: "", effort: "", technique: "", tactics: "", comprehension: "", minutes: "", goals: "", assists: "", note: "" };
+}
+
+// Setzt Spieler bei einer Abwesenheit/Verletzung automatisch auf "Fehlt" - und nimmt das wieder
+// zurueck, wenn die Abwesenheit geloescht oder verkuerzt wird.
+// - Vorwaerts: ueberschreibt nur Ratings, die noch komplett unbearbeitet sind ("open" ohne jede
+//   weitere Eingabe). Eine manuell gesetzte Anwesenheit sowie Teilnoten/Notizen bleiben unangetastet.
+// - Rueckwaerts: nur Eintraege mit autoAbsence-Markierung. Die Markierung faellt weg, sobald
+//   jemand das Rating von Hand aendert (updateRating) - dann bleibt es immer stehen.
 function applyAutoAbsence(event) {
   let changed = false;
   state.players.forEach((player) => {
     const existing = event.ratings?.[player.id];
+    const reason = unavailabilityReason(player, event.date);
+    if (existing?.autoAbsence) {
+      if (reason && existing.note === reason) return;
+      event.ratings[player.id] = reason
+        ? { ...existing, note: reason }
+        : { ...blankRating(), autoAbsence: false };
+      cloudSaveRating(event.id, player.id, event.ratings[player.id]);
+      changed = true;
+      return;
+    }
     if (existing?.attendance && existing.attendance !== "open") return;
     if (hasRatingData(existing)) return;
-    const reason = unavailabilityReason(player, event.date);
     if (!reason) return;
     event.ratings ||= {};
-    event.ratings[player.id] = {
-      attendance: "absent",
-      grade: "",
-      effort: "",
-      technique: "",
-      tactics: "",
-      comprehension: "",
-      minutes: "",
-      goals: "",
-      assists: "",
-      note: reason
-    };
+    event.ratings[player.id] = { ...blankRating(), attendance: "absent", note: reason, autoAbsence: true };
     cloudSaveRating(event.id, player.id, event.ratings[player.id]);
     changed = true;
   });
@@ -3128,6 +3135,8 @@ function updateRating(playerId, field, value, rerender = true) {
   event.ratings ||= {};
   event.ratings[playerId] ||= { attendance: "open", grade: "", effort: "", technique: "", tactics: "", comprehension: "", minutes: "", goals: "", assists: "", note: "" };
   event.ratings[playerId][field] = ["effort", "technique", "tactics", "comprehension", "minutes", "goals", "assists"].includes(field) && value !== "" ? Number(value) : value;
+  // Eine Hand-Aenderung macht aus dem automatisch gesetzten Eintrag einen normalen: er wird nie wieder zurueckgesetzt.
+  if (event.ratings[playerId].autoAbsence) event.ratings[playerId].autoAbsence = false;
   if (field === "minutes" && value !== "") {
     event.ratings[playerId].minutes = Math.min(Number(event.matchDuration || 90), Math.max(0, Number(value)));
   }
@@ -3397,6 +3406,7 @@ function deleteAbsence(absenceId) {
   state.absences[playerId] = (state.absences?.[playerId] || []).filter((item) => item.id !== absenceId);
   persist();
   cloudDeleteAbsence(playerId, absenceId);
+  reconcileAbsences();
   drawProfile();
 }
 

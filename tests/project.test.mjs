@@ -424,3 +424,55 @@ test("Anwesenheits- und Einsatzquote zählen keine zukünftigen oder ungesetzten
   }
 });
 
+test("Gelöschte oder verkürzte Abwesenheit setzt automatisch gesetzte „Fehlt“-Einträge zurück", async () => {
+  for (const team of teams) {
+    const source = await read(`outputs/${team}/app.js`);
+    const saved = [];
+    const state = {
+      players: [{ id: "p1", status: "Fit" }, { id: "p2", status: "Fit" }],
+      absences: { p1: [{ id: "a1", kind: "absence", label: "Urlaub", from: "2026-05-02", to: "2026-05-04" }] },
+      events: ["2026-05-01", "2026-05-02", "2026-05-03", "2026-05-04", "2026-05-05"].map((date, index) => ({ id: `e${index}`, type: "Training", date, ratings: {} })),
+      selectedEventId: "e1"
+    };
+    const context = { state, persist: () => {}, cloudSaveRating: (...args) => saved.push(args), renderEvents: () => {} };
+    const fns = loadFunctions(source, ["roundGrade", "calculatedGrade", "normalizeRating", "blankRating", "hasRatingData", "formatDate", "isInjuryAbsence", "absenceTitle", "absenceCoversDate", "activeAbsenceOn", "unavailabilityReason", "applyAutoAbsence", "reconcileAbsences", "selectedEvent", "updateRating"], context);
+    const attendance = () => state.events.map((event) => event.ratings.p1?.attendance || "open").join(",");
+
+    fns.reconcileAbsences();
+    assert.equal(attendance(), "open,absent,absent,absent,open", `${team}: Abwesenheit setzt Fehlt`);
+    assert.ok(state.events[1].ratings.p1.autoAbsence, `${team}: Markierung fehlt`);
+    assert.equal(state.events[1].ratings.p2, undefined, `${team}: anderer Spieler betroffen`);
+
+    // Die Markierung übersteht das Laden (Cloud-Sync normalisiert jedes Rating)
+    assert.equal(fns.normalizeRating({ attendance: "absent", autoAbsence: true }).autoAbsence, true, `${team}: Markierung geht beim Laden verloren`);
+    assert.equal("autoAbsence" in fns.normalizeRating({ attendance: "absent", autoAbsence: false }), false, `${team}: false-Markierung bleibt hängen`);
+
+    // Verkürzen: nur nicht mehr abgedeckte Events werden zurückgesetzt, die Notiz folgt dem neuen Ende
+    state.absences.p1[0].to = "2026-05-03";
+    fns.reconcileAbsences();
+    assert.equal(attendance(), "open,absent,absent,open,open", `${team}: Verkürzen`);
+    assert.match(state.events[2].ratings.p1.note, /bis/, `${team}: Notiz`);
+
+    // Eine manuelle Änderung schützt den Eintrag vor dem Zurücksetzen
+    fns.updateRating("p1", "attendance", "limited"); // selectedEventId = e1
+    assert.equal(state.events[1].ratings.p1.autoAbsence, false, `${team}: Hand-Änderung löst Markierung nicht`);
+
+    // Löschen: alles Automatische verschwindet, das manuell Geänderte bleibt
+    state.absences.p1 = [];
+    fns.reconcileAbsences();
+    assert.equal(attendance(), "open,limited,open,open,open", `${team}: Löschen hinterlässt Fehlt-Einträge`);
+    assert.equal(state.events[2].ratings.p1.note, "", `${team}: Notiz nicht geleert`);
+    assert.ok(saved.length > 0, `${team}: Zurücksetzen wird nicht gespeichert`);
+
+    // Anlegen und sofort wieder Löschen hinterlässt nichts
+    state.absences.p1 = [{ id: "a2", kind: "absence", label: "Klassenfahrt", from: "2026-05-04", to: "2026-05-05" }];
+    fns.reconcileAbsences();
+    state.absences.p1 = [];
+    fns.reconcileAbsences();
+    assert.equal(attendance(), "open,limited,open,open,open", `${team}: Anlegen+Löschen`);
+  }
+
+  const app = await read("outputs/team-manager/app.js");
+  assert.match(app, /cloudDeleteAbsence\(playerId, absenceId\);\s*reconcileAbsences\(\);/, "deleteAbsence stößt den Abgleich nicht an");
+});
+
