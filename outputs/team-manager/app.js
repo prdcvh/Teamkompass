@@ -3665,7 +3665,7 @@ function renderAnalyticsCards(playerId, ratings = playerRatings(playerId)) {
     ["Belastungsindikator", `${risk.level} · ${risk.percentage}%`],
     ["Ø Intensität zuletzt", avgIntensity ? avgIntensity.toFixed(1).replace(".", ",") : "-"],
     ["Entwicklung Saison", development === null ? "-" : `${development > 0 ? "+" : ""}${gradeLabel(development)}`],
-    ["Bestes Event", bestEvent ? `${gradeLabel(bestEvent.rating.grade)} · ${bestEvent.event.type}` : "-"],
+    ["Bestes Event", bestEvent ? `${gradeLabel(bestEvent.rating.grade)} · ${escapeHtml(bestEvent.event.type)}` : "-"],
     ["Einsatzquote", `${gameStats.appearanceRate}%`],
     ["Scorer/Spiel", statLabel(gameStats.scorersPerGame)],
     ["Tore + Vorlagen", `${gameStats.goals} + ${gameStats.assists}`],
@@ -3697,7 +3697,7 @@ function downloadProfilePdf() {
       <tr>
         <td>${formatDate(event.date)}</td>
         <td>${escapeHtml(event.title)}</td>
-        <td>${event.type}</td>
+        <td>${escapeHtml(event.type)}</td>
         <td>${gradeLabel(rating.grade)}</td>
       </tr>
     `).join("");
