@@ -33,7 +33,7 @@ test("Eltern und medizinische Leserechte sind getrennt; Co-Trainer ist nicht ein
 
 test("bekannte persistente XSS-Senken sind escaped", async () => {
   const app = await read("outputs/team-manager/app.js");
-  for (const unsafe of ["<strong>${player.name}</strong>", "<strong>${event.title}</strong>", "${rating.note || event.notes || \"Keine Notiz\"}"]) {
+  for (const unsafe of ["<strong>${player.name}</strong>", "<strong>${event.title}</strong>", "${rating.note || event.notes || \"Keine Notiz\"}", "<td>${event.type}</td>", "${bestEvent.event.type}"]) {
     assert.equal(app.includes(unsafe), false, `unsichere Ausgabe gefunden: ${unsafe}`);
   }
 });
