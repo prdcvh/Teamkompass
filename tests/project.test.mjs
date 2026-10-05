@@ -279,6 +279,37 @@ test("alle Cloud-Schreibfunktionen setzen die Sync-Anzeige zurueck (Erfolg und F
   }
 });
 
+test("Angular-Target u14: Output, SPA-Rewrite, Caching, CSP und Deploy-Schritt", async () => {
+  const config = JSON.parse(await read("firebase.json"));
+  const target = config.hosting.find((entry) => entry.target === "u14");
+  assert.ok(target, "Hosting-Target u14 fehlt");
+  assert.equal(target.public, "angular/dist/teamkompass-angular/browser");
+  assert.deepEqual(target.rewrites, [{ source: "**", destination: "/index.html" }]);
+
+  const headerFor = (source, key) => target.headers.find((entry) => entry.source === source)?.headers.find((header) => header.key === key)?.value;
+  const csp = headerFor("**", "Content-Security-Policy");
+  assert.match(csp, /script-src 'self'/);
+  assert.doesNotMatch(csp, /script-src[^;]*'unsafe-(inline|eval)'/, "Skripte duerfen nicht inline/eval laufen");
+  assert.match(csp, /frame-ancestors 'none'/);
+  assert.match(headerFor("/index.html", "Cache-Control"), /no-cache/);
+  assert.match(headerFor("**", "Cache-Control"), /no-cache/, "Deep-Link-Antworten (index.html per Rewrite) muessen revalidieren");
+  assert.match(headerFor("/@(main|chunk|polyfills|styles)-*.@(js|css)", "Cache-Control"), /immutable/);
+  assert.match(headerFor("/media/**", "Cache-Control"), /immutable/);
+
+  // Das Build-Verzeichnis kommt aus angular.json; ohne diese Uebereinstimmung deployt Hosting ins Leere.
+  const angular = JSON.parse(await read("angular/angular.json"));
+  const build = angular.projects["teamkompass-angular"].architect.build;
+  assert.equal(`angular/dist/teamkompass-angular/${build.options.outputPath ?? "browser"}`.replace(/\/$/, ""), target.public);
+  // Inline-onload fuer kritisches CSS wuerde von der CSP blockiert (Seite bliebe ungestylt).
+  assert.equal(build.configurations.production.optimization.styles.inlineCritical, false);
+
+  const firebaserc = JSON.parse(await read(".firebaserc"));
+  assert.deepEqual(firebaserc.targets["teamkompass-b8aac"].hosting.u14, ["teamkompass-u14"]);
+  const deploy = await read(".github/workflows/firebase-hosting-merge.yml");
+  assert.match(deploy, /target: u14/);
+  assert.match(deploy, /npm run verify/, "Der Angular-Build laeuft ueber verify vor dem Deploy");
+});
+
 test("interne Trainer-Notizen liegen in einem eigenen, nur für Trainer lesbaren Pfad", async () => {
   const rules = await read("firestore.rules");
   const block = rules.match(/match \/privateNotes\/\{playerId\} \{([\s\S]*?)\n        \}/);
