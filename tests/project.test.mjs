@@ -124,7 +124,8 @@ test("Service Worker und Hosting kennen die neuen Stylesheets", async () => {
   assert.doesNotMatch(worker, /responsive-enhancements/);
 
   const hosting = JSON.parse(await read("firebase.json"));
-  for (const site of hosting.hosting) {
+  // Die Angular-Site (u14) liefert gehashte Bundles statt base.css/mobile.css.
+  for (const site of hosting.hosting.filter((entry) => entry.public.startsWith("outputs/"))) {
     const sources = site.headers.map((entry) => entry.source);
     assert.ok(sources.includes("/base.css"), `${site.target}: /base.css ohne no-cache-Header`);
     assert.ok(sources.includes("/mobile.css"), `${site.target}: /mobile.css ohne no-cache-Header`);
