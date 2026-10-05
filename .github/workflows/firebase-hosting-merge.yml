@@ -18,6 +18,8 @@ jobs:
         run: npm ci --prefix angular
       - name: Verify application
         run: npm run verify
+      - name: Build Angular app (U14)
+        run: npm run build --prefix angular
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
@@ -39,3 +41,10 @@ jobs:
           channelId: live
           projectId: teamkompass-b8aac
           target: u15
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TEAMKOMPASS_B8AAC }}
+          channelId: live
+          projectId: teamkompass-b8aac
+          target: u14
