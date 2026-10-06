@@ -191,6 +191,58 @@ export class FirebaseService {
     );
   }
 
+  /** Echtzeit-Abo auf die Bewertungen eines Events (Dokument je Spieler). Lesen dürfen Trainer und der jeweilige Spieler. */
+  async watchRatings(
+    eventId: string,
+    onData: (docs: RawDoc[], meta: SnapshotMeta) => void,
+    onError: (error: unknown) => void,
+  ): Promise<() => void> {
+    return this.watchEventSubcollection(eventId, 'ratings', onData, onError);
+  }
+
+  /** Echtzeit-Abo auf die internen Trainer-Notizen eines Events. Nur Trainer dürfen den Pfad lesen (SCRUM-14). */
+  async watchPrivateNotes(
+    eventId: string,
+    onData: (docs: RawDoc[], meta: SnapshotMeta) => void,
+    onError: (error: unknown) => void,
+  ): Promise<() => void> {
+    return this.watchEventSubcollection(eventId, 'privateNotes', onData, onError);
+  }
+
+  private async watchEventSubcollection(
+    eventId: string,
+    name: 'ratings' | 'privateNotes',
+    onData: (docs: RawDoc[], meta: SnapshotMeta) => void,
+    onError: (error: unknown) => void,
+  ): Promise<() => void> {
+    const { db } = await this.init();
+    const { collection, onSnapshot } = await import('firebase/firestore');
+    return onSnapshot(
+      collection(db, 'teams', environment.teamId, 'events', eventId, name),
+      { includeMetadataChanges: true },
+      (snapshot) =>
+        onData(
+          snapshot.docs.map((entry) => ({ id: entry.id, data: entry.data() })),
+          { fromCache: snapshot.metadata.fromCache, hasPendingWrites: snapshot.metadata.hasPendingWrites },
+        ),
+      onError,
+    );
+  }
+
+  /** Schreibt die Bewertung eines Spielers (merge, mit `playerId` für die Regeln und Abfragen der Spieleransicht). */
+  async saveRating(eventId: string, playerId: string, data: Readonly<Record<string, unknown>>): Promise<void> {
+    const { db } = await this.init();
+    const { doc, setDoc } = await import('firebase/firestore');
+    await setDoc(doc(db, 'teams', environment.teamId, 'events', eventId, 'ratings', playerId), { ...data, playerId }, { merge: true });
+  }
+
+  /** Schreibt die interne Notiz. Sie liegt bewusst getrennt von der Bewertung, die Spieler und Eltern lesen dürfen. */
+  async savePrivateNote(eventId: string, playerId: string, note: string): Promise<void> {
+    const { db } = await this.init();
+    const { doc, setDoc } = await import('firebase/firestore');
+    await setDoc(doc(db, 'teams', environment.teamId, 'events', eventId, 'privateNotes', playerId), { playerId, note }, { merge: true });
+  }
+
   /** Legt ein Event an oder aktualisiert es (merge: Felder älterer Versionen bleiben erhalten). Nur Metadaten, nie Bewertungen. */
   async saveEvent(id: string, data: Readonly<Record<string, unknown>>): Promise<void> {
     const { db } = await this.init();

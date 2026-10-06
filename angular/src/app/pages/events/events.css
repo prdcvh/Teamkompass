@@ -134,6 +134,13 @@ td {
   border-top: 1px solid var(--tk-line);
 }
 
+.row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--tk-space-2);
+  align-items: center;
+}
+
 .event-card {
   display: grid;
   grid-template-columns: auto 1fr auto;
@@ -146,6 +153,7 @@ td {
   background: transparent;
   border: 0;
   text-align: left;
+  text-decoration: none;
   cursor: pointer;
 }
 
