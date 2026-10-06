@@ -310,6 +310,21 @@ test("Angular-Target u14: Output, SPA-Rewrite, Caching, CSP und Deploy-Schritt",
   assert.match(deploy, /npm run verify/, "Der Angular-Build laeuft ueber verify vor dem Deploy");
 });
 
+test("Spieler loeschen raeumt auch Einladungen und Zugaenge (invites/members) auf", async () => {
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    const body = app.match(/async function cloudDeletePlayer\(playerId\) \{([\s\S]*?)\n\}\n/)?.[1] || "";
+    assert.match(body, /\["invites", "members"\]/, `${team}: invites/members werden beim Loeschen nicht berücksichtigt`);
+    assert.match(body, /where\("playerId", "==", playerId\)/, `${team}: Zugaenge werden nicht per playerId gefunden`);
+  }
+});
+
+test("Angular: Spieler loeschen raeumt invites/members auf", async () => {
+  const service = await read("angular/src/app/core/firebase.service.ts");
+  assert.match(service, /collection\(db, \.\.\.base, 'invites'\), where\('playerId', '==', id\)/);
+  assert.match(service, /collection\(db, \.\.\.base, 'members'\), where\('playerId', '==', id\)/);
+});
+
 test("interne Trainer-Notizen liegen in einem eigenen, nur für Trainer lesbaren Pfad", async () => {
   const rules = await read("firestore.rules");
   const block = rules.match(/match \/privateNotes\/\{playerId\} \{([\s\S]*?)\n        \}/);

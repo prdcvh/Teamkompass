@@ -179,10 +179,12 @@ export class FirebaseService {
   /** Löscht den Spieler samt Unterdaten, Bewertungen und internen Notizen in allen Events (in Blöcken, Limit 500 je Schreibvorgang). */
   async deletePlayer(id: string): Promise<void> {
     const { db } = await this.init();
-    const { collection, doc, getDocs, writeBatch } = await import('firebase/firestore');
+    const { collection, doc, getDocs, query, where, writeBatch } = await import('firebase/firestore');
     const base = ['teams', environment.teamId] as const;
-    const [events, ...children] = await Promise.all([
+    const [events, invites, members, ...children] = await Promise.all([
       getDocs(collection(db, ...base, 'events')),
+      getDocs(query(collection(db, ...base, 'invites'), where('playerId', '==', id))),
+      getDocs(query(collection(db, ...base, 'members'), where('playerId', '==', id))),
       ...PLAYER_SUBCOLLECTIONS.map((name) => getDocs(collection(db, ...base, 'players', id, name))),
     ]);
     const refs = [
@@ -190,6 +192,9 @@ export class FirebaseService {
       ...events.docs.map((event) => doc(db, ...base, 'events', event.id, 'ratings', id)),
       // Interne Trainer-Notizen (SCRUM-14) liegen getrennt von der Bewertung.
       ...events.docs.map((event) => doc(db, ...base, 'events', event.id, 'privateNotes', id)),
+      // Einladungscodes und Zugänge des Spielers (SCRUM-53): sonst zeigen sie auf einen gelöschten Spieler.
+      ...invites.docs.map((entry) => entry.ref),
+      ...members.docs.map((entry) => entry.ref),
       doc(db, ...base, 'players', id), // zuletzt: bricht ein Block ab, bleibt der Spieler sichtbar und der Löschversuch wiederholbar
     ];
     for (let offset = 0; offset < refs.length; offset += 450) {

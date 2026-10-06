@@ -1195,6 +1195,10 @@ async function cloudDeletePlayer(playerId) {
     refs.push(...ratingSnapshots.filter((snapshot) => snapshot.exists()).map((snapshot) => snapshot.ref));
     const privateNoteSnapshots = await Promise.all(state.events.map((event) => firestoreModule.getDoc(teamDoc("events", event.id, "privateNotes", playerId))));
     refs.push(...privateNoteSnapshots.filter((snapshot) => snapshot.exists()).map((snapshot) => snapshot.ref));
+    // Einladungscodes und Zugaenge (members) des Spielers: sonst bleibt ein Code gueltig bzw. ein Zugang
+    // bestehen, der auf einen nicht mehr vorhandenen Spieler zeigt.
+    const accessSnapshots = await Promise.all(["invites", "members"].map((name) => firestoreModule.getDocs(firestoreModule.query(teamCollection(name), firestoreModule.where("playerId", "==", playerId)))));
+    refs.push(...accessSnapshots.flatMap((snapshot) => snapshot.docs.map((docSnap) => docSnap.ref)));
     refs.push(teamDoc("players", playerId));
     await commitDeleteRefs(refs);
     cloudWriteSucceeded();
