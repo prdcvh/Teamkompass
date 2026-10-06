@@ -579,3 +579,64 @@ test("Gelöschte oder verkürzte Abwesenheit setzt automatisch gesetzte „Fehlt
   assert.match(app, /cloudDeleteAbsence\(playerId, absenceId\);\s*reconcileAbsences\(\);/, "deleteAbsence stößt den Abgleich nicht an");
 });
 
+
+test("Bewertungs-Chips haben Kriterium im Namen und aria-pressed (SCRUM-48)", async () => {
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    const start = app.indexOf("function chipGroupHtml(");
+    const end = app.indexOf("function attendanceSelectHtml(");
+    assert.ok(start > 0 && end > start, `${team}: chipGroupHtml fehlt`);
+    const escapeHtml = (value) => String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+    const chipGroupHtml = new Function("escapeHtml", `${app.slice(start, end)}; return chipGroupHtml;`)(escapeHtml);
+    const options = [["", "–"], ["1", "1"], ["2", "2"], ["3", "3"]];
+    const html = chipGroupHtml("p1", "effort", "2", options, "grade-chips", "Einsatz");
+    assert.match(html, /role="group" aria-label="Einsatz"/, `${team}: Gruppe nicht benannt`);
+    assert.match(html, /aria-label="Einsatz: Note 2"[^>]*data-value="2"/, `${team}: Button ohne Kriterium im Namen`);
+    assert.match(html, /aria-pressed="true"[^>]*aria-label="Einsatz: Note 2"/, `${team}: gewaehlter Wert nicht aria-pressed=true`);
+    assert.equal((html.match(/aria-pressed="true"/g) || []).length, 1, `${team}: genau ein Wert darf gewaehlt sein`);
+    assert.equal((html.match(/aria-pressed="false"/g) || []).length, options.length - 1);
+    assert.match(html, /aria-label="Einsatz: keine Note"/, `${team}: leerer Wert nicht benannt`);
+    assert.match(app, /gradeChipsHtml[\s\S]{0,400}ratingFieldLabels\[field\]/, `${team}: Kriterium wird nicht an die Chips uebergeben`);
+  }
+});
+
+test("Bereichswechsel schliesst das Aktionen-Menue, auch nach Breakpoint-Wechsel (SCRUM-49)", async () => {
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    const start = app.indexOf("function closeActionMenu()");
+    assert.ok(start > 0, `${team}: closeActionMenu fehlt`);
+    const end = start + app.slice(start).indexOf("\n}\n") + 3;
+    const menus = [{ open: true, removeAttribute(name) { if (name === "open") this.open = false; } }];
+    const document = { querySelectorAll: () => menus.filter((menu) => menu.open) };
+    const closeActionMenu = new Function("document", `${app.slice(start, end)}; return closeActionMenu;`)(document);
+    closeActionMenu();
+    assert.equal(menus[0].open, false, `${team}: Menue bleibt offen`);
+    const setViewStart = app.indexOf("function setView(viewName)");
+    const setViewBody = app.slice(setViewStart, setViewStart + 300);
+    assert.match(setViewBody, /closeActionMenu\(\)/, `${team}: setView schliesst das Menue nicht`);
+    assert.match(app, /matchMedia\?\.\("\(max-width: 720px\)"\)\?\.addEventListener\?\.\("change", closeActionMenu\)/, `${team}: Breakpoint-Wechsel schliesst das Menue nicht`);
+  }
+  const root = await read("app.js");
+  assert.match(root.slice(root.indexOf("function setView(viewName)"), root.indexOf("function setView(viewName)") + 300), /action-menu\[open\]/, "Root-Kopie schliesst das Menue nicht");
+});
+
+test("Event auswaehlen ist reine Navigation und setzt keinen Cloud-Sync-Status (SCRUM-50)", async () => {
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    const start = app.indexOf("function persistLocalUiState()");
+    assert.ok(start > 0, `${team}: persistLocalUiState fehlt`);
+    const end = start + app.slice(start).indexOf("\n}\n") + 3;
+    const calls = [];
+    const persistLocalUiState = new Function("normalizeState", "writeLocalCache", "setSyncState", "state", `let s = state; ${app.slice(start, end).replace(/state = /, "s = ").replace(/normalizeState\(state\)/, "normalizeState(s)")}; return persistLocalUiState;`)(
+      (value) => value, () => calls.push("cache"), () => calls.push("sync"), {}
+    );
+    persistLocalUiState();
+    assert.deepEqual(calls, ["cache"], `${team}: Auswahl darf nur lokal speichern, nicht den Sync-Status setzen`);
+    const select = app.slice(app.indexOf('on("#eventSelect", "change"'), app.indexOf('on("#ratingFilter"'));
+    assert.match(select, /persistLocalUiState\(\)/, `${team}: Desktop-Select ruft persist()`);
+    assert.ok(!/\bpersist\(\)/.test(select), `${team}: Desktop-Select setzt noch "Wird gespeichert"`);
+    const click = app.slice(app.indexOf("function handleEventListClick("), app.indexOf('on("#eventList", "click"'));
+    assert.match(click, /persistLocalUiState\(\)/, `${team}: Eventkarte ruft persist()`);
+    assert.ok(!/\bpersist\(\)/.test(click), `${team}: Eventkarte setzt noch "Wird gespeichert"`);
+  }
+});

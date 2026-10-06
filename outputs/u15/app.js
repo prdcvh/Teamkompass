@@ -703,6 +703,13 @@ function clearLocalTeamData() {
   });
 }
 
+// Reine Navigationszustaende (z. B. gewaehltes Event) werden nur lokal gemerkt. Es folgt kein
+// Cloud-Write, also darf auch kein "Wird gespeichert …" angezeigt werden (SCRUM-50).
+function persistLocalUiState() {
+  state = normalizeState(state);
+  writeLocalCache();
+}
+
 function persist() {
   state = normalizeState(state);
   writeLocalCache();
@@ -1745,8 +1752,14 @@ function allowedViews() {
   return Object.keys(views);
 }
 
+// Jeder Bereichswechsel (Bottom-Navigation, Schnellzugriff, Suche, "Mehr") schliesst das Aktionen-Menue.
+function closeActionMenu() {
+  document.querySelectorAll("details.action-menu[open]").forEach((menu) => menu.removeAttribute("open"));
+}
+
 function setView(viewName) {
   if (!allowedViews().includes(viewName)) return;
+  closeActionMenu();
   Object.entries(views).forEach(([name, element]) => element.classList.toggle("active", name === viewName));
   document.querySelectorAll(".nav-tab").forEach((button) => button.classList.toggle("active", button.dataset.view === viewName));
   if ($("#moreNavTab")) {
@@ -2943,10 +2956,18 @@ function renderRatingTableHead(isGame) {
   `;
 }
 
-function chipGroupHtml(playerId, field, value, options, extraClass = "") {
-  return `<div class="chip-group ${extraClass}" role="group">${options.map(([optionValue, label]) => `
-    <button type="button" class="chip-button ${String(value ?? "") === optionValue ? "active" : ""}" data-value="${optionValue}" data-player-id="${playerId}" data-field="${field}">${label}</button>
-  `).join("")}</div>`;
+// groupLabel benennt die Gruppe und jeden Button fuer Screenreader (z. B. "Einsatz: Note 2");
+// der gewaehlte Wert steht in aria-pressed, nicht nur in der CSS-Klasse "active".
+function chipGroupHtml(playerId, field, value, options, extraClass = "", groupLabel = "") {
+  const groupAttr = groupLabel ? ` aria-label="${escapeHtml(groupLabel)}"` : "";
+  return `<div class="chip-group ${extraClass}" role="group"${groupAttr}>${options.map(([optionValue, label]) => {
+    const active = String(value ?? "") === optionValue;
+    const buttonName = groupLabel ? `${groupLabel}: ${optionValue === "" ? "keine Note" : `Note ${label}`}` : "";
+    const nameAttr = buttonName ? ` aria-label="${escapeHtml(buttonName)}"` : "";
+    return `
+    <button type="button" class="chip-button ${active ? "active" : ""}" aria-pressed="${active}"${nameAttr} data-value="${optionValue}" data-player-id="${playerId}" data-field="${field}">${label}</button>
+  `;
+  }).join("")}</div>`;
 }
 
 function attendanceSelectHtml(playerId, value, isGame = false) {
@@ -2962,7 +2983,7 @@ function attendanceSelectHtml(playerId, value, isGame = false) {
 
 function gradeChipsHtml(playerId, field, value) {
   const options = [["", "–"], ["1", "1"], ["2", "2"], ["3", "3"], ["4", "4"], ["5", "5"], ["6", "6"]];
-  return chipGroupHtml(playerId, field, value ?? "", options, "grade-chips");
+  return chipGroupHtml(playerId, field, value ?? "", options, "grade-chips", ratingFieldLabels[field] || "");
 }
 
 function gradeSelectHtml(playerId, field, value) {
@@ -4228,6 +4249,8 @@ function safeRender(fn, label) {
 
 document.querySelectorAll(".nav-tab").forEach((button) => button.addEventListener("click", () => setView(button.dataset.view)));
 on("#mobileViewSelect", "change", (event) => setView(event.target.value));
+// Nach einem Wechsel zwischen Desktop und Mobil darf kein offenes Overlay zurueckbleiben.
+window.matchMedia?.("(max-width: 720px)")?.addEventListener?.("change", closeActionMenu);
 if ($("#moreNavTab") && $("#moreSheet")) {
   on("#moreNavTab", "click", () => $("#moreSheet").showModal());
   on("#moreSheet", "click", (event) => {
@@ -4434,7 +4457,7 @@ on("#closeEventDialogBtn", "click", () => $("#eventDialog").close());
 on("#cancelEventDialogBtn", "click", () => $("#eventDialog").close());
 on("#eventSelect", "change", (event) => {
   state.selectedEventId = event.target.value;
-  persist();
+  persistLocalUiState();
   renderEvents();
 });
 on("#ratingFilter", "change", renderRatingTable);
@@ -4530,7 +4553,7 @@ function handleEventListClick(event) {
   const card = event.target.closest("[data-event-id]");
   if (!card) return;
   state.selectedEventId = card.dataset.eventId;
-  persist();
+  persistLocalUiState();
   renderEvents();
   setEventStep("rate");
 }
