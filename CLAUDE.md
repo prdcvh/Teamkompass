@@ -94,6 +94,18 @@ keeps the board current, reports at sprint end).
   `In Überprüfung` (PR open) → `Erledigt` (merged to `main`, i.e. live).
   Put the key in the PR title and commits (`SCRUM-15: …`) and comment the PR
   link plus a short "what changed / how to check" on the ticket.
+- **Ticket comments are written for the PO, in plain German (standing
+  instruction from the PO, 2026-10-06).** Not developer jargon (no
+  "merge", "listener", file names in the main text). Fixed structure:
+  **Was jetzt anders ist** (everyday words), **So prüfst du es**
+  (numbered click steps with the URL), **Was noch fehlt / wo ich unsicher
+  bin**; technical details (PR link, tests) only briefly at the end. Say
+  explicitly what was *not* tried in a real browser. Add screenshots when
+  they help: Chromium/Playwright is available in the session; attaching to
+  Jira (`uploadAttachmentToJiraIssue`, needs a shell `curl` with the upload
+  token) may be blocked by the sandbox, then send the images in the chat
+  (`SendUserFile`) and say so. Never put credentials into files, tickets or
+  commits.
 - **Definition of Done:** acceptance criteria met; change applied to every
   app copy (see "Repo layout"); `npm run verify` green, with a test for the
   fix where the logic is testable; PR merged per the merge workflow below;
