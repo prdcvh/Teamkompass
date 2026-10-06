@@ -391,6 +391,7 @@ async function createFirebaseStore(config) {
 }
 
 function setView(viewName) {
+  document.querySelectorAll("details.action-menu[open]").forEach((menu) => menu.removeAttribute("open"));
   Object.entries(views).forEach(([name, element]) => element.classList.toggle("active", name === viewName));
   document.querySelectorAll(".nav-tab").forEach((button) => button.classList.toggle("active", button.dataset.view === viewName));
   $("#pageTitle").textContent = titles[viewName];
