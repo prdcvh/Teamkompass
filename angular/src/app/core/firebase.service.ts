@@ -44,6 +44,9 @@ export interface SnapshotMeta {
 /** Unterkollektionen eines Spielers, die beim Löschen mitgehen (Entwicklungspläne, Abwesenheiten, Messwerte). */
 const PLAYER_SUBCOLLECTIONS = ['developmentPlans', 'absences', 'measurements'] as const;
 
+/** Unterkollektionen eines Spielers, die das Profil verwaltet. */
+export type PlayerRecordKind = 'developmentPlans' | 'absences' | 'measurements';
+
 const ROLES: readonly Role[] = ['trainer', 'player', 'parent', 'medical'];
 
 /**
@@ -247,6 +250,54 @@ export class FirebaseService {
       (snapshot) =>
         onData(snapshot.exists() ? snapshot.data() : null, { fromCache: snapshot.metadata.fromCache, hasPendingWrites: snapshot.metadata.hasPendingWrites }),
       onError,
+    );
+  }
+
+  /**
+   * Echtzeit-Abo auf eine Unterkollektion eines Spielers (Förderpläne, Abwesenheiten, Messwerte). Lesen dürfen
+   * Trainer, der Spieler selbst (und seine Eltern); Abwesenheiten und Messwerte zusätzlich die medizinische Rolle.
+   */
+  async watchPlayerRecords(
+    playerId: string,
+    name: PlayerRecordKind,
+    onData: (docs: RawDoc[], meta: SnapshotMeta) => void,
+    onError: (error: unknown) => void,
+  ): Promise<() => void> {
+    const { db } = await this.init();
+    const { collection, onSnapshot } = await import('firebase/firestore');
+    return onSnapshot(
+      collection(db, 'teams', environment.teamId, 'players', playerId, name),
+      { includeMetadataChanges: true },
+      (snapshot) =>
+        onData(
+          snapshot.docs.map((entry) => ({ id: entry.id, data: entry.data() })),
+          { fromCache: snapshot.metadata.fromCache, hasPendingWrites: snapshot.metadata.hasPendingWrites },
+        ),
+      onError,
+    );
+  }
+
+  /** Schreibt einen Eintrag vollständig (wie die bisherige App, mit `playerId` für Abfragen und Regeln). */
+  async savePlayerRecord(playerId: string, name: PlayerRecordKind, id: string, data: Readonly<Record<string, unknown>>): Promise<void> {
+    const { db } = await this.init();
+    const { doc, setDoc } = await import('firebase/firestore');
+    await setDoc(doc(db, 'teams', environment.teamId, 'players', playerId, name, id), { ...data, playerId });
+  }
+
+  async deletePlayerRecord(playerId: string, name: PlayerRecordKind, id: string): Promise<void> {
+    const { db } = await this.init();
+    const { deleteDoc, doc } = await import('firebase/firestore');
+    await deleteDoc(doc(db, 'teams', environment.teamId, 'players', playerId, name, id));
+  }
+
+  /** Selbstreflexion: ändert nur diese beiden Felder des Förderplans (so erlauben es die Regeln dem Spieler). */
+  async saveSelfReflection(playerId: string, planId: string, text: string, at: string): Promise<void> {
+    const { db } = await this.init();
+    const { doc, setDoc } = await import('firebase/firestore');
+    await setDoc(
+      doc(db, 'teams', environment.teamId, 'players', playerId, 'developmentPlans', planId),
+      { selfReflection: text, selfReflectionAt: at },
+      { merge: true },
     );
   }
 

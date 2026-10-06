@@ -42,7 +42,7 @@
           <div class="who">
             <strong>{{ p.name }}</strong>
             <span>{{ positionText(p) }} · {{ formatDate(p.birthdate) }} · {{ age(p.birthdate) }} Jahre</span>
-            <span class="status-line"><tk-status [label]="p.status" />{{ injury() }}</span>
+            <span class="status-line"><tk-status [label]="status()" />{{ injury() }}</span>
             <small class="muted">Datennutzung: {{ consent() }}</small>
           </div>
           <div class="grade">
@@ -50,6 +50,17 @@
             <strong>{{ gradeLabel(figures().average) }}</strong>
           </div>
         </div>
+        @if (risk(); as r) {
+          <div class="risk" [attr.data-tier]="r.tier">
+            <div class="risk-head">
+              <span>Belastungsindikator</span>
+              <strong>{{ r.level }} · {{ r.percentage }}%</strong>
+            </div>
+            <div class="risk-meter" role="img" [attr.aria-label]="'Belastungsindikator ' + r.percentage + ' Prozent, ' + r.level"><span [style.width.%]="r.percentage"></span></div>
+            <small>{{ r.reason }} · Ø Belastung {{ numberLabel(r.load) }}/Woche ({{ r.recentEvents }} Einsätze/4 Wochen)</small>
+            <small>{{ r.action }}</small>
+          </div>
+        }
       </tk-card>
 
       <section class="columns">
@@ -122,6 +133,8 @@
           </ul>
         }
       </tk-card>
+
+      <tk-profile-extras [editable]="true" />
     }
   }
 </section>

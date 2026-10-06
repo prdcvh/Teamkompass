@@ -1,0 +1,75 @@
+form {
+  display: grid;
+  gap: var(--tk-space-4);
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--tk-space-3);
+}
+
+textarea {
+  resize: vertical;
+}
+
+.error {
+  color: var(--tk-red);
+  font-size: var(--tk-text-sm);
+  font-weight: 400;
+}
+
+.hint {
+  margin: 0;
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+[aria-invalid='true'] {
+  border-color: var(--tk-red);
+}
+
+menu {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--tk-space-2);
+  margin: 0;
+  padding: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+
+@media (max-width: 720px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  menu button {
+    min-height: var(--tk-touch);
+  }
+
+  form {
+    max-height: 78vh;
+  }
+
+  menu {
+    position: sticky;
+    bottom: 0;
+    padding-top: var(--tk-space-2);
+    background: var(--tk-surface);
+  }
+}

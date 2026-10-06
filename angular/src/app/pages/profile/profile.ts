@@ -15,17 +15,21 @@ import {
   trendChart,
 } from '../../core/profile';
 import { ProfileService } from '../../core/profile.service';
+import { effectiveStatus } from '../../core/records';
+import { RecordsService } from '../../core/records.service';
+import { injuryRisk } from '../../core/risk';
 import { gradeLabel } from '../../core/rating';
 import { SquadService } from '../../core/squad.service';
 import { SyncService } from '../../core/sync.service';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 import { Status } from '../../ui/status/status';
+import { ProfileExtras } from './profile-extras';
 
 /** Spielerprofil (Figma: Profil Desktop/Handy): Kopfbereich, Notenverlauf, Kompetenzprofil, Verfügbarkeit, Statistik, Eventhistorie. */
 @Component({
   selector: 'app-profile',
-  imports: [Button, Card, Status],
+  imports: [Button, Card, Status, ProfileExtras],
   templateUrl: './profile.html',
   styleUrl: './profile.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -35,6 +39,7 @@ export class Profile implements OnInit {
   private readonly router = inject(Router);
   protected readonly squad = inject(SquadService);
   protected readonly profile = inject(ProfileService);
+  protected readonly records = inject(RecordsService);
   protected readonly sync = inject(SyncService);
   protected readonly mobile = inject(LayoutService).isMobile;
 
@@ -58,6 +63,18 @@ export class Profile implements OnInit {
   protected readonly ready = computed(() => this.squad.load() === 'ready' && !this.profile.loading());
   protected readonly failed = computed(() => this.squad.load() === 'error' || this.profile.error() !== '');
   protected readonly errorText = computed(() => this.profile.error() || this.squad.error());
+
+  /** Anzeige-Status: eine heute laufende Abwesenheit überlagert den manuell gesetzten Status. */
+  protected readonly status = computed(() => {
+    const player = this.player();
+    return player ? effectiveStatus(player, this.records.absences(), this.today) : 'Fit';
+  });
+  /** Belastungsindikator; erst sinnvoll, wenn Bewertungen und Zusatzdaten geladen sind. */
+  protected readonly risk = computed(() => {
+    const player = this.player();
+    if (!player || !this.records.ready() || this.profile.loading()) return null;
+    return injuryRisk(player, this.profile.items(), this.records.absences(), this.records.measurements());
+  });
 
   protected readonly cards = computed(() => {
     const f = this.figures();
@@ -85,8 +102,13 @@ export class Profile implements OnInit {
     effect(() => {
       const player = this.player();
       untracked(() => {
-        if (player) this.profile.start(player.id);
-        else this.profile.stop();
+        if (player) {
+          this.profile.start(player.id);
+          this.records.start(player.id);
+        } else {
+          this.profile.stop();
+          this.records.stop();
+        }
       });
     });
   }
@@ -115,7 +137,7 @@ export class Profile implements OnInit {
 
   protected injury(): string {
     const player = this.player();
-    return player?.status === 'Verletzt' && player.injuryUntil ? ` (ca. bis ${formatDate(player.injuryUntil)})` : '';
+    return this.status() === 'Verletzt' && player?.injuryUntil ? ` (ca. bis ${formatDate(player.injuryUntil)})` : '';
   }
 
   protected choose(id: string): void {
@@ -133,5 +155,6 @@ export class Profile implements OnInit {
       this.squad.start();
     }
     this.profile.retry();
+    this.records.retry();
   }
 }

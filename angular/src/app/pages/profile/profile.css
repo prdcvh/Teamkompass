@@ -283,3 +283,53 @@ h2 {
     min-height: var(--tk-touch);
   }
 }
+
+.risk {
+  display: grid;
+  gap: 6px;
+  margin-top: var(--tk-space-4);
+  padding-top: var(--tk-space-4);
+  border-top: 1px solid var(--tk-line);
+}
+
+.risk-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--tk-space-3);
+  font-size: var(--tk-text-sm);
+}
+
+.risk-head span {
+  color: var(--tk-muted);
+}
+
+.risk-meter {
+  height: 8px;
+  overflow: hidden;
+  background: var(--tk-field);
+  border-radius: var(--tk-radius-pill);
+}
+
+.risk-meter span {
+  display: block;
+  height: 100%;
+  background: var(--tk-green);
+}
+
+.risk[data-tier='beobachten'] .risk-meter span {
+  background: var(--tk-blue, #2563eb);
+}
+
+.risk[data-tier='anpassen'] .risk-meter span {
+  background: var(--tk-amber);
+}
+
+.risk[data-tier='reduzieren'] .risk-meter span,
+.risk[data-tier='aussetzen'] .risk-meter span {
+  background: var(--tk-red);
+}
+
+.risk small {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
