@@ -1,0 +1,146 @@
+<section class="page" [attr.data-variant]="mobile() ? 'mobile' : 'desktop'">
+  <header class="head">
+    <div>
+      <p class="tk-eyebrow">{{ mobile() ? 'Mannschaft' : '1. FC Königstein / Trainerbereich' }}</p>
+      <h1>Spielerprofile</h1>
+    </div>
+    @if (players().length > 0) {
+      <label class="picker">
+        <span class="tk-sr-only">Spieler auswählen</span>
+        <select class="tk-input" (change)="select($event)">
+          @for (option of players(); track option.id) {
+            <option [value]="option.id" [selected]="option.id === player()?.id">{{ option.number }} · {{ option.name }}</option>
+          }
+        </select>
+      </label>
+    }
+  </header>
+
+  <p class="sync" role="status" [attr.data-state]="sync.state()">
+    {{ sync.label() }}
+    @if (sync.detail()) {
+      <span class="detail"> – {{ sync.detail() }}</span>
+    }
+  </p>
+
+  @if (failed()) {
+    <div class="notice" role="alert">
+      <p>{{ errorText() }}</p>
+      <button tkButton type="button" (click)="retry()">Erneut versuchen</button>
+    </div>
+  } @else if (!ready()) {
+    <p class="muted" role="status">Profil wird geladen …</p>
+  } @else if (players().length === 0) {
+    <tk-card>
+      <div class="empty"><p>Noch keine Spieler im Kader.</p><a tkButton routerLink="/kader">Zum Kader</a></div>
+    </tk-card>
+  } @else if (notFound() || !player()) {
+    <tk-card>
+      <div class="empty"><p>Diesen Spieler gibt es nicht (mehr).</p><a tkButton routerLink="/profile">Zu den Profilen</a></div>
+    </tk-card>
+  } @else {
+    @let p = player()!;
+    <tk-card>
+      <div class="identity">
+        <span class="number" aria-hidden="true">{{ p.number }}</span>
+        <div class="who">
+          <h2>{{ p.name }}</h2>
+          <p class="line">
+            {{ positionText(p) }} · {{ formatDate(p.birthdate) }} · {{ age(p) }} ·
+            <tk-status [label]="p.status" /> <span class="status-note">{{ statusText(p) === p.status ? '' : statusText(p).slice(p.status.length) }}</span>
+          </p>
+          <p class="consent">Datennutzung: {{ consentText(p) }}</p>
+        </div>
+        <div class="average">
+          <span>Ø Note</span>
+          <strong>{{ gradeLabel(average()) }}</strong>
+        </div>
+      </div>
+    </tk-card>
+
+    <tk-card>
+      <section class="block" aria-labelledby="trend-title">
+        <h2 id="trend-title">Notenentwicklung</h2>
+        @if (chart().points.length === 0) {
+          <p class="muted">Noch keine benoteten Events vorhanden.</p>
+        } @else {
+          <svg class="trend" [attr.viewBox]="'0 0 ' + chart().width + ' ' + chart().height" role="img" [attr.aria-label]="chartSummary()" preserveAspectRatio="xMidYMid meet">
+            @for (line of chart().grid; track line.label) {
+              <line class="grid" x1="30" [attr.x2]="chart().width - 16" [attr.y1]="line.y" [attr.y2]="line.y" />
+              <text class="axis" x="22" [attr.y]="line.y + 4" text-anchor="end">{{ line.label }}</text>
+            }
+            @if (chart().line) {
+              <path class="line-path" [attr.d]="chart().line" />
+            }
+            @for (point of chart().points; track $index) {
+              <circle class="dot" [attr.cx]="point.x" [attr.cy]="point.y" r="4"><title>{{ point.label }}: Note {{ gradeLabel(point.grade) }}</title></circle>
+              @if (point.showLabel) {
+                <text class="axis" [attr.x]="point.x" [attr.y]="chart().height - 8" text-anchor="middle">{{ point.label }}</text>
+              }
+            }
+          </svg>
+          <p class="hint">Eine bessere Note steht weiter oben (1 = sehr gut).</p>
+        }
+      </section>
+    </tk-card>
+
+    <div class="pair">
+      <tk-card>
+        <section class="block" aria-labelledby="skills-title">
+          <h2 id="skills-title">Kompetenzprofil</h2>
+          <ul class="bars">
+            @for (skill of skills(); track skill.field) {
+              <li>
+                <div class="bar-head"><strong>{{ skill.label }}</strong><span>{{ gradeLabel(skill.value) }}</span></div>
+                <div class="bar" role="img" [attr.aria-label]="skill.label + ': ' + gradeLabel(skill.value)"><span [style.width.%]="gradeToPercent(skill.value)"></span></div>
+              </li>
+            }
+          </ul>
+        </section>
+      </tk-card>
+      <tk-card>
+        <section class="block" aria-labelledby="availability-title">
+          <h2 id="availability-title">Anwesenheit</h2>
+          <ul class="bars">
+            @for (share of availability(); track share.label) {
+              <li>
+                <div class="bar-head"><strong>{{ share.label }}</strong><span>{{ share.display }}</span></div>
+                <div class="bar availability" role="img" [attr.aria-label]="share.label + ': ' + share.value + ' Prozent'"><span [style.width.%]="share.value"></span></div>
+              </li>
+            }
+          </ul>
+          <p class="hint">Es zählen vergangene Events mit gesetzter Anwesenheit.</p>
+        </section>
+      </tk-card>
+    </div>
+
+    <section class="block" aria-labelledby="stats-title">
+      <h2 id="stats-title">Statistik</h2>
+      <div class="cards">
+        @for (card of cards(); track card.label) {
+          <article class="insight"><span>{{ card.label }}</span><strong>{{ card.value }}</strong></article>
+        }
+      </div>
+    </section>
+
+    <section class="block" aria-labelledby="history-title">
+      <h2 id="history-title">Eventhistorie</h2>
+      @if (rows().length === 0) {
+        <tk-card><p class="empty-text">Für diesen Spieler gibt es noch keine Bewertungen.</p></tk-card>
+      } @else {
+        <ul class="history">
+          @for (row of rows(); track row.eventId) {
+            <li>
+              <div class="history-main">
+                <a [routerLink]="['/events', row.eventId]"><strong>{{ row.title }}</strong></a>
+                <small>{{ row.date }} · {{ row.type }}@if (row.result) { · {{ row.result }}} · Intensität {{ row.intensity }} · Note {{ row.grade }}</small>
+                <p>{{ row.note }}</p>
+              </div>
+              <span class="grade-badge" [attr.aria-label]="'Note ' + row.grade">{{ row.grade }}</span>
+            </li>
+          }
+        </ul>
+      }
+    </section>
+  }
+</section>

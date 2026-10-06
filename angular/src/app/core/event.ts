@@ -197,6 +197,11 @@ export function docFromEvent(event: TeamEvent): Record<string, unknown> {
   };
 }
 
+/** „2 · mittel“; unbekannte Werte gelten als mittel (wie beim Laden eines Events). */
+export function intensityText(value: number): string {
+  return (INTENSITIES.find((entry) => entry.value === value) ?? INTENSITIES[1]).label;
+}
+
 export function resultText(event: TeamEvent): string {
   return event.type === 'Spiel' && event.goalsFor !== null && event.goalsAgainst !== null ? `${event.goalsFor}:${event.goalsAgainst}` : '';
 }

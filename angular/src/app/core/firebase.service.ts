@@ -200,6 +200,30 @@ export class FirebaseService {
     return this.watchEventSubcollection(eventId, 'ratings', onData, onError);
   }
 
+  /**
+   * Echtzeit-Abo auf die Bewertung eines einzelnen Spielers in einem Event (ein Dokument, nicht die ganze
+   * Sammlung). Gibt es noch keine Bewertung, kommt `null`. Das Spielerprofil nutzt es für den Verlauf über alle Events.
+   */
+  async watchPlayerRating(
+    eventId: string,
+    playerId: string,
+    onData: (data: Readonly<Record<string, unknown>> | null, meta: SnapshotMeta) => void,
+    onError: (error: unknown) => void,
+  ): Promise<() => void> {
+    const { db } = await this.init();
+    const { doc, onSnapshot } = await import('firebase/firestore');
+    return onSnapshot(
+      doc(db, 'teams', environment.teamId, 'events', eventId, 'ratings', playerId),
+      { includeMetadataChanges: true },
+      (snapshot) =>
+        onData(snapshot.exists() ? snapshot.data() : null, {
+          fromCache: snapshot.metadata.fromCache,
+          hasPendingWrites: snapshot.metadata.hasPendingWrites,
+        }),
+      onError,
+    );
+  }
+
   /** Echtzeit-Abo auf die internen Trainer-Notizen eines Events. Nur Trainer dürfen den Pfad lesen (SCRUM-14). */
   async watchPrivateNotes(
     eventId: string,

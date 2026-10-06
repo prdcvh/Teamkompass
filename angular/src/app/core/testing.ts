@@ -219,6 +219,44 @@ export class FakeFirebase implements Pick<FirebaseService, keyof FirebaseService
     this.subListeners.get(`${name}:${eventId}`)?.onData(docs, { fromCache: false, hasPendingWrites: false });
   }
 
+  // --- Bewertung eines einzelnen Spielers je Event (Spielerprofil) ---
+  watchPlayerRatingError: unknown = null;
+  playerRatingWatchers = 0;
+  private playerRatingListeners = new Map<string, { onData: (data: Record<string, unknown> | null, meta: SnapshotMeta) => void; onError: (error: unknown) => void }>();
+
+  async watchPlayerRating(
+    eventId: string,
+    playerId: string,
+    onData: (data: Readonly<Record<string, unknown>> | null, meta: SnapshotMeta) => void,
+    onError: (error: unknown) => void,
+  ): Promise<() => void> {
+    this.calls.push(`watchPlayerRating:${eventId}:${playerId}`);
+    if (this.watchPlayerRatingError) throw this.watchPlayerRatingError;
+    this.playerRatingWatchers += 1;
+    const key = `${eventId}:${playerId}`;
+    this.playerRatingListeners.set(key, { onData, onError });
+    this.emitPlayerRating(eventId, playerId);
+    return () => {
+      this.playerRatingWatchers -= 1;
+      this.playerRatingListeners.delete(key);
+    };
+  }
+
+  private emitPlayerRating(eventId: string, playerId: string): void {
+    const data = this.ratings.get(eventId)?.get(playerId) ?? null;
+    this.playerRatingListeners.get(`${eventId}:${playerId}`)?.onData(data, { fromCache: false, hasPendingWrites: false });
+  }
+
+  /** Test-Hilfe: Abo-Fehler der Spielerbewertung eines Events. */
+  failPlayerRating(eventId: string, playerId: string, error: unknown): void {
+    this.playerRatingListeners.get(`${eventId}:${playerId}`)?.onError(error);
+  }
+
+  /** Test-Hilfe: sendet den aktuellen Stand der Spielerbewertung (nach direktem Ändern von `ratings`). */
+  emitRatingFor(eventId: string, playerId: string): void {
+    this.emitPlayerRating(eventId, playerId);
+  }
+
   /** Test-Hilfe: Abo-Fehler eines Unterpfads (z. B. permission-denied). */
   failSub(name: 'ratings' | 'privateNotes', eventId: string, error: unknown): void {
     this.subListeners.get(`${name}:${eventId}`)?.onError(error);
@@ -231,6 +269,7 @@ export class FakeFirebase implements Pick<FirebaseService, keyof FirebaseService
     store.set(playerId, { ...store.get(playerId), ...data, playerId });
     this.ratings.set(eventId, store);
     this.emitSub('ratings', eventId);
+    this.emitPlayerRating(eventId, playerId);
   }
 
   async savePrivateNote(eventId: string, playerId: string, note: string): Promise<void> {

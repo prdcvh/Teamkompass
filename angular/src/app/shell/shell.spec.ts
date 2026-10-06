@@ -12,7 +12,7 @@ import { App } from '../app';
 describe('Shell (in der App)', () => {
   const isMobile = signal(false);
 
-  async function render(role: Role = 'trainer') {
+  async function render(role: Role = 'trainer', url = '/profile') {
     await TestBed.configureTestingModule({
       imports: [App],
       providers: [
@@ -23,7 +23,7 @@ describe('Shell (in der App)', () => {
     }).compileComponents();
     TestBed.inject(SessionService).role.set(role);
     const fixture = TestBed.createComponent(App);
-    await TestBed.inject(Router).navigateByUrl('/profile');
+    await TestBed.inject(Router).navigateByUrl(url);
     await fixture.whenStable();
     return fixture;
   }
@@ -59,7 +59,7 @@ describe('Shell (in der App)', () => {
   });
 
   it('wechselt die Variante live, ohne die Seite neu zu laden', async () => {
-    const fixture = await render();
+    const fixture = await render('trainer', '/teamanalyse');
     const root = el(fixture);
     const page = root.querySelector('app-placeholder');
     expect(page).not.toBeNull();
