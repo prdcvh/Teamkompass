@@ -346,6 +346,9 @@ async function initDataStore() {
       renderAll();
       $("#storageState").textContent = "Cloud aktuell";
       applyingRemoteSnapshot = false;
+    }, (error) => {
+      console.error(error);
+      $("#storageState").textContent = "Verbindung unterbrochen – Daten evtl. nicht aktuell";
     });
     await cloudStore.ensureSeeded(state);
   } catch (error) {
@@ -379,10 +382,10 @@ async function createFirebaseStore(config) {
         updatedAt: firestoreModule.serverTimestamp()
       });
     },
-    subscribe(callback) {
+    subscribe(callback, onError) {
       return firestoreModule.onSnapshot(ref, (snapshot) => {
         if (snapshot.exists()) callback(snapshot.data());
-      });
+      }, onError);
     }
   };
 }

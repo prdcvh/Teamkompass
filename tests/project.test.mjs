@@ -325,6 +325,53 @@ test("Angular: Spieler loeschen raeumt invites/members auf", async () => {
   assert.match(service, /collection\(db, \.\.\.base, 'members'\), where\('playerId', '==', id\)/);
 });
 
+test("Listener-Fehler setzen einen sichtbaren Status und werden bei neuem Snapshot zurueckgesetzt", async () => {
+  for (const team of teams) {
+    const source = await read(`outputs/${team}/app.js`);
+    const html = await read(`outputs/${team}/index.html`);
+    assert.match(html, /<small id="storageState" role="status" aria-live="polite">/, `${team}: Status nicht als Live-Region erkennbar`);
+    assert.doesNotMatch(source, /\(error\) => console\.error\("[a-zA-Z ]* sync"/, `${team}: Listener-Fehler landen nur in der Konsole`);
+
+    const calls = [];
+    const timers = [];
+    const context = {
+      console: { error() {} },
+      setSyncState: (stateName, label) => calls.push([stateName, label]),
+      setTimeout: (fn) => { timers.push(fn); return timers.length; },
+      stopCloudSync: () => calls.push(["stop"]),
+      startCloudSync: () => calls.push(["start"]),
+      currentRole: "trainer"
+    };
+    const prelude = source.match(/const cloudListenerFailures[\s\S]*?const RETRYABLE_LISTENER_ERRORS = .*\n/)[0];
+    const code = ["cloudListenerFailed", "cloudListenerRecovered"].map((name) => {
+      const start = source.indexOf(`function ${name}(`);
+      return source.slice(start, source.indexOf("\n}\n", start) + 3);
+    }).join("\n");
+    const fns = new Function(...Object.keys(context), `${prelude}\n${code}\nreturn { cloudListenerFailed, cloudListenerRecovered };`)(...Object.values(context));
+
+    fns.cloudListenerFailed("events", { code: "unavailable", message: "transport errored" });
+    assert.deepEqual(calls[0][0], "error");
+    assert.match(calls[0][1], /Verbindung unterbrochen/);
+    assert.doesNotMatch(calls[0][1], /transport errored|unavailable/, "technische Details duerfen nicht in der Oberflaeche stehen");
+    assert.equal(timers.length, 1, "voruebergehende Fehler starten die Synchronisation neu");
+    fns.cloudListenerFailed("ratings:e1", { code: "unavailable" });
+    assert.equal(timers.length, 1, "kein zweiter Neustart-Timer");
+
+    fns.cloudListenerRecovered("events");
+    assert.equal(calls.filter((call) => call[0] === "saved").length, 0, "solange ein Listener ausgefallen ist, bleibt der Fehlerstatus");
+    fns.cloudListenerRecovered("ratings:e1");
+    assert.deepEqual(calls.at(-1), ["saved", "Cloud verbunden"]);
+
+    // Berechtigungsfehler: Status, aber kein Neustart-Schleife.
+    const before = timers.length;
+    fns.cloudListenerFailed("players", { code: "permission-denied" });
+    assert.equal(timers.length, before);
+  }
+  const root = await read("app.js");
+  assert.match(root, /subscribe\(callback, onError\)/);
+  assert.match(await read("index.html"), /id="storageState" role="status"/);
+});
+
 test("interne Trainer-Notizen liegen in einem eigenen, nur für Trainer lesbaren Pfad", async () => {
   const rules = await read("firestore.rules");
   const block = rules.match(/match \/privateNotes\/\{playerId\} \{([\s\S]*?)\n        \}/);

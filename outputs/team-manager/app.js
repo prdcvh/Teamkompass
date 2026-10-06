@@ -731,6 +731,39 @@ function cloudWriteFailed(error, label) {
   alert(`${label}${cloudErrorSuffix(error)}`);
 }
 
+// Listener-Gesundheit: Ein Fehler eines Echtzeit-Listeners darf nicht unsichtbar bleiben, sonst
+// vertraut man veralteten Daten. Der Status ist als role="status" (index.html) auch fuer
+// Screenreader erkennbar; technische Details landen nur in der Konsole.
+const cloudListenerFailures = new Set();
+let cloudSyncDegraded = false;
+let cloudRestartTimer = null;
+const RETRYABLE_LISTENER_ERRORS = ["unavailable", "deadline-exceeded", "aborted", "cancelled", "internal"];
+
+function cloudListenerFailed(key, error) {
+  console.error(key, error);
+  cloudListenerFailures.add(key);
+  cloudSyncDegraded = true;
+  setSyncState("error", "Verbindung unterbrochen – Daten evtl. nicht aktuell");
+  // Ein Listener ist nach einem Fehler beendet. Bei voruebergehenden Fehlern wird die gesamte
+  // Synchronisation nach kurzer Pause neu gestartet; bei Berechtigungsfehlern nicht (Endlosschleife).
+  if (RETRYABLE_LISTENER_ERRORS.includes(error?.code) && !cloudRestartTimer) {
+    cloudRestartTimer = setTimeout(() => {
+      cloudRestartTimer = null;
+      if (!currentRole) return;
+      stopCloudSync();
+      cloudListenerFailures.clear();
+      startCloudSync();
+    }, 10000);
+  }
+}
+
+function cloudListenerRecovered(key) {
+  cloudListenerFailures.delete(key);
+  if (!cloudSyncDegraded || cloudListenerFailures.size) return;
+  cloudSyncDegraded = false;
+  setSyncState("saved", "Cloud verbunden");
+}
+
 // ---------------------------------------------------------------------------
 // Cloud-Sync. Zwei Modi:
 // - Legacy-Blob (Standard, unveraendert seit je her): ein gemeinsames Dokument,
@@ -836,7 +869,10 @@ async function initLegacyBlobSync() {
     localStorage.setItem(storageKey, JSON.stringify(state));
     renderAll();
     $("#storageState").textContent = "Cloud aktuell";
-  }, (error) => console.error(error));
+  }, (error) => {
+    console.error(error);
+    setSyncState("error", "Verbindung unterbrochen – Daten evtl. nicht aktuell");
+  });
   $("#storageState").textContent = "Cloud verbunden";
 }
 
@@ -934,7 +970,8 @@ function startCloudSync() {
     }
     else if (["player", "parent"].includes(currentRole) && currentPlayerId) syncPlayerRatingListeners(eventIds);
     rebuildStateFromCloudCache();
-  }, (error) => console.error("events sync", error)));
+    cloudListenerRecovered("events");
+  }, (error) => cloudListenerFailed("events", error)));
 
   if (currentRole === "trainer") {
     cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("players"), (snapshot) => {
@@ -943,12 +980,14 @@ function startCloudSync() {
       syncAbsenceListeners(cloudCache.players.map((player) => player.id));
       syncMeasurementListeners(cloudCache.players.map((player) => player.id));
       rebuildStateFromCloudCache();
-    }, (error) => console.error("players sync", error)));
+      cloudListenerRecovered("players");
+    }, (error) => cloudListenerFailed("players", error)));
 
     cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("opponents"), (snapshot) => {
       cloudCache.opponents = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
       rebuildStateFromCloudCache();
-    }, (error) => console.error("opponents sync", error)));
+      cloudListenerRecovered("opponents");
+    }, (error) => cloudListenerFailed("opponents", error)));
 
     // Startelf/Taktikboard ist wie das gesamte Dashboard nur fuer Trainer sichtbar
     // (siehe applyRoleRestrictions) - deshalb genuegt ein einzelnes Dokument statt
@@ -956,7 +995,8 @@ function startCloudSync() {
     cloudUnsubscribers.push(firestoreModule.onSnapshot(teamDoc("meta", "lineup"), (docSnap) => {
       cloudCache.lineup = docSnap.exists() ? docSnap.data() : null;
       rebuildStateFromCloudCache();
-    }, (error) => console.error("lineup sync", error)));
+      cloudListenerRecovered("lineup");
+    }, (error) => cloudListenerFailed("lineup", error)));
   } else if (["player", "parent"].includes(currentRole) && currentPlayerId) {
     // Ein Spieler darf nie die ganze players-Collection auflisten (Firestore-Regeln
     // erlauben Listenabfragen nur, wenn sie fuer JEDES moegliche Ergebnis gelten -
@@ -964,29 +1004,34 @@ function startCloudSync() {
     cloudUnsubscribers.push(firestoreModule.onSnapshot(teamDoc("players", currentPlayerId), (docSnap) => {
       cloudCache.players = docSnap.exists() ? [{ id: docSnap.id, ...docSnap.data() }] : [];
       rebuildStateFromCloudCache();
-    }, (error) => console.error("player sync", error)));
+      cloudListenerRecovered("player");
+    }, (error) => cloudListenerFailed("player", error)));
 
     cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("players", currentPlayerId, "developmentPlans"), (snapshot) => {
       cloudCache.developmentPlans = { [currentPlayerId]: snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })) };
       rebuildStateFromCloudCache();
-    }, (error) => console.error("development plans sync", error)));
+      cloudListenerRecovered("developmentPlans");
+    }, (error) => cloudListenerFailed("developmentPlans", error)));
 
     cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("players", currentPlayerId, "absences"), (snapshot) => {
       cloudCache.absences = { [currentPlayerId]: snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })) };
       rebuildStateFromCloudCache();
-    }, (error) => console.error("absences sync", error)));
+      cloudListenerRecovered("absences");
+    }, (error) => cloudListenerFailed("absences", error)));
 
     cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("players", currentPlayerId, "measurements"), (snapshot) => {
       cloudCache.measurements = { [currentPlayerId]: snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })) };
       rebuildStateFromCloudCache();
-    }, (error) => console.error("measurements sync", error)));
+      cloudListenerRecovered("measurements");
+    }, (error) => cloudListenerFailed("measurements", error)));
   } else if (currentRole === "medical") {
     cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("players"), (snapshot) => {
       cloudCache.players = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
       syncAbsenceListeners(cloudCache.players.map((player) => player.id));
       syncMeasurementListeners(cloudCache.players.map((player) => player.id));
       rebuildStateFromCloudCache();
-    }, (error) => console.error("medical player sync", error)));
+      cloudListenerRecovered("medical players");
+    }, (error) => cloudListenerFailed("medical players", error)));
   }
 }
 
@@ -1016,8 +1061,9 @@ function syncRatingListeners(eventIds) {
         cloudCache.ratings[eventId] = {};
         snapshot.forEach((docSnap) => { cloudCache.ratings[eventId][docSnap.id] = docSnap.data(); });
         rebuildStateFromCloudCache();
+        cloudListenerRecovered(`ratings:${eventId}`);
       },
-      (error) => console.error("ratings sync", eventId, error)
+      (error) => cloudListenerFailed(`ratings:${eventId}`, error)
     );
   });
 }
@@ -1041,8 +1087,9 @@ function syncPrivateNoteListeners(eventIds) {
         cloudCache.privateNotes[eventId] = {};
         snapshot.forEach((docSnap) => { cloudCache.privateNotes[eventId][docSnap.id] = docSnap.data().note || ""; });
         rebuildStateFromCloudCache();
+        cloudListenerRecovered(`private-notes:${eventId}`);
       },
-      (error) => console.error("private notes sync", eventId, error)
+      (error) => cloudListenerFailed(`private-notes:${eventId}`, error)
     );
   });
 }
@@ -1062,8 +1109,9 @@ function syncPlayerRatingListeners(eventIds) {
       (docSnap) => {
         cloudCache.ratings[eventId] = docSnap.exists() ? { [currentPlayerId]: docSnap.data() } : {};
         rebuildStateFromCloudCache();
+        cloudListenerRecovered(`ratings:${eventId}`);
       },
-      (error) => console.error("ratings sync", eventId, error)
+      (error) => cloudListenerFailed(`ratings:${eventId}`, error)
     );
   });
 }
@@ -1083,8 +1131,9 @@ function syncPlanListeners(playerIds) {
       (snapshot) => {
         cloudCache.developmentPlans[playerId] = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
         rebuildStateFromCloudCache();
+        cloudListenerRecovered(`development-plans:${playerId}`);
       },
-      (error) => console.error("development plans sync", playerId, error)
+      (error) => cloudListenerFailed(`development-plans:${playerId}`, error)
     );
   });
 }
@@ -1104,8 +1153,9 @@ function syncAbsenceListeners(playerIds) {
       (snapshot) => {
         cloudCache.absences[playerId] = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
         rebuildStateFromCloudCache();
+        cloudListenerRecovered(`absences:${playerId}`);
       },
-      (error) => console.error("absences sync", playerId, error)
+      (error) => cloudListenerFailed(`absences:${playerId}`, error)
     );
   });
 }
@@ -1125,8 +1175,9 @@ function syncMeasurementListeners(playerIds) {
       (snapshot) => {
         cloudCache.measurements[playerId] = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
         rebuildStateFromCloudCache();
+        cloudListenerRecovered(`measurements:${playerId}`);
       },
-      (error) => console.error("measurements sync", playerId, error)
+      (error) => cloudListenerFailed(`measurements:${playerId}`, error)
     );
   });
 }
