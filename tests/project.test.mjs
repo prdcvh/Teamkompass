@@ -372,6 +372,15 @@ test("Listener-Fehler setzen einen sichtbaren Status und werden bei neuem Snapsh
   assert.match(await read("index.html"), /id="storageState" role="status"/);
 });
 
+test("Angular-Lockfile enthaelt kein verwundbares piscina mehr (SCRUM-56)", async () => {
+  const lock = JSON.parse(await read("angular/package-lock.json"));
+  const version = lock.packages["node_modules/piscina"]?.version;
+  assert.ok(version, "piscina fehlt im Lockfile");
+  const [major, minor, patch] = version.split(".").map(Number);
+  const affected = major === 5 && (minor < 3 || (minor === 3 && patch <= 1));
+  assert.equal(affected, false, `piscina ${version} ist von GHSA-67c8-pqhq-4rmx betroffen (5.0.0 bis 5.3.1)`);
+});
+
 test("interne Trainer-Notizen liegen in einem eigenen, nur für Trainer lesbaren Pfad", async () => {
   const rules = await read("firestore.rules");
   const block = rules.match(/match \/privateNotes\/\{playerId\} \{([\s\S]*?)\n        \}/);
