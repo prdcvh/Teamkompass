@@ -229,6 +229,27 @@ export class FirebaseService {
     );
   }
 
+  /**
+   * Echtzeit-Abo auf die Bewertung eines einzelnen Spielers in einem Event (Dokument oder „gibt es nicht“ = null).
+   * So lesen die Regeln auch Spieler und Eltern für das eigene Profil; für den Trainer ersetzt es die Abfrage über alle Spieler.
+   */
+  async watchRatingDoc(
+    eventId: string,
+    playerId: string,
+    onData: (data: Readonly<Record<string, unknown>> | null, meta: SnapshotMeta) => void,
+    onError: (error: unknown) => void,
+  ): Promise<() => void> {
+    const { db } = await this.init();
+    const { doc, onSnapshot } = await import('firebase/firestore');
+    return onSnapshot(
+      doc(db, 'teams', environment.teamId, 'events', eventId, 'ratings', playerId),
+      { includeMetadataChanges: true },
+      (snapshot) =>
+        onData(snapshot.exists() ? snapshot.data() : null, { fromCache: snapshot.metadata.fromCache, hasPendingWrites: snapshot.metadata.hasPendingWrites }),
+      onError,
+    );
+  }
+
   /** Schreibt die Bewertung eines Spielers (merge, mit `playerId` für die Regeln und Abfragen der Spieleransicht). */
   async saveRating(eventId: string, playerId: string, data: Readonly<Record<string, unknown>>): Promise<void> {
     const { db } = await this.init();

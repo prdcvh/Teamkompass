@@ -1,0 +1,127 @@
+<section class="page" [attr.data-variant]="mobile() ? 'mobile' : 'desktop'">
+  <header class="head">
+    <div>
+      <p class="tk-eyebrow">{{ mobile() ? 'Mannschaft' : '1. FC Königstein / Trainerbereich' }}</p>
+      <h1>Spielerprofil</h1>
+    </div>
+    @if (players().length > 0) {
+      <label class="picker">
+        <span class="tk-sr-only">Spieler wählen</span>
+        <select class="tk-input" [value]="player()?.id" (change)="choose(valueOf($event))">
+          @for (entry of players(); track entry.id) {
+            <option [value]="entry.id" [selected]="entry.id === player()?.id">{{ entry.number }} · {{ entry.name }}</option>
+          }
+        </select>
+      </label>
+    }
+  </header>
+
+  <p class="sync" role="status" [attr.data-state]="sync.state()">
+    {{ sync.label() }}
+    @if (sync.detail()) {
+      <span class="detail"> – {{ sync.detail() }}</span>
+    }
+  </p>
+
+  @if (failed()) {
+    <div class="notice" role="alert">
+      <p>{{ errorText() }}</p>
+      <button tkButton type="button" (click)="retry()">Erneut versuchen</button>
+    </div>
+  } @else if (squad.load() !== 'ready') {
+    <p class="muted" role="status">Profil wird geladen …</p>
+  } @else if (!player()) {
+    <tk-card><div class="empty"><p>Noch kein Spieler im Kader.</p></div></tk-card>
+  } @else if (!ready()) {
+    <p class="muted" role="status">Bewertungen werden geladen …</p>
+  } @else {
+    @if (player(); as p) {
+      <tk-card>
+        <div class="header">
+          <span class="number">{{ p.number }}</span>
+          <div class="who">
+            <strong>{{ p.name }}</strong>
+            <span>{{ positionText(p) }} · {{ formatDate(p.birthdate) }} · {{ age(p.birthdate) }} Jahre</span>
+            <span class="status-line"><tk-status [label]="p.status" />{{ injury() }}</span>
+            <small class="muted">Datennutzung: {{ consent() }}</small>
+          </div>
+          <div class="grade">
+            <span>Ø Note</span>
+            <strong>{{ gradeLabel(figures().average) }}</strong>
+          </div>
+        </div>
+      </tk-card>
+
+      <section class="columns">
+        <tk-card>
+          <h2>Notenverlauf</h2>
+          <svg class="chart" [attr.viewBox]="'0 0 ' + chart().width + ' ' + chart().height" role="img" [attr.aria-label]="graded().length ? 'Notenverlauf: ' + graded().length + ' benotete Events' : 'Noch keine benoteten Events vorhanden'">
+            @for (line of chart().grid; track line.grade) {
+              <line x1="54" [attr.y1]="line.y" [attr.x2]="chart().width - 24" [attr.y2]="line.y" class="grid" />
+              <text x="24" [attr.y]="line.y + 4" class="axis">{{ line.grade }}</text>
+            }
+            @if (chart().points.length > 0) {
+              <path [attr.d]="chart().path" class="line" />
+              @for (point of chart().points; track $index) {
+                <circle [attr.cx]="point.x" [attr.cy]="point.y" r="5" class="dot"><title>{{ point.title }}</title></circle>
+                <text [attr.x]="point.x - 14" [attr.y]="chart().height - 12" class="axis small">{{ point.label }}</text>
+              }
+            } @else {
+              <text x="54" y="138" class="axis">Noch keine benoteten Events vorhanden.</text>
+            }
+          </svg>
+        </tk-card>
+
+        <tk-card>
+          <h2>Kompetenzprofil</h2>
+          <ul class="bars">
+            @for (skill of skills(); track skill.field) {
+              <li>
+                <div><strong>{{ skill.label }}</strong><span>{{ gradeLabel(skill.value) }}</span></div>
+                <div class="bar" role="img" [attr.aria-label]="skill.label + ' ' + gradeLabel(skill.value)"><span [style.width.%]="gradeToPercent(skill.value)"></span></div>
+              </li>
+            }
+          </ul>
+          <h2>Verfügbarkeit</h2>
+          <ul class="bars">
+            @for (row of attendance(); track row.label) {
+              <li>
+                <div><strong>{{ row.label }}</strong><span>{{ row.display }}</span></div>
+                <div class="bar muted-bar" role="img" [attr.aria-label]="row.label + ' ' + row.display"><span [style.width.%]="row.percent"></span></div>
+              </li>
+            }
+          </ul>
+        </tk-card>
+      </section>
+
+      <h2 class="section-title">Statistik</h2>
+      <section class="cards" aria-label="Statistik">
+        @for (card of cards(); track card.label) {
+          <article class="stat"><span>{{ card.label }}</span><strong>{{ card.value }}</strong></article>
+        }
+      </section>
+
+      <h2 class="section-title">Eventhistorie</h2>
+      <tk-card>
+        @if (history().length === 0) {
+          <div class="empty"><p>Für diesen Spieler gibt es noch keine Bewertungen.</p></div>
+        } @else {
+          <ul class="history">
+            @for (entry of history(); track entry.event.id) {
+              <li>
+                <div>
+                  <strong>{{ entry.event.title }}</strong>
+                  <small>
+                    {{ formatDate(entry.event.date) }} · {{ entry.event.type }}@if (entry.event.goalsFor !== null && entry.event.goalsAgainst !== null) { · {{ entry.event.goalsFor }}:{{ entry.event.goalsAgainst }}} · Note {{ gradeLabel(entry.grade) }}
+                  </small>
+                  <p class="muted">{{ entry.rating.note || entry.event.notes || 'Keine Notiz' }}</p>
+                </div>
+                <span class="badge">{{ gradeLabel(entry.grade) }}</span>
+              </li>
+            }
+          </ul>
+        }
+      </tk-card>
+    }
+  }
+</section>

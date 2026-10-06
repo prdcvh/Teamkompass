@@ -241,4 +241,36 @@ export class FakeFirebase implements Pick<FirebaseService, keyof FirebaseService
     this.privateNotes.set(eventId, store);
     this.emitSub('privateNotes', eventId);
   }
+
+  // --- Bewertung eines einzelnen Spielers je Event (Profil) ---
+  ratingDocWatchers = 0;
+  watchRatingDocError: unknown = null;
+  private ratingDocListeners = new Map<string, { onData: (data: Readonly<Record<string, unknown>> | null, meta: SnapshotMeta) => void; onError: (error: unknown) => void }>();
+
+  async watchRatingDoc(
+    eventId: string,
+    playerId: string,
+    onData: (data: Readonly<Record<string, unknown>> | null, meta: SnapshotMeta) => void,
+    onError: (error: unknown) => void,
+  ): Promise<() => void> {
+    this.calls.push(`watchRatingDoc:${eventId}:${playerId}`);
+    if (this.watchRatingDocError) throw this.watchRatingDocError;
+    this.ratingDocWatchers += 1;
+    const key = `${eventId}:${playerId}`;
+    this.ratingDocListeners.set(key, { onData, onError });
+    onData(this.ratings.get(eventId)?.get(playerId) ?? null, { fromCache: false, hasPendingWrites: false });
+    return () => {
+      this.ratingDocWatchers -= 1;
+      this.ratingDocListeners.delete(key);
+    };
+  }
+
+  /** Test-Hilfe: meldet einer laufenden Profil-Abfrage neue Daten (oder einen Fehler). */
+  pushRatingDoc(eventId: string, playerId: string, data: Readonly<Record<string, unknown>> | null): void {
+    this.ratingDocListeners.get(`${eventId}:${playerId}`)?.onData(data, { fromCache: false, hasPendingWrites: false });
+  }
+
+  failRatingDoc(eventId: string, playerId: string, error: unknown): void {
+    this.ratingDocListeners.get(`${eventId}:${playerId}`)?.onError(error);
+  }
 }
