@@ -1,0 +1,70 @@
+<section class="page" [attr.data-variant]="mobile() ? 'mobile' : 'desktop'">
+  <header class="head">
+    <p class="tk-eyebrow">{{ teamName }}</p>
+    <h1>Start</h1>
+    <p class="meta">Team-ID {{ teamId }}</p>
+  </header>
+
+  @if (!isTrainer()) {
+    <p class="muted">Willkommen bei TeamKompass.</p>
+  } @else {
+    <p class="sync" role="status" [attr.data-state]="sync.state()">
+      {{ sync.label() }}
+      @if (sync.detail()) {
+        <span class="detail"> – {{ sync.detail() }}</span>
+      }
+    </p>
+
+    @if (team.error()) {
+      <div class="notice" role="alert">
+        <p>{{ team.error() }}</p>
+        <button tkButton type="button" (click)="team.retry()">Erneut versuchen</button>
+      </div>
+    } @else if (!team.ready()) {
+      <p class="muted" role="status">Teamauswertung wird geladen …</p>
+    } @else {
+      <div class="stats">
+        @for (card of cards(); track card.label) {
+          <article class="stat"><span>{{ card.label }}</span><strong>{{ card.value }}</strong></article>
+        }
+      </div>
+
+      <div class="columns">
+        <tk-card>
+          <div class="panel">
+            <h2>Nächstes Event</h2>
+            @if (figures().next; as next) {
+              <p class="next-title">{{ next.title }}</p>
+              <p class="muted">
+                {{ next.type }} · {{ formatDate(next.date) }}@if (next.opponent) { · vs. {{ next.opponent }}}@if (next.location) { · {{ next.location }}}
+              </p>
+              <a class="link" [routerLink]="['/events', next.id]">Zur Bewertung</a>
+            } @else {
+              <p class="muted">Kein kommendes Event geplant.</p>
+              <a class="link" routerLink="/events">Event anlegen</a>
+            }
+          </div>
+        </tk-card>
+
+        <tk-card>
+          <div class="panel">
+            <h2>Formkurve · Bestenliste</h2>
+            @if (board().length === 0) {
+              <p class="muted">Noch keine benoteten Events.</p>
+            } @else {
+              <ol class="board">
+                @for (entry of board(); track entry.player.id) {
+                  <li>
+                    <a [routerLink]="['/profile', entry.player.id]">{{ entry.player.name }}</a>
+                    <span class="muted">{{ entry.events }} Einsätze</span>
+                    <strong>Ø {{ numberLabel(entry.grade) }}</strong>
+                  </li>
+                }
+              </ol>
+            }
+          </div>
+        </tk-card>
+      </div>
+    }
+  }
+</section>
