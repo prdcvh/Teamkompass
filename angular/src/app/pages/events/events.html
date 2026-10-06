@@ -1,0 +1,163 @@
+<section class="page" [attr.data-variant]="mobile() ? 'mobile' : 'desktop'">
+  <header class="head">
+    <div>
+      <p class="tk-eyebrow">{{ mobile() ? 'Mannschaft' : '1. FC Königstein / Trainerbereich' }}</p>
+      <h1>Events</h1>
+      <p class="meta">{{ events.events().length }} Events</p>
+    </div>
+    @if (events.canEdit() && !mobile()) {
+      <button tkButton variant="primary" type="button" (click)="openNew()">+ Event anlegen</button>
+    }
+  </header>
+
+  <p class="sync" role="status" [attr.data-state]="sync.state()">
+    {{ sync.label() }}
+    @if (sync.detail()) {
+      <span class="detail"> – {{ sync.detail() }}</span>
+    }
+  </p>
+
+  @if (events.load() === 'error') {
+    <div class="notice" role="alert">
+      <p>{{ events.error() }}</p>
+      <button tkButton type="button" (click)="retry()">Erneut versuchen</button>
+    </div>
+  } @else if (events.load() !== 'ready') {
+    <p class="muted" role="status">Events werden geladen …</p>
+  } @else {
+    <div class="filters">
+      <label class="search">
+        <span class="tk-sr-only">Events suchen</span>
+        <input
+          class="tk-input"
+          type="search"
+          placeholder="Titel, Gegner, Ort"
+          [value]="query()"
+          (input)="query.set(valueOf($event))"
+        />
+      </label>
+      <label>
+        <span class="tk-sr-only">Typ filtern</span>
+        <select class="tk-input" [value]="type()" (change)="type.set($any(valueOf($event)))">
+          <option value="all" [selected]="type() === 'all'">Alle Typen</option>
+          @for (option of typeOptions; track option) {
+            <option [value]="option" [selected]="type() === option">{{ option }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        <span class="tk-sr-only">Sortieren nach</span>
+        <select class="tk-input" [value]="sort()" (change)="sort.set($any(valueOf($event)))">
+          @for (option of sortOptions; track option.key) {
+            <option [value]="option.key" [selected]="sort() === option.key">{{ option.label }}</option>
+          }
+        </select>
+      </label>
+    </div>
+
+    @if (visible().length === 0) {
+      <tk-card>
+        <div class="empty">
+          @if (events.events().length === 0) {
+            <p>Noch keine Events angelegt.</p>
+            @if (events.canWrite()) {
+              <button tkButton variant="primary" type="button" (click)="openNew()">+ Event anlegen</button>
+            }
+          } @else {
+            <p>Kein Event passt zu den Filtern.</p>
+            <button tkButton type="button" (click)="resetFilters()">Filter zurücksetzen</button>
+          }
+        </div>
+      </tk-card>
+    } @else if (mobile()) {
+      @for (month of months(); track month.label) {
+        <h2 class="group">{{ month.label }} · {{ month.events.length }}</h2>
+        <tk-card>
+          <ul class="cards">
+            @for (event of month.events; track event.id) {
+              <li>
+                <button
+                  type="button"
+                  class="event-card"
+                  [disabled]="!events.canWrite()"
+                  [attr.aria-label]="events.canWrite() ? 'Event bearbeiten: ' + event.title : null"
+                  (click)="openEdit(event)"
+                >
+                  <span class="badge" [attr.data-type]="event.type">{{ event.type }}</span>
+                  <span class="what">
+                    <strong>{{ event.title }}</strong>
+                    <small>{{ formatDate(event.date) }}@if (detail(event); as info) { · {{ info }}}</small>
+                  </span>
+                  @if (resultText(event); as result) {
+                    <span class="result">{{ result }}</span>
+                  }
+                </button>
+              </li>
+            }
+          </ul>
+        </tk-card>
+      }
+    } @else {
+      <tk-card>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Datum</th>
+                <th scope="col">Titel</th>
+                <th scope="col">Typ</th>
+                <th scope="col">Ort / Gegner</th>
+                <th scope="col">Intensität</th>
+                <th scope="col">Ergebnis</th>
+                @if (events.canWrite()) {
+                  <th scope="col"><span class="tk-sr-only">Aktionen</span></th>
+                }
+              </tr>
+            </thead>
+            <tbody>
+              @for (event of visible(); track event.id) {
+                <tr>
+                  <td>{{ formatDate(event.date) }}</td>
+                  <td><strong>{{ event.title }}</strong></td>
+                  <td><span class="badge" [attr.data-type]="event.type">{{ event.type }}</span></td>
+                  <td>{{ detail(event) || '–' }}</td>
+                  <td>{{ intensityLabel(event) }}</td>
+                  <td>{{ resultText(event) || '–' }}</td>
+                  @if (events.canWrite()) {
+                    <td>
+                      <div class="actions">
+                        <button tkButton size="sm" type="button" (click)="openEdit(event)" [attr.aria-label]="'Bearbeiten: ' + event.title">Bearbeiten</button>
+                        <button tkButton size="sm" type="button" class="danger" (click)="askDelete(event)" [attr.aria-label]="'Löschen: ' + event.title">Löschen</button>
+                      </div>
+                    </td>
+                  }
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </tk-card>
+    }
+  }
+
+  @if (events.canEdit() && mobile()) {
+    <button type="button" class="fab" aria-label="Event anlegen" (click)="openNew()"><tk-icon name="plus" /></button>
+  }
+</section>
+
+@if (events.canWrite()) {
+  <tk-event-dialog [open]="dialogOpen()" [event]="editing()" (closed)="closeDialog()" (deleteRequested)="askDelete($event)" />
+
+  <tk-dialog [open]="deleting() !== null" title="Event löschen?" (closed)="cancelDelete()">
+    <p>
+      „{{ deleting()?.title }}“ wird mit allen Bewertungen und internen Notizen gelöscht. Das lässt sich nicht rückgängig machen.
+    </p>
+    @if (deleteFailed()) {
+      <p class="error" role="alert">Löschen fehlgeschlagen. Bitte Verbindung prüfen und erneut versuchen.</p>
+    }
+    <div class="confirm-actions">
+      <button tkButton type="button" (click)="cancelDelete()">Abbrechen</button>
+      <button tkButton type="button" variant="primary" [disabled]="deleteBusy()" (click)="confirmDelete()">{{ deleteBusy() ? 'Löscht …' : 'Endgültig löschen' }}</button>
+    </div>
+  </tk-dialog>
+}

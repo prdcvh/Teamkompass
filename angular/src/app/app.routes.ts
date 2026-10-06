@@ -32,7 +32,7 @@ export const routes: Routes = [
           { path: '', pathMatch: 'full', redirectTo: 'start' },
           { path: 'start', loadComponent: () => import('./pages/home/home').then((m) => m.Home) },
           { path: 'kader', loadComponent: () => import('./pages/squad/squad').then((m) => m.Squad) },
-          { path: 'events', loadComponent: placeholder, data: { title: 'Events' } },
+          { path: 'events', loadComponent: () => import('./pages/events/events').then((m) => m.Events) },
           { path: 'profile', loadComponent: placeholder, data: { title: 'Spielerprofile' } },
           { path: 'teamanalyse', loadComponent: placeholder, data: { title: 'Teamanalyse' } },
           { path: 'gegneranalyse', loadComponent: placeholder, data: { title: 'Gegneranalyse' } },
