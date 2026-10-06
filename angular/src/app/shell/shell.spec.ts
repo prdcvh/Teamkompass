@@ -23,7 +23,7 @@ describe('Shell (in der App)', () => {
     }).compileComponents();
     TestBed.inject(SessionService).role.set(role);
     const fixture = TestBed.createComponent(App);
-    await TestBed.inject(Router).navigateByUrl('/events');
+    await TestBed.inject(Router).navigateByUrl('/profile');
     await fixture.whenStable();
     return fixture;
   }
@@ -45,7 +45,7 @@ describe('Shell (in der App)', () => {
   it('markiert den aktuellen Bereich in der Sidebar', async () => {
     const root = el(await render());
     const active = root.querySelector('tk-sidebar ul a.active');
-    expect(active?.textContent?.trim()).toBe('Events');
+    expect(active?.textContent?.trim()).toBe('Spielerprofile');
     expect(active?.getAttribute('aria-current')).toBe('page');
   });
 
@@ -55,7 +55,7 @@ describe('Shell (in der App)', () => {
     expect(root.querySelector('tk-sidebar')).toBeNull();
     const tabs = [...root.querySelectorAll('tk-tab-bar a, tk-tab-bar button')].map((a) => a.textContent?.trim());
     expect(tabs).toEqual(['Start', 'Kader', 'Events', 'Profile', 'Mehr']);
-    expect(root.querySelector('tk-tab-bar a.active')?.textContent?.trim()).toBe('Events');
+    expect(root.querySelector('tk-tab-bar a.active')?.textContent?.trim()).toBe('Profile');
   });
 
   it('wechselt die Variante live, ohne die Seite neu zu laden', async () => {

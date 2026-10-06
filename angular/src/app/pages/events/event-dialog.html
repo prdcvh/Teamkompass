@@ -1,0 +1,198 @@
+<tk-dialog [open]="open()" [title]="title()" (closed)="closed.emit()">
+  <form (submit)="submit($event)" novalidate>
+    <div class="field">
+      <label class="tk-label">
+        Titel
+        <input
+          class="tk-input"
+          name="title"
+          autocomplete="off"
+          [attr.maxlength]="limits.title"
+          placeholder="z. B. Training Dienstag oder Heimspiel"
+          [value]="draft().title"
+          [attr.aria-invalid]="errors().title ? 'true' : null"
+          [attr.aria-describedby]="errors().title ? 'err-title' : null"
+          (input)="patch({ title: value($event) })"
+        />
+      </label>
+      @if (errors().title) {
+        <span class="error" id="err-title" role="alert">{{ errors().title }}</span>
+      }
+    </div>
+
+    <div class="grid">
+      <label class="tk-label">
+        Typ
+        <select class="tk-input" name="type" [value]="draft().type" (change)="patch({ type: $any(value($event)) })">
+          @for (type of types; track type) {
+            <option [value]="type" [selected]="draft().type === type">{{ type }}</option>
+          }
+        </select>
+      </label>
+      <div class="field">
+        <label class="tk-label">
+          Datum
+          <input
+            class="tk-input"
+            name="date"
+            type="date"
+            [value]="draft().date"
+            [attr.aria-invalid]="errors().date ? 'true' : null"
+            [attr.aria-describedby]="errors().date ? 'err-date' : null"
+            (input)="patch({ date: value($event) })"
+          />
+        </label>
+        @if (errors().date) {
+          <span class="error" id="err-date" role="alert">{{ errors().date }}</span>
+        }
+      </div>
+      <label class="tk-label">
+        Intensität
+        <select class="tk-input" name="intensity" [value]="draft().intensity" (change)="patch({ intensity: +value($event) })">
+          @for (entry of intensities; track entry.value) {
+            <option [value]="entry.value" [selected]="draft().intensity === entry.value">{{ entry.label }}</option>
+          }
+        </select>
+      </label>
+      <div class="field">
+        <label class="tk-label">
+          Ort
+          <input
+            class="tk-input"
+            name="location"
+            autocomplete="off"
+            [attr.maxlength]="limits.text"
+            placeholder="Sportplatz, Halle, auswärts"
+            [value]="draft().location"
+            [attr.aria-invalid]="errors().location ? 'true' : null"
+            [attr.aria-describedby]="errors().location ? 'err-location' : null"
+            (input)="patch({ location: value($event) })"
+          />
+        </label>
+        @if (errors().location) {
+          <span class="error" id="err-location" role="alert">{{ errors().location }}</span>
+        }
+      </div>
+    </div>
+
+    @if (draft().type === 'Training') {
+      <label class="tk-label">
+        Trainingsfokus
+        <select class="tk-input" name="trainingFocus" [value]="draft().trainingFocus" (change)="patch({ trainingFocus: value($event) })">
+          @for (focus of focuses; track focus) {
+            <option [value]="focus" [selected]="draft().trainingFocus === focus">{{ focus }}</option>
+          }
+        </select>
+      </label>
+    } @else {
+      <div class="grid">
+        <div class="field">
+          <label class="tk-label">
+            Gegner
+            <input
+              class="tk-input"
+              name="opponent"
+              autocomplete="off"
+              [attr.maxlength]="limits.text"
+              [value]="draft().opponent"
+              [attr.aria-invalid]="errors().opponent ? 'true' : null"
+              [attr.aria-describedby]="errors().opponent ? 'err-opponent' : null"
+              (input)="patch({ opponent: value($event) })"
+            />
+          </label>
+          @if (errors().opponent) {
+            <span class="error" id="err-opponent" role="alert">{{ errors().opponent }}</span>
+          }
+        </div>
+        <div class="field">
+          <label class="tk-label">
+            Spieldauer (Minuten)
+            <input
+              class="tk-input"
+              name="matchDuration"
+              type="number"
+              inputmode="numeric"
+              min="1"
+              [max]="limits.duration"
+              [value]="draft().matchDuration"
+              [attr.aria-invalid]="errors().matchDuration ? 'true' : null"
+              [attr.aria-describedby]="errors().matchDuration ? 'err-duration' : null"
+              (input)="patch({ matchDuration: value($event) })"
+            />
+          </label>
+          @if (errors().matchDuration) {
+            <span class="error" id="err-duration" role="alert">{{ errors().matchDuration }}</span>
+          }
+        </div>
+        <div class="field">
+          <label class="tk-label">
+            Eigene Tore
+            <input
+              class="tk-input"
+              name="goalsFor"
+              type="number"
+              inputmode="numeric"
+              min="0"
+              [max]="limits.score"
+              [value]="draft().goalsFor"
+              [attr.aria-invalid]="errors().goalsFor ? 'true' : null"
+              [attr.aria-describedby]="errors().goalsFor ? 'err-goals-for' : null"
+              (input)="patch({ goalsFor: value($event) })"
+            />
+          </label>
+          @if (errors().goalsFor) {
+            <span class="error" id="err-goals-for" role="alert">{{ errors().goalsFor }}</span>
+          }
+        </div>
+        <div class="field">
+          <label class="tk-label">
+            Gegentore
+            <input
+              class="tk-input"
+              name="goalsAgainst"
+              type="number"
+              inputmode="numeric"
+              min="0"
+              [max]="limits.score"
+              [value]="draft().goalsAgainst"
+              [attr.aria-invalid]="errors().goalsAgainst ? 'true' : null"
+              [attr.aria-describedby]="errors().goalsAgainst ? 'err-goals-against' : null"
+              (input)="patch({ goalsAgainst: value($event) })"
+            />
+          </label>
+          @if (errors().goalsAgainst) {
+            <span class="error" id="err-goals-against" role="alert">{{ errors().goalsAgainst }}</span>
+          }
+        </div>
+      </div>
+    }
+
+    <div class="field">
+      <label class="tk-label">
+        Notiz
+        <textarea
+          class="tk-input"
+          name="notes"
+          rows="3"
+          [attr.maxlength]="limits.notes"
+          placeholder="Schwerpunkt, Besonderheiten"
+          [value]="draft().notes"
+          [attr.aria-invalid]="errors().notes ? 'true' : null"
+          [attr.aria-describedby]="errors().notes ? 'err-notes' : null"
+          (input)="patch({ notes: value($event) })"
+        ></textarea>
+      </label>
+      @if (errors().notes) {
+        <span class="error" id="err-notes" role="alert">{{ errors().notes }}</span>
+      }
+    </div>
+
+    <menu>
+      @if (editing()) {
+        <button tkButton type="button" variant="neutral" class="delete" (click)="askDelete()">Event löschen</button>
+      }
+      <button tkButton type="button" variant="neutral" (click)="closed.emit()">Abbrechen</button>
+      <button tkButton type="submit" variant="primary">Speichern</button>
+    </menu>
+  </form>
+</tk-dialog>
