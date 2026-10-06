@@ -212,20 +212,21 @@ describe('Events (Events-Seite)', () => {
   });
 
   describe('Handy', () => {
-    it('gruppiert nach Monat und öffnet das Bearbeiten per Tipp', async () => {
+    it('gruppiert nach Monat, öffnet das Bewerten per Tipp und das Bearbeiten über die Schaltfläche', async () => {
       const fixture = await render('trainer', true);
       expect(qa(fixture, '.group').map(text)).toEqual(['Oktober 2026 · 2', 'September 2026 · 1']);
       expect(q(fixture, 'table')).toBeNull();
       expect(q(fixture, '.fab')).not.toBeNull();
-      qa<HTMLButtonElement>(fixture, '.event-card')[0].click();
+      expect(qa<HTMLAnchorElement>(fixture, 'a.event-card')[0].getAttribute('href')).toBe('/events/e2');
+      qa<HTMLButtonElement>(fixture, '.row button')[0].click();
       await flush(fixture);
       expect(text(q(fixture, 'tk-event-dialog h2'))).toBe('Event bearbeiten');
     });
 
-    it('zeigt für Medizin keine Schaltfläche zum Anlegen und deaktivierte Karten', async () => {
+    it('zeigt für Medizin weder Anlegen noch Bearbeiten', async () => {
       const fixture = await render('medical', true);
       expect(q(fixture, '.fab')).toBeNull();
-      expect(qa<HTMLButtonElement>(fixture, '.event-card').every((card) => card.disabled)).toBe(true);
+      expect(qa(fixture, '.row button')).toHaveLength(0);
     });
   });
 });

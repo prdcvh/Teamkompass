@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { LayoutService } from '../../core/layout.service';
 import {
   EVENT_SORT_OPTIONS,
@@ -24,7 +25,7 @@ import { EventDialog } from './event-dialog';
 /** Events (Training/Spiel): Liste mit Suche und Typfilter, anlegen, nachträglich bearbeiten und löschen. */
 @Component({
   selector: 'app-events',
-  imports: [Button, Card, Dialog, Icon, EventDialog],
+  imports: [RouterLink, Button, Card, Dialog, Icon, EventDialog],
   templateUrl: './events.html',
   styleUrl: './events.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

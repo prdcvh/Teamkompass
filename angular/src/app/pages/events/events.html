@@ -75,14 +75,8 @@
         <tk-card>
           <ul class="cards">
             @for (event of month.events; track event.id) {
-              <li>
-                <button
-                  type="button"
-                  class="event-card"
-                  [disabled]="!events.canWrite()"
-                  [attr.aria-label]="events.canWrite() ? 'Event bearbeiten: ' + event.title : null"
-                  (click)="openEdit(event)"
-                >
+              <li class="row">
+                <a class="event-card" [routerLink]="['/events', event.id]" [attr.aria-label]="'Event bewerten: ' + event.title">
                   <span class="badge" [attr.data-type]="event.type">{{ event.type }}</span>
                   <span class="what">
                     <strong>{{ event.title }}</strong>
@@ -91,7 +85,10 @@
                   @if (resultText(event); as result) {
                     <span class="result">{{ result }}</span>
                   }
-                </button>
+                </a>
+                @if (events.canWrite()) {
+                  <button tkButton size="sm" type="button" (click)="openEdit(event)" [attr.aria-label]="'Event bearbeiten: ' + event.title">Bearbeiten</button>
+                }
               </li>
             }
           </ul>
@@ -126,6 +123,7 @@
                   @if (events.canWrite()) {
                     <td>
                       <div class="actions">
+                        <a tkButton size="sm" variant="primary" [routerLink]="['/events', event.id]" [attr.aria-label]="'Bewerten: ' + event.title">Bewerten</a>
                         <button tkButton size="sm" type="button" (click)="openEdit(event)" [attr.aria-label]="'Bearbeiten: ' + event.title">Bearbeiten</button>
                         <button tkButton size="sm" type="button" class="danger" (click)="askDelete(event)" [attr.aria-label]="'Löschen: ' + event.title">Löschen</button>
                       </div>

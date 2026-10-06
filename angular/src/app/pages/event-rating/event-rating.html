@@ -1,0 +1,189 @@
+<section class="page" [attr.data-variant]="mobile() ? 'mobile' : 'desktop'">
+  <header class="head">
+    <div>
+      <a class="back" routerLink="/events">‹ Events</a>
+      @if (event(); as ev) {
+        <h1>{{ ev.title }}</h1>
+        <p class="meta">
+          {{ ev.type }} · {{ formatDate(ev.date) }}@if (resultText(ev); as result) { · Ergebnis {{ result }}} · Intensität {{ intensity() }}@if (ev.location) { · {{ ev.location }}}@if (isGame()) { · {{ ratings.matchDuration() }} Min.}
+        </p>
+      } @else {
+        <h1>Event bewerten</h1>
+      }
+    </div>
+  </header>
+
+  <p class="sync" role="status" [attr.data-state]="sync.state()">
+    {{ sync.label() }}
+    @if (sync.detail()) {
+      <span class="detail"> – {{ sync.detail() }}</span>
+    }
+  </p>
+
+  @if (failed()) {
+    <div class="notice" role="alert">
+      <p>{{ errorText() }}</p>
+      <button tkButton type="button" (click)="retry()">Erneut versuchen</button>
+    </div>
+  } @else if (!ready()) {
+    <p class="muted" role="status">Bewertungen werden geladen …</p>
+  } @else if (!event()) {
+    <tk-card>
+      <div class="empty">
+        <p>Dieses Event gibt es nicht (mehr).</p>
+        <a tkButton routerLink="/events">Zu den Events</a>
+      </div>
+    </tk-card>
+  } @else {
+    <div class="toolbar">
+      <div class="progress" [attr.data-complete]="progress().total > 0 && progress().done === progress().total">
+        <span class="progress-label">{{ progress().done }} von {{ progress().total }} Spielern erfasst</span>
+        <span class="track"><span [style.width.%]="progress().share"></span></span>
+      </div>
+      <label class="view">
+        <span class="tk-sr-only">Ansicht</span>
+        <select class="tk-input" [value]="view()" (change)="setView(valueOf($event))">
+          @for (option of views; track option.key) {
+            <option [value]="option.key" [selected]="view() === option.key">{{ option.label }}</option>
+          }
+        </select>
+      </label>
+    </div>
+
+    @if (allPlayers().length === 0) {
+      <tk-card><div class="empty"><p>Noch keine Spieler im Kader.</p><a tkButton routerLink="/kader">Zum Kader</a></div></tk-card>
+    } @else if (players().length === 0) {
+      <tk-card><div class="empty"><p>Kein Spieler passt zur Ansicht.</p><button tkButton type="button" (click)="setView('all')">Alle Spieler zeigen</button></div></tk-card>
+    } @else if (mobile()) {
+      @if (current(); as player) {
+        <div class="stepper-nav">
+          <button tkButton type="button" [disabled]="currentIndex() === 0" (click)="previous()">‹ Zurück</button>
+          <label class="jump">
+            <span class="tk-sr-only">Zu Spieler springen</span>
+            <select class="tk-input" [value]="currentIndex()" (change)="jump(valueOf($event))">
+              @for (item of players(); track item.id; let i = $index) {
+                <option [value]="i" [selected]="i === currentIndex()">{{ item.number }} · {{ item.name }}</option>
+              }
+            </select>
+          </label>
+          <button tkButton type="button" [disabled]="currentIndex() === players().length - 1" (click)="next()">Weiter ›</button>
+        </div>
+        <p class="position" aria-live="polite">{{ currentIndex() + 1 }} / {{ players().length }}</p>
+
+        <tk-card>
+          <article class="rating-card" [attr.data-attendance]="attendanceOf(player)">
+            <header class="card-head">
+              <span class="number">{{ player.number }}</span>
+              <div>
+                <strong>{{ player.name }}</strong>
+                <span class="grade">Gesamtnote {{ total(player) }}</span>
+              </div>
+            </header>
+
+            <label class="field">
+              <span class="label">Anwesenheit</span>
+              <select class="tk-input" [attr.aria-label]="'Anwesenheit: ' + player.name" [value]="attendanceOf(player)" (change)="set(player, 'attendance', valueOf($event))">
+                @for (option of attendances; track option) {
+                  @if (option !== 'excluded' || isGame()) {
+                    <option [value]="option" [selected]="attendanceOf(player) === option">{{ attendanceLabels[option] }}</option>
+                  }
+                }
+              </select>
+            </label>
+
+            @for (field of gradeFields; track field) {
+              <div class="field" role="group" [attr.aria-label]="gradeLabels[field] + ': ' + player.name">
+                <span class="label">{{ gradeLabels[field] }}</span>
+                <div class="chips">
+                  <button type="button" class="chip" [attr.aria-pressed]="ratings.ratingFor(player.id)[field] === null" [attr.aria-label]="gradeLabels[field] + ' nicht erfasst'" (click)="set(player, field, '')">–</button>
+                  @for (grade of gradeOptions; track grade) {
+                    <button type="button" class="chip" [attr.aria-pressed]="ratings.ratingFor(player.id)[field] === grade" [attr.aria-label]="gradeLabels[field] + ' Note ' + grade" (click)="set(player, field, '' + grade)">{{ grade }}</button>
+                  }
+                </div>
+              </div>
+            }
+
+            @if (isGame()) {
+              <div class="numbers">
+                <label class="field"><span class="label">Minuten</span>
+                  <input class="tk-input" type="number" inputmode="numeric" min="0" [max]="ratings.matchDuration()" [value]="ratings.ratingFor(player.id).minutes ?? ''" (change)="set(player, 'minutes', valueOf($event))" />
+                </label>
+                <label class="field"><span class="label">Tore</span>
+                  <input class="tk-input" type="number" inputmode="numeric" min="0" [max]="limits.goals" [value]="ratings.ratingFor(player.id).goals ?? ''" (change)="set(player, 'goals', valueOf($event))" />
+                </label>
+                <label class="field"><span class="label">Vorlagen</span>
+                  <input class="tk-input" type="number" inputmode="numeric" min="0" [max]="limits.goals" [value]="ratings.ratingFor(player.id).assists ?? ''" (change)="set(player, 'assists', valueOf($event))" />
+                </label>
+              </div>
+            }
+
+            <label class="field"><span class="label">Feedback an Spieler (sichtbar)</span>
+              <input class="tk-input" [attr.maxlength]="limits.note" placeholder="Sichtbar für Spieler/Eltern" [value]="ratings.ratingFor(player.id).note" (change)="set(player, 'note', valueOf($event))" />
+            </label>
+            <label class="field"><span class="label">Interne Notiz (nur Trainer)</span>
+              <input class="tk-input" [attr.maxlength]="limits.note" placeholder="Nur für Trainer" [value]="ratings.noteFor(player.id)" (change)="setNote(player, valueOf($event))" />
+            </label>
+          </article>
+        </tk-card>
+      }
+    } @else {
+      <tk-card>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Spieler</th>
+                <th scope="col">Anwesenheit</th>
+                <th scope="col">Gesamtnote</th>
+                @for (field of gradeFields; track field) {
+                  <th scope="col">{{ gradeLabels[field] }}</th>
+                }
+                @if (isGame()) {
+                  <th scope="col">Min.</th>
+                  <th scope="col">Tore</th>
+                  <th scope="col">Vorlagen</th>
+                }
+                <th scope="col" title="Diese Notiz sehen Spieler und Eltern in ihrem Profil">Feedback an Spieler (sichtbar)</th>
+                <th scope="col" title="Nur für Trainer sichtbar, Spieler und Eltern bekommen sie nie zu sehen">Interne Notiz (nur Trainer)</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (player of players(); track player.id) {
+                <tr [attr.data-attendance]="attendanceOf(player)">
+                  <td><span class="number">{{ player.number }}</span> <strong>{{ player.name }}</strong></td>
+                  <td>
+                    <select class="tk-input" [attr.aria-label]="'Anwesenheit: ' + player.name" [value]="attendanceOf(player)" (change)="set(player, 'attendance', valueOf($event))">
+                      @for (option of attendances; track option) {
+                        @if (option !== 'excluded' || isGame()) {
+                          <option [value]="option" [selected]="attendanceOf(player) === option">{{ attendanceLabels[option] }}</option>
+                        }
+                      }
+                    </select>
+                  </td>
+                  <td><span class="grade-total">{{ total(player) }}</span></td>
+                  @for (field of gradeFields; track field) {
+                    <td>
+                      <select class="tk-input grade-select" [attr.aria-label]="gradeLabels[field] + ': ' + player.name" [value]="ratings.ratingFor(player.id)[field] ?? ''" (change)="set(player, field, valueOf($event))">
+                        <option value="" [selected]="ratings.ratingFor(player.id)[field] === null">–</option>
+                        @for (grade of gradeOptions; track grade) {
+                          <option [value]="grade" [selected]="ratings.ratingFor(player.id)[field] === grade">{{ grade }}</option>
+                        }
+                      </select>
+                    </td>
+                  }
+                  @if (isGame()) {
+                    <td><input class="tk-input small" type="number" min="0" [max]="ratings.matchDuration()" [attr.aria-label]="'Minuten: ' + player.name" [value]="ratings.ratingFor(player.id).minutes ?? ''" (change)="set(player, 'minutes', valueOf($event))" /></td>
+                    <td><input class="tk-input small" type="number" min="0" [max]="limits.goals" [attr.aria-label]="'Tore: ' + player.name" [value]="ratings.ratingFor(player.id).goals ?? ''" (change)="set(player, 'goals', valueOf($event))" /></td>
+                    <td><input class="tk-input small" type="number" min="0" [max]="limits.goals" [attr.aria-label]="'Vorlagen: ' + player.name" [value]="ratings.ratingFor(player.id).assists ?? ''" (change)="set(player, 'assists', valueOf($event))" /></td>
+                  }
+                  <td><input class="tk-input" [attr.maxlength]="limits.note" [attr.aria-label]="'Feedback an ' + player.name" placeholder="Sichtbar für Spieler/Eltern" [value]="ratings.ratingFor(player.id).note" (change)="set(player, 'note', valueOf($event))" /></td>
+                  <td><input class="tk-input" [attr.maxlength]="limits.note" [attr.aria-label]="'Interne Notiz für ' + player.name" placeholder="Nur für Trainer" [value]="ratings.noteFor(player.id)" (change)="setNote(player, valueOf($event))" /></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </tk-card>
+    }
+  }
+</section>
