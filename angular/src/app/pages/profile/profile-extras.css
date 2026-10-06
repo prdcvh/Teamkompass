@@ -1,0 +1,195 @@
+:host {
+  display: grid;
+  gap: var(--tk-space-4);
+}
+
+.block {
+  display: grid;
+  gap: var(--tk-space-3);
+}
+
+.block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tk-space-3);
+}
+
+h2 {
+  margin: 0;
+  font-size: var(--tk-text-lg);
+}
+
+.muted {
+  margin: 0;
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+.pad {
+  padding: var(--tk-space-3) var(--tk-space-1);
+}
+
+.notice {
+  display: grid;
+  justify-items: start;
+  gap: var(--tk-space-3);
+  padding: var(--tk-space-4);
+  color: var(--tk-red);
+  background: var(--tk-soft-red);
+  border-radius: var(--tk-radius-lg);
+}
+
+.notice p {
+  margin: 0;
+}
+
+.items {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.items li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--tk-space-3);
+  padding: var(--tk-space-3) 0;
+}
+
+.items li + li {
+  border-top: 1px solid var(--tk-line);
+}
+
+.items p {
+  margin: 4px 0 0;
+}
+
+.pill {
+  display: inline-block;
+  margin-right: var(--tk-space-2);
+  padding: 2px var(--tk-space-3);
+  color: var(--tk-ink);
+  background: var(--tk-field);
+  border-radius: var(--tk-radius-pill);
+  font-size: var(--tk-text-xs);
+  font-weight: 600;
+}
+
+.pill[data-tone='success'] {
+  color: var(--tk-green);
+}
+
+.pill[data-tone='warning'] {
+  color: var(--tk-amber);
+}
+
+.pill[data-tone='danger'] {
+  color: var(--tk-red);
+  background: var(--tk-soft-red);
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  justify-content: flex-end;
+  gap: var(--tk-space-2);
+}
+
+.danger {
+  color: var(--tk-red);
+}
+
+.chart {
+  width: 100%;
+  height: auto;
+}
+
+.chart .line {
+  fill: none;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.chart [data-series='height'] {
+  stroke: var(--tk-red);
+  fill: var(--tk-red);
+}
+
+.chart [data-series='weight'] {
+  stroke: var(--tk-blue, #2563eb);
+  fill: var(--tk-blue, #2563eb);
+}
+
+.chart [data-series='bmi'] {
+  stroke: var(--tk-green);
+  fill: var(--tk-green);
+}
+
+.chart .line[data-series] {
+  fill: none;
+}
+
+.chart .axis {
+  fill: var(--tk-muted);
+  font-size: 11px;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tk-space-4);
+  margin: 0 0 var(--tk-space-3);
+  padding: 0;
+  list-style: none;
+  font-size: var(--tk-text-sm);
+}
+
+.legend li {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.legend [data-series='height'] .swatch,
+.legend li[data-series='height'] .swatch {
+  background: var(--tk-red);
+}
+
+.legend li[data-series='weight'] .swatch {
+  background: var(--tk-blue, #2563eb);
+}
+
+.legend li[data-series='bmi'] .swatch {
+  background: var(--tk-green);
+}
+
+.error {
+  color: var(--tk-red);
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--tk-space-2);
+}
+
+@media (max-width: 720px) {
+  .items li {
+    flex-direction: column;
+  }
+
+  .row-actions {
+    justify-content: flex-start;
+  }
+}

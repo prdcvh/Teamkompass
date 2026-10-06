@@ -1,0 +1,149 @@
+@if (records.error()) {
+  <div class="notice" role="alert">
+    <p>{{ records.error() }}</p>
+    <button tkButton type="button" (click)="records.retry()">Erneut versuchen</button>
+  </div>
+} @else if (!records.ready()) {
+  <p class="muted" role="status">Förderpläne, Abwesenheiten und Messwerte werden geladen …</p>
+} @else {
+  <section class="block" aria-labelledby="plans-title">
+    <div class="block-head">
+      <h2 id="plans-title">Förderpläne</h2>
+      @if (canEdit()) {
+        <button tkButton size="sm" type="button" (click)="openPlan(null)">+ Förderplan</button>
+      }
+    </div>
+    <tk-card>
+      @if (plans().length === 0) {
+        <p class="muted pad">Noch kein Förderplan für diesen Spieler angelegt.</p>
+      } @else {
+        <ul class="items">
+          @for (plan of plans(); track plan.id) {
+            <li>
+              <div>
+                <span class="pill" [attr.data-tone]="planTone(plan)">{{ plan.status }}</span>
+                <strong>{{ plan.focus }}</strong>
+                <p>{{ plan.goal }}</p>
+                <small class="muted">
+                  @if (plan.dueDate) { Ziel bis {{ formatDate(plan.dueDate) }} · }{{ plan.actions || 'Keine Maßnahmen notiert.' }}
+                </small>
+                @if (plan.selfReflection) {
+                  <p><strong>Selbstreflexion:</strong> {{ plan.selfReflection }}</p>
+                }
+                @if (plan.coachReview) {
+                  <p><strong>Trainerreview:</strong> {{ plan.coachReview }}</p>
+                }
+              </div>
+              @if (canEdit()) {
+                <div class="row-actions">
+                  <button tkButton size="sm" type="button" (click)="openPlan(plan)" [attr.aria-label]="'Förderplan bearbeiten: ' + plan.focus">Bearbeiten</button>
+                  <button tkButton size="sm" type="button" class="danger" (click)="askDelete('plan', plan.id, '„' + plan.focus + '“ (Förderplan)')" [attr.aria-label]="'Förderplan löschen: ' + plan.focus">Löschen</button>
+                </div>
+              }
+            </li>
+          }
+        </ul>
+      }
+    </tk-card>
+  </section>
+
+  <section class="block" aria-labelledby="absences-title">
+    <div class="block-head">
+      <h2 id="absences-title">Abwesenheiten und Verletzungen</h2>
+      @if (canEdit()) {
+        <button tkButton size="sm" type="button" (click)="openAbsence(null)">+ Eintrag</button>
+      }
+    </div>
+    <tk-card>
+      @if (absences().length === 0) {
+        <p class="muted pad">Noch keine Abwesenheit oder Verletzung für diesen Spieler eingetragen.</p>
+      } @else {
+        <ul class="items">
+          @for (absence of absences(); track absence.id) {
+            <li>
+              <div>
+                @if (isInjury(absence)) { <span class="pill" data-tone="danger">Verletzung</span> }
+                <strong>{{ absenceTitle(absence) }}</strong>
+                <p>{{ absencePeriodText(absence) }}</p>
+              </div>
+              @if (canEdit()) {
+                <div class="row-actions">
+                  <button tkButton size="sm" type="button" (click)="openAbsence(absence)" [attr.aria-label]="'Eintrag bearbeiten: ' + absenceTitle(absence)">Bearbeiten</button>
+                  <button tkButton size="sm" type="button" class="danger" (click)="askDelete('absence', absence.id, '„' + absenceTitle(absence) + '“')" [attr.aria-label]="'Eintrag löschen: ' + absenceTitle(absence)">Löschen</button>
+                </div>
+              }
+            </li>
+          }
+        </ul>
+      }
+    </tk-card>
+  </section>
+
+  <section class="block" aria-labelledby="measurements-title">
+    <div class="block-head">
+      <h2 id="measurements-title">Messwerte</h2>
+      @if (canEdit()) {
+        <button tkButton size="sm" type="button" (click)="openMeasurement(null)">+ Messung</button>
+      }
+    </div>
+    <tk-card>
+      @if (chart().enough) {
+        <svg class="chart" [attr.viewBox]="'0 0 ' + chart().width + ' ' + chart().height" role="img" aria-label="Verlauf von Größe, Gewicht und BMI der letzten 12 Monate">
+          @for (series of chart().series; track series.key) {
+            <path [attr.d]="series.path" class="line" [attr.data-series]="series.key" />
+            @for (point of series.points; track $index) {
+              <circle [attr.cx]="point.x" [attr.cy]="point.y" r="4" class="dot" [attr.data-series]="series.key"><title>{{ point.title }}</title></circle>
+            }
+          }
+          @for (label of chart().labels; track $index) {
+            <text [attr.x]="label.x" [attr.y]="chart().height - 12" class="axis" text-anchor="middle">{{ label.text }}</text>
+          }
+        </svg>
+        <ul class="legend">
+          @for (series of chart().series; track series.key) {
+            <li [attr.data-series]="series.key"><span class="swatch"></span>{{ series.label }}</li>
+          }
+        </ul>
+      } @else {
+        <p class="muted pad">Noch nicht genug Messwerte der letzten 12 Monate für einen Verlauf (mindestens 2 mit Größe und Gewicht nötig).</p>
+      }
+      @if (measurementsNewestFirst().length === 0) {
+        <p class="muted pad">Noch keine Messwerte für diesen Spieler eingetragen.</p>
+      } @else {
+        <ul class="items">
+          @for (measurement of measurementsNewestFirst(); track measurement.id) {
+            <li>
+              <div>
+                <strong>{{ formatDate(measurement.date) }}</strong>
+                <p>{{ measurementText(measurement) }}</p>
+              </div>
+              @if (canEdit()) {
+                <div class="row-actions">
+                  <button tkButton size="sm" type="button" (click)="openMeasurement(measurement)" [attr.aria-label]="'Messung bearbeiten: ' + formatDate(measurement.date)">Bearbeiten</button>
+                  <button tkButton size="sm" type="button" class="danger" (click)="askDelete('measurement', measurement.id, 'die Messung vom ' + formatDate(measurement.date))" [attr.aria-label]="'Messung löschen: ' + formatDate(measurement.date)">Löschen</button>
+                </div>
+              }
+            </li>
+          }
+        </ul>
+      }
+    </tk-card>
+  </section>
+}
+
+@if (canEdit()) {
+  <tk-plan-dialog [open]="planDialog().open" [plan]="planDialog().plan" (closed)="closePlan()" />
+  <tk-absence-dialog [open]="absenceDialog().open" [absence]="absenceDialog().absence" (closed)="closeAbsence()" />
+  <tk-measurement-dialog [open]="measurementDialog().open" [measurement]="measurementDialog().measurement" (closed)="closeMeasurement()" />
+
+  <tk-dialog [open]="deleting() !== null" title="Eintrag löschen?" (closed)="cancelDelete()">
+    <p>{{ deleting()?.text }} wird gelöscht. Das lässt sich nicht rückgängig machen.</p>
+    @if (deleteFailed()) {
+      <p class="error" role="alert">Löschen fehlgeschlagen. Bitte Verbindung prüfen und erneut versuchen.</p>
+    }
+    <div class="confirm-actions">
+      <button tkButton type="button" (click)="cancelDelete()">Abbrechen</button>
+      <button tkButton type="button" variant="primary" [disabled]="deleteBusy()" (click)="confirmDelete()">{{ deleteBusy() ? 'Löscht …' : 'Endgültig löschen' }}</button>
+    </div>
+  </tk-dialog>
+}
