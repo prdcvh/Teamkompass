@@ -59,4 +59,54 @@ describe('Login', () => {
     (root(fixture).querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit'));
     await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith('/'));
   });
+
+  describe('Gestaltung (SCRUM-84)', () => {
+    it('hat keine Inline-Styles (CSP-konform) und dekorative Grafik ist für Screenreader versteckt', async () => {
+      const fixture = await render();
+      expect(root(fixture).querySelectorAll('[style]')).toHaveLength(0);
+      expect(root(fixture).querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
+    });
+
+    it('zeigt Vereins- und Teamnamen und die Kernpunkte', async () => {
+      const fixture = await render();
+      const text = root(fixture).textContent ?? '';
+      expect(text).toContain('1. FC Königstein');
+      expect(text).toContain('U14');
+      expect(root(fixture).querySelectorAll('.points li')).toHaveLength(3);
+    });
+
+    it('kann das Passwort anzeigen und wieder verbergen', async () => {
+      const fixture = await render();
+      const reveal = root(fixture).querySelector('.reveal') as HTMLButtonElement;
+      expect(reveal.getAttribute('aria-label')).toBe('Passwort anzeigen');
+      reveal.click();
+      fixture.detectChanges();
+      expect(root(fixture).querySelector('input[name="password"]')?.getAttribute('type')).toBe('text');
+      expect(reveal.getAttribute('aria-pressed')).toBe('true');
+      reveal.click();
+      fixture.detectChanges();
+      expect(root(fixture).querySelector('input[name="password"]')?.getAttribute('type')).toBe('password');
+    });
+
+    it('wechselt die Tabs per Pfeiltaste und setzt den Fokus', async () => {
+      const fixture = await render();
+      const first = root(fixture).querySelector('#tab-trainer') as HTMLElement;
+      first.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(root(fixture).querySelector('#tab-code')?.getAttribute('aria-selected')).toBe('true');
+      expect(root(fixture).querySelector('[role="tabpanel"]')?.getAttribute('aria-labelledby')).toBe('tab-code');
+    });
+
+    it('zeigt beim Anmelden einen Ladezustand und sperrt den Knopf', async () => {
+      const fixture = await render();
+      TestBed.inject(AuthService).busy.set(true);
+      fixture.detectChanges();
+      const submit = root(fixture).querySelector('button[type="submit"]') as HTMLButtonElement;
+      expect(submit.disabled).toBe(true);
+      expect(submit.getAttribute('aria-busy')).toBe('true');
+      expect(submit.textContent).toContain('Anmelden …');
+      expect(submit.querySelector('.spinner')).not.toBeNull();
+    });
+  });
 });
