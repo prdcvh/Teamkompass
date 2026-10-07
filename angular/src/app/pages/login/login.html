@@ -1,49 +1,97 @@
 <div class="login">
   <section class="brand" aria-label="TeamKompass">
-    <span class="badge" aria-hidden="true">TK</span>
-    <h1>TeamKompass</h1>
-    <p class="claim">Dein Team.<br />Deine Richtung.</p>
-    <p class="lead">Plane deine Saison, begleite die Entwicklung deiner Spieler und bereite jedes Spiel vor.</p>
-    <p class="meta">{{ club }} · {{ team }}</p>
+    <svg class="pitch" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
+      <g class="lines" fill="none" stroke="currentColor" stroke-width="2">
+        <rect class="draw" x="30" y="30" width="340" height="540" rx="6" pathLength="1" />
+        <path class="draw" d="M30 300h340" pathLength="1" />
+        <circle class="draw" cx="200" cy="300" r="56" pathLength="1" />
+        <rect class="draw" x="110" y="30" width="180" height="84" pathLength="1" />
+        <rect class="draw" x="110" y="486" width="180" height="84" pathLength="1" />
+        <path class="draw" d="M150 114a56 56 0 0 0 100 0" pathLength="1" />
+        <path class="draw" d="M150 486a56 56 0 0 1 100 0" pathLength="1" />
+      </g>
+      <circle class="ball" cx="200" cy="300" r="7" fill="currentColor" />
+    </svg>
+
+    <div class="brand-inner">
+      <div class="identity">
+        <span class="badge" aria-hidden="true">TK</span>
+        <div>
+          <p class="club">{{ club }}</p>
+          <p class="team">{{ team }}</p>
+        </div>
+      </div>
+
+      <h1>TeamKompass</h1>
+      <p class="claim">Dein Team.<br />Deine Richtung.</p>
+      <p class="lead">Plane deine Saison, begleite die Entwicklung deiner Spieler und bereite jedes Spiel vor.</p>
+
+      <ul class="points">
+        <li><span class="dot" aria-hidden="true"></span>Kader, Events und Bewertungen an einem Ort</li>
+        <li><span class="dot" aria-hidden="true"></span>Entwicklung jedes Spielers im Blick</li>
+        <li><span class="dot" aria-hidden="true"></span>Immer bereit für den nächsten Spieltag</li>
+      </ul>
+    </div>
   </section>
 
   <section class="form-area">
-    <h2>Willkommen zurück</h2>
-    <p class="sub">Melde dich bei deiner Mannschaft an.</p>
+    <div class="form-inner">
+      <h2>Willkommen zurück</h2>
+      <p class="sub">Melde dich bei deiner Mannschaft an.</p>
 
-    <div class="tabs" role="tablist" aria-label="Anmeldeart">
-      <button type="button" role="tab" [attr.aria-selected]="tab() === 'trainer'" [class.on]="tab() === 'trainer'" (click)="select('trainer')">Trainer</button>
-      <button type="button" role="tab" [attr.aria-selected]="tab() === 'code'" [class.on]="tab() === 'code'" (click)="select('code')">Spieler / Eltern</button>
-    </div>
+      <div class="tabs" role="tablist" aria-label="Anmeldeart">
+        <button type="button" role="tab" id="tab-trainer" [attr.aria-selected]="tab() === 'trainer'" [attr.tabindex]="tab() === 'trainer' ? 0 : -1" [class.on]="tab() === 'trainer'" (click)="select('trainer')" (keydown.arrowright)="selectByKey('code')" (keydown.arrowleft)="selectByKey('code')">Trainer</button>
+        <button type="button" role="tab" id="tab-code" [attr.aria-selected]="tab() === 'code'" [attr.tabindex]="tab() === 'code' ? 0 : -1" [class.on]="tab() === 'code'" (click)="select('code')" (keydown.arrowleft)="selectByKey('trainer')" (keydown.arrowright)="selectByKey('trainer')">Spieler / Eltern</button>
+      </div>
 
-    <div class="card">
-      @if (tab() === 'trainer') {
-        <form (ngSubmit)="submitTrainer()" #trainerForm="ngForm">
-          <h3>Trainer-Login</h3>
-          <label class="tk-label">
-            E-Mail
-            <input class="tk-input" type="email" name="email" autocomplete="username" required [(ngModel)]="email" />
-          </label>
-          <label class="tk-label">
-            Passwort
-            <input class="tk-input" type="password" name="password" autocomplete="current-password" required [(ngModel)]="password" />
-          </label>
-          <button tkButton variant="primary" type="submit" [disabled]="auth.busy()">Anmelden</button>
-        </form>
-      } @else {
-        <form (ngSubmit)="submitCode()" #codeForm="ngForm">
-          <h3>Spieler- oder Elternzugang</h3>
-          <p class="hint">Gib den persönlichen Einladungscode ein, den du von deinem Trainer bekommen hast.</p>
-          <label class="tk-label">
-            Einladungscode
-            <input class="tk-input" type="text" name="code" autocomplete="off" autocapitalize="off" spellcheck="false" required [(ngModel)]="code" />
-          </label>
-          <button tkButton variant="primary" type="submit" [disabled]="auth.busy()">Zugang öffnen</button>
-        </form>
-      }
-      @if (auth.error()) {
-        <p class="error" role="alert">{{ auth.error() }}</p>
-      }
+      <div class="card" role="tabpanel" [attr.aria-labelledby]="tab() === 'trainer' ? 'tab-trainer' : 'tab-code'">
+        @if (tab() === 'trainer') {
+          <form (ngSubmit)="submitTrainer()" #trainerForm="ngForm">
+            <h3>Trainer-Login</h3>
+            <label class="tk-label">
+              E-Mail
+              <input class="tk-input" type="email" name="email" autocomplete="username" required [(ngModel)]="email" />
+            </label>
+            <label class="tk-label">
+              Passwort
+              <span class="password">
+                <input class="tk-input" [type]="showPassword() ? 'text' : 'password'" name="password" autocomplete="current-password" required [(ngModel)]="password" />
+                <button type="button" class="reveal" [attr.aria-pressed]="showPassword()" [attr.aria-label]="showPassword() ? 'Passwort verbergen' : 'Passwort anzeigen'" (click)="showPassword.set(!showPassword())">
+                  {{ showPassword() ? 'Verbergen' : 'Anzeigen' }}
+                </button>
+              </span>
+            </label>
+            <button tkButton variant="primary" type="submit" [disabled]="auth.busy()" [attr.aria-busy]="auth.busy()">
+              @if (auth.busy()) {
+                <span class="spinner" aria-hidden="true"></span> Anmelden …
+              } @else {
+                Anmelden
+              }
+            </button>
+          </form>
+        } @else {
+          <form (ngSubmit)="submitCode()" #codeForm="ngForm">
+            <h3>Spieler- oder Elternzugang</h3>
+            <p class="hint">Gib den persönlichen Einladungscode ein, den du von deinem Trainer bekommen hast.</p>
+            <label class="tk-label">
+              Einladungscode
+              <input class="tk-input" type="text" name="code" autocomplete="off" autocapitalize="off" spellcheck="false" required [(ngModel)]="code" />
+            </label>
+            <button tkButton variant="primary" type="submit" [disabled]="auth.busy()" [attr.aria-busy]="auth.busy()">
+              @if (auth.busy()) {
+                <span class="spinner" aria-hidden="true"></span> Zugang wird geöffnet …
+              } @else {
+                Zugang öffnen
+              }
+            </button>
+          </form>
+        }
+        @if (auth.error()) {
+          <p class="error" role="alert">{{ auth.error() }}</p>
+        }
+      </div>
+
+      <p class="foot">{{ club }} · {{ team }}</p>
     </div>
   </section>
 </div>

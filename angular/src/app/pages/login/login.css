@@ -1,109 +1,227 @@
 :host {
   display: block;
+
+  /* Vereins-Hero: bleibt in hellem und dunklem Design dunkel, damit weiße Schrift (Kontrast AAA) lesbar bleibt. */
+  --hero-deep: #2a0b12;
+  --hero-mid: #6b0f22;
+  --hero-glow: #d8072e;
+  --hero-text: #fff;
+  --hero-soft: #f1d9de;
 }
 
 .login {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
   min-height: 100vh;
 }
 
+/* ---------- Hero ---------- */
 .brand {
+  position: relative;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  color: var(--hero-text);
+  background:
+    radial-gradient(120% 90% at 85% 8%, var(--hero-glow) 0%, transparent 55%),
+    linear-gradient(160deg, var(--hero-mid) 0%, var(--hero-deep) 80%);
+}
+
+.pitch {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  color: var(--hero-text);
+  opacity: 0.16;
+}
+
+.draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: draw 2.4s ease-out forwards;
+}
+
+.draw:nth-child(2) { animation-delay: 0.2s; }
+.draw:nth-child(3) { animation-delay: 0.4s; }
+.draw:nth-child(4) { animation-delay: 0.7s; }
+.draw:nth-child(5) { animation-delay: 0.7s; }
+.draw:nth-child(6) { animation-delay: 1s; }
+.draw:nth-child(7) { animation-delay: 1s; }
+
+.ball {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pulse 3.2s ease-in-out 2.4s infinite;
+}
+
+.brand-inner {
+  position: relative;
   display: flex;
   flex-direction: column;
-  justify-content: center;
   gap: var(--tk-space-4);
-  padding: var(--tk-space-6) 15%;
-  color: #fff;
-  background: #241d1f;
+  width: 100%;
+  max-width: 460px;
+  padding: var(--tk-space-6) 12%;
+  animation: rise 0.7s ease-out both;
+}
+
+.identity {
+  display: flex;
+  gap: var(--tk-space-3);
+  align-items: center;
 }
 
 .badge {
-  align-self: flex-start;
-  padding: 6px 14px;
-  background: #d8072e;
-  border-radius: var(--tk-radius-sm);
-  font-size: 12px;
-  font-weight: 600;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  color: var(--hero-deep);
+  background: var(--hero-text);
+  border-radius: var(--tk-radius-lg);
+  font-size: var(--tk-text-lg);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 30%);
+}
+
+.club,
+.team {
+  margin: 0;
+}
+
+.club {
+  color: var(--hero-soft);
+  font-size: var(--tk-text-sm);
+}
+
+.team {
+  font-size: var(--tk-text-lg);
+  font-weight: 700;
 }
 
 h1 {
-  margin: 0;
-  font-size: 34px;
+  margin: var(--tk-space-4) 0 0;
+  font-size: 40px;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
 }
 
 .claim {
   margin: 0;
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 700;
   line-height: 1.2;
 }
 
-.lead,
-.meta {
+.lead {
   margin: 0;
-  max-width: 300px;
-  color: #cfc8ca;
+  max-width: 340px;
+  color: var(--hero-soft);
+  font-size: var(--tk-text-md);
+  line-height: 1.5;
+}
+
+.points {
+  display: grid;
+  gap: var(--tk-space-3);
+  margin: var(--tk-space-4) 0 0;
+  padding: 0;
+  list-style: none;
   font-size: var(--tk-text-md);
 }
 
-.meta {
-  margin-top: var(--tk-space-6);
-  font-size: var(--tk-text-sm);
+.points li {
+  display: flex;
+  gap: var(--tk-space-3);
+  align-items: center;
 }
 
+.dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  background: var(--hero-text);
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px rgb(255 255 255 / 20%);
+}
+
+/* ---------- Formular ---------- */
 .form-area {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  width: min(100%, 520px);
   padding: var(--tk-space-6);
-  margin: 0 auto;
+  background: var(--tk-bg);
+}
+
+.form-inner {
+  width: min(100%, 460px);
+  animation: rise 0.6s ease-out 0.1s both;
 }
 
 h2 {
   margin: 0;
-  font-size: 24px;
+  font-size: 28px;
+  letter-spacing: -0.01em;
 }
 
 .sub {
-  margin: 6px 0 var(--tk-space-4);
+  margin: 6px 0 var(--tk-space-5);
   color: var(--tk-muted);
-  font-size: var(--tk-text-sm);
+  font-size: var(--tk-text-md);
 }
 
 .tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--tk-space-2);
+  gap: var(--tk-space-1);
   margin-bottom: var(--tk-space-4);
+  padding: var(--tk-space-1);
+  background: var(--tk-soft-neutral);
+  border-radius: var(--tk-radius-lg);
 }
 
 .tabs button {
-  min-height: 40px;
-  color: var(--tk-ink);
-  background: var(--tk-surface);
-  border: 1px solid var(--tk-line);
+  min-height: var(--tk-touch);
+  color: var(--tk-muted);
+  background: transparent;
+  border: 0;
   border-radius: var(--tk-radius-md);
   font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.18s,
+    color 0.18s,
+    box-shadow 0.18s;
 }
 
 .tabs button.on {
-  color: #fff;
-  background: var(--tk-red);
-  border-color: var(--tk-red);
+  color: var(--tk-ink);
+  background: var(--tk-surface);
+  box-shadow: var(--tk-shadow-card);
+}
+
+.tabs button:focus-visible,
+.reveal:focus-visible {
+  outline: 2px solid var(--tk-red);
+  outline-offset: 2px;
 }
 
 .card {
   padding: var(--tk-space-5);
   background: var(--tk-surface);
   border: 1px solid var(--tk-line);
-  border-radius: var(--tk-radius-lg);
+  border-top: 4px solid var(--tk-red);
+  border-radius: var(--tk-radius-xl);
+  box-shadow: var(--tk-shadow-card);
 }
 
 form {
   display: grid;
   gap: var(--tk-space-3);
+  animation: fade 0.25s ease-out both;
 }
 
 h3 {
@@ -117,71 +235,173 @@ h3 {
   font-size: var(--tk-text-sm);
 }
 
-.error {
-  margin: var(--tk-space-3) 0 0;
-  color: var(--tk-red);
-  font-size: var(--tk-text-sm);
-  font-weight: 600;
+.password {
+  position: relative;
+  display: block;
 }
 
-/* Handy: dunkler Hintergrund, Marke oben, Formular als Karte (Figma 01 Login) */
+.password .tk-input {
+  padding-right: 96px;
+}
+
+.reveal {
+  position: absolute;
+  top: 50%;
+  right: var(--tk-space-2);
+  min-height: 32px;
+  padding: 0 var(--tk-space-2);
+  color: var(--tk-muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--tk-radius-sm);
+  font-size: var(--tk-text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.reveal:hover {
+  color: var(--tk-ink);
+}
+
+.spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: var(--tk-space-2);
+  vertical-align: -2px;
+  border: 2px solid currentcolor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+.error {
+  margin: var(--tk-space-3) 0 0;
+  padding: var(--tk-space-3);
+  color: var(--tk-red);
+  background: var(--tk-soft-red);
+  border-radius: var(--tk-radius-md);
+  font-size: var(--tk-text-sm);
+  font-weight: 600;
+  animation: fade 0.25s ease-out both;
+}
+
+.foot {
+  margin: var(--tk-space-4) 0 0;
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+  text-align: center;
+}
+
+.card .tk-input {
+  background: var(--tk-bg);
+}
+
+/* ---------- Handy: Hero als Kopf, Formular darunter ---------- */
 @media (max-width: 720px) {
   .login {
     display: flex;
     flex-direction: column;
-    background: linear-gradient(#3a0f19, #171314 70%);
   }
 
   .brand {
-    align-items: center;
-    padding: 72px var(--tk-space-4) var(--tk-space-4);
-    text-align: center;
-    background: transparent;
+    align-items: flex-end;
+    min-height: 260px;
   }
 
-  .badge {
-    align-self: center;
+  .brand-inner {
+    max-width: none;
+    gap: var(--tk-space-2);
+    padding: 56px var(--tk-space-4) var(--tk-space-5);
   }
 
-  .claim,
-  .lead {
+  .pitch {
+    opacity: 0.12;
+  }
+
+  h1 {
+    margin-top: var(--tk-space-3);
+    font-size: 30px;
+  }
+
+  .claim {
+    font-size: 18px;
+  }
+
+  .lead,
+  .points {
     display: none;
   }
 
-  .meta {
-    margin: 0;
-    font-size: var(--tk-text-lg);
-  }
-
   .form-area {
-    width: 100%;
-    padding: 0 var(--tk-space-4) var(--tk-space-6);
+    flex: 1;
+    align-items: flex-start;
+    padding: var(--tk-space-5) var(--tk-space-4) var(--tk-space-6);
+    border-radius: var(--tk-radius-xl) var(--tk-radius-xl) 0 0;
+    margin-top: calc(var(--tk-space-4) * -1);
+    position: relative;
   }
 
   h2,
   .sub {
     display: none;
   }
+}
 
-  .tabs {
-    padding: 4px;
-    background: rgb(255 255 255 / 10%);
-    border-radius: var(--tk-radius-lg);
-  }
-
-  .tabs button {
-    color: #fff;
-    background: transparent;
-    border: 0;
-  }
-
-  .tabs button.on {
-    color: #241d1f;
-    background: #fff;
+/* ---------- Animationen ---------- */
+@keyframes draw {
+  to {
+    stroke-dashoffset: 0;
   }
 }
 
-/* Felder sind in Figma leicht grau abgesetzt */
-.card .tk-input {
-  background: var(--tk-bg);
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.6);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .draw,
+  .ball,
+  .brand-inner,
+  .form-inner,
+  form,
+  .error,
+  .spinner {
+    animation: none;
+  }
+
+  .draw {
+    stroke-dashoffset: 0;
+  }
+
+  .tabs button {
+    transition: none;
+  }
 }

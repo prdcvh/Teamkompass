@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { environment } from '../../../environments/environment';
@@ -18,8 +18,10 @@ type Tab = 'trainer' | 'code';
 export class Login {
   protected readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   protected readonly tab = signal<Tab>('trainer');
+  protected readonly showPassword = signal(false);
   protected email = '';
   protected password = '';
   protected code = '';
@@ -29,6 +31,12 @@ export class Login {
   protected select(tab: Tab): void {
     this.tab.set(tab);
     this.auth.error.set('');
+  }
+
+  /** Pfeiltasten wechseln den Tab und setzen den Fokus mit (ARIA-Muster für Tabs). */
+  protected selectByKey(tab: Tab): void {
+    this.select(tab);
+    queueMicrotask(() => this.host.nativeElement.querySelector<HTMLElement>(`#tab-${tab}`)?.focus());
   }
 
   protected async submitTrainer(): Promise<void> {
