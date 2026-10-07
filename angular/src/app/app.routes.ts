@@ -44,7 +44,7 @@ export const routes: Routes = [
           { path: 'trainer-konto', loadComponent: placeholder, data: { title: 'Trainer-Konto anlegen' } },
           { path: 'medizin-zugang', loadComponent: placeholder, data: { title: 'Medizinischer Lesezugang' } },
           { path: 'export', loadComponent: placeholder, data: { title: 'Daten exportieren' } },
-          { path: 'einstellungen', loadComponent: placeholder, data: { title: 'Datenschutz & lokale Daten' } },
+          { path: 'einstellungen', loadComponent: () => import('./pages/settings/settings').then((m) => m.Settings) },
         ],
       },
     ],

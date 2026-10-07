@@ -1,8 +1,9 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { environment } from '../../../environments/environment';
-import { SIDEBAR_ITEMS } from '../../core/navigation';
+import { ADMIN_ITEMS, PRIVACY_ITEM, SIDEBAR_ITEMS } from '../../core/navigation';
 import { SessionService } from '../../core/session.service';
+import { ThemeService } from '../../core/theme.service';
 import { Icon } from '../../ui/icon/icon';
 
 /** Desktop-Navigation (Figma „Sidebar“, 240 px). */
@@ -15,7 +16,10 @@ import { Icon } from '../../ui/icon/icon';
 })
 export class Sidebar {
   protected readonly session = inject(SessionService);
+  protected readonly theme = inject(ThemeService);
   protected readonly items = SIDEBAR_ITEMS;
+  protected readonly adminItems = ADMIN_ITEMS;
+  protected readonly privacy = PRIVACY_ITEM;
   protected readonly club = environment.clubName;
   protected readonly team = environment.teamLabel;
   protected readonly season = seasonLabel(new Date());

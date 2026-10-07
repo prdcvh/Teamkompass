@@ -1,0 +1,60 @@
+<section class="page">
+  <header class="head">
+    <p class="tk-eyebrow">TeamKompass</p>
+    <h1>Einstellungen &amp; Datenschutz</h1>
+    <p class="muted">Diese Einstellungen gelten nur für dieses Gerät. Daten in der Cloud bleiben unberührt.</p>
+  </header>
+
+  <tk-card>
+    <div class="panel">
+      <h2>Darstellung</h2>
+      <label class="row">
+        <span>Darkmode</span>
+        <input type="checkbox" role="switch" [checked]="theme.dark()" (change)="theme.toggle()" />
+      </label>
+    </div>
+  </tk-card>
+
+  <tk-card>
+    <div class="panel">
+      <h2>Lokale Daten</h2>
+      <label class="field">
+        <span>Lokale Aufbewahrung</span>
+        <select class="tk-input" (change)="setRetention($event)">
+          @for (option of retentionOptions; track option.days) {
+            <option [value]="option.days" [selected]="workspace.retentionDays() === option.days">{{ option.label }}</option>
+          }
+        </select>
+      </label>
+      <div>
+        <button tkButton type="button" (click)="confirmClear.set(true)">Lokalen Zwischenspeicher löschen</button>
+      </div>
+      @if (cleared()) {
+        <p class="muted" role="status">Der lokale Zwischenspeicher wurde gelöscht.</p>
+      }
+    </div>
+  </tk-card>
+
+  <tk-card>
+    <div class="panel">
+      <h2>Aktivitätsverlauf</h2>
+      @if (workspace.activity().length === 0) {
+        <p class="muted">Noch keine lokalen Aktivitäten protokolliert.</p>
+      } @else {
+        <ul class="log">
+          @for (item of workspace.activity(); track item.id) {
+            <li><strong>{{ item.action }}</strong><span class="muted">{{ time(item.at) }}</span></li>
+          }
+        </ul>
+      }
+    </div>
+  </tk-card>
+
+  <tk-dialog [open]="confirmClear()" title="Lokalen Zwischenspeicher löschen?" (closed)="confirmClear.set(false)">
+    <p>Gespeicherte Teamdaten auf diesem Gerät werden gelöscht. Cloud-Daten bleiben erhalten.</p>
+    <div class="confirm-actions">
+      <button tkButton type="button" (click)="confirmClear.set(false)">Abbrechen</button>
+      <button tkButton type="button" variant="primary" (click)="clear()">Löschen</button>
+    </div>
+  </tk-dialog>
+</section>
