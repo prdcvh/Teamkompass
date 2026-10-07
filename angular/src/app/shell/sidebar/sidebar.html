@@ -8,7 +8,7 @@
   </div>
 
   <p class="group">Mannschaft</p>
-  <ul>
+  <ul class="main">
     @for (item of items; track item.path) {
       <li>
         <a [routerLink]="item.path" routerLinkActive="active" ariaCurrentWhenActive="page">
@@ -19,17 +19,51 @@
     }
   </ul>
 
+  <p class="group">Verwaltung</p>
+  <ul class="admin">
+    @for (item of adminItems; track item.path) {
+      <li>
+        <a [routerLink]="item.path" routerLinkActive="active" ariaCurrentWhenActive="page">
+          <tk-icon [name]="item.icon" />
+          {{ item.label }}
+        </a>
+      </li>
+    }
+  </ul>
+
+  <p class="group">App</p>
+  <ul class="app">
+    <li>
+      <a [routerLink]="privacy.path" routerLinkActive="active" ariaCurrentWhenActive="page">
+        <tk-icon [name]="privacy.icon" />
+        {{ privacy.label }}
+      </a>
+    </li>
+    <li>
+      <label class="toggle">
+        <tk-icon name="moon" />
+        <span>Darkmode</span>
+        <input type="checkbox" role="switch" [checked]="theme.dark()" (change)="theme.toggle()" />
+      </label>
+    </li>
+    <li>
+      <a routerLink="/abmelden" class="danger">
+        <tk-icon name="logout" />
+        Abmelden
+      </a>
+    </li>
+  </ul>
+
   <div class="foot">
     <div class="season">
       <small>Saison</small>
       <strong>{{ season }}</strong>
     </div>
-    <a class="privacy" routerLink="/einstellungen" routerLinkActive="active">Einstellungen &amp; Datenschutz</a>
     <div class="user">
       <span class="badge" aria-hidden="true">{{ session.initials() }}</span>
       <div>
         <strong>{{ session.displayName() }}</strong>
-        <small>Trainer · <a routerLink="/abmelden">Abmelden</a></small>
+        <small>Trainer</small>
       </div>
     </div>
   </div>

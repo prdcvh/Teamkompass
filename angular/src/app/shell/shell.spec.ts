@@ -3,6 +3,8 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { AuthService } from '../core/auth.service';
 import { LayoutService } from '../core/layout.service';
+import { ADMIN_ITEMS } from '../core/navigation';
+import { ThemeService } from '../core/theme.service';
 import type { Role } from '../core/role';
 import { SessionService } from '../core/session.service';
 import { routes } from '../app.routes';
@@ -36,15 +38,54 @@ describe('Shell (in der App)', () => {
     const root = el(await render());
     expect(root.querySelector('tk-sidebar')).not.toBeNull();
     expect(root.querySelector('tk-tab-bar')).toBeNull();
-    const labels = [...root.querySelectorAll('tk-sidebar ul a')].map((a) => a.textContent?.trim());
+    const labels = [...root.querySelectorAll('tk-sidebar ul.main a')].map((a) => a.textContent?.trim());
     expect(labels).toEqual([
       'Dashboard', 'Kader', 'Events', 'Spielerprofile', 'Teamanalyse', 'Gegneranalyse', 'Aufstellung',
     ]);
   });
 
+  it('zeigt am PC auch Verwaltung und App-Einträge, dieselben wie am Handy', async () => {
+    const root = el(await render());
+    const admin = [...root.querySelectorAll('tk-sidebar ul.admin a')].map((a) => a.textContent?.trim());
+    expect(admin).toEqual(ADMIN_ITEMS.map((item) => item.label));
+    const app = [...root.querySelectorAll('tk-sidebar ul.app a, tk-sidebar ul.app label')].map((a) => a.textContent?.replace(/\s+/g, ' ').trim());
+    expect(app).toEqual(['Einstellungen & Datenschutz', 'Darkmode', 'Abmelden']);
+  });
+
+  it('schaltet den Darkmode am PC um', async () => {
+    const fixture = await render();
+    const root = el(fixture);
+    const theme = TestBed.inject(ThemeService);
+    theme.set(false);
+    const toggle = root.querySelector('tk-sidebar input[role="switch"]') as HTMLInputElement;
+    toggle.click();
+    expect(theme.dark()).toBe(true);
+    expect(document.documentElement.dataset['theme']).toBe('dark');
+    theme.set(false);
+  });
+
+  it('lässt die Sidebar bei kleiner Fensterhöhe scrollen', async () => {
+    const root = el(await render());
+    const nav = root.querySelector('tk-sidebar nav') as HTMLElement;
+    expect(getComputedStyle(nav).overflowY).toBe('auto');
+  });
+
+  it('erreicht die Einstellungen über die Sidebar', async () => {
+    const fixture = await render();
+    const root = el(fixture);
+    (root.querySelector('tk-sidebar ul.app a') as HTMLAnchorElement).click();
+    await fixture.whenStable();
+    await vi.waitFor(() => expect(root.querySelector('app-settings')).not.toBeNull());
+  });
+
+  it('nennt bei noch nicht gebauten Bereichen das Ticket', async () => {
+    const root = el(await render());
+    expect(root.querySelector('app-placeholder')?.textContent).toContain('SCRUM-70');
+  });
+
   it('markiert den aktuellen Bereich in der Sidebar', async () => {
     const root = el(await render());
-    const active = root.querySelector('tk-sidebar ul a.active');
+    const active = root.querySelector('tk-sidebar ul.main a.active');
     expect(active?.textContent?.trim()).toBe('Teamanalyse');
     expect(active?.getAttribute('aria-current')).toBe('page');
   });
