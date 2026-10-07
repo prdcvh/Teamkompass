@@ -1624,6 +1624,7 @@ async function createStaffAccount(role) {
 
 async function createInviteCodeForPlayer(playerId) {
   if (!isCloudTrainer()) return;
+  if (!confirmDespiteRevokedConsent([state.players.find((item) => item.id === playerId)].filter(Boolean), "Das Erzeugen des Zugangs")) return;
   const accessInput = prompt("Zugangstyp eingeben: Spieler oder Eltern", "Spieler");
   if (accessInput === null) return;
   const role = accessInput.trim().toLowerCase().startsWith("eltern") ? "parent" : "player";
@@ -2722,7 +2723,7 @@ function renderSquad() {
     const missingMeasurement = measurementMissingThisQuarter(player.id);
     return `
       <tr>
-        <td data-label="Spieler"><div class="player-cell"><span class="number-badge">${player.number}</span><strong>${escapeHtml(player.name)}</strong></div></td>
+        <td data-label="Spieler"><div class="player-cell"><span class="number-badge">${player.number}</span><strong>${escapeHtml(player.name)}</strong>${consentChipHtml(player)}</div></td>
         <td data-label="Positionen">${positionChips(player)}</td>
         <td data-label="Geburtsdatum">${formatDate(player.birthdate)}</td>
         <td data-label="Status"><span class="status-pill ${statusClass}">${escapeHtml(effectiveStatus)}</span></td>
@@ -3006,6 +3007,7 @@ function renderRatingCard(player, event, matchDuration) {
       <span class="number-badge">${player.number}</span>
       <div>
         <strong>${escapeHtml(player.name)}</strong>
+        ${consentChipHtml(player)}
         <span class="computed-grade">Gesamtnote ${gradeLabel(calculatedGrade(rating))}</span>
       </div>
     </div>
@@ -3318,6 +3320,7 @@ function saveDevelopmentPlan(event) {
   event.preventDefault();
   const playerId = $("#profilePlayer").value || state.players[0]?.id;
   if (!playerId) return;
+  if (!confirmDespiteRevokedConsent([state.players.find((item) => item.id === playerId)].filter(Boolean), "Das Speichern des Förderplans")) return;
   state.developmentPlans ||= {};
   state.developmentPlans[playerId] ||= [];
   const id = $("#developmentPlanId").value || `dp${crypto.randomUUID()}`;
@@ -3433,6 +3436,7 @@ function saveAbsence(event) {
   event.preventDefault();
   const playerId = $("#profilePlayer").value || state.players[0]?.id;
   if (!playerId) return;
+  if (!confirmDespiteRevokedConsent([state.players.find((item) => item.id === playerId)].filter(Boolean), "Das Speichern von Verletzung/Abwesenheit")) return;
   state.absences ||= {};
   state.absences[playerId] ||= [];
   const id = $("#absenceId").value || `ab${crypto.randomUUID()}`;
@@ -3516,6 +3520,7 @@ function saveMeasurement(event) {
   event.preventDefault();
   const playerId = $("#profilePlayer").value || state.players[0]?.id;
   if (!playerId) return;
+  if (!confirmDespiteRevokedConsent([state.players.find((item) => item.id === playerId)].filter(Boolean), "Das Speichern des Messwerts")) return;
   state.measurements ||= {};
   state.measurements[playerId] ||= [];
   const id = $("#measurementId").value || `me${crypto.randomUUID()}`;
@@ -3652,6 +3657,32 @@ function renderMeasurementChart(player) {
   ctx.textAlign = "left";
 }
 
+// Einwilligung (SCRUM-51): "widerrufen" warnt deutlich, blockiert aber nichts. "Noch offen" und
+// "dokumentiert" verhalten sich gleich und zeigen keine Warnung.
+function isConsentRevoked(player) {
+  return player?.consentStatus === "revoked";
+}
+
+function consentRevokedMessage(player) {
+  return `Die Datennutzung für ${player?.name || "diesen Spieler"} wurde widerrufen. Bitte Daten prüfen und nur weiter erfassen oder weitergeben, wenn dafür eine andere Rechtsgrundlage besteht.`;
+}
+
+// Fragt vor dem Erfassen/Einladen/Exportieren nach, wenn die Einwilligung widerrufen ist. Gibt false zurück,
+// wenn der Trainer abbricht; es wird nie ohne seine Bestätigung etwas gesperrt oder erzwungen.
+function confirmDespiteRevokedConsent(players, action) {
+  const revoked = players.filter(isConsentRevoked);
+  if (!revoked.length) return true;
+  const names = revoked.map((player) => player.name).join(", ");
+  const text = revoked.length === 1
+    ? `${consentRevokedMessage(revoked[0])}\n\n${action} trotzdem fortsetzen?`
+    : `Für ${revoked.length} Spieler (${names}) wurde die Datennutzung widerrufen. Bitte Daten prüfen.\n\n${action} trotzdem fortsetzen?`;
+  return confirm(text);
+}
+
+function consentChipHtml(player) {
+  return isConsentRevoked(player) ? `<span class="consent-chip" title="${escapeHtml(consentRevokedMessage(player))}">⚠ Einwilligung widerrufen</span>` : "";
+}
+
 function renderProfileHeader(player, ratings) {
   const average = playerAverageGrade(player?.id);
   const risk = player ? playerInjuryRisk(player.id) : null;
@@ -3662,7 +3693,8 @@ function renderProfileHeader(player, ratings) {
       <div>
         <strong>${escapeHtml(player.name)}</strong>
         <span>${escapeHtml(positionText(player))} · ${formatDate(player.birthdate)} · ${ageFromBirthdate(player.birthdate) ?? "-"} Jahre · ${escapeHtml(effectiveStatus)}${effectiveStatus === "Verletzt" && player.injuryUntil ? ` (ca. bis ${formatDate(player.injuryUntil)})` : ""}</span>
-        <small class="muted">Datennutzung: ${player.consentStatus === "granted" ? `dokumentiert${player.consentDate ? ` am ${formatDate(player.consentDate)}` : ""}` : player.consentStatus === "revoked" ? "widerrufen – Datenprüfung erforderlich" : "noch offen"}</small>
+        <small class="muted">Datennutzung: ${player.consentStatus === "granted" ? `dokumentiert${player.consentDate ? ` am ${formatDate(player.consentDate)}` : ""}` : player.consentStatus === "revoked" ? "widerrufen" : "noch offen"}</small>
+        ${isConsentRevoked(player) ? `<p class="consent-warning" role="alert">${escapeHtml(consentRevokedMessage(player))}</p>` : ""}
       </div>
       <div class="profile-grade">
         <span>Ø Note</span>
@@ -4108,6 +4140,7 @@ function drawBarChart(canvas, rows, title, color) {
 }
 
 function exportData() {
+  if (!confirmDespiteRevokedConsent(state.players, "Der Export")) return;
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);

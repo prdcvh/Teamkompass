@@ -640,3 +640,49 @@ test("Event auswaehlen ist reine Navigation und setzt keinen Cloud-Sync-Status (
     assert.ok(!/\bpersist\(\)/.test(click), `${team}: Eventkarte setzt noch "Wird gespeichert"`);
   }
 });
+
+test("Einwilligung widerrufen warnt, blockiert aber nichts; offen und erteilt warnen nicht (SCRUM-51)", async () => {
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    const start = app.indexOf("// Einwilligung (SCRUM-51)");
+    const end = app.indexOf("function renderProfileHeader");
+    assert.ok(start > 0 && end > start, `${team}: Einwilligungs-Helfer fehlen`);
+    const prompts = [];
+    const build = (answer) => new Function("confirm", "escapeHtml", `${app.slice(start, end)}; return { isConsentRevoked, confirmDespiteRevokedConsent, consentChipHtml };`)(
+      (text) => { prompts.push(text); return answer; },
+      (value) => String(value).replace(/</g, "&lt;")
+    );
+    const api = build(true);
+    const revoked = { name: "<b>Ali</b>", consentStatus: "revoked" };
+    const pending = { name: "Ben", consentStatus: "pending" };
+    const granted = { name: "Cem", consentStatus: "granted" };
+
+    assert.equal(api.isConsentRevoked(revoked), true);
+    assert.equal(api.isConsentRevoked(pending), false);
+    assert.equal(api.isConsentRevoked(granted), false);
+
+    // offen/erteilt: keine Rückfrage, einfach weiter
+    assert.equal(api.confirmDespiteRevokedConsent([pending, granted], "Der Export"), true);
+    assert.equal(prompts.length, 0, `${team}: bei offen/erteilt darf nicht gewarnt werden`);
+    assert.equal(api.consentChipHtml(pending), "");
+    assert.equal(api.consentChipHtml(granted), "");
+
+    // widerrufen: Rückfrage; bestätigt = weiter, abgebrochen = nicht gespeichert, nichts wird sonst gesperrt
+    assert.equal(api.confirmDespiteRevokedConsent([revoked], "Der Export"), true);
+    assert.equal(prompts.length, 1);
+    assert.match(prompts[0], /widerrufen/);
+    assert.equal(build(false).confirmDespiteRevokedConsent([revoked], "Der Export"), false);
+
+    // Namen im Chip sind escaped
+    assert.doesNotMatch(api.consentChipHtml(revoked), /<b>/);
+    assert.match(api.consentChipHtml(revoked), /Einwilligung widerrufen/);
+
+    // Warnung ist an Profil, Bewertung, Förderplan, Abwesenheit, Messwert, Einladung und Export angeschlossen
+    for (const fn of ["saveDevelopmentPlan", "saveAbsence", "saveMeasurement", "createInviteCodeForPlayer", "exportData"]) {
+      const body = app.slice(app.indexOf(`function ${fn}(`), app.indexOf(`function ${fn}(`) + 1500);
+      assert.match(body, /confirmDespiteRevokedConsent/, `${team}: ${fn} warnt nicht bei widerrufener Einwilligung`);
+    }
+    assert.match(app, /consent-warning" role="alert"/, `${team}: Profil-Warnung fehlt`);
+    assert.ok((app.match(/consentChipHtml\(player\)/g) || []).length >= 2, `${team}: Warnung in Bewertungstabelle/-karte fehlt`);
+  }
+});

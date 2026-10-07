@@ -15,12 +15,12 @@ describe('Profile (Spielerprofil)', () => {
 
   const grades = (grade: number, extra: Record<string, unknown> = {}) => ({ attendance: 'present', effort: grade, technique: grade, tactics: grade, comprehension: grade, ...extra });
 
-  async function render(options: { mobile?: boolean; id?: string; withData?: boolean } = {}) {
-    const { mobile = false, id = '', withData = true } = options;
+  async function render(options: { mobile?: boolean; id?: string; withData?: boolean; consent?: string } = {}) {
+    const { mobile = false, id = '', withData = true, consent } = options;
     isMobile.set(mobile);
     firebase = new FakeFirebase();
     firebase.players.set('p1', { name: 'Jonas Keller', positions: ['TW'], number: 1, birthdate: '2012-05-05', status: 'Verletzt', injuryUntil: '2026-12-01', consentStatus: 'granted', consentDate: '2026-09-01' });
-    firebase.players.set('p2', { name: '<b>Elias</b> Wagner', positions: ['RV', 'LV'], number: 2, birthdate: '2012-06-06', status: 'Fit', consentStatus: 'pending' });
+    firebase.players.set('p2', { name: '<b>Elias</b> Wagner', positions: ['RV', 'LV'], number: 2, birthdate: '2012-06-06', status: 'Fit', consentStatus: consent ?? 'pending' });
     if (withData) {
       firebase.events.set('e1', { type: 'Training', title: 'Training Montag', date: '2026-09-01', intensity: 2, notes: 'Passspiel' });
       firebase.events.set('e2', { type: 'Spiel', title: '<img src=x onerror=alert(1)>', date: '2026-09-08', intensity: 3, goalsFor: 3, goalsAgainst: 1, matchDuration: 80 });
@@ -354,6 +354,30 @@ describe('Profile (Spielerprofil)', () => {
       expect(root(fixture).querySelector('tk-profile-extras b')).toBeNull();
       expect(root(fixture).querySelector('tk-profile-extras script')).toBeNull();
       expect(text(q(fixture, 'tk-profile-extras'))).toContain('<img src=x onerror=alert(1)>');
+    });
+  });
+
+  describe('Einwilligung (SCRUM-51)', () => {
+    it('warnt bei widerrufener Einwilligung im Profil und bei den Zusatzdaten', async () => {
+      const fixture = await render({ id: 'p2', consent: 'revoked' });
+      const warnings = qa(fixture, '.consent-warning');
+      expect(warnings.length).toBeGreaterThanOrEqual(1);
+      expect(text(warnings[0])).toContain('wurde widerrufen');
+      expect(text(q(fixture, '.who'))).toContain('Datennutzung: widerrufen');
+      // HTML im Namen wird als Text ausgegeben
+      expect(text(warnings[0])).toContain('<b>Elias</b> Wagner');
+      expect(root(fixture).querySelector('.consent-warning b')).toBeNull();
+    });
+
+    it.each(['pending', 'granted'])('zeigt bei „%s“ keine Warnung', async (consent) => {
+      const fixture = await render({ id: 'p2', consent });
+      expect(q(fixture, '.consent-warning')).toBeNull();
+    });
+
+    it('zeigt „noch offen“ ohne Problemhinweis', async () => {
+      const fixture = await render({ id: 'p2' });
+      expect(text(q(fixture, '.who'))).toContain('Datennutzung: noch offen');
+      expect(q(fixture, '.consent-warning')).toBeNull();
     });
   });
 });

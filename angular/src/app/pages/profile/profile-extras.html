@@ -1,3 +1,6 @@
+@if (consentWarning()) {
+  <p class="consent-warning" role="alert">{{ consentWarning() }}</p>
+}
 @if (records.error()) {
   <div class="notice" role="alert">
     <p>{{ records.error() }}</p>

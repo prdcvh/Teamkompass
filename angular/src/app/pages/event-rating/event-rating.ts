@@ -5,7 +5,7 @@ import { map } from 'rxjs';
 import { INTENSITIES, formatDate, resultText } from '../../core/event';
 import { EventsService } from '../../core/events.service';
 import { LayoutService } from '../../core/layout.service';
-import { type Player } from '../../core/player';
+import { type Player, consentRevokedMessage, isConsentRevoked } from '../../core/player';
 import {
   ATTENDANCES,
   ATTENDANCE_LABELS,
@@ -93,6 +93,14 @@ export class EventRating implements OnInit {
   protected formatDate = formatDate;
   protected resultText = resultText;
   protected gradeLabel = gradeLabel;
+
+  protected revoked(player: Player): boolean {
+    return isConsentRevoked(player);
+  }
+
+  protected revokedMessage(player: Player): string {
+    return consentRevokedMessage(player.name);
+  }
 
   protected total(player: Player): string {
     return gradeLabel(calculatedGrade(this.ratings.ratingFor(player.id)));

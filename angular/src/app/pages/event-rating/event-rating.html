@@ -76,6 +76,9 @@
               <span class="number">{{ player.number }}</span>
               <div>
                 <strong>{{ player.name }}</strong>
+                @if (revoked(player)) {
+                  <span class="consent-chip" role="alert" [title]="revokedMessage(player)">⚠ Einwilligung widerrufen – {{ revokedMessage(player) }}</span>
+                }
                 <span class="grade">Gesamtnote {{ total(player) }}</span>
               </div>
             </header>
@@ -150,7 +153,12 @@
             <tbody>
               @for (player of players(); track player.id) {
                 <tr [attr.data-attendance]="attendanceOf(player)">
-                  <td><span class="number">{{ player.number }}</span> <strong>{{ player.name }}</strong></td>
+                  <td>
+                    <span class="number">{{ player.number }}</span> <strong>{{ player.name }}</strong>
+                    @if (revoked(player)) {
+                      <span class="consent-chip" [title]="revokedMessage(player)">⚠ Einwilligung widerrufen</span>
+                    }
+                  </td>
                   <td>
                     <select class="tk-input" [attr.aria-label]="'Anwesenheit: ' + player.name" [value]="attendanceOf(player)" (change)="set(player, 'attendance', valueOf($event))">
                       @for (option of attendances; track option) {

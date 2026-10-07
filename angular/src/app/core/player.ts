@@ -10,6 +10,18 @@ export const PLAYER_STATUSES = ['Fit', 'Angeschlagen', 'Verletzt', 'Pause'] as c
 export type PlayerStatus = (typeof PLAYER_STATUSES)[number];
 
 export type ConsentStatus = 'pending' | 'granted' | 'revoked';
+
+/**
+ * Einwilligung (SCRUM-51): Nur „widerrufen“ löst eine Warnung aus. „Noch offen“ und „dokumentiert“ verhalten sich
+ * gleich. Die Warnung blockiert nichts (keine serverseitige Sperre).
+ */
+export function isConsentRevoked(player: { readonly consentStatus: ConsentStatus } | null | undefined): boolean {
+  return player?.consentStatus === 'revoked';
+}
+
+export function consentRevokedMessage(name: string): string {
+  return `Die Datennutzung für ${name} wurde widerrufen. Bitte Daten prüfen und nur weiter erfassen oder weitergeben, wenn dafür eine andere Rechtsgrundlage besteht.`;
+}
 export const CONSENT_LABELS: Readonly<Record<ConsentStatus, string>> = {
   pending: 'Einwilligung offen',
   granted: 'Einwilligung dokumentiert',

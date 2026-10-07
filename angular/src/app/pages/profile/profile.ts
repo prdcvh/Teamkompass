@@ -4,7 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { map } from 'rxjs';
 import { formatDate } from '../../core/event';
 import { LayoutService } from '../../core/layout.service';
-import { ageFromBirthdate, positionText, todayIso } from '../../core/player';
+import { ageFromBirthdate, consentRevokedMessage, isConsentRevoked, positionText, todayIso } from '../../core/player';
 import {
   availability,
   gradeToPercent,
@@ -128,11 +128,16 @@ export class Profile implements OnInit {
     return age === null ? '–' : String(age);
   }
 
+  protected consentWarning(): string {
+    const player = this.player();
+    return player && isConsentRevoked(player) ? consentRevokedMessage(player.name) : '';
+  }
+
   protected consent(): string {
     const player = this.player();
     if (!player) return '';
     if (player.consentStatus === 'granted') return player.consentDate ? `dokumentiert am ${formatDate(player.consentDate)}` : 'dokumentiert';
-    return player.consentStatus === 'revoked' ? 'widerrufen – Datenprüfung erforderlich' : 'noch offen';
+    return player.consentStatus === 'revoked' ? 'widerrufen' : 'noch offen';
   }
 
   protected injury(): string {
