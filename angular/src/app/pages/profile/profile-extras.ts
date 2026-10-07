@@ -41,6 +41,8 @@ export class ProfileExtras {
 
   /** Anzeigeseitig: nur Trainer sehen Schaltflächen zum Ändern. */
   readonly editable = input(true);
+  /** Warntext bei widerrufener Einwilligung (leer = keine Warnung); blockiert nichts. */
+  readonly consentWarning = input('');
 
   protected readonly plans = computed(() => [...this.records.plans()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
   protected readonly absences = computed(() => [...this.records.absences()].sort((a, b) => b.from.localeCompare(a.from)));

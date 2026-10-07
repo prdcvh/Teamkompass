@@ -44,6 +44,9 @@
             <span>{{ positionText(p) }} · {{ formatDate(p.birthdate) }} · {{ age(p.birthdate) }} Jahre</span>
             <span class="status-line"><tk-status [label]="status()" />{{ injury() }}</span>
             <small class="muted">Datennutzung: {{ consent() }}</small>
+            @if (consentWarning(); as warning) {
+              <p class="consent-warning" role="alert">{{ warning }}</p>
+            }
           </div>
           <div class="grade">
             <span>Ø Note</span>
@@ -134,7 +137,7 @@
         }
       </tk-card>
 
-      <tk-profile-extras [editable]="true" />
+      <tk-profile-extras [editable]="true" [consentWarning]="consentWarning()" />
     }
   }
 </section>

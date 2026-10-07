@@ -2118,3 +2118,33 @@ menu {
   gap: 8px;
   justify-content: flex-end;
 }
+
+/* Einwilligung widerrufen (SCRUM-51): deutlich, aber ohne Sperre */
+.consent-warning {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  color: #7a1f1f;
+  background: #fde8e8;
+  border: 1px solid #e5a3a3;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.consent-chip {
+  padding: 2px 8px;
+  color: #7a1f1f;
+  background: #fde8e8;
+  border: 1px solid #e5a3a3;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+:root[data-theme="dark"] .consent-warning,
+:root[data-theme="dark"] .consent-chip {
+  color: #ffd4d4;
+  background: #4a1f1f;
+  border-color: #8a3a3a;
+}

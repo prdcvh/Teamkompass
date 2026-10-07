@@ -245,3 +245,14 @@ tr[data-attendance='excluded'] td {
     min-height: var(--tk-touch);
   }
 }
+
+.consent-chip {
+  display: inline-block;
+  padding: 2px var(--tk-space-2);
+  color: var(--tk-red);
+  background: var(--tk-soft-red);
+  border: 1px solid var(--tk-red);
+  border-radius: var(--tk-radius-md);
+  font-size: var(--tk-text-xs);
+  font-weight: 600;
+}

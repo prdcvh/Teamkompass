@@ -333,3 +333,14 @@ h2 {
   color: var(--tk-muted);
   font-size: var(--tk-text-sm);
 }
+
+.consent-warning {
+  margin: var(--tk-space-2) 0 0;
+  padding: var(--tk-space-2) var(--tk-space-3);
+  color: var(--tk-red);
+  background: var(--tk-soft-red);
+  border: 1px solid var(--tk-red);
+  border-radius: var(--tk-radius-md);
+  font-size: var(--tk-text-sm);
+  font-weight: 600;
+}

@@ -12,15 +12,15 @@ describe('EventRating (Event bewerten)', () => {
   let firebase: FakeFirebase;
   const isMobile = signal(false);
 
-  async function render(options: { mobile?: boolean; eventId?: string; game?: boolean } = {}) {
-    const { mobile = false, eventId = 'e1', game = true } = options;
+  async function render(options: { mobile?: boolean; eventId?: string; game?: boolean; consent?: string } = {}) {
+    const { mobile = false, eventId = 'e1', game = true, consent } = options;
     isMobile.set(mobile);
     firebase = new FakeFirebase();
     firebase.events.set('e1', game
       ? { type: 'Spiel', title: 'Heimspiel', date: '2026-10-10', opponent: 'SV Nord', goalsFor: 3, goalsAgainst: 1, intensity: 3, location: 'Platz 1', matchDuration: 70 }
       : { type: 'Training', title: 'Training Montag', date: '2026-10-05', intensity: 2 });
     firebase.players.set('p1', { name: 'Jonas Keller', positions: ['TW'], number: 1, birthdate: '2012-05-05', status: 'Fit' });
-    firebase.players.set('p2', { name: 'Elias Wagner', positions: ['RV'], number: 2, birthdate: '2012-06-06', status: 'Fit' });
+    firebase.players.set('p2', { name: 'Elias Wagner', positions: ['RV'], number: 2, birthdate: '2012-06-06', status: 'Fit', ...(consent ? { consentStatus: consent } : {}) });
     firebase.players.set('p3', { name: '<b>Jan</b> Braun', positions: ['ST'], number: 9, birthdate: '2013-01-01', status: 'Fit' });
     firebase.ratings.set('e1', new Map([
       ['p1', { attendance: 'present', effort: 1, technique: 2, tactics: 3, comprehension: 4, grade: 2.3, minutes: 70, goals: 1, assists: '', note: 'Starkes Spiel', playerId: 'p1' }],
@@ -202,6 +202,31 @@ describe('EventRating (Event bewerten)', () => {
       TestBed.resetTestingModule();
       const training = await render({ mobile: true, game: false });
       expect(q(training, '.numbers')).toBeNull();
+    });
+  });
+
+  describe('Einwilligung (SCRUM-51)', () => {
+    it('warnt am PC nur bei widerrufener Einwilligung und sperrt nichts', async () => {
+      const fixture = await render({ consent: 'revoked' });
+      const rows = qa(fixture, 'tbody tr');
+      expect(text(rows[1])).toContain('Einwilligung widerrufen');
+      expect(rows[0].querySelector('.consent-chip')).toBeNull();
+      expect(rows[2].querySelector('.consent-chip')).toBeNull();
+      expect(rows[1].querySelector('select:disabled, input:disabled')).toBeNull();
+    });
+
+    it.each(['pending', 'granted'])('zeigt bei „%s“ keine Warnung', async (consent) => {
+      const fixture = await render({ consent });
+      expect(q(fixture, '.consent-chip')).toBeNull();
+    });
+
+    it('warnt am Handy auf der Karte des Spielers', async () => {
+      const fixture = await render({ mobile: true, consent: 'revoked' });
+      const next = qa<HTMLButtonElement>(fixture, 'button').find((b) => text(b).startsWith('Weiter'))!;
+      expect(q(fixture, '.consent-chip')).toBeNull(); // Jonas (erste Karte): kein Widerruf
+      next.click();
+      fixture.detectChanges();
+      expect(text(q(fixture, '.consent-chip'))).toContain('Einwilligung widerrufen');
     });
   });
 });

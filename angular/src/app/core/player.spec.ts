@@ -2,6 +2,8 @@ import {
   type Player,
   type PlayerDraft,
   ageFromBirthdate,
+  consentRevokedMessage,
+  isConsentRevoked,
   docFromPlayer,
   draftFromPlayer,
   emptyDraft,
@@ -166,5 +168,18 @@ describe('Spieler-Logik', () => {
         ['Weitere', ['d']],
       ]);
     });
+  });
+});
+
+describe('Einwilligung (SCRUM-51)', () => {
+  it('warnt nur bei widerrufen', () => {
+    expect(isConsentRevoked({ consentStatus: 'revoked' })).toBe(true);
+    expect(isConsentRevoked({ consentStatus: 'pending' })).toBe(false);
+    expect(isConsentRevoked({ consentStatus: 'granted' })).toBe(false);
+    expect(isConsentRevoked(null)).toBe(false);
+  });
+
+  it('nennt den Spieler in der Warnung', () => {
+    expect(consentRevokedMessage('Ali Adler')).toContain('Ali Adler');
   });
 });
