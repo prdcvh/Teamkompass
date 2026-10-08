@@ -71,3 +71,6 @@ node_modules/
 # Firebase-Service-Account-Schluessel (fuer scripts/copy-team.mjs) niemals einchecken
 service-account*.json
 *-firebase-adminsdk-*.json
+
+# SessionStart-Hook: installierte Entwicklungswerkzeuge (Version/Integrität stehen in .claude/hooks/tools/package-lock.json)
+.claude/hooks/tools/node_modules/
