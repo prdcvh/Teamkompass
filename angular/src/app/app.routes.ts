@@ -36,7 +36,7 @@ export const routes: Routes = [
           { path: 'events/:id', loadComponent: () => import('./pages/event-rating/event-rating').then((m) => m.EventRating) },
           { path: 'profile', loadComponent: () => import('./pages/profile/profile').then((m) => m.Profile) },
           { path: 'profile/:id', loadComponent: () => import('./pages/profile/profile').then((m) => m.Profile) },
-          { path: 'teamanalyse', loadComponent: placeholder, data: { title: 'Teamanalyse' } },
+          { path: 'teamanalyse', loadComponent: () => import('./pages/team-analysis/team-analysis').then((m) => m.TeamAnalysis) },
           { path: 'gegneranalyse', loadComponent: placeholder, data: { title: 'Gegneranalyse' } },
           { path: 'aufstellung', loadComponent: placeholder, data: { title: 'Aufstellung' } },
           { path: 'suche', loadComponent: placeholder, data: { title: 'Suche' } },

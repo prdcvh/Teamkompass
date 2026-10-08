@@ -25,6 +25,8 @@ export class TeamService {
 
   readonly active = signal(false);
   readonly events = computed(() => this.eventsService.events());
+  /** Bewertungen aller Spieler je Event (nur lesen). */
+  readonly ratingsByEvent = computed<RatingsByEvent>(() => this.ratings());
   readonly error = signal('');
   private readonly ratings = signal<RatingsByEvent>(new Map());
   private readonly absences = signal<ReadonlyMap<string, readonly Absence[]>>(new Map());
