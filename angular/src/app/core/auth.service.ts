@@ -1,5 +1,4 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { environment } from '../../environments/environment';
 import { authErrorMessage, errorCode } from './auth-errors';
 import { FirebaseService, type FirebaseUser, type InviteRecord } from './firebase.service';
 import { clearLocalTeamData } from './local-data';
@@ -204,9 +203,8 @@ export class AuthService {
       if (!member) {
         // Anonyme Konten ohne Mitgliedschaft sind übrig gebliebene Code-Versuche: still beenden.
         if (!user.isAnonymous) {
-          this.error.set(
-            `Kein Zugang für dieses Konto gefunden. Prüfe, ob unter teams/${environment.teamId}/members/${user.uid} ein Dokument mit Feld "role" existiert.`,
-          );
+          console.warn('Kein Teamzugang hinterlegt.');
+          this.error.set('Für dieses Team ist kein Zugang hinterlegt. Bitte wende dich an den Trainer.');
         }
         await this.abandon();
         this.reset();
