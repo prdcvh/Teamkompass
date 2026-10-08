@@ -1,0 +1,82 @@
+<tk-dialog [open]="open()" [title]="title()" (closed)="closed.emit()">
+  <form (submit)="submit($event)" novalidate>
+    <div class="field">
+      <label class="tk-label">
+        Gegner
+        <input
+          class="tk-input"
+          name="name"
+          autocomplete="off"
+          [attr.maxlength]="limits.name"
+          placeholder="z. B. JSG Taunus"
+          [value]="draft().name"
+          [attr.aria-invalid]="errors().name ? 'true' : null"
+          [attr.aria-describedby]="errors().name ? 'err-name' : null"
+          (input)="patch({ name: value($event) })"
+        />
+      </label>
+      @if (errors().name) {
+        <span class="error" id="err-name" role="alert">{{ errors().name }}</span>
+      }
+    </div>
+
+    <div class="grid">
+      <div class="field">
+        <label class="tk-label">
+          Formation
+          <input
+            class="tk-input"
+            name="formation"
+            autocomplete="off"
+            [attr.maxlength]="limits.formation"
+            placeholder="z. B. 3-2-3, 4-3-3"
+            [value]="draft().formation"
+            [attr.aria-invalid]="errors().formation ? 'true' : null"
+            [attr.aria-describedby]="errors().formation ? 'err-formation' : null"
+            (input)="patch({ formation: value($event) })"
+          />
+        </label>
+        @if (errors().formation) {
+          <span class="error" id="err-formation" role="alert">{{ errors().formation }}</span>
+        }
+      </div>
+      <label class="tk-label">
+        Spielweise
+        <select class="tk-input" name="style" [value]="draft().style" (change)="patch({ style: $any(value($event)) })">
+          @for (style of styles; track style) {
+            <option [value]="style" [selected]="draft().style === style">{{ style }}</option>
+          }
+        </select>
+      </label>
+    </div>
+
+    @for (field of fields; track field.key) {
+      <div class="field">
+        <label class="tk-label">
+          {{ field.label }}
+          <textarea
+            class="tk-input"
+            rows="2"
+            [name]="field.key"
+            [attr.maxlength]="limits.detail"
+            [value]="text(field.key)"
+            [attr.aria-invalid]="errors()[field.key] ? 'true' : null"
+            [attr.aria-describedby]="errors()[field.key] ? 'err-' + field.key : null"
+            (input)="setText(field.key, $event)"
+          ></textarea>
+        </label>
+        @if (errors()[field.key]; as message) {
+          <span class="error" [id]="'err-' + field.key" role="alert">{{ message }}</span>
+        }
+      </div>
+    }
+
+    <menu>
+      @if (editing()) {
+        <button tkButton type="button" class="delete" (click)="askDelete()">Löschen</button>
+      }
+      <button tkButton type="button" (click)="closed.emit()">Abbrechen</button>
+      <button tkButton variant="primary" type="submit">Speichern</button>
+    </menu>
+  </form>
+</tk-dialog>

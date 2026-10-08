@@ -37,7 +37,7 @@ export const routes: Routes = [
           { path: 'profile', loadComponent: () => import('./pages/profile/profile').then((m) => m.Profile) },
           { path: 'profile/:id', loadComponent: () => import('./pages/profile/profile').then((m) => m.Profile) },
           { path: 'teamanalyse', loadComponent: () => import('./pages/team-analysis/team-analysis').then((m) => m.TeamAnalysis) },
-          { path: 'gegneranalyse', loadComponent: placeholder, data: { title: 'Gegneranalyse' } },
+          { path: 'gegneranalyse', loadComponent: () => import('./pages/opponents/opponents').then((m) => m.Opponents) },
           { path: 'aufstellung', loadComponent: placeholder, data: { title: 'Aufstellung' } },
           { path: 'suche', loadComponent: placeholder, data: { title: 'Suche' } },
           { path: 'zugaenge', loadComponent: placeholder, data: { title: 'Spieler-Zugänge' } },
