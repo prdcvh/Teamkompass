@@ -1,4 +1,5 @@
-import { Injectable, computed, effect, inject, signal } from '@angular/core';
+import { Injectable, Injector, computed, effect, inject, signal } from '@angular/core';
+import { AbsenceSyncService } from './absence-sync.service';
 import { authErrorMessage, errorCode } from './auth-errors';
 import { FirebaseService } from './firebase.service';
 import {
@@ -10,6 +11,7 @@ import {
   docFromPlayer,
   validateDraft,
 } from './player';
+import { EventsService } from './events.service';
 import { SessionService } from './session.service';
 import { SyncService } from './sync.service';
 
@@ -25,6 +27,9 @@ export class SquadService {
   private readonly firebase = inject(FirebaseService);
   private readonly session = inject(SessionService);
   private readonly sync = inject(SyncService);
+  private readonly absences = inject(AbsenceSyncService);
+  // EventsService hängt selbst vom Kader ab: erst beim Gebrauch holen, sonst gäbe es einen Zirkelbezug.
+  private readonly injector = inject(Injector);
 
   readonly players = signal<readonly Player[]>([]);
   readonly load = signal<SquadLoad>('idle');
@@ -96,10 +101,19 @@ export class SquadService {
     if (Object.keys(errors).length > 0) return errors;
     const id = draft.id ?? `p${crypto.randomUUID()}`;
     const player = playerFromDraft(draft, id);
+    const previous = this.players().find((entry) => entry.id === id);
     if (!this.sync.isFailed()) this.sync.state.set('syncing');
     void this.firebase
       .savePlayer(id, docFromPlayer(player))
       .then(() => this.sync.clearError())
+      // Status oder „verletzt bis“ geändert: Events dieses Spielers automatisch abgleichen (SCRUM-80).
+      .then(async () => {
+        const injured = player.status === 'Verletzt' && player.injuryUntil !== '';
+        const changed = previous ? previous.status !== player.status || previous.injuryUntil !== player.injuryUntil : injured;
+        if (!changed) return;
+        const events = await this.injector.get(EventsService).whenLoaded();
+        await this.absences.reconcilePlayer(player, events);
+      })
       .catch((error) => this.failWrite(error, `„${player.name}“ konnte nicht gespeichert werden.`));
     return {};
   }

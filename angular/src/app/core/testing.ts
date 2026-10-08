@@ -317,6 +317,19 @@ export class FakeFirebase implements Pick<FirebaseService, keyof FirebaseService
     };
   }
 
+  readPlayerRecordsError: unknown = null;
+
+  async readPlayerRecords(playerId: string, name: string): Promise<RawDoc[]> {
+    this.calls.push(`readPlayerRecords:${playerId}:${name}`);
+    if (this.readPlayerRecordsError) throw this.readPlayerRecordsError;
+    return [...(this.playerRecords.get(`${playerId}/${name}`) ?? new Map())].map(([id, data]) => ({ id, data }));
+  }
+
+  async readRatingDoc(eventId: string, playerId: string): Promise<Readonly<Record<string, unknown>> | null> {
+    this.calls.push(`readRatingDoc:${eventId}:${playerId}`);
+    return this.ratings.get(eventId)?.get(playerId) ?? null;
+  }
+
   failPlayerRecords(playerId: string, name: string, error: unknown): void {
     this.recordListeners.get(`${playerId}/${name}`)?.onError(error);
   }

@@ -278,6 +278,22 @@ export class FirebaseService {
     );
   }
 
+  /** Einmaliges Lesen einer Unterkollektion eines Spielers (Förderpläne, Abwesenheiten, Messwerte). */
+  async readPlayerRecords(playerId: string, name: PlayerRecordKind): Promise<RawDoc[]> {
+    const { db } = await this.init();
+    const { collection, getDocs } = await import('firebase/firestore');
+    const snapshot = await getDocs(collection(db, 'teams', environment.teamId, 'players', playerId, name));
+    return snapshot.docs.map((entry) => ({ id: entry.id, data: entry.data() }));
+  }
+
+  /** Einmaliges Lesen der Bewertung eines Spielers in einem Event (null = es gibt keine). */
+  async readRatingDoc(eventId: string, playerId: string): Promise<Readonly<Record<string, unknown>> | null> {
+    const { db } = await this.init();
+    const { doc, getDoc } = await import('firebase/firestore');
+    const snapshot = await getDoc(doc(db, 'teams', environment.teamId, 'events', eventId, 'ratings', playerId));
+    return snapshot.exists() ? snapshot.data() : null;
+  }
+
   /** Schreibt einen Eintrag vollständig (wie die bisherige App, mit `playerId` für Abfragen und Regeln). */
   async savePlayerRecord(playerId: string, name: PlayerRecordKind, id: string, data: Readonly<Record<string, unknown>>): Promise<void> {
     const { db } = await this.init();

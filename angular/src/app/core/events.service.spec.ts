@@ -3,6 +3,7 @@ import { emptyDraft } from './event';
 import { EventsService } from './events.service';
 import { FirebaseService } from './firebase.service';
 import { SessionService } from './session.service';
+import { SquadService } from './squad.service';
 import { SyncService } from './sync.service';
 import { FakeFirebase } from './testing';
 
@@ -125,5 +126,59 @@ describe('EventsService', () => {
     expect(events.events()).toEqual([]);
     expect(events.load()).toBe('idle');
     expect(firebase.eventWatchers).toBe(0);
+  });
+
+  describe('Abwesenheit vorbelegen (SCRUM-80)', () => {
+    async function ready() {
+      const events = setup();
+      firebase.players.set('p1', { name: 'Ali', positions: ['ST'], number: 9, birthdate: '2012-05-05', status: 'Fit' });
+      firebase.players.set('p2', { name: 'Ben', positions: ['IV'], number: 4, birthdate: '2012-06-06', status: 'Fit' });
+      firebase.playerRecords.set('p1/absences', new Map([['a1', { kind: 'absence', label: 'Urlaub', detail: '', from: '2026-10-01', to: '2026-10-20' }]]));
+      TestBed.inject(SquadService).start();
+      events.start();
+      await vi.waitFor(() => expect(events.load() === 'ready' && TestBed.inject(SquadService).load() === 'ready').toBe(true));
+      return events;
+    }
+    const saved = () => firebase.calls.filter((call) => call.startsWith('saveRating:'));
+
+    it('belegt bei einem neuen Event alle Spieler mit Abwesenheit im Zeitraum mit „Fehlt“ vor', async () => {
+      const events = await ready();
+      events.save(draft({ date: '2026-10-10' }));
+      await vi.waitFor(() => expect(saved()).toHaveLength(1));
+      const eventId = [...firebase.events.keys()].find((id) => id !== 'e1')!;
+      expect(saved()[0]).toBe(`saveRating:${eventId}:p1`);
+      const rating = firebase.ratings.get(eventId)?.get('p1');
+      expect(rating?.['attendance']).toBe('absent');
+      expect(rating?.['autoAbsence']).toBe(true);
+      expect(String(rating?.['note'])).toContain('Urlaub');
+      expect(firebase.ratings.get(eventId)?.has('p2')).toBe(false);
+    });
+
+    it('prüft bei geändertem Datum erneut, bei gleichem Datum nicht', async () => {
+      const events = await ready();
+      events.save(draft({ id: 'e1', date: '2026-10-05', title: 'Training Mo' })); // gleiches Datum
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(firebase.calls.some((call) => call.startsWith('readRatingDoc'))).toBe(false);
+      events.save(draft({ id: 'e1', date: '2026-10-12', title: 'Training Mo' })); // neues Datum, p1 im Urlaub
+      await vi.waitFor(() => expect(saved()).toEqual(['saveRating:e1:p1']));
+    });
+
+    it('setzt eine von Hand gesetzte Anwesenheit nicht zurück', async () => {
+      const events = await ready();
+      firebase.ratings.set('e1', new Map([['p1', { attendance: 'present', effort: 2, technique: 2, tactics: 2, comprehension: 2 }]]));
+      events.save(draft({ id: 'e1', date: '2026-10-12', title: 'Training Mo' }));
+      await vi.waitFor(() => expect(firebase.calls.some((call) => call === 'readRatingDoc:e1:p1')).toBe(true));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(saved()).toHaveLength(0);
+    });
+
+    it('meldet einen Lesefehler im Sync-Status und speichert das Event trotzdem', async () => {
+      const events = await ready();
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      firebase.readPlayerRecordsError = { code: 'permission-denied' };
+      events.save(draft({ date: '2026-10-10' }));
+      await vi.waitFor(() => expect(TestBed.inject(SyncService).isFailed()).toBe(true));
+      expect(firebase.calls.some((call) => call.startsWith('saveEvent:'))).toBe(true);
+    });
   });
 });
