@@ -32,6 +32,15 @@ export class AuthService {
   /** Verhindert Doppel-Absenden (z. B. Doppel-Tap am Handy) beim Einlösen eines Codes. */
   private claiming = false;
   private retryDelayMs = CLAIM_RETRY_DELAY_MS;
+  /**
+   * Identität, deren Zugang gerade geprüft wird bzw. geprüft wurde (null = niemand). `epoch` zählt jeden
+   * Wechsel (Anmeldung, Abmeldung, anderes Konto). Antworten einer Prüfung aus einer früheren Epoche werden
+   * verworfen, damit eine verspätete Antwort weder eine Abmeldung rückgängig macht noch die Rolle eines
+   * neueren Kontos überschreibt (SCRUM-88).
+   */
+  private epoch = 0;
+  private identityUid: string | null = null;
+  private inflight: Promise<void> | null = null;
 
   /** Startet die Anmeldeprüfung (einmal beim App-Start). */
   start(retryDelayMs = CLAIM_RETRY_DELAY_MS): void {
@@ -57,7 +66,9 @@ export class AuthService {
     this.error.set('');
     this.busy.set(true);
     try {
-      await this.firebase.signInWithEmail(email.trim(), password);
+      const user = await this.firebase.signInWithEmail(email.trim(), password);
+      // Erst fertig, wenn der Zugang geprüft ist – sonst steht der Status beim ersten Klick noch auf „signedOut“ (SCRUM-87).
+      await this.verify(user);
     } catch (error) {
       this.error.set(authErrorMessage(errorCode(error)));
     } finally {
@@ -107,7 +118,7 @@ export class AuthService {
       if (!(await this.claim(uid, code, invite))) return;
       // Der Anmeldezustand hat sich schon vor dem Anlegen des Zugangs gemeldet (damals noch
       // ohne members-Dokument) – jetzt die Rolle nachladen.
-      await this.loadMember({ uid, isAnonymous: true, email: null });
+      await this.verify({ uid, isAnonymous: true, email: null });
     } finally {
       this.claiming = false;
       this.busy.set(false);
@@ -120,6 +131,7 @@ export class AuthService {
     } catch (error) {
       console.error(error);
     }
+    this.enter(null);
     this.reset();
     this.status.set('signedOut');
   }
@@ -158,6 +170,7 @@ export class AuthService {
   }
 
   private async onUser(user: FirebaseUser | null): Promise<void> {
+    this.enter(user);
     if (!user) {
       this.reset();
       this.markStatus('signedOut');
@@ -165,12 +178,29 @@ export class AuthService {
     }
     // Spieler-Anmeldung läuft: das members-Dokument entsteht erst im Anschluss (signInWithCode).
     if (this.claiming && user.isAnonymous) return;
-    await this.loadMember(user);
+    await this.verify(user);
   }
 
-  private async loadMember(user: FirebaseUser): Promise<void> {
+  /** Meldet die aktuelle Identität; ein Wechsel beginnt eine neue Epoche und macht laufende Prüfungen ungültig. */
+  private enter(user: FirebaseUser | null): void {
+    const uid = user?.uid ?? null;
+    if (uid === this.identityUid) return;
+    this.identityUid = uid;
+    this.epoch += 1;
+    this.inflight = null;
+  }
+
+  /** Prüft den Zugang der Identität genau einmal; Listener und Anmelde-Aufruf teilen sich dieselbe Prüfung. */
+  private verify(user: FirebaseUser): Promise<void> {
+    this.enter(user);
+    this.inflight ??= this.loadMember(user, this.epoch);
+    return this.inflight;
+  }
+
+  private async loadMember(user: FirebaseUser, epoch: number): Promise<void> {
     try {
       const member = await this.firebase.readMember(user.uid);
+      if (epoch !== this.epoch) return; // veraltet: inzwischen abgemeldet oder anderes Konto
       if (!member) {
         // Anonyme Konten ohne Mitgliedschaft sind übrig gebliebene Code-Versuche: still beenden.
         if (!user.isAnonymous) {
@@ -189,6 +219,7 @@ export class AuthService {
       this.error.set('');
       this.markStatus('ready');
     } catch (error) {
+      if (epoch !== this.epoch) return;
       console.error(error);
       this.reset();
       this.error.set(`Zugang konnte nicht geprüft werden. ${authErrorMessage(errorCode(error))}`);

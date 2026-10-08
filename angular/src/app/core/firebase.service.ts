@@ -80,10 +80,11 @@ export class FirebaseService {
     );
   }
 
-  async signInWithEmail(email: string, password: string): Promise<void> {
+  async signInWithEmail(email: string, password: string): Promise<FirebaseUser> {
     const { auth } = await this.init();
     const { signInWithEmailAndPassword } = await import('firebase/auth');
-    await signInWithEmailAndPassword(auth, email, password);
+    const { user } = await signInWithEmailAndPassword(auth, email, password);
+    return { uid: user.uid, isAnonymous: user.isAnonymous, email: user.email };
   }
 
   /**

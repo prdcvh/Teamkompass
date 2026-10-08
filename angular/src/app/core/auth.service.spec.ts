@@ -130,6 +130,111 @@ describe('AuthService', () => {
     });
   });
 
+  describe('Anmeldung und Prüfung des Zugangs', () => {
+    /** Ein Gate, das der Test selbst öffnet: die Antwort von readMember kommt erst dann. */
+    const gate = () => {
+      let open!: () => void;
+      const promise = new Promise<void>((resolve) => (open = resolve));
+      return { promise, open };
+    };
+    const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+    it('SCRUM-87: ein einziger Anmelde-Aufruf liefert den fertigen Zustand (kein zweiter Klick nötig)', async () => {
+      firebase.members.set('uid-1', { role: 'trainer', playerId: null });
+      auth.start(0);
+      await auth.signInTrainer('coach@verein.de', 'geheim');
+      expect(auth.status()).toBe('ready');
+      expect(session.role()).toBe('trainer');
+    });
+
+    it('SCRUM-87: bleibt im Ladezustand, solange der Zugang geprüft wird', async () => {
+      const held = gate();
+      firebase.memberGates.set('uid-1', held.promise);
+      firebase.members.set('uid-1', { role: 'trainer', playerId: null });
+      auth.start(0);
+      const done = auth.signInTrainer('coach@verein.de', 'geheim');
+      await tick();
+      expect(auth.busy()).toBe(true);
+      expect(auth.status()).not.toBe('ready');
+      held.open();
+      await done;
+      expect(auth.busy()).toBe(false);
+      expect(auth.status()).toBe('ready');
+    });
+
+    it('SCRUM-87: meldet fehlenden Zugang nach dem ersten Versuch mit Fehlermeldung', async () => {
+      auth.start(0);
+      await auth.signInTrainer('a@b.de', 'x');
+      expect(auth.status()).toBe('signedOut');
+      expect(auth.error()).toContain('Kein Zugang');
+    });
+
+    it('SCRUM-88: eine verspätete Rollenprüfung stellt nach dem Abmelden nichts wieder her', async () => {
+      const held = gate();
+      firebase.memberGates.set('uid-1', held.promise);
+      firebase.members.set('uid-1', { role: 'trainer', playerId: null });
+      auth.start(0);
+      firebase.emit({ uid: 'uid-1', isAnonymous: false, email: 'coach@verein.de' });
+      await tick();
+      await auth.signOut();
+      held.open();
+      await tick();
+      await tick();
+      expect(auth.status()).toBe('signedOut');
+      expect(session.role()).toBeNull();
+      expect(session.displayName()).not.toBe('coach');
+    });
+
+    it('SCRUM-88: bei Identitätswechsel überschreibt die ältere Antwort die neue Rolle nicht', async () => {
+      const held = gate();
+      firebase.memberGates.set('uid-a', held.promise);
+      firebase.members.set('uid-a', { role: 'trainer', playerId: null });
+      firebase.members.set('uid-b', { role: 'player', playerId: 'p1' });
+      auth.start(0);
+      firebase.emit({ uid: 'uid-a', isAnonymous: false, email: 'a@verein.de' });
+      firebase.emit({ uid: 'uid-b', isAnonymous: false, email: null });
+      await tick();
+      await tick();
+      expect(session.role()).toBe('player');
+      held.open();
+      await tick();
+      await tick();
+      expect(session.role()).toBe('player');
+      expect(session.playerId()).toBe('p1');
+      expect(auth.status()).toBe('ready');
+    });
+
+    it('SCRUM-88: auch ein verspäteter Fehler einer früheren Prüfung beeinflusst die aktuelle Sitzung nicht', async () => {
+      const held = gate();
+      firebase.memberGates.set('uid-a', held.promise);
+      firebase.memberErrors.set('uid-a', { code: 'permission-denied' });
+      firebase.members.set('uid-b', { role: 'trainer', playerId: null });
+      auth.start(0);
+      firebase.emit({ uid: 'uid-a', isAnonymous: false, email: 'a@verein.de' });
+      firebase.emit({ uid: 'uid-b', isAnonymous: false, email: 'b@verein.de' });
+      await tick();
+      await tick();
+      expect(auth.status()).toBe('ready');
+      held.open();
+      await tick();
+      await tick();
+      expect(auth.status()).toBe('ready');
+      expect(auth.error()).toBe('');
+      expect(session.role()).toBe('trainer');
+    });
+
+    it('SCRUM-88: nach Abmelden und erneuter Anmeldung desselben Kontos wird der Zugang neu geprüft', async () => {
+      firebase.members.set('uid-1', { role: 'trainer', playerId: null });
+      auth.start(0);
+      await auth.signInTrainer('coach@verein.de', 'x');
+      await auth.signOut();
+      expect(auth.status()).toBe('signedOut');
+      firebase.members.set('uid-1', { role: 'medical', playerId: null });
+      await auth.signInTrainer('coach@verein.de', 'x');
+      expect(session.role()).toBe('medical');
+    });
+  });
+
   it('Abmelden leert Sitzung und lokale Daten', async () => {
     firebase.members.set('uid-1', { role: 'trainer', playerId: null });
     auth.start(0);
