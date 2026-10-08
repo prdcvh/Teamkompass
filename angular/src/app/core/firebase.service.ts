@@ -195,6 +195,37 @@ export class FirebaseService {
     );
   }
 
+  /** Echtzeit-Abo auf die Gegnerprofile. Lesen und Schreiben dürfen nur Trainer. */
+  async watchOpponents(
+    onData: (docs: RawDoc[], meta: SnapshotMeta) => void,
+    onError: (error: unknown) => void,
+  ): Promise<() => void> {
+    const { db } = await this.init();
+    const { collection, onSnapshot } = await import('firebase/firestore');
+    return onSnapshot(
+      collection(db, 'teams', environment.teamId, 'opponents'),
+      { includeMetadataChanges: true },
+      (snapshot) =>
+        onData(
+          snapshot.docs.map((entry) => ({ id: entry.id, data: entry.data() })),
+          { fromCache: snapshot.metadata.fromCache, hasPendingWrites: snapshot.metadata.hasPendingWrites },
+        ),
+      onError,
+    );
+  }
+
+  async saveOpponent(id: string, data: Readonly<Record<string, unknown>>): Promise<void> {
+    const { db } = await this.init();
+    const { doc, setDoc } = await import('firebase/firestore');
+    await setDoc(doc(db, 'teams', environment.teamId, 'opponents', id), data, { merge: true });
+  }
+
+  async deleteOpponent(id: string): Promise<void> {
+    const { db } = await this.init();
+    const { deleteDoc, doc } = await import('firebase/firestore');
+    await deleteDoc(doc(db, 'teams', environment.teamId, 'opponents', id));
+  }
+
   /** Echtzeit-Abo auf die Bewertungen eines Events (Dokument je Spieler). Lesen dürfen Trainer und der jeweilige Spieler. */
   async watchRatings(
     eventId: string,
