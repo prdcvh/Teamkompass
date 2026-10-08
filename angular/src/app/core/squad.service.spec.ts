@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { FirebaseService } from './firebase.service';
 import { emptyDraft } from './player';
+import { EventsService } from './events.service';
 import { SessionService } from './session.service';
 import { SquadService } from './squad.service';
 import { SyncService } from './sync.service';
@@ -185,5 +186,58 @@ describe('SquadService', () => {
     squad.save(draft());
     await vi.waitFor(() => expect(sync.state()).toBe('saved'));
     expect(sync.detail()).toBe('');
+  });
+
+  describe('Abwesenheit vorbelegen (SCRUM-80)', () => {
+    const saved = () => firebase.calls.filter((call) => call.startsWith('saveRating:'));
+    const edit = (squad: ReturnType<typeof setup>, overrides = {}) =>
+      squad.save({ ...emptyDraft([]), id: 'p1', name: 'Ali Adler', positions: ['ST'], number: '9', birthdate: '2012-05-05', ...overrides });
+
+    async function ready() {
+      const squad = setup();
+      firebase.events.set('e1', { type: 'Training', title: 'Training Mo', date: '2026-10-05' });
+      firebase.events.set('e2', { type: 'Spiel', title: 'Spiel', date: '2026-11-30' });
+      squad.start();
+      await vi.waitFor(() => expect(squad.load()).toBe('ready'));
+      return squad;
+    }
+
+    it('belegt bei „Verletzt“ mit Datum die Events im Zeitraum mit „Fehlt“ vor', async () => {
+      const squad = await ready();
+      expect(edit(squad, { status: 'Verletzt', injuryUntil: '2026-10-31' })).toEqual({});
+      await vi.waitFor(() => expect(saved()).toEqual(['saveRating:e1:p1']));
+      expect(firebase.ratings.get('e1')?.get('p1')?.['autoAbsence']).toBe(true);
+      expect(firebase.ratings.get('e2')?.has('p1') ?? false).toBe(false); // nach „verletzt bis“
+    });
+
+    it('nimmt automatisch gesetztes „Fehlt“ zurück, wenn der Spieler wieder fit ist', async () => {
+      const squad = await ready();
+      firebase.players.set('p1', { name: 'Ali Adler', positions: ['ST'], number: 9, birthdate: '2012-05-05', status: 'Verletzt', injuryUntil: '2026-10-31' });
+      firebase.emitPlayers();
+      firebase.ratings.set('e1', new Map([['p1', { attendance: 'absent', autoAbsence: true, note: 'Verletzt (ca. bis 31.10.2026)' }]]));
+      edit(squad, { status: 'Fit', injuryUntil: '' });
+      await vi.waitFor(() => expect(saved()).toEqual(['saveRating:e1:p1']));
+      expect(firebase.ratings.get('e1')?.get('p1')?.['attendance']).toBe('open');
+    });
+
+    it('fasst Events nicht an, wenn sich Status und „verletzt bis“ nicht ändern', async () => {
+      const squad = await ready();
+      edit(squad, { name: 'Ali Neu' });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(firebase.calls.some((call) => call.startsWith('readRatingDoc'))).toBe(false);
+    });
+
+    it('prüft einen neuen, gesunden Spieler nicht', async () => {
+      const squad = await ready();
+      squad.save({ ...emptyDraft([]), name: 'Neu Neumann', positions: ['IV'], number: '4', birthdate: '2012-01-01' });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(firebase.calls.some((call) => call.startsWith('readRatingDoc'))).toBe(false);
+    });
+
+    it('liefert die Events über whenLoaded auch ohne laufendes Abo', async () => {
+      await ready();
+      const events = TestBed.inject(EventsService);
+      expect((await events.whenLoaded()).map((event) => event.id).sort()).toEqual(['e1', 'e2']);
+    });
   });
 });

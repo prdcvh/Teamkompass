@@ -1,8 +1,10 @@
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { authErrorMessage, errorCode } from './auth-errors';
 import { type EventDraft, type EventErrors, type TeamEvent, docFromEvent, eventFromDoc, eventFromDraft, validateDraft } from './event';
+import { AbsenceSyncService } from './absence-sync.service';
 import { FirebaseService } from './firebase.service';
 import { SessionService } from './session.service';
+import { SquadService } from './squad.service';
 import { SyncService } from './sync.service';
 
 export type EventsLoad = 'idle' | 'loading' | 'ready' | 'error';
@@ -18,6 +20,8 @@ export class EventsService {
   private readonly firebase = inject(FirebaseService);
   private readonly session = inject(SessionService);
   private readonly sync = inject(SyncService);
+  private readonly absences = inject(AbsenceSyncService);
+  private readonly squad = inject(SquadService);
 
   readonly events = signal<readonly TeamEvent[]>([]);
   readonly load = signal<EventsLoad>('idle');
@@ -26,6 +30,7 @@ export class EventsService {
   readonly canEdit = computed(() => this.canWrite() && this.load() === 'ready');
 
   private unsubscribe: (() => void) | null = null;
+  private waiters: (() => void)[] = [];
   /** Erhöht bei jedem start/stop, damit ein spät eintreffendes Abo eines alten Laufs verworfen wird. */
   private generation = 0;
 
@@ -48,6 +53,7 @@ export class EventsService {
           if (generation !== this.generation) return;
           this.events.set(docs.map((entry) => eventFromDoc(entry.id, entry.data)));
           this.load.set('ready');
+          this.flushWaiters();
           this.sync.applySnapshot(meta);
         },
         (error) => {
@@ -72,6 +78,20 @@ export class EventsService {
     this.events.set([]);
     this.load.set('idle');
     this.error.set('');
+    this.flushWaiters();
+  }
+
+  /** Startet das Abo (falls nötig) und liefert die Events, sobald sie geladen sind; bei Fehler oder Abbruch leer. */
+  async whenLoaded(): Promise<readonly TeamEvent[]> {
+    this.start();
+    if (this.load() === 'loading') await new Promise<void>((resolve) => this.waiters.push(resolve));
+    return this.load() === 'ready' ? this.events() : [];
+  }
+
+  private flushWaiters(): void {
+    const waiting = this.waiters;
+    this.waiters = [];
+    waiting.forEach((resolve) => resolve());
   }
 
   /**
@@ -86,10 +106,13 @@ export class EventsService {
     if (Object.keys(errors).length > 0) return errors;
     const id = draft.id ?? `e${crypto.randomUUID()}`;
     const event = eventFromDraft(draft, id);
+    const previous = this.events().find((entry) => entry.id === id);
     if (!this.sync.isFailed()) this.sync.state.set('syncing');
     void this.firebase
       .saveEvent(id, docFromEvent(event))
       .then(() => this.sync.clearError())
+      // Neues Event oder neues Datum: Spieler mit Abwesenheit im Zeitraum automatisch auf „Fehlt“ setzen (SCRUM-80).
+      .then(() => (!previous || previous.date !== event.date ? this.absences.reconcileEvent(event, this.squad.players()) : 0))
       .catch((error) => this.failWrite(error, `„${event.title}“ konnte nicht gespeichert werden.`));
     return {};
   }
@@ -113,6 +136,7 @@ export class EventsService {
     this.unsubscribe?.();
     this.unsubscribe = null; // erlaubt „Erneut versuchen“
     this.load.set('error');
+    this.flushWaiters();
     this.error.set(`Die Events konnten nicht geladen werden. ${authErrorMessage(errorCode(error))}`);
     this.sync.fail('Laden fehlgeschlagen');
   }
