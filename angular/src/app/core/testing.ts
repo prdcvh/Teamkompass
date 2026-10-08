@@ -31,10 +31,12 @@ export class FakeFirebase implements Pick<FirebaseService, keyof FirebaseService
     this.listener?.(user);
   }
 
-  async signInWithEmail(email: string): Promise<void> {
+  async signInWithEmail(email: string): Promise<FirebaseUser> {
     this.calls.push(`email:${email}`);
     if (this.emailError) throw this.emailError;
-    this.emit({ uid: this.nextUid, isAnonymous: false, email });
+    const user = { uid: this.nextUid, isAnonymous: false, email };
+    this.emit(user);
+    return user;
   }
 
   async signInAnonymously(): Promise<string> {
@@ -48,8 +50,15 @@ export class FakeFirebase implements Pick<FirebaseService, keyof FirebaseService
     this.emit(null);
   }
 
+  /** Test-Hilfe: hält die Antwort von readMember für eine uid zurück, bis das Versprechen aufgelöst wird. */
+  memberGates = new Map<string, Promise<void>>();
+  /** Test-Hilfe: lässt readMember für eine uid mit diesem Fehler scheitern (nach dem Gate). */
+  memberErrors = new Map<string, unknown>();
+
   async readMember(uid: string): Promise<MemberRecord | null> {
     this.calls.push(`member:${uid}`);
+    await this.memberGates.get(uid);
+    if (this.memberErrors.has(uid)) throw this.memberErrors.get(uid);
     return this.members.get(uid) ?? null;
   }
 
