@@ -686,3 +686,23 @@ test("Einwilligung widerrufen warnt, blockiert aber nichts; offen und erteilt wa
     assert.ok((app.match(/consentChipHtml\(player\)/g) || []).length >= 2, `${team}: Warnung in Bewertungstabelle/-karte fehlt`);
   }
 });
+
+test("SessionStart-Hook installiert nur festgeschriebene, integritätsgeprüfte Pakete (SCRUM-86)", async () => {
+  const hook = await read(".claude/hooks/session-start.sh");
+  assert.doesNotMatch(hook, /npm\s+(install|i)\s+(-g|--global)/, "keine globale Installation einer beweglichen Version");
+  assert.match(hook, /npm ci\b/, "Installation über das Lockfile");
+  assert.match(hook, /--ignore-scripts/, "Installationsskripte werden nicht ausgeführt");
+
+  const pkg = JSON.parse(await read(".claude/hooks/tools/package.json"));
+  for (const [name, version] of Object.entries(pkg.dependencies)) {
+    assert.match(version, /^\d+\.\d+\.\d+$/, `${name}: Version muss exakt festgeschrieben sein`);
+  }
+
+  const lock = JSON.parse(await read(".claude/hooks/tools/package-lock.json"));
+  const entries = Object.entries(lock.packages).filter(([path]) => path !== "");
+  assert.ok(entries.length > 0, "Lockfile enthält Pakete");
+  for (const [path, entry] of entries) {
+    assert.match(entry.integrity || "", /^sha512-/, `${path}: Integrität fehlt`);
+    assert.match(entry.resolved || "", /^https:\/\/registry\.npmjs\.org\//, `${path}: Bezugsquelle ist nicht die npm-Registry`);
+  }
+});

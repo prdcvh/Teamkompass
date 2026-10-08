@@ -1,0 +1,8 @@
+{
+  "name": "teamkompass-claude-tools",
+  "private": true,
+  "description": "Entwicklungswerkzeug für Claude-Code-Sitzungen (SessionStart-Hook). Version und Integrität stehen in package-lock.json.",
+  "dependencies": {
+    "ui-ux-pro-max-cli": "2.15.0"
+  }
+}
