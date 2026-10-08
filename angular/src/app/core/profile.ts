@@ -188,17 +188,37 @@ export interface TrendChart {
   readonly path: string;
 }
 
-/** Verlaufsdiagramm: Note 1 oben, Note 6 unten, ein Punkt je benotetem Event (älteste links). */
-export function trendChart(graded: readonly GradedEvent[]): TrendChart {
+/** Ein Punkt eines Notendiagramms. */
+export interface PlotPoint {
+  readonly grade: number;
+  readonly label: string;
+  readonly title: string;
+  /** Wird unverändert am Punkt weitergereicht (z. B. Spiel/Training). */
+  readonly kind?: string;
+}
+
+export interface PlottedPoint extends PlotPoint {
+  readonly x: number;
+  readonly y: number;
+}
+
+export interface PlotChart {
+  readonly width: number;
+  readonly height: number;
+  readonly grid: readonly { y: number; grade: number }[];
+  readonly points: readonly PlottedPoint[];
+  readonly path: string;
+}
+
+/** Notendiagramm: Note 1 oben, Note 6 unten, Punkte gleichmäßig von links nach rechts. */
+export function plotChart(input: readonly PlotPoint[]): PlotChart {
   const plotWidth = CHART_WIDTH - CHART_LEFT - CHART_RIGHT;
   const plotHeight = CHART_HEIGHT - CHART_TOP - CHART_BOTTOM;
   const y = (grade: number) => CHART_TOP + ((grade - 1) / 5) * plotHeight;
-  const points = graded.map((entry, index) => ({
-    x: CHART_LEFT + (index * plotWidth) / Math.max(graded.length - 1, 1),
+  const points = input.map((entry, index) => ({
+    ...entry,
+    x: CHART_LEFT + (index * plotWidth) / Math.max(input.length - 1, 1),
     y: y(entry.grade),
-    grade: entry.grade,
-    label: entry.event.date.slice(5),
-    title: `${entry.event.title}: Note ${gradeLabel(entry.grade)}`,
   }));
   return {
     width: CHART_WIDTH,
@@ -207,4 +227,15 @@ export function trendChart(graded: readonly GradedEvent[]): TrendChart {
     points,
     path: points.map((point, index) => `${index ? 'L' : 'M'} ${point.x} ${point.y}`).join(' '),
   };
+}
+
+/** Verlaufsdiagramm: Note 1 oben, Note 6 unten, ein Punkt je benotetem Event (älteste links). */
+export function trendChart(graded: readonly GradedEvent[]): TrendChart {
+  return plotChart(
+    graded.map((entry) => ({
+      grade: entry.grade,
+      label: entry.event.date.slice(5),
+      title: `${entry.event.title}: Note ${gradeLabel(entry.grade)}`,
+    })),
+  );
 }

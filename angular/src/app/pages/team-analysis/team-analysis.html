@@ -1,0 +1,143 @@
+<section class="page" [attr.data-variant]="mobile() ? 'mobile' : 'desktop'">
+  <header class="head">
+    <p class="tk-eyebrow">{{ mobile() ? 'Mannschaft' : '1. FC Königstein / Trainerbereich' }}</p>
+    <h1>Teamanalyse</h1>
+    <p class="meta">Form, Kennzahlen und Kaderstruktur</p>
+  </header>
+
+  @if (!isTrainer()) {
+    <p class="muted">Die Teamanalyse sehen nur Trainer.</p>
+  } @else {
+    <p class="sync" role="status" [attr.data-state]="sync.state()">
+      {{ sync.label() }}
+      @if (sync.detail()) {
+        <span class="detail"> – {{ sync.detail() }}</span>
+      }
+    </p>
+
+    @if (team.error()) {
+      <div class="notice" role="alert">
+        <p>{{ team.error() }}</p>
+        <button tkButton type="button" (click)="team.retry()">Erneut versuchen</button>
+      </div>
+    } @else if (!team.ready()) {
+      <p class="muted" role="status">Teamauswertung wird geladen …</p>
+    } @else {
+      <div class="stats">
+        @for (card of cards(); track card.label) {
+          <article class="stat"><span>{{ card.label }}</span><strong>{{ card.value }}</strong></article>
+        }
+      </div>
+
+      <section class="columns">
+        <tk-card>
+          <div class="panel">
+            <h2>Teamform</h2>
+            <svg class="chart" [attr.viewBox]="'0 0 ' + trend().width + ' ' + trend().height" role="img" [attr.aria-label]="trend().points.length ? 'Teamnoten nach Event: ' + trend().points.length + ' Events mit Note' : 'Noch keine Teamnoten vorhanden'">
+              @for (line of trend().grid; track line.grade) {
+                <line x1="54" [attr.y1]="line.y" [attr.x2]="trend().width - 24" [attr.y2]="line.y" class="grid" />
+                <text x="24" [attr.y]="line.y + 4" class="axis">{{ line.grade }}</text>
+              }
+              @if (trend().points.length > 0) {
+                <path [attr.d]="trend().path" class="line" />
+                @for (point of trend().points; track $index) {
+                  <circle [attr.cx]="point.x" [attr.cy]="point.y" r="5" class="dot" [class.game]="point.kind === 'Spiel'"><title>{{ point.title }}</title></circle>
+                  <text [attr.x]="point.x - 14" [attr.y]="trend().height - 12" class="axis small">{{ point.label }}</text>
+                }
+              } @else {
+                <text x="54" y="138" class="axis">Noch keine Teamnoten vorhanden.</text>
+              }
+            </svg>
+            <p class="legend"><span class="key game"></span> Spiel <span class="key training"></span> Training</p>
+          </div>
+        </tk-card>
+
+        <tk-card>
+          <div class="panel">
+            <h2>Nützliche Kennzahlen</h2>
+            <div class="insights">
+              <article>
+                <strong>Topform</strong>
+                @for (entry of topForm(); track entry.player.id) {
+                  <span><a [routerLink]="['/profile', entry.player.id]">{{ entry.player.name }}</a> · Note {{ gradeLabel(entry.grade) }}</span>
+                } @empty {
+                  <span>Noch keine Bewertungen.</span>
+                }
+              </article>
+              <article>
+                <strong>Belastung im Blick</strong>
+                @for (entry of loadWatch(); track entry.player.id) {
+                  <span>{{ entry.player.name }} · {{ entry.risk.level }} ({{ entry.risk.percentage }}%)@if (entry.risk.reason) { · {{ entry.risk.reason }}}</span>
+                } @empty {
+                  <span>Noch keine Spieler im Kader.</span>
+                }
+              </article>
+              <article>
+                <strong>Spielauswertung</strong>
+                <span>{{ stats().record.wins }} Siege, {{ stats().record.draws }} Unentschieden, {{ stats().record.losses }} Niederlagen</span>
+                <span>{{ stats().record.goalsFor }} Tore erzielt, {{ stats().record.goalsAgainst }} Gegentore</span>
+              </article>
+              <article>
+                <strong>Trainingssteuerung</strong>
+                @for (row of focusRows(); track row.label) {
+                  <span>{{ row.label }}: {{ row.value }} Einheiten</span>
+                }
+              </article>
+              <article>
+                <strong>Kaderstruktur</strong>
+                <span>Geburtsquartale: {{ quarterText() }}</span>
+                <span>Knapp besetzt: {{ thin().length ? thin().join(', ') : 'keine auffälligen Lücken' }}</span>
+              </article>
+            </div>
+          </div>
+        </tk-card>
+      </section>
+
+      <section class="columns three">
+        <tk-card>
+          <div class="panel">
+            <h2>Geburtsquartale</h2>
+            <ul class="bars">
+              @for (row of quarterRows(); track row.label) {
+                <li>
+                  <div><strong>{{ row.label }}</strong><span>{{ row.value }}</span></div>
+                  <div class="bar" role="img" [attr.aria-label]="row.label + ': ' + row.value + ' Spieler'"><span [style.width.%]="row.percent"></span></div>
+                </li>
+              }
+            </ul>
+          </div>
+        </tk-card>
+        <tk-card>
+          <div class="panel">
+            <h2>Positionsabdeckung</h2>
+            @if (positionRows().length === 0) {
+              <p class="muted">Noch keine Spieler im Kader.</p>
+            } @else {
+              <ul class="bars">
+                @for (row of positionRows(); track row.label) {
+                  <li>
+                    <div><strong>{{ row.label }}</strong><span>{{ row.value }}</span></div>
+                    <div class="bar green" role="img" [attr.aria-label]="row.label + ': ' + row.value + ' Spieler'"><span [style.width.%]="row.percent"></span></div>
+                  </li>
+                }
+              </ul>
+            }
+          </div>
+        </tk-card>
+        <tk-card>
+          <div class="panel">
+            <h2>Trainingsfokus</h2>
+            <ul class="bars">
+              @for (row of focusRows(); track row.label) {
+                <li>
+                  <div><strong>{{ row.label }}</strong><span>{{ row.value }}</span></div>
+                  <div class="bar amber" role="img" [attr.aria-label]="row.label + ': ' + row.value + ' Einheiten'"><span [style.width.%]="row.percent"></span></div>
+                </li>
+              }
+            </ul>
+          </div>
+        </tk-card>
+      </section>
+    }
+  }
+</section>

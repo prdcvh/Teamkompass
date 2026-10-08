@@ -25,7 +25,7 @@ describe('Shell (in der App)', () => {
     }).compileComponents();
     TestBed.inject(SessionService).role.set(role);
     const fixture = TestBed.createComponent(App);
-    await TestBed.inject(Router).navigateByUrl('/teamanalyse');
+    await TestBed.inject(Router).navigateByUrl('/export');
     await fixture.whenStable();
     return fixture;
   }
@@ -80,13 +80,13 @@ describe('Shell (in der App)', () => {
 
   it('nennt bei noch nicht gebauten Bereichen das Ticket', async () => {
     const root = el(await render());
-    expect(root.querySelector('app-placeholder')?.textContent).toContain('SCRUM-70');
+    expect(root.querySelector('app-placeholder')?.textContent).toContain('SCRUM-75');
   });
 
   it('markiert den aktuellen Bereich in der Sidebar', async () => {
     const root = el(await render());
-    const active = root.querySelector('tk-sidebar ul.main a.active');
-    expect(active?.textContent?.trim()).toBe('Teamanalyse');
+    const active = root.querySelector('tk-sidebar a.active');
+    expect(active?.textContent?.trim()).toBe('Daten exportieren');
     expect(active?.getAttribute('aria-current')).toBe('page');
   });
 
@@ -96,7 +96,7 @@ describe('Shell (in der App)', () => {
     expect(root.querySelector('tk-sidebar')).toBeNull();
     const tabs = [...root.querySelectorAll('tk-tab-bar a, tk-tab-bar button')].map((a) => a.textContent?.trim());
     expect(tabs).toEqual(['Start', 'Kader', 'Events', 'Profile', 'Mehr']);
-    expect(root.querySelector('tk-tab-bar a.active')).toBeNull(); // Teamanalyse liegt unter „Mehr“, kein Tab ist aktiv
+    expect(root.querySelector('tk-tab-bar a.active')).toBeNull(); // der Export liegt unter „Mehr“, kein Tab ist aktiv
   });
 
   it('wechselt die Variante live, ohne die Seite neu zu laden', async () => {
