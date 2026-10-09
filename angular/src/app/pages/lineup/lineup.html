@@ -1,0 +1,153 @@
+<section class="page" [attr.data-variant]="mobile() ? 'mobile' : 'desktop'">
+  <header class="head">
+    <p class="tk-eyebrow">{{ mobile() ? 'Mannschaft' : '1. FC Königstein / Trainerbereich' }}</p>
+    <h1>Aufstellung</h1>
+    @if (ready()) {
+      <p class="meta">
+        {{ name() }} · {{ onPitchCount() }}/{{ max }} auf dem Feld ·
+        @if (teamGrade() !== null) { Mannschaftsnote Ø {{ gradeLabel(teamGrade()) }} } @else { Mannschaftsnote noch ohne Bewertungen }
+      </p>
+    }
+  </header>
+
+  @if (!isTrainer()) {
+    <p class="muted">Die Aufstellung sehen nur Trainer.</p>
+  } @else {
+    <p class="sync" role="status" [attr.data-state]="sync.state()">
+      {{ sync.label() }}
+      @if (sync.detail()) {
+        <span class="detail"> – {{ sync.detail() }}</span>
+      }
+    </p>
+
+    @if (failed()) {
+      <div class="notice" role="alert">
+        <p>{{ failed() }}</p>
+        <button tkButton type="button" (click)="retry()">Erneut versuchen</button>
+      </div>
+    } @else if (!ready()) {
+      <p class="muted" role="status">Aufstellung wird geladen …</p>
+    } @else {
+      <div class="layout">
+        <tk-card>
+          <div class="panel">
+            <div class="pitch" role="group" aria-label="Spielfeld">
+              @for (zone of board(); track zone.zone) {
+                <div class="zone" [class.empty]="zone.chips.length === 0" [style.left.%]="zone.x" [style.top.%]="zone.y" [style.width.%]="zone.width">
+                  @if (zone.chips.length === 0) {
+                    <button type="button" class="slot" (click)="openZone(zone.zone, null)" [attr.aria-label]="'Position ' + zone.zone + ' besetzen'">{{ zone.zone }}</button>
+                  }
+                  @for (chip of zone.chips; track chip.player.id) {
+                    <button type="button" class="chip" [class.off]="chip.off" (click)="openZone(zone.zone, chip.player.id)" [attr.aria-label]="chip.player.name + ', ' + zone.zone + (chip.off ? ', nicht auf eigener Position' : '') + ', ändern'">
+                      <em>{{ zone.zone }}</em>
+                      <strong>{{ chip.player.number }} {{ chip.player.name.split(' ')[0] }}</strong>
+                      <span>Note {{ gradeLabel(chip.grade) }}</span>
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+        </tk-card>
+
+        <div class="side">
+          <tk-card>
+            <div class="panel">
+              <h2>Formation</h2>
+              @if (mobile()) {
+                <label class="tk-label">
+                  Formation wählen
+                  <select class="tk-input" (change)="onFormationSelect($event)" aria-label="Formation wählen">
+                    @if (currentOptionIndex() < 0) {
+                      <option value="" selected>{{ name() === 'Keine Aufstellung' ? 'Formation wählen' : 'Eigene Aufstellung · ' + name() }}</option>
+                    }
+                    @for (option of options(); track $index) {
+                      <option [value]="$index" [selected]="$index === currentOptionIndex()">
+                        {{ option.name }} · Ø {{ gradeLabel(option.preview.grade) }} · {{ option.preview.filled }}/{{ option.preview.total }}{{ option.recommended ? ' · empfohlen' : '' }}
+                      </option>
+                    }
+                  </select>
+                </label>
+              } @else {
+                <div class="formations">
+                  @for (option of options(); track $index) {
+                    <button type="button" class="formation" [class.recommended]="option.recommended" [attr.aria-pressed]="$index === currentOptionIndex()" (click)="applyFormation($index)">
+                      @if (option.recommended) {
+                        <span class="badge">Empfohlen</span>
+                      }
+                      <strong>{{ option.name }}</strong>
+                      <span>
+                        Ø {{ gradeLabel(option.preview.grade) }} · {{ option.preview.filled }}/{{ option.preview.total }} besetzt@if (option.preview.filled < option.preview.total) { · {{ option.preview.total - option.preview.filled }} offen}
+                      </span>
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+          </tk-card>
+
+          <tk-card>
+            <div class="panel">
+              <h2>Bank <span class="count">{{ bench().length ? bench().length + ' Spieler' : 'leer' }}</span></h2>
+              @if (bench().length === 0) {
+                <p class="muted">Alle Spieler stehen auf dem Feld.</p>
+              } @else {
+                <ul class="bench">
+                  @for (entry of bench(); track entry.player.id) {
+                    <li>
+                      <button type="button" (click)="openBench(entry.player.id)" [attr.aria-label]="entry.player.name + ' aufstellen'">
+                        <span class="number">{{ entry.player.number }}</span>
+                        <span class="who"><strong>{{ entry.player.name }}</strong><small>{{ positionText(entry.player) }}@if (entry.status !== 'Fit') { · {{ entry.status }} }</small></span>
+                        <span class="grade">{{ gradeLabel(entry.grade) }}</span>
+                      </button>
+                    </li>
+                  }
+                </ul>
+              }
+            </div>
+          </tk-card>
+        </div>
+      </div>
+    }
+  }
+</section>
+
+@if (isTrainer()) {
+  <tk-dialog [open]="target() !== null" [title]="dialogTitle()" (closed)="close()">
+    @if (message()) {
+      <p class="error" role="alert">{{ message() }}</p>
+    }
+    @if (benchTarget()) {
+      <div class="zone-grid">
+        @for (zone of zones; track zone) {
+          <button tkButton type="button" (click)="placeBench(zone)">{{ zone }}</button>
+        }
+      </div>
+    } @else {
+      <label class="tk-label">
+        Spieler suchen
+        <input class="tk-input" type="search" placeholder="Name, Position oder Nummer" [value]="query()" (input)="query.set(valueOf($event))" />
+      </label>
+      <ul class="pick">
+        @for (entry of pickList(); track entry.player.id) {
+          <li>
+            <button type="button" [class.off]="!entry.eligible" [class.current]="entry.player.id === zoneTarget()?.playerId" (click)="pick(entry.player.id)">
+              <span class="number">{{ entry.player.number }}</span>
+              <span class="who">
+                <strong>{{ entry.player.name }}</strong>
+                <small>{{ positionText(entry.player) }} · Note {{ gradeLabel(entry.grade) }} · {{ entry.zone ? 'aktuell ' + entry.zone : 'Bank' }}</small>
+              </span>
+            </button>
+          </li>
+        } @empty {
+          <li class="muted">Kein Spieler gefunden.</li>
+        }
+      </ul>
+      @if (zoneTarget()?.playerId) {
+        <div class="actions">
+          <button tkButton type="button" class="danger" (click)="removeCurrent()">Vom Feld nehmen</button>
+        </div>
+      }
+    }
+  </tk-dialog>
+}
