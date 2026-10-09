@@ -71,7 +71,8 @@ describe('AuthService', () => {
     auth.start(0);
     await auth.signInTrainer('a@b.de', 'x');
     await vi.waitFor(() => expect(auth.status()).toBe('signedOut'));
-    expect(auth.error()).toContain('Kein Zugang');
+    expect(auth.error()).toContain('kein Zugang hinterlegt');
+    expect(auth.error()).not.toMatch(/uid-|teams\/|members/);
     expect(firebase.calls).toContain('signOut');
     expect(session.role()).toBeNull();
   });
@@ -166,7 +167,8 @@ describe('AuthService', () => {
       auth.start(0);
       await auth.signInTrainer('a@b.de', 'x');
       expect(auth.status()).toBe('signedOut');
-      expect(auth.error()).toContain('Kein Zugang');
+      expect(auth.error()).toContain('kein Zugang hinterlegt');
+      expect(auth.error()).not.toMatch(/uid-|teams\/|members/);
     });
 
     it('SCRUM-88: eine verspätete Rollenprüfung stellt nach dem Abmelden nichts wieder her', async () => {
