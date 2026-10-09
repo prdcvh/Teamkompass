@@ -38,10 +38,10 @@
               <p class="muted">
                 {{ next.type }} · {{ formatDate(next.date) }}@if (next.opponent) { · vs. {{ next.opponent }}}@if (next.location) { · {{ next.location }}}
               </p>
-              <a class="link" [routerLink]="['/events', next.id]">Zur Bewertung</a>
+              <a tkButton variant="primary" [routerLink]="['/events', next.id]">Zur Bewertung</a>
             } @else {
               <p class="muted">Kein kommendes Event geplant.</p>
-              <a class="link" routerLink="/events">Event anlegen</a>
+              <a tkButton variant="primary" routerLink="/events">Event anlegen</a>
             }
           </div>
         </tk-card>
@@ -55,7 +55,7 @@
               <ol class="board">
                 @for (entry of board(); track entry.player.id) {
                   <li>
-                    <a [routerLink]="['/profile', entry.player.id]">{{ entry.player.name }}</a>
+                    <a class="player-link" [routerLink]="['/profile', entry.player.id]">{{ entry.player.name }}</a>
                     <span class="muted">{{ entry.events }} Einsätze</span>
                     <strong>Ø {{ numberLabel(entry.grade) }}</strong>
                   </li>

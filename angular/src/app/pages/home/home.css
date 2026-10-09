@@ -93,9 +93,19 @@ h2 {
   font-weight: 600;
 }
 
-.link {
-  color: var(--tk-blue, inherit);
+.panel > [tkButton] {
+  justify-self: start;
+}
+
+.player-link {
+  color: var(--tk-ink);
   font-weight: 600;
+  text-decoration: none;
+}
+
+.player-link:hover {
+  color: var(--tk-red);
+  text-decoration: underline;
 }
 
 .board {
