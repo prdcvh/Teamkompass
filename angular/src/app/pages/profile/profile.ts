@@ -4,7 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { map } from 'rxjs';
 import { formatDate } from '../../core/event';
 import { LayoutService } from '../../core/layout.service';
-import { ageFromBirthdate, consentRevokedMessage, isConsentRevoked, positionText, todayIso } from '../../core/player';
+import { type Player, ageFromBirthdate, consentRevokedMessage, isConsentRevoked, positionText, todayIso } from '../../core/player';
 import {
   availability,
   gradeToPercent,
@@ -48,9 +48,9 @@ export class Profile implements OnInit {
   private readonly chosen = signal('');
 
   protected readonly players = computed(() => [...this.squad.players()].sort((a, b) => a.number - b.number));
-  protected readonly player = computed(() => {
+  protected readonly player = computed<Player | null>(() => {
     const id = this.chosen() || this.routeId();
-    return this.players().find((entry) => entry.id === id) ?? this.players()[0] ?? null;
+    return this.players().find((entry) => entry.id === id) ?? this.players().at(0) ?? null;
   });
 
   protected readonly today = todayIso();
