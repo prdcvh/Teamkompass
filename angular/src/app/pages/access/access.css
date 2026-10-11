@@ -1,0 +1,140 @@
+:host {
+  display: block;
+}
+
+.page {
+  display: grid;
+  gap: var(--tk-space-4);
+  max-width: 1100px;
+  padding: var(--tk-space-5);
+}
+
+.head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--tk-space-4);
+}
+
+h1,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: var(--tk-text-title);
+}
+
+.meta,
+.muted {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+.notice {
+  display: grid;
+  justify-items: start;
+  gap: var(--tk-space-3);
+  padding: var(--tk-space-4);
+  color: var(--tk-red);
+  background: var(--tk-soft-red);
+  border-radius: var(--tk-radius-lg);
+}
+
+.empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--tk-space-3);
+  padding: var(--tk-space-5);
+  color: var(--tk-muted);
+}
+
+.list {
+  display: grid;
+  gap: var(--tk-space-3);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tk-space-3);
+  padding: var(--tk-space-4);
+}
+
+.who {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.who strong {
+  font-size: var(--tk-text-lg);
+  overflow-wrap: anywhere;
+}
+
+.who small {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+.who small.expired {
+  color: var(--tk-red);
+  font-weight: 600;
+}
+
+.danger {
+  flex: none;
+  color: var(--tk-red);
+}
+
+.fab {
+  position: fixed;
+  right: var(--tk-space-4);
+  bottom: calc(76px + env(safe-area-inset-bottom));
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  color: var(--tk-on-red);
+  background: var(--tk-red);
+  border: 0;
+  border-radius: 50%;
+  box-shadow: var(--tk-shadow-fab);
+  cursor: pointer;
+}
+
+.fab:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.fab tk-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.error {
+  color: var(--tk-red);
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--tk-space-2);
+}
+
+@media (max-width: 720px) {
+  .page {
+    padding: var(--tk-space-4) var(--tk-space-4) 140px;
+  }
+
+  .row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .danger {
+    min-height: var(--tk-touch);
+  }
+}

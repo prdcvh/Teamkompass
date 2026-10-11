@@ -1,0 +1,78 @@
+<section class="page" [attr.data-variant]="mobile() ? 'mobile' : 'desktop'">
+  <header class="head">
+    <div>
+      <p class="tk-eyebrow">{{ mobile() ? 'Verwaltung' : '1. FC Königstein / Trainerbereich' }}</p>
+      <h1>Spieler-Zugänge</h1>
+      <p class="meta">{{ rows().length }} {{ rows().length === 1 ? 'Zugang' : 'Zugänge' }}</p>
+    </div>
+    @if (isTrainer() && !mobile()) {
+      <button tkButton variant="primary" type="button" [disabled]="squad.load() !== 'ready'" (click)="inviteOpen.set(true)">+ Zugang erzeugen</button>
+    }
+  </header>
+
+  @if (!isTrainer()) {
+    <p class="muted">Die Zugangsverwaltung sehen nur Trainer.</p>
+  } @else {
+    <p class="muted">
+      Einladungscodes für Spieler und Eltern erzeugen und bestehende Zugänge sperren. Ein Code gilt wie ein Passwort und wird nur einmal angezeigt.
+    </p>
+
+    @if (access.load() === 'error') {
+      <div class="notice" role="alert">
+        <p>{{ access.error() }}</p>
+        <button tkButton type="button" (click)="retry()">Erneut versuchen</button>
+      </div>
+    } @else if (access.load() !== 'ready') {
+      <p class="muted" role="status">Zugänge werden geladen …</p>
+    } @else if (rows().length === 0) {
+      <tk-card>
+        <div class="empty">
+          <p>Noch keine Zugänge vergeben.</p>
+          <button tkButton variant="primary" type="button" [disabled]="squad.load() !== 'ready'" (click)="inviteOpen.set(true)">+ Zugang erzeugen</button>
+        </div>
+      </tk-card>
+    } @else {
+      <div class="list">
+        @for (row of rows(); track row.entry.kind + row.entry.id) {
+          <tk-card>
+            <article class="row">
+              <div class="who">
+                <strong>{{ row.name }}</strong>
+                <small>{{ row.kind }}@if (shortCode(row.entry)) { · {{ shortCode(row.entry) }}}</small>
+                <small [class.expired]="row.expired">{{ row.validity }}</small>
+              </div>
+              <button tkButton size="sm" type="button" class="danger" (click)="askRevoke(row.entry)" [attr.aria-label]="'Zugang sperren: ' + row.name">
+                {{ row.entry.kind === 'invite' ? 'Code zurückziehen' : 'Zugang sperren' }}
+              </button>
+            </article>
+          </tk-card>
+        }
+      </div>
+    }
+  }
+
+  @if (isTrainer() && mobile()) {
+    <button type="button" class="fab" aria-label="Zugang erzeugen" [disabled]="squad.load() !== 'ready'" (click)="inviteOpen.set(true)"><tk-icon name="plus" /></button>
+  }
+</section>
+
+@if (isTrainer()) {
+  <tk-invite-dialog [open]="inviteOpen()" [players]="squad.players()" (closed)="inviteOpen.set(false)" />
+
+  <tk-dialog [open]="revoking() !== null" [title]="revoking()?.kind === 'invite' ? 'Code zurückziehen?' : 'Zugang sperren?'" (closed)="cancelRevoke()">
+    @if (revoking()?.kind === 'invite') {
+      <p>Der noch nicht eingelöste Einladungscode wird ungültig.</p>
+    } @else {
+      <p>Die Person muss sich danach mit einem neuen Einladungscode anmelden.</p>
+    }
+    @if (revokeError()) {
+      <p class="error" role="alert">{{ revokeError() }}</p>
+    }
+    <div class="confirm-actions">
+      <button tkButton type="button" (click)="cancelRevoke()">Abbrechen</button>
+      <button tkButton type="button" variant="primary" [disabled]="revokeBusy()" (click)="confirmRevoke()">
+        {{ revokeBusy() ? 'Sperrt …' : revoking()?.kind === 'invite' ? 'Zurückziehen' : 'Sperren' }}
+      </button>
+    </div>
+  </tk-dialog>
+}

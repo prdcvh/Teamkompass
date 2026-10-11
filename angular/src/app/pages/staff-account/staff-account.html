@@ -1,0 +1,83 @@
+<section class="page">
+  <header class="head">
+    <p class="tk-eyebrow">Verwaltung</p>
+    <h1>{{ title }}</h1>
+  </header>
+
+  @if (!isTrainer()) {
+    <p class="muted">Diese Seite sehen nur Trainer.</p>
+  } @else {
+    <p class="muted">{{ intro }}</p>
+    <tk-card>
+      <form class="form" (ngSubmit)="submit()" novalidate>
+        <div class="field">
+          <label class="tk-label">
+            E-Mail-Adresse
+            <input
+              class="tk-input"
+              type="email"
+              name="email"
+              autocomplete="off"
+              autocapitalize="off"
+              spellcheck="false"
+              [attr.aria-invalid]="errors().email ? 'true' : null"
+              [(ngModel)]="email"
+            />
+          </label>
+          @if (errors().email) {
+            <span class="error" role="alert">{{ errors().email }}</span>
+          }
+        </div>
+
+        <div class="field">
+          <label class="tk-label">
+            Passwort (mind. {{ minLength }} Zeichen)
+            <span class="password">
+              <input
+                class="tk-input"
+                [type]="showPassword() ? 'text' : 'password'"
+                name="password"
+                autocomplete="new-password"
+                [attr.aria-invalid]="errors().password ? 'true' : null"
+                [(ngModel)]="password"
+              />
+              <button type="button" class="reveal" [attr.aria-pressed]="showPassword()" [attr.aria-label]="showPassword() ? 'Passwort verbergen' : 'Passwort anzeigen'" (click)="showPassword.set(!showPassword())">
+                {{ showPassword() ? 'Verbergen' : 'Anzeigen' }}
+              </button>
+            </span>
+          </label>
+          @if (errors().password) {
+            <span class="error" role="alert">{{ errors().password }}</span>
+          }
+        </div>
+
+        <div class="field">
+          <label class="tk-label">
+            Passwort wiederholen
+            <input
+              class="tk-input"
+              [type]="showPassword() ? 'text' : 'password'"
+              name="repeat"
+              autocomplete="new-password"
+              [attr.aria-invalid]="errors().repeat ? 'true' : null"
+              [(ngModel)]="repeat"
+            />
+          </label>
+          @if (errors().repeat) {
+            <span class="error" role="alert">{{ errors().repeat }}</span>
+          }
+        </div>
+
+        @if (failure()) {
+          <p class="error" role="alert">{{ failure() }}</p>
+        }
+        @if (success()) {
+          <p class="success" role="status">{{ success() }}</p>
+        }
+        <div>
+          <button tkButton variant="primary" type="submit" [disabled]="busy()" [attr.aria-busy]="busy()">{{ busy() ? 'Legt an …' : 'Konto anlegen' }}</button>
+        </div>
+      </form>
+    </tk-card>
+  }
+</section>

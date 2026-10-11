@@ -76,6 +76,54 @@ export class FakeFirebase implements Pick<FirebaseService, keyof FirebaseService
     this.invites.delete(code);
   }
 
+  // --- Zugangsverwaltung (members/invites, Konten über zweite App-Instanz) ---
+  memberDocs = new Map<string, Record<string, unknown>>();
+  inviteDocs = new Map<string, Record<string, unknown>>();
+  readAccessError: unknown = null;
+  createInviteError: unknown = null;
+  deleteAccessError: unknown = null;
+  createStaffError: unknown = null;
+  nextStaffUid = 'staff-uid-1';
+  lastStaffPassword = '';
+
+  async readMembers(): Promise<RawDoc[]> {
+    this.calls.push('readMembers');
+    if (this.readAccessError) throw this.readAccessError;
+    return [...this.memberDocs].map(([id, data]) => ({ id, data }));
+  }
+
+  async readInvites(): Promise<RawDoc[]> {
+    this.calls.push('readInvites');
+    if (this.readAccessError) throw this.readAccessError;
+    return [...this.inviteDocs].map(([id, data]) => ({ id, data }));
+  }
+
+  async createInvite(code: string, data: { playerId: string; role: 'player' | 'parent'; expiresAt: Date | null }): Promise<void> {
+    this.calls.push(`createInvite:${code}`);
+    if (this.createInviteError) throw this.createInviteError;
+    this.inviteDocs.set(code, { ...data });
+  }
+
+  async deleteMember(uid: string): Promise<void> {
+    this.calls.push(`deleteMember:${uid}`);
+    if (this.deleteAccessError) throw this.deleteAccessError;
+    this.memberDocs.delete(uid);
+  }
+
+  async deleteInvite(code: string): Promise<void> {
+    this.calls.push(`deleteInvite:${code}`);
+    if (this.deleteAccessError) throw this.deleteAccessError;
+    this.inviteDocs.delete(code);
+  }
+
+  async createStaffAccount(email: string, password: string, role: 'trainer' | 'medical'): Promise<string> {
+    this.calls.push(`createStaff:${role}:${email}`);
+    this.lastStaffPassword = password;
+    if (this.createStaffError) throw this.createStaffError;
+    this.memberDocs.set(this.nextStaffUid, { role, email });
+    return this.nextStaffUid;
+  }
+
   // --- Spieler (Echtzeit-Abo wie bei Firestore: lokale Schreibvorgänge melden sofort einen neuen Stand) ---
   players = new Map<string, Record<string, unknown>>();
   playersMeta: SnapshotMeta = { fromCache: false, hasPendingWrites: false };
