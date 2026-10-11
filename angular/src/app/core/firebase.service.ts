@@ -174,6 +174,26 @@ export class FirebaseService {
   }
 
   /**
+   * Echtzeit-Abo auf EIN Spielerdokument (null = es gibt keins). Spieler und Eltern dürfen die Spielerliste nicht
+   * abfragen, nur ihr eigenes Dokument lesen (Regeln: `isPlayerFor`); ein fremdes liefert permission-denied.
+   */
+  async watchPlayerDoc(
+    playerId: string,
+    onData: (data: Readonly<Record<string, unknown>> | null, meta: SnapshotMeta) => void,
+    onError: (error: unknown) => void,
+  ): Promise<() => void> {
+    const { db } = await this.init();
+    const { doc, onSnapshot } = await import('firebase/firestore');
+    return onSnapshot(
+      doc(db, 'teams', environment.teamId, 'players', playerId),
+      { includeMetadataChanges: true },
+      (snapshot) =>
+        onData(snapshot.exists() ? snapshot.data() : null, { fromCache: snapshot.metadata.fromCache, hasPendingWrites: snapshot.metadata.hasPendingWrites }),
+      onError,
+    );
+  }
+
+  /**
    * Echtzeit-Abo auf die Events des Teams (nur Metadaten: Bewertungen und interne Notizen liegen in
    * Unterkollektionen). Lesen dürfen alle Teammitglieder; ein Fehler kommt über `onError`.
    */
@@ -317,11 +337,14 @@ export class FirebaseService {
     name: PlayerRecordKind,
     onData: (docs: RawDoc[], meta: SnapshotMeta) => void,
     onError: (error: unknown) => void,
+    options: { readonly ownOnly?: boolean } = {},
   ): Promise<() => void> {
     const { db } = await this.init();
-    const { collection, onSnapshot } = await import('firebase/firestore');
+    const { collection, onSnapshot, query, where } = await import('firebase/firestore');
+    const records = collection(db, 'teams', environment.teamId, 'players', playerId, name);
+    // Spieler und Eltern: die Regeln prüfen das Feld `playerId` der Dokumente, deshalb muss die Abfrage exakt danach filtern.
     return onSnapshot(
-      collection(db, 'teams', environment.teamId, 'players', playerId, name),
+      options.ownOnly ? query(records, where('playerId', '==', playerId)) : records,
       { includeMetadataChanges: true },
       (snapshot) =>
         onData(

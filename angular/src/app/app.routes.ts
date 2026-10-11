@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard, guestGuard, trainerGuard } from './core/auth.guard';
+import { authGuard, guestGuard, memberViewGuard, trainerGuard } from './core/auth.guard';
 import { Shell } from './shell/shell';
 
 const placeholder = () => import('./pages/placeholder/placeholder').then((m) => m.Placeholder);
@@ -23,8 +23,8 @@ export const routes: Routes = [
     component: Shell,
     canActivate: [authGuard],
     children: [
-      // Die eine Ansicht für Spieler, Eltern und Medizin (Figma 01c/01d) – folgt als eigenes Ticket.
-      { path: 'ansicht', loadComponent: placeholder, data: { title: 'Meine Ansicht' } },
+      // Die eine Ansicht für Spieler, Eltern und Medizin (Figma 01c/01d); der Trainer wird zur Übersicht geschickt.
+      { path: 'ansicht', canActivate: [memberViewGuard], loadComponent: () => import('./pages/member-view/member-view').then((m) => m.MemberView) },
       {
         path: '',
         canActivateChild: [trainerGuard],

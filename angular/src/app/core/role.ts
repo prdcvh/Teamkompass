@@ -4,3 +4,8 @@ export type Role = 'trainer' | 'player' | 'parent' | 'medical';
 export function showsNavigation(role: Role | null): boolean {
   return role === 'trainer';
 }
+
+/** Startseite nach der Anmeldung: der Trainer geht zur Übersicht, alle anderen zu ihrer einen Ansicht. */
+export function homeFor(role: Role | null): string {
+  return role === null || role === 'trainer' ? '/' : '/ansicht';
+}

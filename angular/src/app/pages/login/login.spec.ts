@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
 import { FirebaseService } from '../../core/firebase.service';
+import { SessionService } from '../../core/session.service';
 import { FakeFirebase } from '../../core/testing';
 import { Login } from './login';
 
@@ -58,6 +59,23 @@ describe('Login', () => {
     password.dispatchEvent(new Event('input'));
     (root(fixture).querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit'));
     await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith('/'));
+  });
+
+  it('führt Spieler nach dem Einlösen des Einladungscodes zur eigenen Ansicht', async () => {
+    const fixture = await render();
+    firebase.invites.set('ABC123', { role: 'player', playerId: 'p1', expiresAt: null });
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    (root(fixture).querySelector('#tab-code') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const code = root(fixture).querySelector('input[name="code"], #code') as HTMLInputElement;
+    code.value = 'ABC123';
+    code.dispatchEvent(new Event('input'));
+    (root(fixture).querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit'));
+    await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith('/ansicht'), { timeout: 3000 });
+    expect(firebase.calls).toContain('claim:ABC123');
+    expect(TestBed.inject(SessionService).role()).toBe('player');
+    expect(TestBed.inject(SessionService).playerId()).toBe('p1');
   });
 
   describe('Gestaltung (SCRUM-84)', () => {

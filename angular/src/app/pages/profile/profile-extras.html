@@ -9,6 +9,7 @@
 } @else if (!records.ready()) {
   <p class="muted" role="status">Förderpläne, Abwesenheiten und Messwerte werden geladen …</p>
 } @else {
+  @if (showPlans()) {
   <section class="block" aria-labelledby="plans-title">
     <div class="block-head">
       <h2 id="plans-title">Förderpläne</h2>
@@ -30,7 +31,16 @@
                 <small class="muted">
                   @if (plan.dueDate) { Ziel bis {{ formatDate(plan.dueDate) }} · }{{ plan.actions || 'Keine Maßnahmen notiert.' }}
                 </small>
-                @if (plan.selfReflection) {
+                @if (canReflect()) {
+                  <label class="reflection">
+                    <span><strong>Meine Selbstreflexion</strong></span>
+                    <textarea class="tk-input" rows="3" maxlength="400" [ngModel]="reflectionText(plan)" (ngModelChange)="editReflection(plan, $event)" placeholder="Wie läuft es bei diesem Ziel?"></textarea>
+                  </label>
+                  <button tkButton size="sm" type="button" [disabled]="reflectionBusy() !== ''" (click)="saveReflection(plan)">{{ reflectionBusy() === plan.id ? 'Speichert …' : 'Reflexion speichern' }}</button>
+                  @if (reflectionFailed() === plan.id) {
+                    <p class="error" role="alert">Speichern fehlgeschlagen. Bitte Verbindung prüfen und erneut versuchen.</p>
+                  }
+                } @else if (plan.selfReflection) {
                   <p><strong>Selbstreflexion:</strong> {{ plan.selfReflection }}</p>
                 }
                 @if (plan.coachReview) {
@@ -49,6 +59,7 @@
       }
     </tk-card>
   </section>
+  }
 
   <section class="block" aria-labelledby="absences-title">
     <div class="block-head">
