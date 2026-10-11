@@ -85,7 +85,7 @@
   function installCommandPalette() {
     const dialog = document.createElement("dialog");
     dialog.className = "command-palette";
-    dialog.innerHTML = `<div class="command-palette-box"><label>TeamKompass durchsuchen<input type="search" id="commandSearch" placeholder="Bereich, Spieler oder Event …" autocomplete="off" /></label><div id="commandResults"></div><small>Esc zum Schließen · Strg/⌘ + K zum Öffnen</small></div>`;
+    dialog.innerHTML = `<div class="command-palette-box"><div class="command-palette-head"><label>TeamKompass durchsuchen<input type="search" id="commandSearch" placeholder="Bereich, Spieler, Event oder Gegner …" autocomplete="off" /></label><button type="button" class="command-palette-close" id="commandClose" aria-label="Suche schließen">✕</button></div><div id="commandResults"></div><small>Esc zum Schließen · Strg/⌘ + K zum Öffnen</small></div>`;
     document.body.append(dialog);
     const input = dialog.querySelector("#commandSearch");
     const results = dialog.querySelector("#commandResults");
@@ -98,7 +98,8 @@
       const items = [
         ...views.map(([id, label]) => ({ type: "view", id, label, meta: "Bereich" })),
         ...(allowed.includes("profiles") ? state.players : []).map((player) => ({ type: "player", id: player.id, label: player.name, meta: `Spieler · Nr. ${player.number}` })),
-        ...(allowed.includes("events") ? state.events : []).map((event) => ({ type: "event", id: event.id, label: event.title, meta: `${event.type} · ${event.date}` }))
+        ...(allowed.includes("events") ? state.events : []).map((event) => ({ type: "event", id: event.id, label: event.title, meta: `${event.type} · ${event.date}` })),
+        ...(allowed.includes("opponents") ? state.opponents || [] : []).map((opponent) => ({ type: "opponent", id: opponent.id, label: opponent.name, meta: `Gegner${opponent.formation ? ` · ${opponent.formation}` : ""}` }))
       ].filter((item) => !query || `${item.label} ${item.meta}`.toLowerCase().includes(query)).slice(0, 12);
       results.innerHTML = items.map((item) => `<button type="button" data-type="${item.type}" data-id="${escape(item.id)}"><strong>${escape(item.label)}</strong><span>${escape(item.meta)}</span></button>`).join("") || `<p class="muted">Kein Treffer.</p>`;
     };
@@ -108,11 +109,24 @@
       if (!button) return;
       if (button.dataset.type === "player") window.TeamKompass?.openPlayer?.(button.dataset.id);
       else if (button.dataset.type === "event") window.TeamKompass?.openEvent?.(button.dataset.id);
+      else if (button.dataset.type === "opponent") window.TeamKompass?.openOpponent?.(button.dataset.id);
       else document.querySelector(`.nav-tab[data-view="${button.dataset.id}"]`)?.click();
       dialog.close();
     });
+    // Fokus zurueck zur ausloesenden Schaltflaeche (bzw. dem zuvor fokussierten Element).
+    let opener = null;
+    dialog.addEventListener("close", () => {
+      if (opener?.isConnected) opener.focus();
+      opener = null;
+    });
+    // Escape explizit behandeln, damit das Schliessen nicht vom Browser-Standard abhaengt.
+    dialog.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") { event.preventDefault(); dialog.close(); }
+    });
+    dialog.querySelector("#commandClose").addEventListener("click", () => dialog.close());
     const openPalette = () => {
       if (dialog.open) return;
+      opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       dialog.showModal();
       input.value = "";
       render();

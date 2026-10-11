@@ -4692,6 +4692,16 @@ window.TeamKompass = Object.freeze({
     renderEvents();
     setEventStep("rate");
   },
+  openOpponent: (opponentId) => {
+    if (!allowedViews().includes("opponents")) return;
+    const opponent = (state.opponents || []).find((item) => item.id === opponentId);
+    if (!opponent) return;
+    // Liste auf diesen Gegner filtern, damit sein Profil direkt sichtbar ist.
+    opponentFilter = opponent.name;
+    if ($("#opponentSearch")) $("#opponentSearch").value = opponent.name;
+    setView("opponents");
+    renderOpponentAnalysis();
+  },
   openPlayer: (playerId) => {
     if (["player", "parent"].includes(currentRole) && playerId !== currentPlayerId) return;
     if (!allowedViews().includes("profiles")) return;
