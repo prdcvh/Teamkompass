@@ -1,0 +1,89 @@
+:host {
+  display: block;
+}
+
+.page {
+  display: grid;
+  gap: var(--tk-space-4);
+  max-width: 560px;
+  padding: var(--tk-space-5);
+}
+
+h1,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: var(--tk-text-title);
+}
+
+.muted {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+.form {
+  display: grid;
+  gap: var(--tk-space-4);
+  padding: var(--tk-space-4);
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+.password {
+  display: flex;
+  gap: var(--tk-space-2);
+  align-items: center;
+}
+
+.password .tk-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.reveal {
+  flex: none;
+  min-height: var(--tk-touch);
+  padding: 0 var(--tk-space-3);
+  color: var(--tk-muted);
+  background: none;
+  border: 0;
+  font: inherit;
+  font-size: var(--tk-text-sm);
+  cursor: pointer;
+}
+
+.error {
+  color: var(--tk-red);
+  font-size: var(--tk-text-sm);
+}
+
+.success {
+  color: var(--tk-green);
+  font-size: var(--tk-text-sm);
+  font-weight: 600;
+}
+
+[aria-invalid='true'] {
+  border-color: var(--tk-red);
+}
+
+@media (max-width: 720px) {
+  .page {
+    padding: var(--tk-space-4) var(--tk-space-4) 140px;
+  }
+
+  .tk-input {
+    min-height: var(--tk-touch);
+  }
+}
+
+.reveal:focus-visible {
+  outline: 2px solid var(--tk-red);
+  outline-offset: 2px;
+}

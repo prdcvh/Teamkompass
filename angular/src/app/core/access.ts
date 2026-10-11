@@ -1,0 +1,129 @@
+import type { RawDoc } from './firebase.service';
+import type { Role } from './role';
+
+/** Mindestlänge für neue Passwörter von Trainer- und Medizin-Konten (die Referenz-App erlaubte noch 6). */
+export const MIN_PASSWORD_LENGTH = 8;
+export const MAX_PASSWORD_LENGTH = 128;
+export const MAX_EXPIRY_DAYS = 365;
+
+/** Rollen, für die ein Einladungscode erzeugt werden kann. */
+export type InviteRole = 'player' | 'parent';
+export type StaffRole = 'trainer' | 'medical';
+
+export const INVITE_ROLES: readonly { readonly value: InviteRole; readonly label: string }[] = [
+  { value: 'player', label: 'Spieler' },
+  { value: 'parent', label: 'Eltern' },
+];
+
+/** Ein Zugang aus der Liste: bestehendes Mitglied (members) oder noch offener Einladungscode (invites). */
+export interface AccessEntry {
+  readonly kind: 'member' | 'invite';
+  /** members: UID; invites: der Code selbst. */
+  readonly id: string;
+  readonly role: Role;
+  readonly playerId: string | null;
+  readonly email: string;
+  readonly expiresAt: Date | null;
+}
+
+/** Kryptografisch starker Einladungscode: 24 Zufallsbytes als 48 Hex-Zeichen (wie die Referenz-App). */
+export function generateInviteCode(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(24));
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/** Ablaufdatum „N Tage ab jetzt“; null = unbefristet. */
+export function expiryFromDays(days: number | null, now: Date = new Date()): Date | null {
+  return days === null ? null : new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+}
+
+/**
+ * Liest das Befristungsfeld: leer = unbefristet (`null`), sonst eine ganze Zahl von 1 bis 365 Tagen.
+ * Ungültige Eingaben ergeben `undefined` (statt wie in der Referenz still unbefristet zu werden).
+ */
+export function parseExpiryDays(input: string): number | null | undefined {
+  const text = input.trim();
+  if (text === '') return null;
+  if (!/^\d+$/.test(text)) return undefined;
+  const days = Number(text);
+  return days >= 1 && days <= MAX_EXPIRY_DAYS ? days : undefined;
+}
+
+export interface StaffDraft {
+  readonly email: string;
+  readonly password: string;
+  readonly repeat: string;
+}
+
+export type StaffErrors = Partial<Record<keyof StaffDraft, string>>;
+
+export function validateStaffDraft(draft: StaffDraft): StaffErrors {
+  const errors: StaffErrors = {};
+  const email = draft.email.trim();
+  if (!email) errors.email = 'Bitte eine E-Mail-Adresse eingeben.';
+  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = 'Bitte eine gültige E-Mail-Adresse eingeben.';
+  if (draft.password.length < MIN_PASSWORD_LENGTH) errors.password = `Das Passwort muss mindestens ${MIN_PASSWORD_LENGTH} Zeichen haben.`;
+  else if (draft.password.length > MAX_PASSWORD_LENGTH) errors.password = `Das Passwort darf höchstens ${MAX_PASSWORD_LENGTH} Zeichen haben.`;
+  if (!errors.password && draft.repeat !== draft.password) errors.repeat = 'Die beiden Passwörter stimmen nicht überein.';
+  return errors;
+}
+
+function dateOf(value: unknown): Date | null {
+  const date = (value as { toDate?: () => Date } | null | undefined)?.toDate?.();
+  return date instanceof Date && !Number.isNaN(date.getTime()) ? date : null;
+}
+
+/** members-Dokument → Eintrag; Trainer-Konten werden hier nicht verwaltet (wie in der Referenz) und ergeben null. */
+export function memberEntry(doc: RawDoc): AccessEntry | null {
+  const role = (['player', 'parent', 'medical'] as const).find((value) => value === doc.data['role']);
+  if (!role) return null;
+  return {
+    kind: 'member',
+    id: doc.id,
+    role,
+    playerId: typeof doc.data['playerId'] === 'string' ? doc.data['playerId'] : null,
+    email: typeof doc.data['email'] === 'string' ? doc.data['email'] : '',
+    expiresAt: dateOf(doc.data['expiresAt']),
+  };
+}
+
+export function inviteEntry(doc: RawDoc): AccessEntry | null {
+  const role = (['player', 'parent'] as const).find((value) => value === doc.data['role']);
+  if (!role || typeof doc.data['playerId'] !== 'string') return null;
+  return { kind: 'invite', id: doc.id, role, playerId: doc.data['playerId'], email: '', expiresAt: dateOf(doc.data['expiresAt']) };
+}
+
+export function roleLabel(role: Role): string {
+  switch (role) {
+    case 'parent':
+      return 'Eltern';
+    case 'medical':
+      return 'Medizin (nur lesen)';
+    case 'trainer':
+      return 'Trainer';
+    default:
+      return 'Spieler';
+  }
+}
+
+export function isExpired(entry: Pick<AccessEntry, 'expiresAt'>, now: Date = new Date()): boolean {
+  return entry.expiresAt !== null && entry.expiresAt.getTime() < now.getTime();
+}
+
+function germanDate(date: Date): string {
+  return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+/** Gültigkeit in Worten für die Liste. */
+export function validityText(entry: Pick<AccessEntry, 'expiresAt'>, now: Date = new Date()): string {
+  if (!entry.expiresAt) return 'Unbegrenzt gültig';
+  return isExpired(entry, now) ? `Abgelaufen seit ${germanDate(entry.expiresAt)}` : `Gültig bis ${germanDate(entry.expiresAt)}`;
+}
+
+/** Zugänge sortiert: offene Einladungen zuerst, dann nach Rolle und Namen. */
+export function sortEntries(entries: readonly AccessEntry[], nameOf: (entry: AccessEntry) => string): AccessEntry[] {
+  const order: Record<string, number> = { invite: 0, member: 1 };
+  return [...entries].sort(
+    (a, b) => order[a.kind] - order[b.kind] || nameOf(a).localeCompare(nameOf(b), 'de') || a.id.localeCompare(b.id),
+  );
+}

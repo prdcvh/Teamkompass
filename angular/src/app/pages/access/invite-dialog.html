@@ -1,0 +1,83 @@
+<tk-dialog [open]="open()" [title]="created() ? 'Einladungscode' : 'Zugang erzeugen'" (closed)="close()">
+  @if (created(); as result) {
+    <div class="result">
+      <p>
+        Einladungscode für <strong>{{ result.player }}</strong> ({{ roleName(result.role) }}). Er wird nur jetzt angezeigt – bitte direkt weitergeben.
+      </p>
+      <code class="code" data-testid="invite-code">{{ result.code }}</code>
+      <p class="muted">
+        Der Code wird bei der ersten erfolgreichen Anmeldung ungültig
+        @if (result.expiresAt) {
+          und läuft am {{ date(result.expiresAt) }} ab.
+        } @else {
+          (sonst unbegrenzt gültig).
+        }
+        Behandle ihn bis dahin wie ein Passwort.
+      </p>
+      @if (copied()) {
+        <p class="muted" role="status">Code kopiert.</p>
+      }
+      <menu>
+        <button tkButton type="button" (click)="copy()">Code kopieren</button>
+        <button tkButton variant="primary" type="button" (click)="close()">Fertig</button>
+      </menu>
+    </div>
+  } @else {
+    <form (submit)="submit($event)" novalidate>
+      <div class="field">
+        <label class="tk-label">
+          Spieler
+          <select class="tk-input" name="player" [attr.aria-invalid]="errors().player ? 'true' : null" (change)="playerId.set(value($event))">
+            <option value="" [selected]="playerId() === ''">Bitte auswählen</option>
+            @for (player of players(); track player.id) {
+              <option [value]="player.id" [selected]="playerId() === player.id">{{ player.name }}</option>
+            }
+          </select>
+        </label>
+        @if (errors().player) {
+          <span class="error" role="alert">{{ errors().player }}</span>
+        }
+      </div>
+
+      @if (consentWarning(); as warning) {
+        <p class="consent-warning" role="alert">{{ warning }}</p>
+      }
+
+      <label class="tk-label">
+        Zugang für
+        <select class="tk-input" name="role" (change)="role.set($any(value($event)))">
+          @for (option of roles; track option.value) {
+            <option [value]="option.value" [selected]="role() === option.value">{{ option.label }}</option>
+          }
+        </select>
+      </label>
+
+      <div class="field">
+        <label class="tk-label">
+          Befristung in Tagen (optional)
+          <input
+            class="tk-input"
+            name="days"
+            inputmode="numeric"
+            autocomplete="off"
+            placeholder="leer = unbegrenzt gültig"
+            [value]="days()"
+            [attr.aria-invalid]="errors().days ? 'true' : null"
+            (input)="days.set(value($event))"
+          />
+        </label>
+        @if (errors().days) {
+          <span class="error" role="alert">{{ errors().days }}</span>
+        }
+      </div>
+
+      @if (failure()) {
+        <p class="error" role="alert">{{ failure() }}</p>
+      }
+      <menu>
+        <button tkButton type="button" (click)="close()">Abbrechen</button>
+        <button tkButton variant="primary" type="submit" [disabled]="busy()">{{ busy() ? 'Erzeugt …' : 'Code erzeugen' }}</button>
+      </menu>
+    </form>
+  }
+</tk-dialog>

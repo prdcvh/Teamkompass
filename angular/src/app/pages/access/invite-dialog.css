@@ -1,0 +1,72 @@
+form,
+.result {
+  display: grid;
+  gap: var(--tk-space-4);
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+p {
+  margin: 0;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+.muted {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+.code {
+  padding: var(--tk-space-3);
+  background: var(--tk-soft-red);
+  border-radius: var(--tk-radius-md);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--tk-text-sm);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.error {
+  color: var(--tk-red);
+  font-size: var(--tk-text-sm);
+}
+
+.consent-warning {
+  padding: var(--tk-space-2) var(--tk-space-3);
+  color: var(--tk-red);
+  background: var(--tk-soft-red);
+  border: 1px solid var(--tk-red);
+  border-radius: var(--tk-radius-md);
+  font-size: var(--tk-text-sm);
+  font-weight: 600;
+}
+
+[aria-invalid='true'] {
+  border-color: var(--tk-red);
+}
+
+menu {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--tk-space-2);
+  margin: 0;
+  padding: 0;
+}
+
+button,
+input,
+select {
+  touch-action: manipulation;
+}
+
+@media (max-width: 720px) {
+  menu button {
+    min-height: var(--tk-touch);
+  }
+}

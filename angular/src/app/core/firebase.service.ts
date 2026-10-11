@@ -151,6 +151,72 @@ export class FirebaseService {
     await batch.commit();
   }
 
+  /** Alle Zugänge (members) lesen. Die Regeln erlauben die Liste nur Trainern. */
+  async readMembers(): Promise<RawDoc[]> {
+    const { db } = await this.init();
+    const { collection, getDocs } = await import('firebase/firestore');
+    const snapshot = await getDocs(collection(db, 'teams', environment.teamId, 'members'));
+    return snapshot.docs.map((entry) => ({ id: entry.id, data: entry.data() }));
+  }
+
+  /** Alle offenen Einladungscodes lesen (nur Trainer dürfen auflisten). */
+  async readInvites(): Promise<RawDoc[]> {
+    const { db } = await this.init();
+    const { collection, getDocs } = await import('firebase/firestore');
+    const snapshot = await getDocs(collection(db, 'teams', environment.teamId, 'invites'));
+    return snapshot.docs.map((entry) => ({ id: entry.id, data: entry.data() }));
+  }
+
+  /** Legt einen Einladungscode für einen Spieler oder ein Elternteil an (`expiresAt` null = unbefristet). */
+  async createInvite(code: string, data: { playerId: string; role: 'player' | 'parent'; expiresAt: Date | null }): Promise<void> {
+    const { db } = await this.init();
+    const { Timestamp, doc, serverTimestamp, setDoc } = await import('firebase/firestore');
+    await setDoc(doc(db, 'teams', environment.teamId, 'invites', code), {
+      playerId: data.playerId,
+      role: data.role,
+      expiresAt: data.expiresAt ? Timestamp.fromDate(data.expiresAt) : null,
+      createdAt: serverTimestamp(),
+    });
+  }
+
+  /** Sperrt einen Zugang (löscht das members-Dokument). */
+  async deleteMember(uid: string): Promise<void> {
+    const { db } = await this.init();
+    const { deleteDoc, doc } = await import('firebase/firestore');
+    await deleteDoc(doc(db, 'teams', environment.teamId, 'members', uid));
+  }
+
+  /** Zieht einen noch nicht eingelösten Einladungscode zurück. */
+  async deleteInvite(code: string): Promise<void> {
+    const { db } = await this.init();
+    const { deleteDoc, doc } = await import('firebase/firestore');
+    await deleteDoc(doc(db, 'teams', environment.teamId, 'invites', code));
+  }
+
+  /**
+   * Legt ein Trainer- oder Medizin-Konto an: Anmeldekonto und members-Dokument in einem Schritt.
+   * Das Anmeldekonto entsteht über eine zweite, temporäre App-Instanz: `createUserWithEmailAndPassword`
+   * meldet sonst die eigene, gerade aktive Trainer-Sitzung ab und als das neue Konto an. Das members-Dokument
+   * schreibt die normale Instanz, also weiterhin als der eingeloggte Trainer (so verlangen es die Regeln).
+   * Die zweite Instanz wird immer wieder abgemeldet und entfernt. Gibt die UID des neuen Kontos zurück.
+   */
+  async createStaffAccount(email: string, password: string, role: 'trainer' | 'medical'): Promise<string> {
+    const { app, db } = await this.init();
+    const [{ deleteApp, initializeApp }, { createUserWithEmailAndPassword, getAuth, signOut }, { doc, serverTimestamp, setDoc }] =
+      await Promise.all([import('firebase/app'), import('firebase/auth'), import('firebase/firestore')]);
+    const secondary = initializeApp(app.options, `staff-create-${Date.now()}`);
+    const secondaryAuth = getAuth(secondary);
+    try {
+      const credential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+      const uid = credential.user.uid;
+      await setDoc(doc(db, 'teams', environment.teamId, 'members', uid), { role, email, createdAt: serverTimestamp() });
+      return uid;
+    } finally {
+      await signOut(secondaryAuth).catch(() => undefined);
+      await deleteApp(secondary).catch(() => undefined);
+    }
+  }
+
   /**
    * Echtzeit-Abo auf alle Spieler des Teams. Die Regeln erlauben Lesen für Trainer und Medizin
    * (Spieler/Eltern nur das eigene Profil); ein Fehler (z. B. permission-denied) kommt über `onError`.

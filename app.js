@@ -111,8 +111,9 @@ function applyTheme(theme) {
   const toggle = $("#themeToggle");
   const label = $("#themeToggleText");
   if (toggle) {
-    toggle.setAttribute("aria-pressed", String(nextTheme === "dark"));
-    toggle.title = nextTheme === "dark" ? "Lightmode einschalten" : "Darkmode einschalten";
+    const action = nextTheme === "dark" ? "Lightmode einschalten" : "Darkmode einschalten";
+    toggle.setAttribute("aria-label", action);
+    toggle.title = action;
   }
   if (label) label.textContent = nextTheme === "dark" ? "Lightmode" : "Darkmode";
 }
