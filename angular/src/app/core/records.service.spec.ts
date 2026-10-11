@@ -224,4 +224,24 @@ describe('RecordsService', () => {
     await setup();
     expect(TestBed.inject(EventsService).events()).toHaveLength(3);
   });
+
+  it('Spieler lesen Zusatzdaten nur gefiltert auf die eigene playerId', async () => {
+    await setup('player');
+    for (const kind of ['developmentPlans', 'absences', 'measurements']) expect(firebase.calls).toContain(`ownOnly:p1:${kind}`);
+  });
+
+  it('der Trainer liest ungefiltert', async () => {
+    await setup('trainer');
+    expect(firebase.calls.filter((call) => call.startsWith('ownOnly'))).toEqual([]);
+  });
+
+  it('Medizin liest nur Abwesenheiten und Messwerte, keine Förderpläne', async () => {
+    const { records } = await setup('medical');
+    expect(firebase.calls.filter((call) => call.startsWith('watchPlayerRecords')).sort()).toEqual([
+      'watchPlayerRecords:p1:absences',
+      'watchPlayerRecords:p1:measurements',
+    ]);
+    expect(records.plans()).toEqual([]);
+    expect(records.absences()).toHaveLength(1);
+  });
 });

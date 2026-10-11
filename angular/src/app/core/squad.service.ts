@@ -1,7 +1,7 @@
 import { Injectable, Injector, computed, effect, inject, signal } from '@angular/core';
 import { AbsenceSyncService } from './absence-sync.service';
 import { authErrorMessage, errorCode } from './auth-errors';
-import { FirebaseService } from './firebase.service';
+import { FirebaseService, type SnapshotMeta } from './firebase.service';
 import {
   type Player,
   type PlayerDraft,
@@ -49,26 +49,35 @@ export class SquadService {
     });
   }
 
-  /** Startet das Echtzeit-Abo (mehrfacher Aufruf ist harmlos). */
+  /**
+   * Startet das Echtzeit-Abo (mehrfacher Aufruf ist harmlos). Spieler und Eltern dürfen die Spielerliste nicht
+   * abfragen: für sie besteht der „Kader“ nur aus dem eigenen Spielerdokument (Regeln: `isPlayerFor`).
+   */
   start(): void {
     if (this.unsubscribe || this.load() === 'loading') return;
     const generation = ++this.generation;
     this.sync.clearError();
     this.load.set('loading');
     this.error.set('');
-    this.firebase
-      .watchPlayers(
-        (docs, meta) => {
-          if (generation !== this.generation) return;
-          this.players.set(docs.map((entry) => playerFromDoc(entry.id, entry.data)));
-          this.load.set('ready');
-          this.sync.applySnapshot(meta);
-        },
-        (error) => {
-          if (generation !== this.generation) return;
-          this.failLoad(error);
-        },
-      )
+    const onData = (players: readonly Player[], meta: SnapshotMeta) => {
+      if (generation !== this.generation) return;
+      this.players.set(players);
+      this.load.set('ready');
+      this.sync.applySnapshot(meta);
+    };
+    const onError = (error: unknown) => {
+      if (generation !== this.generation) return;
+      this.failLoad(error);
+    };
+    const role = this.session.role();
+    const ownId = this.session.playerId();
+    const subscription =
+      role === 'player' || role === 'parent'
+        ? ownId
+          ? this.firebase.watchPlayerDoc(ownId, (data, meta) => onData(data ? [playerFromDoc(ownId, data)] : [], meta), onError)
+          : Promise.reject(new Error('Kein Spielerprofil verknüpft'))
+        : this.firebase.watchPlayers((docs, meta) => onData(docs.map((entry) => playerFromDoc(entry.id, entry.data)), meta), onError);
+    subscription
       .then((unsubscribe) => {
         // Wurde inzwischen gestoppt oder ist das Abo schon fehlgeschlagen, wird es sofort wieder beendet.
         if (generation !== this.generation || this.load() === 'error') unsubscribe();

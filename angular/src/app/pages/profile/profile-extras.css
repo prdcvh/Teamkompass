@@ -204,3 +204,9 @@ h2 {
   font-size: var(--tk-text-sm);
   font-weight: 600;
 }
+
+.reflection {
+  display: grid;
+  gap: var(--tk-space-1);
+  margin: var(--tk-space-2) 0;
+}

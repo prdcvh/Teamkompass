@@ -10,11 +10,12 @@ import { FakeFirebase } from './testing';
 describe('SquadService', () => {
   let firebase: FakeFirebase;
 
-  function setup(role: 'trainer' | 'medical' | 'player' | null = 'trainer') {
+  function setup(role: 'trainer' | 'medical' | 'player' | 'parent' | null = 'trainer') {
     firebase = new FakeFirebase();
     firebase.players.set('p1', { name: 'Ali Adler', positions: ['ST'], number: 9, birthdate: '2012-05-05', status: 'Fit' });
     TestBed.configureTestingModule({ providers: [{ provide: FirebaseService, useValue: firebase }] });
     TestBed.inject(SessionService).role.set(role);
+    if (role === 'player' || role === 'parent') TestBed.inject(SessionService).playerId.set('p1');
     return TestBed.inject(SquadService);
   }
 
@@ -239,5 +240,25 @@ describe('SquadService', () => {
       const events = TestBed.inject(EventsService);
       expect((await events.whenLoaded()).map((event) => event.id).sort()).toEqual(['e1', 'e2']);
     });
+  });
+
+  it('Spieler und Eltern laden nur das eigene Spielerdokument, nie die Spielerliste', async () => {
+    const squad = setup('player');
+    firebase.players.set('p2', { name: 'Zoe Zander', positions: ['TW'], number: 1, birthdate: '2013-01-01' });
+    TestBed.inject(SessionService).playerId.set('p1');
+    squad.start();
+    await vi.waitFor(() => expect(squad.load()).toBe('ready'));
+    expect(squad.players().map((p) => p.name)).toEqual(['Ali Adler']);
+    expect(firebase.calls).toContain('watchPlayerDoc:p1');
+    expect(firebase.calls).not.toContain('watchPlayers');
+  });
+
+  it('Spieler ohne verknüpftes Profil bekommen einen Fehler statt der Spielerliste', async () => {
+    const squad = setup('parent');
+    TestBed.inject(SessionService).playerId.set(null);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    squad.start();
+    await vi.waitFor(() => expect(squad.load()).toBe('error'));
+    expect(firebase.calls).not.toContain('watchPlayers');
   });
 });

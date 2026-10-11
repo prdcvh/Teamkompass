@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { formatDate } from '../../core/event';
 import { todayIso } from '../../core/player';
 import {
@@ -12,6 +13,7 @@ import {
   measurementText,
 } from '../../core/records';
 import { RecordsService } from '../../core/records.service';
+import { SessionService } from '../../core/session.service';
 import { SyncService } from '../../core/sync.service';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
@@ -30,7 +32,7 @@ interface Deleting {
 /** Zusatzdaten im Profil: Förderpläne, Abwesenheiten/Verletzungen und Messwerte (mit Verlaufsdiagramm). */
 @Component({
   selector: 'tk-profile-extras',
-  imports: [Button, Card, Dialog, PlanDialog, AbsenceDialog, MeasurementDialog],
+  imports: [FormsModule, Button, Card, Dialog, PlanDialog, AbsenceDialog, MeasurementDialog],
   templateUrl: './profile-extras.html',
   styleUrl: './profile-extras.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -38,9 +40,12 @@ interface Deleting {
 export class ProfileExtras {
   protected readonly records = inject(RecordsService);
   private readonly sync = inject(SyncService);
+  private readonly session = inject(SessionService);
 
   /** Anzeigeseitig: nur Trainer sehen Schaltflächen zum Ändern. */
   readonly editable = input(true);
+  /** Förderpläne anzeigen (die medizinische Rolle darf sie nicht lesen). */
+  readonly showPlans = input(true);
   /** Warntext bei widerrufener Einwilligung (leer = keine Warnung); blockiert nichts. */
   readonly consentWarning = input('');
 
@@ -49,6 +54,12 @@ export class ProfileExtras {
   protected readonly measurementsNewestFirst = computed(() => [...this.records.measurements()].reverse());
   protected readonly chart = computed(() => measurementChart(this.records.measurements(), todayIso()));
   protected readonly canEdit = computed(() => this.editable() && this.records.canWrite());
+
+  /** Nur der Spieler selbst schreibt die Selbstreflexion (Eltern lesen nur). */
+  protected readonly canReflect = computed(() => this.session.role() === 'player');
+  protected readonly reflections = signal<Readonly<Record<string, string>>>({});
+  protected readonly reflectionBusy = signal('');
+  protected readonly reflectionFailed = signal('');
 
   protected readonly planDialog = signal<{ open: boolean; plan: DevelopmentPlan | null }>({ open: false, plan: null });
   protected readonly absenceDialog = signal<{ open: boolean; absence: Absence | null }>({ open: false, absence: null });
@@ -62,6 +73,27 @@ export class ProfileExtras {
   protected absencePeriodText = absencePeriodText;
   protected measurementText = measurementText;
   protected isInjury = isInjuryAbsence;
+
+  protected reflectionText(plan: DevelopmentPlan): string {
+    return this.reflections()[plan.id] ?? plan.selfReflection;
+  }
+
+  protected editReflection(plan: DevelopmentPlan, text: string): void {
+    this.reflections.update((map) => ({ ...map, [plan.id]: text }));
+  }
+
+  protected async saveReflection(plan: DevelopmentPlan): Promise<void> {
+    if (this.reflectionBusy()) return;
+    this.reflectionBusy.set(plan.id);
+    this.reflectionFailed.set('');
+    try {
+      const ok = await this.records.saveSelfReflection(plan.id, this.reflectionText(plan));
+      if (!ok) this.reflectionFailed.set(plan.id);
+      else this.reflections.update((map) => Object.fromEntries(Object.entries(map).filter(([id]) => id !== plan.id)));
+    } finally {
+      this.reflectionBusy.set('');
+    }
+  }
 
   protected planTone(plan: DevelopmentPlan): string {
     return plan.status === 'Erreicht' ? 'success' : plan.status === 'In Arbeit' ? 'warning' : '';

@@ -179,6 +179,26 @@ export class FakeFirebase implements Pick<FirebaseService, keyof FirebaseService
     this.emitPlayers();
   }
 
+  // --- Einzelnes Spielerdokument (Spieler/Eltern dürfen nur das eigene lesen) ---
+  watchPlayerDocError: unknown = null;
+  /** Spieler-IDs, deren Dokument gelesen werden darf; `null` = alle (wie ein Trainer). Andere melden permission-denied. */
+  readablePlayerDocs: Set<string> | null = null;
+
+  async watchPlayerDoc(
+    playerId: string,
+    onData: (data: Readonly<Record<string, unknown>> | null, meta: SnapshotMeta) => void,
+    onError: (error: unknown) => void,
+  ): Promise<() => void> {
+    this.calls.push(`watchPlayerDoc:${playerId}`);
+    if (this.watchPlayerDocError) throw this.watchPlayerDocError;
+    if (this.readablePlayerDocs && !this.readablePlayerDocs.has(playerId)) {
+      onError({ code: 'permission-denied' });
+      return () => undefined;
+    }
+    onData(this.players.get(playerId) ?? null, { fromCache: false, hasPendingWrites: false });
+    return () => undefined;
+  }
+
   // --- Events (gleiches Muster wie bei den Spielern) ---
   events = new Map<string, Record<string, unknown>>();
   eventsMeta: SnapshotMeta = { fromCache: false, hasPendingWrites: false };
@@ -439,8 +459,10 @@ export class FakeFirebase implements Pick<FirebaseService, keyof FirebaseService
     name: string,
     onData: (docs: RawDoc[], meta: SnapshotMeta) => void,
     onError: (error: unknown) => void,
+    options: { readonly ownOnly?: boolean } = {},
   ): Promise<() => void> {
     this.calls.push(`watchPlayerRecords:${playerId}:${name}`);
+    if (options.ownOnly) this.calls.push(`ownOnly:${playerId}:${name}`);
     if (this.watchPlayerRecordsError) throw this.watchPlayerRecordsError;
     this.recordWatchers += 1;
     const key = `${playerId}/${name}`;

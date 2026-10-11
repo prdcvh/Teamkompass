@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { type CanActivateChildFn, type CanActivateFn, Router, UrlTree } from '@angular/router';
 import { AuthService } from './auth.service';
-import { authGuard, guestGuard, trainerGuard } from './auth.guard';
+import { authGuard, guestGuard, memberViewGuard, trainerGuard } from './auth.guard';
 import type { Role } from './role';
 import { SessionService } from './session.service';
 
@@ -49,6 +49,8 @@ describe('Guards', () => {
     status.value = 'ready';
     resolve();
     expect(path(await run(guestGuard))).toBe('/');
+    TestBed.inject(SessionService).role.set('player');
+    expect(path(await run(guestGuard))).toBe('/ansicht');
     status.value = 'signedOut';
     expect(await run(guestGuard)).toBe(true);
   });
@@ -64,5 +66,18 @@ describe('Guards', () => {
     const result = TestBed.runInInjectionContext(() => (trainerGuard as CanActivateChildFn)({} as never, {} as never));
     if (allowed) expect(result).toBe(true);
     else expect(path(result)).toBe('/ansicht');
+  });
+
+  it.each<[Role | null, string | true]>([
+    ['player', true],
+    ['parent', true],
+    ['medical', true],
+    ['trainer', '/start'],
+    [null, '/start'],
+  ])('memberViewGuard (/ansicht) für %s: %s', (role, expected) => {
+    TestBed.inject(SessionService).role.set(role);
+    const result = TestBed.runInInjectionContext(() => memberViewGuard({} as never, {} as never));
+    if (expected === true) expect(result).toBe(true);
+    else expect(path(result)).toBe(expected);
   });
 });

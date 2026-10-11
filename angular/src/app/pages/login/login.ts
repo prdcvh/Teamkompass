@@ -3,6 +3,8 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../../core/auth.service';
+import { homeFor } from '../../core/role';
+import { SessionService } from '../../core/session.service';
 import { Button } from '../../ui/button/button';
 
 type Tab = 'trainer' | 'code';
@@ -18,6 +20,7 @@ type Tab = 'trainer' | 'code';
 export class Login {
   protected readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly session = inject(SessionService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   protected readonly tab = signal<Tab>('trainer');
@@ -50,6 +53,6 @@ export class Login {
   }
 
   private async leaveIfSignedIn(): Promise<void> {
-    if (this.auth.status() === 'ready') await this.router.navigateByUrl('/');
+    if (this.auth.status() === 'ready') await this.router.navigateByUrl(homeFor(this.session.role()));
   }
 }

@@ -53,9 +53,11 @@ export class RecordsService {
   readonly measurementList = signal<readonly Measurement[]>([]);
   readonly error = signal('');
   private readonly answered = signal<ReadonlySet<PlayerRecordKind>>(new Set());
+  /** Welche Zusatzdaten die Rolle lesen darf: Medizin sieht keine Förderpläne (Regeln: players/{id}/developmentPlans). */
+  private readonly expected = signal(3);
 
   readonly canWrite = computed(() => this.session.role() === 'trainer');
-  readonly loading = computed(() => this.playerId() !== null && !this.error() && this.answered().size < 3);
+  readonly loading = computed(() => this.playerId() !== null && !this.error() && this.answered().size < this.expected());
   /** Messungen, älteste zuerst. */
   readonly measurements = computed(() => sortedMeasurements(this.measurementList()));
   readonly ready = computed(() => this.playerId() !== null && !this.loading() && !this.error());
@@ -77,9 +79,15 @@ export class RecordsService {
     const generation = ++this.generation;
     this.playerId.set(playerId);
     const today = todayIso();
-    this.open(generation, playerId, 'developmentPlans', (docs) => this.plans.set(docs.map((entry) => planFromDoc(entry.id, entry.data, today))));
-    this.open(generation, playerId, 'absences', (docs) => this.absences.set(docs.map((entry) => absenceFromDoc(entry.id, entry.data))));
-    this.open(generation, playerId, 'measurements', (docs) => this.measurementList.set(docs.map((entry) => measurementFromDoc(entry.id, entry.data, today))));
+    const role = this.session.role();
+    // Spieler und Eltern: nur Dokumente mit der eigenen playerId (so verlangen es die Regeln).
+    const ownOnly = role === 'player' || role === 'parent';
+    this.expected.set(role === 'medical' ? 2 : 3);
+    if (role !== 'medical') {
+      this.open(generation, playerId, 'developmentPlans', ownOnly, (docs) => this.plans.set(docs.map((entry) => planFromDoc(entry.id, entry.data, today))));
+    }
+    this.open(generation, playerId, 'absences', ownOnly, (docs) => this.absences.set(docs.map((entry) => absenceFromDoc(entry.id, entry.data))));
+    this.open(generation, playerId, 'measurements', ownOnly, (docs) => this.measurementList.set(docs.map((entry) => measurementFromDoc(entry.id, entry.data, today))));
   }
 
   stop(): void {
@@ -233,7 +241,7 @@ export class RecordsService {
       .catch((error) => this.failWrite(error, text));
   }
 
-  private open(generation: number, playerId: string, kind: PlayerRecordKind, apply: (docs: RawDoc[]) => void): void {
+  private open(generation: number, playerId: string, kind: PlayerRecordKind, ownOnly: boolean, apply: (docs: RawDoc[]) => void): void {
     this.firebase
       .watchPlayerRecords(
         playerId,
@@ -247,6 +255,7 @@ export class RecordsService {
         (error) => {
           if (generation === this.generation) this.failLoad(error);
         },
+        { ownOnly },
       )
       .then((unsubscribe) => {
         if (generation !== this.generation || this.error()) unsubscribe();

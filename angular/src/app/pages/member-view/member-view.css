@@ -1,0 +1,23 @@
+.page {
+  max-width: 720px;
+  padding: var(--tk-space-4) 0;
+}
+
+.head {
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.intro {
+  margin: var(--tk-space-1) 0 0;
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+.sign-out {
+  white-space: nowrap;
+}
+
+.picker {
+  flex: 1 1 100%;
+}

@@ -1,0 +1,148 @@
+import { ChangeDetectionStrategy, Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { environment } from '../../../environments/environment';
+import { formatDate } from '../../core/event';
+import { LayoutService } from '../../core/layout.service';
+import { type Player, ageFromBirthdate, positionText, todayIso } from '../../core/player';
+import { availability, gradeToPercent, gradedEvents, profileFigures, skillAverages, trendChart } from '../../core/profile';
+import { ProfileService } from '../../core/profile.service';
+import { gradeLabel } from '../../core/rating';
+import { effectiveStatus } from '../../core/records';
+import { RecordsService } from '../../core/records.service';
+import { SessionService } from '../../core/session.service';
+import { SquadService } from '../../core/squad.service';
+import { SyncService } from '../../core/sync.service';
+import { Button } from '../../ui/button/button';
+import { Card } from '../../ui/card/card';
+import { Status } from '../../ui/status/status';
+import { ProfileExtras } from '../profile/profile-extras';
+
+/**
+ * Die eine Ansicht für Spieler, Eltern und Medizin (Figma 01c/01d). Sie zeigt nur, was die Firestore-Regeln der
+ * Rolle erlauben:
+ * - Spieler: das eigene Profil, die eigenen Bewertungen (ohne interne Trainer-Notizen) und den eigenen Förderplan
+ *   samt Selbstreflexion.
+ * - Eltern: dasselbe, nur lesend.
+ * - Medizin: Spielerliste, Status sowie Abwesenheiten/Verletzungen und Messwerte – keine Noten, keine Förderpläne.
+ * Es gibt keine Navigation zu Trainer-Bereichen; die Trainer-Routen sperrt `trainerGuard`.
+ */
+@Component({
+  selector: 'app-member-view',
+  imports: [RouterLink, Button, Card, Status, ProfileExtras],
+  templateUrl: './member-view.html',
+  styleUrls: ['../profile/profile.css', './member-view.css'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+export class MemberView implements OnInit {
+  private readonly session = inject(SessionService);
+  protected readonly squad = inject(SquadService);
+  protected readonly profile = inject(ProfileService);
+  protected readonly records = inject(RecordsService);
+  protected readonly sync = inject(SyncService);
+  protected readonly mobile = inject(LayoutService).isMobile;
+
+  protected readonly club = `${environment.clubName} ${environment.teamLabel}`;
+  protected readonly today = todayIso();
+
+  protected readonly role = this.session.role;
+  protected readonly medical = computed(() => this.role() === 'medical');
+  /** Spieler und Eltern sind an ein Profil gebunden; ohne Verknüpfung gibt es nichts zu zeigen. */
+  protected readonly unlinked = computed(() => !this.medical() && !this.session.playerId());
+
+  private readonly chosen = signal('');
+  protected readonly players = computed(() => [...this.squad.players()].sort((a, b) => a.number - b.number));
+  protected readonly player = computed<Player | null>(() => {
+    if (this.unlinked()) return null;
+    const list = this.players();
+    // Spieler und Eltern: ausschließlich das verknüpfte Profil, nie eine Auswahl.
+    if (!this.medical()) return list.find((entry) => entry.id === this.session.playerId()) ?? null;
+    return list.find((entry) => entry.id === this.chosen()) ?? list.at(0) ?? null;
+  });
+
+  protected readonly title = computed(() => {
+    const role = this.role();
+    if (role === 'medical') return 'Medizinische Ansicht';
+    if (role === 'parent') return this.player() ? `Profil von ${this.player()!.name}` : 'Profil';
+    return 'Mein Profil';
+  });
+  protected readonly intro = computed(() => {
+    const role = this.role();
+    if (role === 'medical') return 'Lesezugang: Status, Abwesenheiten, Verletzungen und Messwerte.';
+    if (role === 'parent') return 'Lesezugang zum Profil, zu den Bewertungen und zum Förderplan.';
+    return 'Deine Bewertungen, dein Förderplan und deine Entwicklung.';
+  });
+
+  protected readonly graded = computed(() => gradedEvents(this.profile.items()));
+  protected readonly history = computed(() => [...this.graded()].reverse());
+  protected readonly figures = computed(() => profileFigures(this.profile.items(), this.today));
+  protected readonly skills = computed(() => skillAverages(this.graded()));
+  protected readonly attendance = computed(() => availability(this.profile.items(), this.today));
+  protected readonly chart = computed(() => trendChart(this.graded()));
+  protected readonly cards = computed(() => {
+    const f = this.figures();
+    return [
+      { label: 'Notenschnitt', value: gradeLabel(f.average) },
+      { label: 'Bewertete Events', value: String(f.ratedEvents) },
+      { label: 'Teilnahmen', value: String(f.attendances) },
+      { label: 'Tore + Vorlagen', value: `${f.games.goals} + ${f.games.assists}` },
+    ];
+  });
+
+  protected readonly status = computed(() => {
+    const player = this.player();
+    return player ? effectiveStatus(player, this.records.absences(), this.today) : 'Fit';
+  });
+  protected readonly ready = computed(() => this.squad.load() === 'ready' && (this.medical() || !this.profile.loading()));
+  protected readonly failed = computed(() => this.squad.load() === 'error' || (!this.medical() && this.profile.error() !== ''));
+  protected readonly errorText = computed(() => this.squad.error() || this.profile.error());
+
+  constructor() {
+    // Daten laden, sobald das eigene (bzw. gewählte) Profil feststeht.
+    effect(() => {
+      const player = this.player();
+      untracked(() => {
+        if (!player) {
+          this.profile.stop();
+          this.records.stop();
+          return;
+        }
+        // Medizin darf keine Bewertungen lesen (Regeln: events/*/ratings) – dort wird nichts abonniert.
+        if (this.medical()) this.profile.stop();
+        else this.profile.start(player.id);
+        this.records.start(player.id);
+      });
+    });
+  }
+
+  ngOnInit(): void {
+    if (!this.unlinked()) this.squad.start();
+  }
+
+  protected formatDate = formatDate;
+  protected positionText = positionText;
+  protected gradeLabel = gradeLabel;
+  protected gradeToPercent = gradeToPercent;
+
+  protected age(birthdate: string): string {
+    const age = ageFromBirthdate(birthdate);
+    return age === null ? '–' : String(age);
+  }
+
+  protected injury(): string {
+    const player = this.player();
+    return this.status() === 'Verletzt' && player?.injuryUntil ? ` (ca. bis ${formatDate(player.injuryUntil)})` : '';
+  }
+
+  protected choose(event: Event): void {
+    this.chosen.set((event.target as HTMLSelectElement).value);
+  }
+
+  protected retry(): void {
+    if (this.squad.load() === 'error') {
+      this.squad.stop();
+      this.squad.start();
+    }
+    this.profile.retry();
+    this.records.retry();
+  }
+}
