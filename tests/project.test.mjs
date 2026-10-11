@@ -706,3 +706,18 @@ test("SessionStart-Hook installiert nur festgeschriebene, integritätsgeprüfte 
     assert.match(entry.resolved || "", /^https:\/\/registry\.npmjs\.org\//, `${path}: Bezugsquelle ist nicht die npm-Registry`);
   }
 });
+
+test("Suchfelder und Theme-Schalter haben zugängliche Namen ohne widersprüchliches aria-pressed (SCRUM-52)", async () => {
+  for (const file of ["index.html", ...teams.map((team) => `outputs/${team}/index.html`)]) {
+    const html = await read(file);
+    for (const input of html.match(/<input[^>]*type="search"[^>]*>/g) || []) {
+      assert.match(input, /aria-label="[^"]+"/, `${file}: Suchfeld ohne Namen: ${input}`);
+    }
+    assert.match(html, /id="themeToggle"[^>]*aria-label="/, `${file}: Theme-Schalter ohne aria-label`);
+    assert.doesNotMatch(html, /id="themeToggle"[^>]*aria-pressed/, `${file}: Theme-Schalter mit aria-pressed`);
+  }
+  for (const file of ["app.js", ...teams.map((team) => `outputs/${team}/app.js`)]) {
+    const app = await read(file);
+    assert.doesNotMatch(app, /toggle\.setAttribute\("aria-pressed"/, `${file}: Theme-Schalter setzt aria-pressed`);
+  }
+});
