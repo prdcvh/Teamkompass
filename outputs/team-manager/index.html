@@ -129,7 +129,7 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
               <span>Suche</span>
             </button>
-            <button class="theme-toggle" id="themeToggle" type="button" aria-pressed="false" title="Darkmode umschalten">
+            <button class="theme-toggle" id="themeToggle" type="button" aria-label="Darkmode einschalten" title="Darkmode einschalten">
               <span class="theme-toggle-icon" aria-hidden="true">◐</span>
               <span id="themeToggleText">Darkmode</span>
             </button>
@@ -226,7 +226,7 @@
             <div class="toolbar">
               <label class="search-box">
                 <span>Suche</span>
-                <input id="searchInput" type="search" placeholder="Name, Position, Status" />
+                <input id="searchInput" type="search" aria-label="Spieler suchen" placeholder="Name, Position, Status" />
               </label>
               <select id="positionFilter" aria-label="Position filtern">
                 <option value="all">Alle Positionen</option>
@@ -656,7 +656,7 @@
         </div>
         <label class="search-box">
           <span>Suche</span>
-          <input id="substituteSearch" type="search" placeholder="Name, Position" />
+          <input id="substituteSearch" type="search" aria-label="Auswechselspieler suchen" placeholder="Name, Position" />
         </label>
         <div class="substitute-list" id="substituteList"></div>
         <menu>
