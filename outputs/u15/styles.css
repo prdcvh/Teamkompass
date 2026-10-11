@@ -20,6 +20,8 @@
 .command-palette-box { display: grid; gap: 12px; padding: 18px; border-radius: 18px; background: var(--panel); color: var(--ink); box-shadow: 0 24px 80px rgb(0 0 0 / 28%); }
 .command-palette-box label { display: grid; gap: 8px; font-weight: 700; }
 .command-palette-box input { width: 100%; font-size: 1rem; }
+.command-palette-head { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; }
+.command-palette-close { min-width: 44px; min-height: 44px; border: 1px solid var(--line, #ccc); border-radius: 12px; background: transparent; color: inherit; font-size: 1.1rem; cursor: pointer; }
 #commandResults { display: grid; gap: 5px; max-height: 55vh; overflow: auto; }
 #commandResults button { display: flex; justify-content: space-between; gap: 16px; width: 100%; padding: 11px 12px; border: 0; border-radius: 10px; background: transparent; color: inherit; text-align: left; }
 #commandResults button:hover, #commandResults button:focus-visible { background: var(--soft-panel); }

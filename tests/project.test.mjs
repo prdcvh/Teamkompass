@@ -707,6 +707,21 @@ test("SessionStart-Hook installiert nur festgeschriebene, integritätsgeprüfte 
   }
 });
 
+test("Globale Suche: Schließen-Schaltfläche, Escape, Fokus-Rückgabe und Gegnerprofile (SCRUM-55)", async () => {
+  for (const team of teams) {
+    const nextLevel = await read(`outputs/${team}/next-level.js`);
+    const app = await read(`outputs/${team}/app.js`);
+    const css = await read(`outputs/${team}/styles.css`);
+    assert.match(nextLevel, /id="commandClose"[^>]*aria-label="Suche schließen"/);
+    assert.match(nextLevel, /event\.key === "Escape"[\s\S]*dialog\.close\(\)/);
+    assert.match(nextLevel, /opener\.focus\(\)/);
+    assert.match(nextLevel, /allowed\.includes\("opponents"\)[\s\S]*type: "opponent"/);
+    assert.match(app, /openOpponent: \(opponentId\)[\s\S]*allowedViews\(\)\.includes\("opponents"\)/);
+    assert.match(css, /\.command-palette-close \{ min-width: 44px; min-height: 44px;/);
+    assert.match(await read(`outputs/${team}/mobile.css`), /\.command-palette-close \{[^}]*min-height: 44px;/);
+  }
+});
+
 test("Suchfelder und Theme-Schalter haben zugängliche Namen ohne widersprüchliches aria-pressed (SCRUM-52)", async () => {
   for (const file of ["index.html", ...teams.map((team) => `outputs/${team}/index.html`)]) {
     const html = await read(file);
