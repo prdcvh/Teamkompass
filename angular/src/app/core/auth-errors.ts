@@ -2,6 +2,7 @@
 export function authErrorMessage(code: string | undefined): string {
   const value = code ?? '';
   if (value.includes('email-already-in-use')) return 'Diese E-Mail wird bereits verwendet.';
+  if (value.includes('requires-recent-login')) return 'Bitte melde dich neu an und versuche es dann erneut.';
   if (value.includes('wrong-password') || value.includes('invalid-credential')) {
     return 'E-Mail oder Passwort ist falsch.';
   }

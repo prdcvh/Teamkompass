@@ -33,6 +33,7 @@
           <label>E-Mail <input id="trainerLoginEmail" type="email" required /></label>
           <label>Passwort <input id="trainerLoginPassword" type="password" required /></label>
           <button class="primary-button" type="submit">Anmelden</button>
+          <button class="ghost-button" type="button" id="trainerResetBtn">Passwort vergessen?</button>
         </form>
 
         <hr />
@@ -142,6 +143,7 @@
                 <button class="ghost-button" id="migrateDataBtn" type="button" hidden>Alte Daten migrieren</button>
                 <button class="ghost-button" id="addTrainerBtn" type="button" hidden>Trainer-Konto anlegen</button>
                 <button class="ghost-button" id="addMedicalBtn" type="button" hidden>Medizinischen Lesezugang anlegen</button>
+                <button class="ghost-button" id="changePasswordBtn" type="button" hidden>Passwort ändern</button>
                 <button class="ghost-button" id="signOutBtn" type="button" hidden>Abmelden</button>
               </div>
             </details>
@@ -724,6 +726,24 @@
         <menu>
           <button class="ghost-button" type="button" id="cancelStaffDialogBtn">Abbrechen</button>
           <button class="primary-button" type="submit" id="staffSubmitBtn">Konto anlegen</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog id="passwordDialog">
+      <form class="player-form" id="passwordForm" method="dialog" novalidate>
+        <div class="dialog-head">
+          <h2>Passwort ändern</h2>
+          <button class="icon-button" type="button" id="closePasswordDialogBtn" aria-label="Schließen">×</button>
+        </div>
+        <label>Aktuelles Passwort <input id="passwordCurrent" type="password" autocomplete="current-password" required /></label>
+        <label>Neues Passwort <input id="passwordNew" type="password" autocomplete="new-password" required /></label>
+        <label>Neues Passwort wiederholen <input id="passwordRepeat" type="password" autocomplete="new-password" required /></label>
+        <p class="muted">Mindestens 12 Zeichen mit Groß- und Kleinbuchstaben und einer Ziffer. Zur Sicherheit wird das aktuelle Passwort noch einmal abgefragt.</p>
+        <p class="auth-gate-error" id="passwordError" role="alert"></p>
+        <menu>
+          <button class="ghost-button" type="button" id="cancelPasswordDialogBtn">Abbrechen</button>
+          <button class="primary-button" type="submit" id="passwordSubmitBtn">Passwort ändern</button>
         </menu>
       </form>
     </dialog>

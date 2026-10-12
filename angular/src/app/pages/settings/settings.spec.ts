@@ -1,4 +1,7 @@
 import { TestBed } from '@angular/core/testing';
+import { FirebaseService } from '../../core/firebase.service';
+import { SessionService } from '../../core/session.service';
+import { FakeFirebase } from '../../core/testing';
 import { TEAM_DATA_PREFIX } from '../../core/local-data';
 import { ThemeService } from '../../core/theme.service';
 import { WORKSPACE_KEY } from '../../core/workspace';
@@ -7,8 +10,12 @@ import { Settings } from './settings';
 describe('Settings (Einstellungen & Datenschutz)', () => {
   beforeEach(() => localStorage.clear());
 
-  async function render() {
-    await TestBed.configureTestingModule({ imports: [Settings] }).compileComponents();
+  let firebase: FakeFirebase;
+
+  async function render(role: 'trainer' | 'medical' | 'player' | null = null) {
+    firebase = new FakeFirebase();
+    await TestBed.configureTestingModule({ imports: [Settings], providers: [{ provide: FirebaseService, useValue: firebase }] }).compileComponents();
+    if (role) TestBed.inject(SessionService).role.set(role);
     const fixture = TestBed.createComponent(Settings);
     await fixture.whenStable();
     return fixture;
@@ -63,5 +70,71 @@ describe('Settings (Einstellungen & Datenschutz)', () => {
     const fixture = await render();
     expect(root(fixture).querySelector('img')).toBeNull();
     expect(root(fixture).textContent).toContain('<img src=x onerror=alert(1)>');
+  });
+
+  describe('Passwort ändern', () => {
+    const fill = (fixture: { nativeElement: unknown }, name: string, value: string) => {
+      const input = root(fixture).querySelector<HTMLInputElement>(`input[name="${name}"]`)!;
+      input.value = value;
+      input.dispatchEvent(new Event('input'));
+    };
+    const submit = async (fixture: { detectChanges: () => void; whenStable: () => Promise<unknown>; nativeElement: unknown }) => {
+      root(fixture).querySelector<HTMLFormElement>('form')!.dispatchEvent(new Event('submit'));
+      await fixture.whenStable();
+      fixture.detectChanges();
+    };
+
+    it('ist für Spieler nicht sichtbar', async () => {
+      expect(root(await render('player')).textContent).not.toContain('Passwort ändern');
+    });
+
+    it('ist ohne Anmeldung nicht sichtbar', async () => {
+      expect(root(await render(null)).textContent).not.toContain('Passwort ändern');
+    });
+
+    it('hat verdeckte Felder mit passenden Autofill-Hinweisen', async () => {
+      const fixture = await render('trainer');
+      fixture.detectChanges();
+      expect(root(fixture).querySelector<HTMLInputElement>('input[name="current"]')!.type).toBe('password');
+      expect(root(fixture).querySelector<HTMLInputElement>('input[name="next"]')!.autocomplete).toBe('new-password');
+      expect(root(fixture).querySelector<HTMLInputElement>('input[name="repeat"]')!.type).toBe('password');
+    });
+
+    it('ändert das Passwort und leert die Felder', async () => {
+      const fixture = await render('medical');
+      fixture.detectChanges();
+      fill(fixture, 'current', 'AltesPasswort1');
+      fill(fixture, 'next', 'NeuesPasswort1');
+      fill(fixture, 'repeat', 'NeuesPasswort1');
+      await submit(fixture);
+      expect(firebase.calls).toContain('changePassword:AltesPasswort1:NeuesPasswort1');
+      expect(root(fixture).textContent).toContain('Das Passwort wurde geändert.');
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(root(fixture).querySelector<HTMLInputElement>('input[name="next"]')!.value).toBe('');
+      expect(root(fixture).querySelector<HTMLInputElement>('input[name="current"]')!.value).toBe('');
+    });
+
+    it('zeigt Richtlinie und Fehler an, ohne Firebase zu fragen', async () => {
+      const fixture = await render('trainer');
+      fixture.detectChanges();
+      fill(fixture, 'current', 'AltesPasswort1');
+      fill(fixture, 'next', 'kurz1A');
+      fill(fixture, 'repeat', 'kurz1A');
+      await submit(fixture);
+      expect(root(fixture).querySelector('[role="alert"]')?.textContent).toContain('mindestens 12');
+      expect(firebase.calls.some((call) => call.startsWith('changePassword'))).toBe(false);
+    });
+
+    it('meldet ein falsches aktuelles Passwort', async () => {
+      const fixture = await render('trainer');
+      fixture.detectChanges();
+      firebase.changePasswordError = { code: 'auth/invalid-credential' };
+      fill(fixture, 'current', 'Falsch');
+      fill(fixture, 'next', 'NeuesPasswort1');
+      fill(fixture, 'repeat', 'NeuesPasswort1');
+      await submit(fixture);
+      expect(root(fixture).querySelector('[role="alert"]')?.textContent).toContain('aktuelle Passwort ist falsch');
+    });
   });
 });
