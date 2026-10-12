@@ -1741,7 +1741,7 @@ async function createInviteCodeForPlayer(playerId) {
   const accessInput = prompt("Zugangstyp eingeben: Spieler oder Eltern", "Spieler");
   if (accessInput === null) return;
   const role = accessInput.trim().toLowerCase().startsWith("eltern") ? "parent" : "player";
-  const daysInput = prompt("Zugang befristen? Anzahl Tage ab der Anmeldung eingeben, oder leer lassen fuer unbegrenzten Zugang:", "");
+  const daysInput = prompt("Zugang befristen? Anzahl Tage ab heute (ab dem Erzeugen des Codes) eingeben, oder leer lassen fuer unbegrenzten Zugang:", "");
   if (daysInput === null) return;
   const days = Number(daysInput.trim());
   const hasLimit = daysInput.trim() !== "" && Number.isFinite(days) && days > 0;
@@ -3190,7 +3190,8 @@ function openPlayerDialog(player) {
   renderPositionPicker(positions);
   $("#playerCustomPositions").value = customPositions.join(", ");
   $("#playerNumber").value = player?.number || nextNumber();
-  $("#playerBirthdate").value = player?.birthdate || "2006-07-01";
+  // Kein vorbelegtes Geburtsdatum: das Feld ist Pflicht (ein falscher Standard verfaelscht Alter und Geburtsquartal).
+  $("#playerBirthdate").value = player?.birthdate || "";
   $("#playerStatus").value = player?.status || "Fit";
   $("#playerInjuryUntil").value = player?.injuryUntil || "";
   $("#playerConsentStatus").value = player?.consentStatus || "pending";
@@ -3564,6 +3565,14 @@ function saveAbsence(event) {
     from: $("#absenceFrom").value,
     to: $("#absenceTo").value
   };
+  // "Bis" vor "Von" waere ein Eintrag, der nie wirkt (absenceCoversDate): nicht speichern.
+  if (absence.from && absence.to && absence.to < absence.from) {
+    const toField = $("#absenceTo");
+    toField.setCustomValidity("Das Enddatum darf nicht vor dem Beginn liegen.");
+    toField.reportValidity();
+    toField.setCustomValidity("");
+    return;
+  }
   const existingIndex = state.absences[playerId].findIndex((item) => item.id === id);
   if (existingIndex >= 0) state.absences[playerId][existingIndex] = absence;
   else state.absences[playerId].push(absence);
@@ -4789,6 +4798,7 @@ on("#signOutBtn", "click", handleSignOut);
 on("#migrateDataBtn", "click", migrateLegacyBlobToCollections);
 on("#addTrainerBtn", "click", createTrainerAccount);
 on("#addMedicalBtn", "click", createMedicalAccount);
+on("#absenceFrom", "change", () => { $("#absenceTo").min = $("#absenceFrom").value; });
 on("#trainerResetBtn", "click", handlePasswordReset);
 on("#changePasswordBtn", "click", openPasswordDialog);
 on("#passwordForm", "submit", handlePasswordChange);
