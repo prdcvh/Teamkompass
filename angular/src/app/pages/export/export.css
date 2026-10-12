@@ -1,0 +1,58 @@
+:host {
+  display: block;
+}
+
+.page {
+  display: grid;
+  gap: var(--tk-space-4);
+  max-width: 720px;
+  padding: var(--tk-space-5);
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: var(--tk-text-title);
+}
+
+h2 {
+  font-size: var(--tk-text-lg);
+}
+
+.muted,
+.sync {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+.panel {
+  display: grid;
+  gap: var(--tk-space-3);
+}
+
+.field {
+  display: grid;
+  gap: var(--tk-space-1);
+}
+
+.notice {
+  display: grid;
+  gap: var(--tk-space-2);
+  justify-items: start;
+}
+
+.error {
+  color: var(--tk-red-dark);
+  font-size: var(--tk-text-sm);
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--tk-space-2);
+  margin-top: var(--tk-space-3);
+}

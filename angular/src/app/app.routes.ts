@@ -2,8 +2,6 @@ import { Routes } from '@angular/router';
 import { authGuard, guestGuard, memberViewGuard, trainerGuard } from './core/auth.guard';
 import { Shell } from './shell/shell';
 
-const placeholder = () => import('./pages/placeholder/placeholder').then((m) => m.Placeholder);
-
 export const routes: Routes = [
   {
     path: 'styleguide',
@@ -43,7 +41,7 @@ export const routes: Routes = [
           { path: 'zugaenge', loadComponent: () => import('./pages/access/access').then((m) => m.Access) },
           { path: 'trainer-konto', loadComponent: () => import('./pages/staff-account/staff-account').then((m) => m.StaffAccount), data: { role: 'trainer' } },
           { path: 'medizin-zugang', loadComponent: () => import('./pages/staff-account/staff-account').then((m) => m.StaffAccount), data: { role: 'medical' } },
-          { path: 'export', loadComponent: placeholder, data: { title: 'Daten exportieren' } },
+          { path: 'export', loadComponent: () => import('./pages/export/export').then((m) => m.Export) },
           { path: 'einstellungen', loadComponent: () => import('./pages/settings/settings').then((m) => m.Settings) },
         ],
       },

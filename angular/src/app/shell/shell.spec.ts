@@ -81,11 +81,6 @@ describe('Shell (in der App)', () => {
     await vi.waitFor(() => expect(root.querySelector('app-settings')).not.toBeNull());
   });
 
-  it('nennt bei noch nicht gebauten Bereichen das Ticket', async () => {
-    const root = el(await render());
-    expect(root.querySelector('app-placeholder')?.textContent).toContain('SCRUM-75');
-  });
-
   it('markiert den aktuellen Bereich in der Sidebar', async () => {
     const root = el(await render());
     const active = root.querySelector('tk-sidebar a.active');
@@ -105,12 +100,12 @@ describe('Shell (in der App)', () => {
   it('wechselt die Variante live, ohne die Seite neu zu laden', async () => {
     const fixture = await render();
     const root = el(fixture);
-    const page = root.querySelector('app-placeholder');
+    const page = root.querySelector('app-export');
     expect(page).not.toBeNull();
     isMobile.set(true);
     await fixture.whenStable();
     expect(root.querySelector('tk-tab-bar')).not.toBeNull();
-    expect(root.querySelector('app-placeholder')).toBe(page);
+    expect(root.querySelector('app-export')).toBe(page);
   });
 
   it('öffnet das Mehr-Sheet über den Tab „Mehr“', async () => {
