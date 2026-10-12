@@ -1,0 +1,13 @@
+{
+  "name": "teamkompass-rules-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "cd ../.. && tests/rules/node_modules/.bin/firebase emulators:exec --only firestore --project demo-rules \"cd tests/rules && node --test *.test.mjs\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.0",
+    "firebase": "^12.0.0",
+    "firebase-tools": "^15.33.0"
+  }
+}
