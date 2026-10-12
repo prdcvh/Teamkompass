@@ -102,3 +102,8 @@ input[role='switch']:checked::after {
   justify-content: flex-end;
   margin-top: var(--tk-space-4);
 }
+
+.error {
+  color: var(--tk-red-dark);
+  font-size: var(--tk-text-sm);
+}

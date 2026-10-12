@@ -16,6 +16,7 @@ import { TabBar } from './tab-bar/tab-bar';
 @Component({
   selector: 'tk-shell',
   imports: [RouterOutlet, Sidebar, TabBar, MoreSheet],
+  host: { '(document:keydown)': 'onKey($event)' },
   templateUrl: './shell.html',
   styleUrl: './shell.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -31,6 +32,14 @@ export class Shell {
     if (!showsNavigation(this.session.role())) return 'focused';
     return this.layout.isMobile() ? 'mobile' : 'desktop';
   });
+
+  /** Strg/⌘ + K öffnet die Suche (nur für Trainer; Spieler, Eltern und Medizin haben keine Suche). */
+  protected onKey(event: KeyboardEvent): void {
+    if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'k') return;
+    if (this.session.role() !== 'trainer') return;
+    event.preventDefault();
+    void this.router.navigateByUrl('/suche');
+  }
 
   /** Aktiv, wenn die aktuelle Seite nur über „Mehr“ erreichbar ist. */
   protected moreActive(): boolean {

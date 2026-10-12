@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "firebase emulators:exec --only firestore --project demo-invite-claim \"node --test invite-claim.test.mjs\""
+    "test": "cd ../.. && tests/rules/node_modules/.bin/firebase emulators:exec --only firestore --project demo-rules \"cd tests/rules && node --test *.test.mjs\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.0",

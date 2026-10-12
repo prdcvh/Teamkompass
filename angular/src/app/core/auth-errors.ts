@@ -2,12 +2,13 @@
 export function authErrorMessage(code: string | undefined): string {
   const value = code ?? '';
   if (value.includes('email-already-in-use')) return 'Diese E-Mail wird bereits verwendet.';
+  if (value.includes('requires-recent-login')) return 'Bitte melde dich neu an und versuche es dann erneut.';
   if (value.includes('wrong-password') || value.includes('invalid-credential')) {
     return 'E-Mail oder Passwort ist falsch.';
   }
   if (value.includes('user-not-found')) return 'Kein Trainer-Konto mit dieser E-Mail gefunden.';
   if (value.includes('invalid-email')) return 'Bitte eine gültige E-Mail-Adresse eingeben.';
-  if (value.includes('weak-password')) return 'Das Passwort muss mindestens 6 Zeichen haben.';
+  if (value.includes('weak-password')) return 'Das Passwort muss mindestens 12 Zeichen haben.';
   if (value.includes('too-many-requests')) {
     return 'Zu viele Versuche. Bitte kurz warten und dann erneut versuchen.';
   }

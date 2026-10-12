@@ -1,5 +1,5 @@
 // Emulator-Tests fuer den Einmalverbrauch von Einladungscodes (SCRUM-77).
-// Starten: siehe tests/rules/README.md (braucht Java + firebase-tools, nicht Teil von "npm run verify").
+// Starten: siehe tests/rules/README.md (braucht Java 21 + firebase-tools; in der CI: .github/workflows/rules-tests.yml).
 import { test, before, after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -12,7 +12,7 @@ let env;
 before(async () => {
   env = await initializeTestEnvironment({
     projectId: "demo-invite-claim",
-    firestore: { rules: readFileSync(process.env.RULES_FILE || new URL("../../firestore.rules", import.meta.url), "utf8"), host: "127.0.0.1", port: 8085 }
+    firestore: { rules: readFileSync(process.env.RULES_FILE || new URL("../../firestore.rules", import.meta.url), "utf8") }
   });
 });
 after(async () => { await env.cleanup(); });

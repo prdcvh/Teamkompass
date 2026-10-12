@@ -45,7 +45,21 @@
       </div>
 
       <div class="card" role="tabpanel" [attr.aria-labelledby]="tab() === 'trainer' ? 'tab-trainer' : 'tab-code'">
-        @if (tab() === 'trainer') {
+        @if (tab() === 'trainer' && resetting()) {
+          <form (ngSubmit)="submitReset()" #resetForm="ngForm">
+            <h3>Passwort zurücksetzen</h3>
+            <p class="hint">Gib die E-Mail-Adresse deines Kontos ein. Du bekommst einen Link, über den du selbst ein neues Passwort festlegst.</p>
+            <label class="tk-label">
+              E-Mail
+              <input class="tk-input" type="email" name="resetEmail" autocomplete="username" required [(ngModel)]="email" />
+            </label>
+            <button tkButton variant="primary" type="submit" [disabled]="resetBusy()" [attr.aria-busy]="resetBusy()">Link senden</button>
+            <button type="button" class="linklike" (click)="closeReset()">Zurück zur Anmeldung</button>
+            @if (resetMessage()) {
+              <p [class.error]="resetFailed()" [class.hint]="!resetFailed()" [attr.role]="resetFailed() ? 'alert' : 'status'">{{ resetMessage() }}</p>
+            }
+          </form>
+        } @else if (tab() === 'trainer') {
           <form (ngSubmit)="submitTrainer()" #trainerForm="ngForm">
             <h3>Trainer-Login</h3>
             <label class="tk-label">
@@ -68,6 +82,7 @@
                 Anmelden
               }
             </button>
+            <button type="button" class="linklike" (click)="openReset()">Passwort vergessen?</button>
           </form>
         } @else {
           <form (ngSubmit)="submitCode()" #codeForm="ngForm">
