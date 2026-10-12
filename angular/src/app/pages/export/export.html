@@ -1,0 +1,69 @@
+<section class="page">
+  <header class="head">
+    <p class="tk-eyebrow">TeamKompass</p>
+    <h1>Daten exportieren</h1>
+    <p class="muted">Sicherung als Datei und Spielerprofil als PDF. Nur für Trainer.</p>
+  </header>
+
+  @if (!isTrainer()) {
+    <p class="muted">Der Export ist nur für Trainer verfügbar.</p>
+  } @else {
+    <p class="sync" role="status" [attr.data-state]="sync.state()">{{ sync.label() }}</p>
+
+    @if (loadFailed()) {
+      <div class="notice" role="alert">
+        <p>Die Teamdaten konnten nicht geladen werden.</p>
+        <button tkButton type="button" (click)="retry()">Erneut versuchen</button>
+      </div>
+    } @else if (!ready()) {
+      <p class="muted" role="status">Daten werden geladen …</p>
+    } @else {
+      <tk-card>
+        <div class="panel">
+          <h2>Sicherung (JSON)</h2>
+          <p class="muted">
+            Spieler, Events mit allen Bewertungen, Förderpläne, Abwesenheiten, Messwerte und Gegnerprofile in einer Datei.
+            Interne Trainer-Notizen sind nicht enthalten. Die Datei enthält persönliche Daten und Gesundheitsdaten: sicher aufbewahren und nicht weitergeben.
+          </p>
+          <div>
+            <button tkButton variant="primary" type="button" [disabled]="busy()" (click)="request('json')">Sicherung herunterladen</button>
+          </div>
+        </div>
+      </tk-card>
+
+      <tk-card>
+        <div class="panel">
+          <h2>Spielerprofil als PDF</h2>
+          <p class="muted">Kompakter Bericht mit Kennzahlen, Kompetenzprofil und Bestleistungen. Im Druckdialog „Als PDF speichern“ wählen.</p>
+          <label class="field">
+            <span>Spieler</span>
+            <select class="tk-input" [disabled]="players().length === 0" (change)="pick($event)">
+              @for (player of players(); track player.id) {
+                <option [value]="player.id" [selected]="player.id === selected()?.id">{{ player.name }}</option>
+              }
+            </select>
+          </label>
+          <div>
+            <button tkButton type="button" [disabled]="busy() || !selected()" (click)="request('pdf')">Bericht erstellen</button>
+          </div>
+        </div>
+      </tk-card>
+
+      @if (failure()) {
+        <p class="error" role="alert">{{ failure() }}</p>
+      }
+      @if (done()) {
+        <p class="muted" role="status">{{ done() }}</p>
+      }
+    }
+  }
+
+  <tk-dialog [open]="confirming() !== null" title="Einwilligung widerrufen" (closed)="confirming.set(null)">
+    <p>{{ confirmText() }}</p>
+    <p>Trotzdem exportieren?</p>
+    <div class="confirm-actions">
+      <button tkButton type="button" (click)="confirming.set(null)">Abbrechen</button>
+      <button tkButton type="button" variant="primary" (click)="confirm()">Trotzdem exportieren</button>
+    </div>
+  </tk-dialog>
+</section>

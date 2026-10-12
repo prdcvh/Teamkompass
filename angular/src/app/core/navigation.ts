@@ -7,15 +7,6 @@ export interface NavItem {
   readonly hint?: string;
 }
 
-/** Noch nicht gebaute Bereiche: Pfad → Ticket, in dem sie entstehen (Hinweis statt leerer Seite). */
-export const PLANNED_IN: Readonly<Record<string, string>> = {
-  '/teamanalyse': 'SCRUM-70',
-  '/gegneranalyse': 'SCRUM-71',
-  '/aufstellung': 'SCRUM-72',
-  '/ansicht': 'SCRUM-74',
-  '/export': 'SCRUM-75',
-};
-
 /** Hauptnavigation des Trainers (Desktop: Sidebar „Mannschaft“). */
 export const SIDEBAR_ITEMS: readonly NavItem[] = [
   { path: '/start', label: 'Dashboard', icon: 'grid' },

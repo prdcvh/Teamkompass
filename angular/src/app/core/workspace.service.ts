@@ -20,6 +20,11 @@ export class WorkspaceService {
     this.update(this.state(), 'Lokalen Zwischenspeicher gelöscht');
   }
 
+  /** Vermerkt eine Aktion im lokalen Aktivitätsverlauf (z. B. einen Export). */
+  record(action: string): void {
+    this.update(this.state(), action);
+  }
+
   private update(next: Workspace, action: string): void {
     const workspace = withActivity(next, action, new Date(), crypto.randomUUID());
     this.state.set(workspace);
