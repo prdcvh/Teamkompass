@@ -7,7 +7,7 @@ export function authErrorMessage(code: string | undefined): string {
   }
   if (value.includes('user-not-found')) return 'Kein Trainer-Konto mit dieser E-Mail gefunden.';
   if (value.includes('invalid-email')) return 'Bitte eine gültige E-Mail-Adresse eingeben.';
-  if (value.includes('weak-password')) return 'Das Passwort muss mindestens 6 Zeichen haben.';
+  if (value.includes('weak-password')) return 'Das Passwort muss mindestens 12 Zeichen haben.';
   if (value.includes('too-many-requests')) {
     return 'Zu viele Versuche. Bitte kurz warten und dann erneut versuchen.';
   }

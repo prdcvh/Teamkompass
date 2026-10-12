@@ -710,6 +710,24 @@
       </form>
     </dialog>
 
+    <dialog id="staffDialog">
+      <form class="player-form" id="staffForm" method="dialog" novalidate>
+        <div class="dialog-head">
+          <h2 id="staffDialogTitle">Trainer-Konto anlegen</h2>
+          <button class="icon-button" type="button" id="closeStaffDialogBtn" aria-label="Schließen">×</button>
+        </div>
+        <label>E-Mail-Adresse <input id="staffEmail" type="email" autocomplete="off" required /></label>
+        <label>Passwort <input id="staffPassword" type="password" autocomplete="new-password" required /></label>
+        <label>Passwort wiederholen <input id="staffPasswordRepeat" type="password" autocomplete="new-password" required /></label>
+        <p class="muted">Mindestens 12 Zeichen mit Groß- und Kleinbuchstaben und einer Ziffer. Das Passwort wird nie angezeigt; das neue Konto kann es später selbst ändern.</p>
+        <p class="auth-gate-error" id="staffError" role="alert"></p>
+        <menu>
+          <button class="ghost-button" type="button" id="cancelStaffDialogBtn">Abbrechen</button>
+          <button class="primary-button" type="submit" id="staffSubmitBtn">Konto anlegen</button>
+        </menu>
+      </form>
+    </dialog>
+
     <dialog id="privacyDialog">
       <div class="player-form">
         <div class="dialog-head">

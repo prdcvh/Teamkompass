@@ -1,8 +1,11 @@
 import type { RawDoc } from './firebase.service';
 import type { Role } from './role';
 
-/** Mindestlänge für neue Passwörter von Trainer- und Medizin-Konten (die Referenz-App erlaubte noch 6). */
-export const MIN_PASSWORD_LENGTH = 8;
+/**
+ * Passwortrichtlinie für neue Trainer- und Medizin-Konten (SCRUM-58): mindestens 12 Zeichen mit Groß- und
+ * Kleinbuchstaben und einer Ziffer. Die Referenz-App erlaubte früher nur 6 Zeichen.
+ */
+export const MIN_PASSWORD_LENGTH = 12;
 export const MAX_PASSWORD_LENGTH = 128;
 export const MAX_EXPIRY_DAYS = 365;
 
@@ -64,6 +67,9 @@ export function validateStaffDraft(draft: StaffDraft): StaffErrors {
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = 'Bitte eine gültige E-Mail-Adresse eingeben.';
   if (draft.password.length < MIN_PASSWORD_LENGTH) errors.password = `Das Passwort muss mindestens ${MIN_PASSWORD_LENGTH} Zeichen haben.`;
   else if (draft.password.length > MAX_PASSWORD_LENGTH) errors.password = `Das Passwort darf höchstens ${MAX_PASSWORD_LENGTH} Zeichen haben.`;
+  else if (!/\p{Ll}/u.test(draft.password) || !/\p{Lu}/u.test(draft.password) || !/\d/.test(draft.password)) {
+    errors.password = 'Das Passwort braucht Groß- und Kleinbuchstaben und mindestens eine Ziffer.';
+  }
   if (!errors.password && draft.repeat !== draft.password) errors.repeat = 'Die beiden Passwörter stimmen nicht überein.';
   return errors;
 }

@@ -1559,7 +1559,7 @@ function authErrorMessage(error) {
   if (code.includes("email-already-in-use")) return "Diese E-Mail wird bereits verwendet.";
   if (code.includes("wrong-password") || code.includes("invalid-credential")) return "E-Mail oder Passwort ist falsch.";
   if (code.includes("user-not-found")) return "Kein Trainer-Konto mit dieser E-Mail gefunden.";
-  if (code.includes("weak-password")) return "Das Passwort muss mindestens 6 Zeichen haben.";
+  if (code.includes("weak-password")) return "Das Passwort muss mindestens 12 Zeichen haben.";
   if (code.includes("operation-not-allowed")) return "Diese Anmeldemethode ist in der Firebase-Konsole noch nicht aktiviert.";
   if (code.includes("permission-denied") || code.includes("insufficient-permissions")) {
     return "Zugriff von den Firestore-Regeln verweigert (permission-denied). Pruefe, ob firestore.rules wirklich veroeffentlicht wurde.";
@@ -1588,14 +1588,63 @@ async function createMedicalAccount() {
   return createStaffAccount("medical");
 }
 
+const MIN_STAFF_PASSWORD_LENGTH = 12;
+
+// Passwortrichtlinie fuer neue Trainer-/Medizin-Konten (SCRUM-58). Liefert die Meldung oder "".
+function staffPasswordProblem(password) {
+  if (password.length < MIN_STAFF_PASSWORD_LENGTH) return "Das Passwort muss mindestens 12 Zeichen haben.";
+  if (password.length > 128) return "Das Passwort darf höchstens 128 Zeichen haben.";
+  if (!/[a-zäöüß]/.test(password) || !/[A-ZÄÖÜ]/.test(password) || !/\d/.test(password)) {
+    return "Das Passwort braucht Groß- und Kleinbuchstaben und mindestens eine Ziffer.";
+  }
+  return "";
+}
+
+// Eingabe der Zugangsdaten im Dialog statt per prompt(): das Passwort steht in einem verdeckten Feld (SCRUM-58).
+function askStaffCredentials(label) {
+  const dialog = $("#staffDialog");
+  const form = $("#staffForm");
+  const error = $("#staffError");
+  $("#staffDialogTitle").textContent = `${label} anlegen`;
+  form.reset();
+  error.textContent = "";
+  return new Promise((resolve) => {
+    const finish = (value) => {
+      form.removeEventListener("submit", submit);
+      dialog.removeEventListener("close", cancel);
+      $("#closeStaffDialogBtn").removeEventListener("click", close);
+      $("#cancelStaffDialogBtn").removeEventListener("click", close);
+      form.reset();
+      if (dialog.open) dialog.close();
+      resolve(value);
+    };
+    const submit = (event) => {
+      event.preventDefault();
+      const email = $("#staffEmail").value.trim();
+      const password = $("#staffPassword").value;
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { error.textContent = "Bitte eine gültige E-Mail-Adresse eingeben."; return; }
+      const problem = staffPasswordProblem(password);
+      if (problem) { error.textContent = problem; return; }
+      if (password !== $("#staffPasswordRepeat").value) { error.textContent = "Die beiden Passwörter stimmen nicht überein."; return; }
+      finish({ email, password });
+    };
+    const close = () => finish(null);
+    const cancel = () => finish(null);
+    form.addEventListener("submit", submit);
+    dialog.addEventListener("close", cancel);
+    $("#closeStaffDialogBtn").addEventListener("click", close);
+    $("#cancelStaffDialogBtn").addEventListener("click", close);
+    dialog.showModal();
+  });
+}
+
 async function createStaffAccount(role) {
   if (!isCloudTrainer()) return;
   const label = role === "medical" ? "medizinischen Lesezugang" : "Trainer-Konto";
-  const email = prompt(`E-Mail-Adresse für den ${label}:`);
-  if (!email) return;
-  const trimmedEmail = email.trim();
-  const password = prompt(`Passwort für den ${label} (mind. 6 Zeichen):`);
-  if (!password) return;
+  const credentials = await askStaffCredentials(role === "medical" ? "Medizinischen Lesezugang" : "Trainer-Konto");
+  if (!credentials) return;
+  const trimmedEmail = credentials.email;
+  const password = credentials.password;
 
   const config = window.TEAMKOMPASS_CONFIG || {};
   const appModule = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js");
