@@ -1632,6 +1632,9 @@ function authErrorMessage(error) {
 
 async function handleSignOut() {
   if (!authInstance) return;
+  // Spieler/Eltern haben nur eine anonyme Anmeldung mit Einmal-Code: ohne neuen Code vom Trainer kommen sie nicht wieder hinein (SCRUM-32).
+  if (["player", "parent"].includes(currentRole) &&
+    !confirm("Wirklich abmelden? Danach kommst du nur mit einem neuen Einladungscode von deinem Trainer wieder hinein. Der bisherige Code ist verbraucht.")) return;
   await authModule.signOut(authInstance);
   clearLocalTeamData();
   // Neu laden setzt auch Rollen-Oberflaeche und Zwischenzustaende der vorigen Sitzung zurueck.

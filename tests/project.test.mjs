@@ -815,3 +815,12 @@ test("Rules-Tests: Lockfile mit Integritaet und CI-Workflow vorhanden (SCRUM-38)
   assert.match(workflow, /npm ci --ignore-scripts --prefix tests\/rules/);
   assert.doesNotMatch(workflow, /secrets\./);
 });
+
+test("Abmelden warnt Spieler und Eltern vor dem Verlust des Zugangs (SCRUM-32)", async () => {
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    const handler = app.slice(app.indexOf("async function handleSignOut"), app.indexOf("async function handleSignOut") + 700);
+    assert.match(handler, /\["player", "parent"\]\.includes\(currentRole\)/);
+    assert.match(handler, /neuen Einladungscode/);
+  }
+});
