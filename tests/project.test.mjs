@@ -790,3 +790,15 @@ test("'Heute' wird lokal und nicht in UTC berechnet (SCRUM-21)", async () => {
     assert.match(app, /function localIsoDate\(date = new Date\(\)\)/, `${file}: Helfer localIsoDate fehlt`);
   }
 });
+
+test("Abwesenheit: 'Bis' vor 'Von' wird nicht gespeichert; kein vorbelegtes Geburtsdatum; Befristung 'ab heute' (SCRUM-22/23)", async () => {
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    assert.match(app, /absence\.to < absence\.from[\s\S]*Das Enddatum darf nicht vor dem Beginn liegen/);
+    assert.match(app, /on\("#absenceFrom", "change"/);
+    assert.doesNotMatch(app, /\$\("#playerBirthdate"\)\.value = player\?\.birthdate \|\| "2006/);
+    assert.match(app, /\$\("#playerBirthdate"\)\.value = player\?\.birthdate \|\| "";/);
+    assert.doesNotMatch(app, /ab der Anmeldung eingeben/);
+    assert.match(app, /Anzahl Tage ab heute/);
+  }
+});
