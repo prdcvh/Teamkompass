@@ -454,7 +454,7 @@ function normalizeDevelopmentPlan(plan = {}) {
     reviewDate: plan.reviewDate || "",
     status: plan.status || "Offen",
     dueDate: plan.dueDate || "",
-    createdAt: plan.createdAt || new Date().toISOString().slice(0, 10)
+    createdAt: plan.createdAt || localIsoDate()
   };
 }
 
@@ -516,7 +516,7 @@ function normalizeMeasurements(measurements = {}, playerIds = new Set()) {
 function normalizeMeasurement(measurement = {}) {
   return {
     id: measurement.id || `me${crypto.randomUUID()}`,
-    date: measurement.date || new Date().toISOString().slice(0, 10),
+    date: measurement.date || localIsoDate(),
     height: measurement.height ?? "",
     weight: measurement.weight ?? ""
   };
@@ -534,7 +534,7 @@ function normalizeOpponent(opponent = {}) {
     setPieces: opponent.setPieces || "",
     gamePlan: opponent.gamePlan || "",
     notes: opponent.notes || "",
-    updatedAt: opponent.updatedAt || new Date().toISOString().slice(0, 10)
+    updatedAt: opponent.updatedAt || localIsoDate()
   };
 }
 
@@ -652,7 +652,7 @@ function migrateLegacyState(data) {
       id: "e-legacy",
       type: "Training",
       title: "Importierte Leistungsdaten",
-      date: data.records.at(-1)?.date || new Date().toISOString().slice(0, 10),
+      date: data.records.at(-1)?.date || localIsoDate(),
       intensity: 2,
       location: "",
       opponent: "",
@@ -1788,8 +1788,8 @@ async function renderAccessManager() {
       let status = "Unbegrenzt gueltig";
       if (expiresAtDate) {
         status = expiresAtDate < now
-          ? `Abgelaufen seit ${formatDate(expiresAtDate.toISOString().slice(0, 10))}`
-          : `Gueltig bis ${formatDate(expiresAtDate.toISOString().slice(0, 10))}`;
+          ? `Abgelaufen seit ${formatDate(localIsoDate(expiresAtDate))}`
+          : `Gueltig bis ${formatDate(localIsoDate(expiresAtDate))}`;
       }
       return `
         <div class="access-row">
@@ -2154,7 +2154,7 @@ function unavailabilityReason(player, dateStr) {
 // andere Abwesenheit (Urlaub, Klassenfahrt etc.) zeigt "Abwesend". Ohne aktive Abwesenheit
 // bleibt es beim manuell gepflegten Status (Fit/Angeschlagen/Verletzt/Pause).
 function playerEffectiveStatus(player) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localIsoDate();
   const absence = activeAbsenceOn(player.id, today);
   if (!absence) return player.status;
   if (isInjuryAbsence(absence)) return "Verletzt";
@@ -2958,7 +2958,7 @@ function eventCardsHtml(events) {
 
 function renderEvents() {
   const events = filteredEvents();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localIsoDate();
   const upcoming = events.filter((event) => event.date >= today).sort((a, b) => new Date(a.date) - new Date(b.date));
   const past = events.filter((event) => event.date < today).sort((a, b) => new Date(b.date) - new Date(a.date));
 
@@ -3448,7 +3448,7 @@ function saveDevelopmentPlan(event) {
     reviewDate: $("#developmentPlanReviewDate").value,
     status: $("#developmentPlanStatus").value,
     dueDate: $("#developmentPlanDueDate").value,
-    createdAt: state.developmentPlans[playerId].find((item) => item.id === id)?.createdAt || new Date().toISOString().slice(0, 10)
+    createdAt: state.developmentPlans[playerId].find((item) => item.id === id)?.createdAt || localIsoDate()
   };
   const existingIndex = state.developmentPlans[playerId].findIndex((item) => item.id === id);
   if (existingIndex >= 0) state.developmentPlans[playerId][existingIndex] = plan;
@@ -4257,7 +4257,7 @@ function exportData() {
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = `teamkompass-export-${new Date().toISOString().slice(0, 10)}.json`;
+  link.download = `teamkompass-export-${localIsoDate()}.json`;
   link.click();
   URL.revokeObjectURL(link.href);
 }
@@ -4335,7 +4335,7 @@ function saveOpponent(event) {
     setPieces: $("#opponentSetPieces").value.trim(),
     gamePlan: $("#opponentGamePlan").value.trim(),
     notes: $("#opponentNotes").value.trim(),
-    updatedAt: new Date().toISOString().slice(0, 10)
+    updatedAt: localIsoDate()
   };
   const existingIndex = state.opponents.findIndex((item) => item.id === id);
   if (existingIndex >= 0) state.opponents[existingIndex] = opponent;
