@@ -39,6 +39,19 @@ export class FakeFirebase implements Pick<FirebaseService, keyof FirebaseService
     return user;
   }
 
+  resetError: unknown = null;
+  changePasswordError: unknown = null;
+
+  async sendPasswordReset(email: string): Promise<void> {
+    this.calls.push(`reset:${email}`);
+    if (this.resetError) throw this.resetError;
+  }
+
+  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    this.calls.push(`changePassword:${currentPassword}:${newPassword}`);
+    if (this.changePasswordError) throw this.changePasswordError;
+  }
+
   async signInAnonymously(): Promise<string> {
     this.calls.push('anonymous');
     this.emit({ uid: this.nextUid, isAnonymous: true, email: null });

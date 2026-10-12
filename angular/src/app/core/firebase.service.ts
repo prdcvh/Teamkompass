@@ -100,6 +100,23 @@ export class FirebaseService {
     return credential.user.uid;
   }
 
+  /** Schickt die Mail zum Zurücksetzen des Passworts (der Nutzer setzt es selbst über den Link in der Mail). */
+  async sendPasswordReset(email: string): Promise<void> {
+    const { auth } = await this.init();
+    const { sendPasswordResetEmail } = await import('firebase/auth');
+    await sendPasswordResetEmail(auth, email);
+  }
+
+  /** Ändert das Passwort des angemeldeten Kontos; das aktuelle Passwort wird dafür erneut bestätigt. */
+  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    const { auth } = await this.init();
+    const { EmailAuthProvider, reauthenticateWithCredential, updatePassword } = await import('firebase/auth');
+    const user = auth.currentUser;
+    if (!user?.email) throw Object.assign(new Error('no-email-user'), { code: 'auth/requires-recent-login' });
+    await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, currentPassword));
+    await updatePassword(user, newPassword);
+  }
+
   async signOut(): Promise<void> {
     const { auth } = await this.init();
     const { signOut } = await import('firebase/auth');

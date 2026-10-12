@@ -35,6 +35,36 @@
     </div>
   </tk-card>
 
+  @if (canChangePassword()) {
+    <tk-card>
+      <form class="panel" #passwordForm="ngForm" (ngSubmit)="changePassword(passwordForm)" autocomplete="off">
+        <h2>Passwort ändern</h2>
+        <p class="muted">Mindestens {{ passwordMin }} Zeichen mit Groß- und Kleinbuchstaben und einer Ziffer. Zur Sicherheit wird das aktuelle Passwort noch einmal abgefragt.</p>
+        <label class="field">
+          <span>Aktuelles Passwort</span>
+          <input class="tk-input" type="password" name="current" autocomplete="current-password" required [(ngModel)]="current" />
+        </label>
+        <label class="field">
+          <span>Neues Passwort</span>
+          <input class="tk-input" type="password" name="next" autocomplete="new-password" required [(ngModel)]="next" />
+        </label>
+        <label class="field">
+          <span>Neues Passwort wiederholen</span>
+          <input class="tk-input" type="password" name="repeat" autocomplete="new-password" required [(ngModel)]="repeat" />
+        </label>
+        <div>
+          <button tkButton variant="primary" type="submit" [disabled]="passwordBusy()">Passwort ändern</button>
+        </div>
+        @if (passwordError()) {
+          <p class="error" role="alert">{{ passwordError() }}</p>
+        }
+        @if (passwordChanged()) {
+          <p class="muted" role="status">Das Passwort wurde geändert.</p>
+        }
+      </form>
+    </tk-card>
+  }
+
   <tk-card>
     <div class="panel">
       <h2>Aktivitätsverlauf</h2>

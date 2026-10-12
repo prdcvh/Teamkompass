@@ -750,3 +750,18 @@ test("Konten-Passwort wird verdeckt abgefragt und folgt der Richtlinie ab 12 Zei
     assert.doesNotMatch(app, /mind\. 6 Zeichen|mindestens 6 Zeichen/);
   }
 });
+
+test("Passwort vergessen und Passwort ändern sind in allen Live-Apps vorhanden (SCRUM-31)", async () => {
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    const html = await read(`outputs/${team}/index.html`);
+    assert.match(html, /id="trainerResetBtn"/);
+    assert.match(html, /id="changePasswordBtn"/);
+    assert.match(html, /id="passwordCurrent" type="password" autocomplete="current-password"/);
+    assert.match(html, /id="passwordNew" type="password" autocomplete="new-password"/);
+    assert.match(app, /sendPasswordResetEmail\(authInstance, email\)/);
+    assert.match(app, /reauthenticateWithCredential\(user, authModule\.EmailAuthProvider\.credential/);
+    // Neutral antworten: keine Konto-Erkennung ueber "user-not-found".
+    assert.match(app, /includes\("user-not-found"\)\) \{\s*error\.textContent = authErrorMessage/);
+  }
+});

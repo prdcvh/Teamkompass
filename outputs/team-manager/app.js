@@ -1431,6 +1431,7 @@ function applyRoleRestrictions() {
   $("#migrateDataBtn").hidden = !isCloudTrainer();
   $("#addTrainerBtn").hidden = !isCloudTrainer();
   $("#addMedicalBtn").hidden = !isCloudTrainer();
+  $("#changePasswordBtn").hidden = !(isCloudActive() && ["trainer", "medical"].includes(currentRole));
   if (["player", "parent"].includes(currentRole)) {
     $("#mobileViewSelect").innerHTML = '<option value="profiles">Profile</option>';
     $("#profilePlayer").disabled = true;
@@ -1454,6 +1455,67 @@ async function handleTrainerLogin(event) {
     await authModule.signInWithEmailAndPassword(authInstance, email, password);
   } catch (error) {
     $("#authGateError").textContent = authErrorMessage(error);
+  }
+}
+
+// "Passwort vergessen?" im Login: schickt die Mail zum Zuruecksetzen. Ob zur Adresse ein Konto existiert,
+// wird nicht verraten (SCRUM-31).
+async function handlePasswordReset() {
+  const error = $("#authGateError");
+  const email = $("#trainerLoginEmail").value.trim();
+  error.textContent = "";
+  $("#authGateStatus").textContent = "";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    error.textContent = "Bitte oben die E-Mail-Adresse deines Kontos eintragen und dann erneut auf „Passwort vergessen?“ tippen.";
+    return;
+  }
+  try {
+    await authModule.sendPasswordResetEmail(authInstance, email);
+  } catch (resetError) {
+    if (!(resetError?.code || "").includes("user-not-found")) {
+      error.textContent = authErrorMessage(resetError);
+      return;
+    }
+  }
+  $("#authGateStatus").textContent = "Wenn zu dieser E-Mail-Adresse ein Konto existiert, ist eine Nachricht mit einem Link zum Zurücksetzen unterwegs. Bitte auch den Spam-Ordner prüfen.";
+}
+
+// Passwort aendern (Trainer/Medizin): das aktuelle Passwort wird erneut bestaetigt (SCRUM-31).
+function openPasswordDialog() {
+  const form = $("#passwordForm");
+  form.reset();
+  $("#passwordError").textContent = "";
+  $("#passwordDialog").showModal();
+}
+
+async function handlePasswordChange(event) {
+  event.preventDefault();
+  const error = $("#passwordError");
+  const current = $("#passwordCurrent").value;
+  const next = $("#passwordNew").value;
+  error.textContent = "";
+  if (!current) { error.textContent = "Bitte das aktuelle Passwort eingeben."; return; }
+  const problem = staffPasswordProblem(next);
+  if (problem) { error.textContent = problem; return; }
+  if (next !== $("#passwordRepeat").value) { error.textContent = "Die beiden neuen Passwörter stimmen nicht überein."; return; }
+  if (next === current) { error.textContent = "Das neue Passwort muss sich vom aktuellen unterscheiden."; return; }
+  const button = $("#passwordSubmitBtn");
+  button.disabled = true;
+  try {
+    const user = authInstance.currentUser;
+    if (!user?.email) throw { code: "auth/requires-recent-login" };
+    await authModule.reauthenticateWithCredential(user, authModule.EmailAuthProvider.credential(user.email, current));
+    await authModule.updatePassword(user, next);
+    $("#passwordForm").reset();
+    $("#passwordDialog").close();
+    alert("Das Passwort wurde geändert.");
+  } catch (changeError) {
+    const code = changeError?.code || "";
+    error.textContent = code.includes("wrong-password") || code.includes("invalid-credential")
+      ? "Das aktuelle Passwort ist falsch."
+      : code.includes("requires-recent-login") ? "Bitte melde dich neu an und versuche es dann erneut." : authErrorMessage(changeError);
+  } finally {
+    button.disabled = false;
   }
 }
 
@@ -4727,6 +4789,11 @@ on("#signOutBtn", "click", handleSignOut);
 on("#migrateDataBtn", "click", migrateLegacyBlobToCollections);
 on("#addTrainerBtn", "click", createTrainerAccount);
 on("#addMedicalBtn", "click", createMedicalAccount);
+on("#trainerResetBtn", "click", handlePasswordReset);
+on("#changePasswordBtn", "click", openPasswordDialog);
+on("#passwordForm", "submit", handlePasswordChange);
+on("#closePasswordDialogBtn", "click", () => $("#passwordDialog").close());
+on("#cancelPasswordDialogBtn", "click", () => $("#passwordDialog").close());
 on("#accessManagerList", "click", (event) => {
   const button = event.target.closest("button[data-action='revoke-access']");
   if (!button) return;
