@@ -1,0 +1,52 @@
+<section class="page">
+  <header class="head">
+    <p class="tk-eyebrow">TeamKompass</p>
+    <h1>Suche</h1>
+    <p class="muted">Bereiche, Spieler, Events und Gegner. Tastenkürzel: Strg/⌘ + K.</p>
+  </header>
+
+  @if (!isTrainer()) {
+    <p class="muted">Die Suche ist nur für Trainer verfügbar.</p>
+  } @else {
+    <label class="search">
+      <span class="tk-sr-only">TeamKompass durchsuchen</span>
+      <input
+        class="tk-input"
+        type="search"
+        placeholder="Bereich, Spieler, Event oder Gegner …"
+        autocomplete="off"
+        #field
+        [value]="query()"
+        (input)="query.set(valueOf($event))"
+      />
+    </label>
+
+    @if (loading()) {
+      <p class="muted" role="status">Daten werden geladen …</p>
+    }
+
+    @if (groups().length === 0 && !loading()) {
+      <tk-card>
+        <p class="empty" role="status">Kein Treffer.</p>
+      </tk-card>
+    } @else {
+      @for (group of groups(); track group.kind) {
+        <tk-card>
+          <div class="group">
+            <h2>{{ group.title }}</h2>
+            <ul class="hits">
+              @for (hit of group.hits; track hit.id) {
+                <li>
+                  <a class="hit" [routerLink]="hit.link" [queryParams]="hit.queryParams">
+                    <strong>{{ hit.label }}</strong>
+                    <span class="muted">{{ hit.meta }}</span>
+                  </a>
+                </li>
+              }
+            </ul>
+          </div>
+        </tk-card>
+      }
+    }
+  }
+</section>

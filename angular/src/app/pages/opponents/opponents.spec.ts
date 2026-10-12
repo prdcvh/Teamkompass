@@ -1,5 +1,6 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { FirebaseService } from '../../core/firebase.service';
 import { LayoutService } from '../../core/layout.service';
 import { SessionService } from '../../core/session.service';
@@ -10,14 +11,14 @@ describe('Opponents (Gegneranalyse)', () => {
   let firebase: FakeFirebase;
   const isMobile = signal(false);
 
-  async function render(role: 'trainer' | 'medical' = 'trainer', mobile = false) {
+  async function render(role: 'trainer' | 'medical' = 'trainer', mobile = false, suche = '') {
     isMobile.set(mobile);
     firebase = new FakeFirebase();
     firebase.opponents.set('o1', {
       name: 'JSG Taunus', formation: '4-3-3', style: 'Pressing', strengths: 'Außen schnell', gamePlan: 'Tief stehen', updatedAt: '2026-10-01',
     });
     firebase.opponents.set('o2', { name: '<img src=x onerror=alert(1)>', formation: '3-2-3', style: 'Ballbesitz', notes: '<b>fett</b>', updatedAt: '2026-09-15' });
-    TestBed.configureTestingModule({ providers: [{ provide: FirebaseService, useValue: firebase }, { provide: LayoutService, useValue: { isMobile } }] });
+    TestBed.configureTestingModule({ providers: [provideRouter([]), { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap(suche ? { suche } : {}) } } }, { provide: FirebaseService, useValue: firebase }, { provide: LayoutService, useValue: { isMobile } }] });
     TestBed.inject(SessionService).role.set(role);
     const fixture = TestBed.createComponent(Opponents);
     await fixture.whenStable();
@@ -53,6 +54,13 @@ describe('Opponents (Gegneranalyse)', () => {
     expect(text(cards[1])).toContain('aktualisiert 01.10.2026');
     // Details nur, wenn Felder gefüllt sind
     expect([...cards[1].querySelectorAll('details .detail-grid section')].map((section) => `${text(section.querySelector('span'))} ${text(section.querySelector('p'))}`)).toEqual(['Stärken Außen schnell', 'Matchplan Tief stehen']);
+  });
+
+  it('filtert die Liste vor, wenn die Seite aus der Suche mit ?suche= geöffnet wird', async () => {
+    const fixture = await render('trainer', false, 'Taunus');
+    expect(qa(fixture, 'article.opponent')).toHaveLength(1);
+    expect(text(q(fixture, 'article.opponent'))).toContain('JSG Taunus');
+    expect((q(fixture, '.search input') as HTMLInputElement).value).toBe('Taunus');
   });
 
   it('gibt alle Texte als Text aus (kein HTML aus Namen oder Notizen)', async () => {
@@ -140,7 +148,7 @@ describe('Opponents (Gegneranalyse)', () => {
   it('zeigt für Medizin nichts außer einem Hinweis und lädt keine Gegner', async () => {
     isMobile.set(false);
     firebase = new FakeFirebase();
-    TestBed.configureTestingModule({ providers: [{ provide: FirebaseService, useValue: firebase }, { provide: LayoutService, useValue: { isMobile } }] });
+    TestBed.configureTestingModule({ providers: [provideRouter([]), { provide: FirebaseService, useValue: firebase }, { provide: LayoutService, useValue: { isMobile } }] });
     TestBed.inject(SessionService).role.set('medical');
     const fixture = TestBed.createComponent(Opponents);
     await fixture.whenStable();

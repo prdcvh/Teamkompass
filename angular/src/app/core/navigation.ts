@@ -13,7 +13,6 @@ export const PLANNED_IN: Readonly<Record<string, string>> = {
   '/gegneranalyse': 'SCRUM-71',
   '/aufstellung': 'SCRUM-72',
   '/ansicht': 'SCRUM-74',
-  '/suche': 'SCRUM-75',
   '/export': 'SCRUM-75',
 };
 
