@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { LayoutService } from '../../core/layout.service';
 import { type Opponent, detailsOf, filterOpponents, formatDate } from '../../core/opponent';
 import { OpponentsService } from '../../core/opponents.service';
@@ -23,6 +24,7 @@ export class Opponents implements OnInit {
   protected readonly sync = inject(SyncService);
   protected readonly mobile = inject(LayoutService).isMobile;
   private readonly session = inject(SessionService);
+  private readonly route = inject(ActivatedRoute);
   protected readonly isTrainer = computed(() => this.session.role() === 'trainer');
 
   protected readonly query = signal('');
@@ -38,6 +40,8 @@ export class Opponents implements OnInit {
   protected detailsOf = detailsOf;
 
   ngOnInit(): void {
+    // Aus der globalen Suche: ?suche=<Gegnername> filtert die Liste vor.
+    this.query.set(this.route.snapshot.queryParamMap.get('suche') ?? '');
     this.opponents.start();
   }
 

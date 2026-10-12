@@ -2,6 +2,8 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { AuthService } from '../core/auth.service';
+import { FirebaseService } from '../core/firebase.service';
+import { FakeFirebase } from '../core/testing';
 import { LayoutService } from '../core/layout.service';
 import { ADMIN_ITEMS } from '../core/navigation';
 import { ThemeService } from '../core/theme.service';
@@ -20,6 +22,7 @@ describe('Shell (in der App)', () => {
       providers: [
         provideRouter(routes),
         { provide: LayoutService, useValue: { isMobile } },
+        { provide: FirebaseService, useValue: new FakeFirebase() },
         { provide: AuthService, useValue: { whenResolved: () => Promise.resolve(), status: () => 'ready' } },
       ],
     }).compileComponents();
