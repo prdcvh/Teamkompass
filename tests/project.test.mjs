@@ -782,3 +782,11 @@ test("Hosting: Doku und Beispiel-Konfiguration werden nicht ausgeliefert, Starts
     }
   }
 });
+
+test("'Heute' wird lokal und nicht in UTC berechnet (SCRUM-21)", async () => {
+  for (const file of ["app.js", ...teams.map((team) => `outputs/${team}/app.js`)]) {
+    const app = await read(file);
+    assert.doesNotMatch(app, /toISOString\(\)\.slice\(0, 10\)/, `${file}: UTC-Datum statt lokalem Datum`);
+    assert.match(app, /function localIsoDate\(date = new Date\(\)\)/, `${file}: Helfer localIsoDate fehlt`);
+  }
+});

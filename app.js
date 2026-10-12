@@ -276,7 +276,7 @@ function migrateLegacyState(data) {
       id: "e-legacy",
       type: "Training",
       title: "Importierte Leistungsdaten",
-      date: data.records.at(-1)?.date || new Date().toISOString().slice(0, 10),
+      date: data.records.at(-1)?.date || localIsoDate(),
       intensity: 2,
       location: "",
       opponent: "",
@@ -474,6 +474,12 @@ function gradeToPercent(value) {
 function intensityLabel(value) {
   const labels = { 1: "niedrig", 2: "mittel", 3: "hoch" };
   return `${value || 2} · ${labels[value] || "mittel"}`;
+}
+
+// Lokales Datum als JJJJ-MM-TT (nicht UTC): "heute" muss auch zwischen 0:00 und 2:00 Uhr der richtige Tag sein.
+function localIsoDate(date = new Date()) {
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
 function formatDate(value) {
@@ -1580,7 +1586,7 @@ function exportData() {
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = `teamkompass-export-${new Date().toISOString().slice(0, 10)}.json`;
+  link.download = `teamkompass-export-${localIsoDate()}.json`;
   link.click();
   URL.revokeObjectURL(link.href);
 }
