@@ -1,0 +1,17 @@
+# Firestore-Regeln: Emulator-Tests
+
+Prüfen `firestore.rules` gegen den lokalen Firestore-Emulator (keine echten Daten, Projekt-ID
+`demo-…`). Nicht Teil von `npm run verify`, weil der Emulator Java (21+) und einen Download
+(~60 MB) braucht. In der CI läuft der Workflow `.github/workflows/rules-tests.yml`, sobald sich
+`firestore.rules`, `firebase.json` oder diese Tests ändern.
+
+```bash
+cd tests/rules
+npm ci --ignore-scripts
+npm test
+```
+
+Aktuell abgedeckt (`roles.test.mjs`): Rollen-Matrix für Trainer, Medizin, Spieler, Eltern,
+abgelaufene Zugänge und Nicht-Mitglieder – wer welche Pfade lesen/schreiben darf (Spielerprofile,
+Bewertungen, interne Notizen, Förderpläne, Abwesenheiten, Messwerte, Gegner, Aufstellung,
+Mitgliedschaften, Einladungen), inklusive der Listenabfragen mit `playerId`-Filter.

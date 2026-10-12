@@ -802,3 +802,16 @@ test("Abwesenheit: 'Bis' vor 'Von' wird nicht gespeichert; kein vorbelegtes Gebu
     assert.match(app, /Anzahl Tage ab heute/);
   }
 });
+
+test("Rules-Tests: Lockfile mit Integritaet und CI-Workflow vorhanden (SCRUM-38)", async () => {
+  const lock = JSON.parse(await read("tests/rules/package-lock.json"));
+  const entries = Object.entries(lock.packages).filter(([path]) => path !== "");
+  assert.ok(entries.length > 0);
+  for (const [path, entry] of entries) {
+    assert.match(entry.integrity || "", /^sha512-/, `${path}: Integritaet fehlt`);
+    assert.match(entry.resolved || "", /^https:\/\/registry\.npmjs\.org\//, `${path}: Bezugsquelle ist nicht die npm-Registry`);
+  }
+  const workflow = await read(".github/workflows/rules-tests.yml");
+  assert.match(workflow, /npm ci --ignore-scripts --prefix tests\/rules/);
+  assert.doesNotMatch(workflow, /secrets\./);
+});
