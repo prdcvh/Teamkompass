@@ -765,3 +765,20 @@ test("Passwort vergessen und Passwort ändern sind in allen Live-Apps vorhanden 
     assert.match(app, /includes\("user-not-found"\)\) \{\s*error\.textContent = authErrorMessage/);
   }
 });
+
+test("Hosting: Doku und Beispiel-Konfiguration werden nicht ausgeliefert, Startseite wird nicht gecacht (SCRUM-60/61)", async () => {
+  const config = JSON.parse(await read("firebase.json"));
+  for (const target of config.hosting) {
+    assert.ok(target.ignore.includes("**/*.md"), `${target.target}: *.md muss ausgeschlossen sein`);
+    assert.ok(target.ignore.includes("**/*.example.js"), `${target.target}: *.example.js muss ausgeschlossen sein`);
+    const headers = target.headers ?? [];
+    const noCache = (source) => headers.some((rule) => rule.source === source && rule.headers.some((header) => header.key === "Cache-Control" && /no-cache/.test(header.value)));
+    if (target.target !== "u14") {
+      assert.ok(noCache("/"), `${target.target}: "/" braucht Cache-Control no-cache`);
+      assert.ok(noCache("/index.html"), `${target.target}: "/index.html" braucht Cache-Control no-cache`);
+    } else {
+      // Angular: alle Antworten no-cache, nur die Dateien mit Hash im Namen sind langlebig.
+      assert.ok(headers.some((rule) => rule.source === "**" && rule.headers.some((header) => header.key === "Cache-Control" && /no-cache/.test(header.value))));
+    }
+  }
+});

@@ -9,7 +9,9 @@
       "ignore": [
         "firebase.json",
         "**/.*",
-        "**/node_modules/**"
+        "**/node_modules/**",
+        "**/*.md",
+        "**/*.example.js"
       ],
       "headers": [
         {
@@ -111,6 +113,15 @@
         },
         {
           "source": "/index.html",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache, no-store, must-revalidate"
+            }
+          ]
+        },
+        {
+          "source": "/",
           "headers": [
             {
               "key": "Cache-Control",
@@ -126,7 +137,9 @@
       "ignore": [
         "firebase.json",
         "**/.*",
-        "**/node_modules/**"
+        "**/node_modules/**",
+        "**/*.md",
+        "**/*.example.js"
       ],
       "headers": [
         {
@@ -228,6 +241,15 @@
         },
         {
           "source": "/index.html",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache, no-store, must-revalidate"
+            }
+          ]
+        },
+        {
+          "source": "/",
           "headers": [
             {
               "key": "Cache-Control",
@@ -243,7 +265,9 @@
       "ignore": [
         "firebase.json",
         "**/.*",
-        "**/node_modules/**"
+        "**/node_modules/**",
+        "**/*.md",
+        "**/*.example.js"
       ],
       "headers": [
         {
@@ -351,6 +375,15 @@
               "value": "no-cache, no-store, must-revalidate"
             }
           ]
+        },
+        {
+          "source": "/",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache, no-store, must-revalidate"
+            }
+          ]
         }
       ]
     },
@@ -360,7 +393,9 @@
       "ignore": [
         "firebase.json",
         "**/.*",
-        "**/node_modules/**"
+        "**/node_modules/**",
+        "**/*.md",
+        "**/*.example.js"
       ],
       "headers": [
         {
