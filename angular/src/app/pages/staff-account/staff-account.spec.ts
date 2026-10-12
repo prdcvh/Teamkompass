@@ -60,12 +60,12 @@ describe('StaffAccount (Trainer-/Medizin-Konto)', () => {
   it('lehnt zu kurze Passwörter und Abweichungen ab, ohne ein Konto anzulegen', async () => {
     const fixture = await render('trainer');
     await fill(fixture, 'email', 'neu@verein.de');
-    await fill(fixture, 'password', '1234567');
-    await fill(fixture, 'repeat', '1234567');
+    await fill(fixture, 'password', 'Abcdefgh12');
+    await fill(fixture, 'repeat', 'Abcdefgh12');
     await submit(fixture);
-    expect(text(root(fixture))).toContain('mindestens 8 Zeichen');
-    await fill(fixture, 'password', 'langgenug1');
-    await fill(fixture, 'repeat', 'langgenug2');
+    expect(text(root(fixture))).toContain('mindestens 12 Zeichen');
+    await fill(fixture, 'password', 'LangGenug123');
+    await fill(fixture, 'repeat', 'LangGenug124');
     await submit(fixture);
     expect(text(root(fixture))).toContain('stimmen nicht überein');
     expect(firebase.calls.some((call) => call.startsWith('createStaff'))).toBe(false);
@@ -74,15 +74,15 @@ describe('StaffAccount (Trainer-/Medizin-Konto)', () => {
   it('legt das Konto an, meldet Erfolg und leert die Passwörter', async () => {
     const fixture = await render('medical');
     await fill(fixture, 'email', ' arzt@verein.de ');
-    await fill(fixture, 'password', 'langgenug1');
-    await fill(fixture, 'repeat', 'langgenug1');
+    await fill(fixture, 'password', 'LangGenug123');
+    await fill(fixture, 'repeat', 'LangGenug123');
     await submit(fixture);
     await vi.waitFor(() => {
       fixture.detectChanges();
       expect(text(q(fixture, '.success'))).toBe('Der medizinische Lesezugang für arzt@verein.de wurde angelegt.');
     });
     expect(firebase.calls).toContain('createStaff:medical:arzt@verein.de');
-    expect(firebase.lastStaffPassword).toBe('langgenug1');
+    expect(firebase.lastStaffPassword).toBe('LangGenug123');
     expect(q<HTMLInputElement>(fixture, 'input[name="password"]')!.value).toBe('');
     expect(q<HTMLInputElement>(fixture, 'input[name="repeat"]')!.value).toBe('');
     expect(q<HTMLInputElement>(fixture, 'input[name="email"]')!.value).toBe('');
@@ -93,8 +93,8 @@ describe('StaffAccount (Trainer-/Medizin-Konto)', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     firebase.createStaffError = { code: 'auth/email-already-in-use' };
     await fill(fixture, 'email', 'da@verein.de');
-    await fill(fixture, 'password', 'langgenug1');
-    await fill(fixture, 'repeat', 'langgenug1');
+    await fill(fixture, 'password', 'LangGenug123');
+    await fill(fixture, 'repeat', 'LangGenug123');
     await submit(fixture);
     await vi.waitFor(() => {
       fixture.detectChanges();

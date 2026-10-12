@@ -736,3 +736,17 @@ test("Suchfelder und Theme-Schalter haben zugängliche Namen ohne widersprüchli
     assert.doesNotMatch(app, /toggle\.setAttribute\("aria-pressed"/, `${file}: Theme-Schalter setzt aria-pressed`);
   }
 });
+
+test("Konten-Passwort wird verdeckt abgefragt und folgt der Richtlinie ab 12 Zeichen (SCRUM-58)", async () => {
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    const html = await read(`outputs/${team}/index.html`);
+    const create = app.slice(app.indexOf("async function createStaffAccount"), app.indexOf("async function createInviteCodeForPlayer"));
+    assert.doesNotMatch(create, /prompt\(/, `${team}: Passwort darf nicht per prompt() abgefragt werden`);
+    assert.match(create, /askStaffCredentials\(/);
+    assert.match(html, /id="staffPassword" type="password" autocomplete="new-password"/);
+    assert.match(html, /id="staffPasswordRepeat" type="password"/);
+    assert.match(app, /const MIN_STAFF_PASSWORD_LENGTH = 12;/);
+    assert.doesNotMatch(app, /mind\. 6 Zeichen|mindestens 6 Zeichen/);
+  }
+});
