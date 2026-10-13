@@ -85,6 +85,7 @@
   function installCommandPalette() {
     const dialog = document.createElement("dialog");
     dialog.className = "command-palette";
+    dialog.setAttribute("aria-label", "TeamKompass durchsuchen");
     dialog.innerHTML = `<div class="command-palette-box"><div class="command-palette-head"><label>TeamKompass durchsuchen<input type="search" id="commandSearch" placeholder="Bereich, Spieler, Event oder Gegner …" autocomplete="off" /></label><button type="button" class="command-palette-close" id="commandClose" aria-label="Suche schließen">✕</button></div><div id="commandResults"></div><small>Esc zum Schließen · Strg/⌘ + K zum Öffnen</small></div>`;
     document.body.append(dialog);
     const input = dialog.querySelector("#commandSearch");
