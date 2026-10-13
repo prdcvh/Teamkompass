@@ -751,3 +751,91 @@ test("Workflows: PR-Code laeuft ohne Service-Account-Secret, Secrets nicht inlin
   assert.doesNotMatch(rules, /echo '\$\{\{ secrets/, "Secret nicht in die Shell-Zeile interpolieren");
   assert.match(rules, /FIREBASE_SERVICE_ACCOUNT: \$\{\{ secrets\./);
 });
+
+test("Konten-Passwort wird verdeckt abgefragt und folgt der Richtlinie ab 12 Zeichen (SCRUM-58)", async () => {
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    const html = await read(`outputs/${team}/index.html`);
+    const create = app.slice(app.indexOf("async function createStaffAccount"), app.indexOf("async function createInviteCodeForPlayer"));
+    assert.doesNotMatch(create, /prompt\(/, `${team}: Passwort darf nicht per prompt() abgefragt werden`);
+    assert.match(create, /askStaffCredentials\(/);
+    assert.match(html, /id="staffPassword" type="password" autocomplete="new-password"/);
+    assert.match(html, /id="staffPasswordRepeat" type="password"/);
+    assert.match(app, /const MIN_STAFF_PASSWORD_LENGTH = 12;/);
+    assert.doesNotMatch(app, /mind\. 6 Zeichen|mindestens 6 Zeichen/);
+  }
+});
+
+test("Passwort vergessen und Passwort ändern sind in allen Live-Apps vorhanden (SCRUM-31)", async () => {
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    const html = await read(`outputs/${team}/index.html`);
+    assert.match(html, /id="trainerResetBtn"/);
+    assert.match(html, /id="changePasswordBtn"/);
+    assert.match(html, /id="passwordCurrent" type="password" autocomplete="current-password"/);
+    assert.match(html, /id="passwordNew" type="password" autocomplete="new-password"/);
+    assert.match(app, /sendPasswordResetEmail\(authInstance, email\)/);
+    assert.match(app, /reauthenticateWithCredential\(user, authModule\.EmailAuthProvider\.credential/);
+    // Neutral antworten: keine Konto-Erkennung ueber "user-not-found".
+    assert.match(app, /includes\("user-not-found"\)\) \{\s*error\.textContent = authErrorMessage/);
+  }
+});
+
+test("Hosting: Doku und Beispiel-Konfiguration werden nicht ausgeliefert, Startseite wird nicht gecacht (SCRUM-60/61)", async () => {
+  const config = JSON.parse(await read("firebase.json"));
+  for (const target of config.hosting) {
+    assert.ok(target.ignore.includes("**/*.md"), `${target.target}: *.md muss ausgeschlossen sein`);
+    assert.ok(target.ignore.includes("**/*.example.js"), `${target.target}: *.example.js muss ausgeschlossen sein`);
+    const headers = target.headers ?? [];
+    const noCache = (source) => headers.some((rule) => rule.source === source && rule.headers.some((header) => header.key === "Cache-Control" && /no-cache/.test(header.value)));
+    if (target.target !== "u14") {
+      assert.ok(noCache("/"), `${target.target}: "/" braucht Cache-Control no-cache`);
+      assert.ok(noCache("/index.html"), `${target.target}: "/index.html" braucht Cache-Control no-cache`);
+    } else {
+      // Angular: alle Antworten no-cache, nur die Dateien mit Hash im Namen sind langlebig.
+      assert.ok(headers.some((rule) => rule.source === "**" && rule.headers.some((header) => header.key === "Cache-Control" && /no-cache/.test(header.value))));
+    }
+  }
+});
+
+test("'Heute' wird lokal und nicht in UTC berechnet (SCRUM-21)", async () => {
+  for (const file of ["app.js", ...teams.map((team) => `outputs/${team}/app.js`)]) {
+    const app = await read(file);
+    assert.doesNotMatch(app, /toISOString\(\)\.slice\(0, 10\)/, `${file}: UTC-Datum statt lokalem Datum`);
+    assert.match(app, /function localIsoDate\(date = new Date\(\)\)/, `${file}: Helfer localIsoDate fehlt`);
+  }
+});
+
+test("Abwesenheit: 'Bis' vor 'Von' wird nicht gespeichert; kein vorbelegtes Geburtsdatum; Befristung 'ab heute' (SCRUM-22/23)", async () => {
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    assert.match(app, /absence\.to < absence\.from[\s\S]*Das Enddatum darf nicht vor dem Beginn liegen/);
+    assert.match(app, /on\("#absenceFrom", "change"/);
+    assert.doesNotMatch(app, /\$\("#playerBirthdate"\)\.value = player\?\.birthdate \|\| "2006/);
+    assert.match(app, /\$\("#playerBirthdate"\)\.value = player\?\.birthdate \|\| "";/);
+    assert.doesNotMatch(app, /ab der Anmeldung eingeben/);
+    assert.match(app, /Anzahl Tage ab heute/);
+  }
+});
+
+test("Rules-Tests: Lockfile mit Integritaet und CI-Workflow vorhanden (SCRUM-38)", async () => {
+  const lock = JSON.parse(await read("tests/rules/package-lock.json"));
+  const entries = Object.entries(lock.packages).filter(([path]) => path !== "");
+  assert.ok(entries.length > 0);
+  for (const [path, entry] of entries) {
+    assert.match(entry.integrity || "", /^sha512-/, `${path}: Integritaet fehlt`);
+    assert.match(entry.resolved || "", /^https:\/\/registry\.npmjs\.org\//, `${path}: Bezugsquelle ist nicht die npm-Registry`);
+  }
+  const workflow = await read(".github/workflows/rules-tests.yml");
+  assert.match(workflow, /npm ci --ignore-scripts --prefix tests\/rules/);
+  assert.doesNotMatch(workflow, /secrets\./);
+});
+
+test("Abmelden warnt Spieler und Eltern vor dem Verlust des Zugangs (SCRUM-32)", async () => {
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    const handler = app.slice(app.indexOf("async function handleSignOut"), app.indexOf("async function handleSignOut") + 700);
+    assert.match(handler, /\["player", "parent"\]\.includes\(currentRole\)/);
+    assert.match(handler, /neuen Einladungscode/);
+  }
+});

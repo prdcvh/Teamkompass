@@ -43,12 +43,17 @@ describe('Zugangsverwaltung (reine Logik)', () => {
     expect(expiryFromDays(2, now)?.toISOString()).toBe('2026-10-03T10:00:00.000Z');
   });
 
-  it('prüft E-Mail und Passwort (mindestens 8 Zeichen, Wiederholung)', () => {
-    expect(validateStaffDraft({ email: 'a@b.de', password: 'x'.repeat(MIN_PASSWORD_LENGTH), repeat: 'x'.repeat(MIN_PASSWORD_LENGTH) })).toEqual({});
-    expect(validateStaffDraft({ email: '', password: 'langgenug1', repeat: 'langgenug1' }).email).toContain('E-Mail');
-    expect(validateStaffDraft({ email: 'kein-at', password: 'langgenug1', repeat: 'langgenug1' }).email).toContain('gültige');
-    expect(validateStaffDraft({ email: 'a@b.de', password: '1234567', repeat: '1234567' }).password).toContain('mindestens 8');
-    expect(validateStaffDraft({ email: 'a@b.de', password: 'langgenug1', repeat: 'anders123' }).repeat).toContain('stimmen nicht überein');
+  it('prüft E-Mail und Passwort (mindestens 12 Zeichen mit Groß-/Kleinbuchstaben und Ziffer, Wiederholung)', () => {
+    const strong = `Aa1${'x'.repeat(MIN_PASSWORD_LENGTH - 3)}`;
+    expect(strong).toHaveLength(MIN_PASSWORD_LENGTH);
+    expect(validateStaffDraft({ email: 'a@b.de', password: strong, repeat: strong })).toEqual({});
+    expect(validateStaffDraft({ email: '', password: 'LangGenug123', repeat: 'LangGenug123' }).email).toContain('E-Mail');
+    expect(validateStaffDraft({ email: 'kein-at', password: 'LangGenug123', repeat: 'LangGenug123' }).email).toContain('gültige');
+    expect(validateStaffDraft({ email: 'a@b.de', password: 'Abcdefgh12', repeat: 'Abcdefgh12' }).password).toContain('mindestens 12');
+    expect(validateStaffDraft({ email: 'a@b.de', password: 'langgenug1234', repeat: 'langgenug1234' }).password).toContain('Groß- und Kleinbuchstaben');
+    expect(validateStaffDraft({ email: 'a@b.de', password: 'LANGGENUG1234', repeat: 'LANGGENUG1234' }).password).toContain('Groß- und Kleinbuchstaben');
+    expect(validateStaffDraft({ email: 'a@b.de', password: 'LangGenugAbcd', repeat: 'LangGenugAbcd' }).password).toContain('Ziffer');
+    expect(validateStaffDraft({ email: 'a@b.de', password: 'LangGenug123', repeat: 'Anders123456' }).repeat).toContain('stimmen nicht überein');
   });
 
   it('wandelt members und invites in Einträge um; Trainer und Unbekanntes bleiben draußen', () => {

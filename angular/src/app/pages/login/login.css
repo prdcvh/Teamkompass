@@ -405,3 +405,21 @@ h3 {
     transition: none;
   }
 }
+
+.linklike {
+  justify-self: start;
+  padding: var(--tk-space-2) 0;
+  border: 0;
+  background: none;
+  color: var(--tk-red-dark);
+  font: inherit;
+  font-size: var(--tk-text-sm);
+  text-decoration: underline;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.linklike:focus-visible {
+  outline: 2px solid var(--tk-red-dark);
+  outline-offset: 2px;
+}

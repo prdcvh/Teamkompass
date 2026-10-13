@@ -127,4 +127,56 @@ describe('Login', () => {
       expect(submit.querySelector('.spinner')).not.toBeNull();
     });
   });
+
+  describe('Passwort vergessen', () => {
+    const openReset = async (fixture: { detectChanges: () => void; whenStable: () => Promise<unknown>; nativeElement: unknown }) => {
+      (root(fixture).querySelector('.linklike') as HTMLButtonElement).click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+    };
+    const sendTo = async (fixture: { detectChanges: () => void; whenStable: () => Promise<unknown>; nativeElement: unknown }, value: string) => {
+      const input = root(fixture).querySelector('input[name="resetEmail"]') as HTMLInputElement;
+      input.value = value;
+      input.dispatchEvent(new Event('input'));
+      (root(fixture).querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit'));
+      await fixture.whenStable();
+      fixture.detectChanges();
+    };
+
+    it('öffnet das Formular zum Zurücksetzen und kommt wieder zur Anmeldung zurück', async () => {
+      const fixture = await render();
+      await openReset(fixture);
+      expect(root(fixture).querySelector('h3')?.textContent).toBe('Passwort zurücksetzen');
+      expect(root(fixture).querySelector('input[type="password"]')).toBeNull();
+      (root(fixture).querySelector('.linklike') as HTMLButtonElement).click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(root(fixture).querySelector('h3')?.textContent).toBe('Trainer-Login');
+    });
+
+    it('schickt die Mail und bestätigt neutral', async () => {
+      const fixture = await render();
+      await openReset(fixture);
+      await sendTo(fixture, 'coach@verein.de');
+      expect(firebase.calls).toContain('reset:coach@verein.de');
+      expect(root(fixture).querySelector('[role="status"]')?.textContent).toContain('Wenn zu dieser E-Mail-Adresse ein Konto existiert');
+    });
+
+    it('bestätigt auch bei unbekannter Adresse gleich (keine Konto-Erkennung)', async () => {
+      const fixture = await render();
+      firebase.resetError = { code: 'auth/user-not-found' };
+      await openReset(fixture);
+      await sendTo(fixture, 'unbekannt@verein.de');
+      expect(root(fixture).querySelector('[role="status"]')?.textContent).toContain('Wenn zu dieser E-Mail-Adresse ein Konto existiert');
+      expect(root(fixture).querySelector('[role="alert"]')).toBeNull();
+    });
+
+    it('meldet eine ungültige Adresse', async () => {
+      const fixture = await render();
+      await openReset(fixture);
+      await sendTo(fixture, 'kein-at');
+      expect(root(fixture).querySelector('[role="alert"]')?.textContent).toContain('gültige E-Mail');
+      expect(firebase.calls.some((call) => call.startsWith('reset:'))).toBe(false);
+    });
+  });
 });

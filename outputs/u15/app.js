@@ -454,7 +454,7 @@ function normalizeDevelopmentPlan(plan = {}) {
     reviewDate: plan.reviewDate || "",
     status: plan.status || "Offen",
     dueDate: plan.dueDate || "",
-    createdAt: plan.createdAt || new Date().toISOString().slice(0, 10)
+    createdAt: plan.createdAt || localIsoDate()
   };
 }
 
@@ -516,7 +516,7 @@ function normalizeMeasurements(measurements = {}, playerIds = new Set()) {
 function normalizeMeasurement(measurement = {}) {
   return {
     id: measurement.id || `me${crypto.randomUUID()}`,
-    date: measurement.date || new Date().toISOString().slice(0, 10),
+    date: measurement.date || localIsoDate(),
     height: measurement.height ?? "",
     weight: measurement.weight ?? ""
   };
@@ -534,7 +534,7 @@ function normalizeOpponent(opponent = {}) {
     setPieces: opponent.setPieces || "",
     gamePlan: opponent.gamePlan || "",
     notes: opponent.notes || "",
-    updatedAt: opponent.updatedAt || new Date().toISOString().slice(0, 10)
+    updatedAt: opponent.updatedAt || localIsoDate()
   };
 }
 
@@ -652,7 +652,7 @@ function migrateLegacyState(data) {
       id: "e-legacy",
       type: "Training",
       title: "Importierte Leistungsdaten",
-      date: data.records.at(-1)?.date || new Date().toISOString().slice(0, 10),
+      date: data.records.at(-1)?.date || localIsoDate(),
       intensity: 2,
       location: "",
       opponent: "",
@@ -1431,6 +1431,7 @@ function applyRoleRestrictions() {
   $("#migrateDataBtn").hidden = !isCloudTrainer();
   $("#addTrainerBtn").hidden = !isCloudTrainer();
   $("#addMedicalBtn").hidden = !isCloudTrainer();
+  $("#changePasswordBtn").hidden = !(isCloudActive() && ["trainer", "medical"].includes(currentRole));
   if (["player", "parent"].includes(currentRole)) {
     $("#mobileViewSelect").innerHTML = '<option value="profiles">Profile</option>';
     $("#profilePlayer").disabled = true;
@@ -1454,6 +1455,67 @@ async function handleTrainerLogin(event) {
     await authModule.signInWithEmailAndPassword(authInstance, email, password);
   } catch (error) {
     $("#authGateError").textContent = authErrorMessage(error);
+  }
+}
+
+// "Passwort vergessen?" im Login: schickt die Mail zum Zuruecksetzen. Ob zur Adresse ein Konto existiert,
+// wird nicht verraten (SCRUM-31).
+async function handlePasswordReset() {
+  const error = $("#authGateError");
+  const email = $("#trainerLoginEmail").value.trim();
+  error.textContent = "";
+  $("#authGateStatus").textContent = "";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    error.textContent = "Bitte oben die E-Mail-Adresse deines Kontos eintragen und dann erneut auf „Passwort vergessen?“ tippen.";
+    return;
+  }
+  try {
+    await authModule.sendPasswordResetEmail(authInstance, email);
+  } catch (resetError) {
+    if (!(resetError?.code || "").includes("user-not-found")) {
+      error.textContent = authErrorMessage(resetError);
+      return;
+    }
+  }
+  $("#authGateStatus").textContent = "Wenn zu dieser E-Mail-Adresse ein Konto existiert, ist eine Nachricht mit einem Link zum Zurücksetzen unterwegs. Bitte auch den Spam-Ordner prüfen.";
+}
+
+// Passwort aendern (Trainer/Medizin): das aktuelle Passwort wird erneut bestaetigt (SCRUM-31).
+function openPasswordDialog() {
+  const form = $("#passwordForm");
+  form.reset();
+  $("#passwordError").textContent = "";
+  $("#passwordDialog").showModal();
+}
+
+async function handlePasswordChange(event) {
+  event.preventDefault();
+  const error = $("#passwordError");
+  const current = $("#passwordCurrent").value;
+  const next = $("#passwordNew").value;
+  error.textContent = "";
+  if (!current) { error.textContent = "Bitte das aktuelle Passwort eingeben."; return; }
+  const problem = staffPasswordProblem(next);
+  if (problem) { error.textContent = problem; return; }
+  if (next !== $("#passwordRepeat").value) { error.textContent = "Die beiden neuen Passwörter stimmen nicht überein."; return; }
+  if (next === current) { error.textContent = "Das neue Passwort muss sich vom aktuellen unterscheiden."; return; }
+  const button = $("#passwordSubmitBtn");
+  button.disabled = true;
+  try {
+    const user = authInstance.currentUser;
+    if (!user?.email) throw { code: "auth/requires-recent-login" };
+    await authModule.reauthenticateWithCredential(user, authModule.EmailAuthProvider.credential(user.email, current));
+    await authModule.updatePassword(user, next);
+    $("#passwordForm").reset();
+    $("#passwordDialog").close();
+    alert("Das Passwort wurde geändert.");
+  } catch (changeError) {
+    const code = changeError?.code || "";
+    error.textContent = code.includes("wrong-password") || code.includes("invalid-credential")
+      ? "Das aktuelle Passwort ist falsch."
+      : code.includes("requires-recent-login") ? "Bitte melde dich neu an und versuche es dann erneut." : authErrorMessage(changeError);
+  } finally {
+    button.disabled = false;
   }
 }
 
@@ -1559,7 +1621,7 @@ function authErrorMessage(error) {
   if (code.includes("email-already-in-use")) return "Diese E-Mail wird bereits verwendet.";
   if (code.includes("wrong-password") || code.includes("invalid-credential")) return "E-Mail oder Passwort ist falsch.";
   if (code.includes("user-not-found")) return "Kein Trainer-Konto mit dieser E-Mail gefunden.";
-  if (code.includes("weak-password")) return "Das Passwort muss mindestens 6 Zeichen haben.";
+  if (code.includes("weak-password")) return "Das Passwort muss mindestens 12 Zeichen haben.";
   if (code.includes("operation-not-allowed")) return "Diese Anmeldemethode ist in der Firebase-Konsole noch nicht aktiviert.";
   if (code.includes("permission-denied") || code.includes("insufficient-permissions")) {
     return "Zugriff von den Firestore-Regeln verweigert (permission-denied). Pruefe, ob firestore.rules wirklich veroeffentlicht wurde.";
@@ -1570,6 +1632,9 @@ function authErrorMessage(error) {
 
 async function handleSignOut() {
   if (!authInstance) return;
+  // Spieler/Eltern haben nur eine anonyme Anmeldung mit Einmal-Code: ohne neuen Code vom Trainer kommen sie nicht wieder hinein (SCRUM-32).
+  if (["player", "parent"].includes(currentRole) &&
+    !confirm("Wirklich abmelden? Danach kommst du nur mit einem neuen Einladungscode von deinem Trainer wieder hinein. Der bisherige Code ist verbraucht.")) return;
   await authModule.signOut(authInstance);
   clearLocalTeamData();
   // Neu laden setzt auch Rollen-Oberflaeche und Zwischenzustaende der vorigen Sitzung zurueck.
@@ -1588,14 +1653,63 @@ async function createMedicalAccount() {
   return createStaffAccount("medical");
 }
 
+const MIN_STAFF_PASSWORD_LENGTH = 12;
+
+// Passwortrichtlinie fuer neue Trainer-/Medizin-Konten (SCRUM-58). Liefert die Meldung oder "".
+function staffPasswordProblem(password) {
+  if (password.length < MIN_STAFF_PASSWORD_LENGTH) return "Das Passwort muss mindestens 12 Zeichen haben.";
+  if (password.length > 128) return "Das Passwort darf höchstens 128 Zeichen haben.";
+  if (!/[a-zäöüß]/.test(password) || !/[A-ZÄÖÜ]/.test(password) || !/\d/.test(password)) {
+    return "Das Passwort braucht Groß- und Kleinbuchstaben und mindestens eine Ziffer.";
+  }
+  return "";
+}
+
+// Eingabe der Zugangsdaten im Dialog statt per prompt(): das Passwort steht in einem verdeckten Feld (SCRUM-58).
+function askStaffCredentials(label) {
+  const dialog = $("#staffDialog");
+  const form = $("#staffForm");
+  const error = $("#staffError");
+  $("#staffDialogTitle").textContent = `${label} anlegen`;
+  form.reset();
+  error.textContent = "";
+  return new Promise((resolve) => {
+    const finish = (value) => {
+      form.removeEventListener("submit", submit);
+      dialog.removeEventListener("close", cancel);
+      $("#closeStaffDialogBtn").removeEventListener("click", close);
+      $("#cancelStaffDialogBtn").removeEventListener("click", close);
+      form.reset();
+      if (dialog.open) dialog.close();
+      resolve(value);
+    };
+    const submit = (event) => {
+      event.preventDefault();
+      const email = $("#staffEmail").value.trim();
+      const password = $("#staffPassword").value;
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { error.textContent = "Bitte eine gültige E-Mail-Adresse eingeben."; return; }
+      const problem = staffPasswordProblem(password);
+      if (problem) { error.textContent = problem; return; }
+      if (password !== $("#staffPasswordRepeat").value) { error.textContent = "Die beiden Passwörter stimmen nicht überein."; return; }
+      finish({ email, password });
+    };
+    const close = () => finish(null);
+    const cancel = () => finish(null);
+    form.addEventListener("submit", submit);
+    dialog.addEventListener("close", cancel);
+    $("#closeStaffDialogBtn").addEventListener("click", close);
+    $("#cancelStaffDialogBtn").addEventListener("click", close);
+    dialog.showModal();
+  });
+}
+
 async function createStaffAccount(role) {
   if (!isCloudTrainer()) return;
   const label = role === "medical" ? "medizinischen Lesezugang" : "Trainer-Konto";
-  const email = prompt(`E-Mail-Adresse für den ${label}:`);
-  if (!email) return;
-  const trimmedEmail = email.trim();
-  const password = prompt(`Passwort für den ${label} (mind. 6 Zeichen):`);
-  if (!password) return;
+  const credentials = await askStaffCredentials(role === "medical" ? "Medizinischen Lesezugang" : "Trainer-Konto");
+  if (!credentials) return;
+  const trimmedEmail = credentials.email;
+  const password = credentials.password;
 
   const config = window.TEAMKOMPASS_CONFIG || {};
   const appModule = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js");
@@ -1630,7 +1744,7 @@ async function createInviteCodeForPlayer(playerId) {
   const accessInput = prompt("Zugangstyp eingeben: Spieler oder Eltern", "Spieler");
   if (accessInput === null) return;
   const role = accessInput.trim().toLowerCase().startsWith("eltern") ? "parent" : "player";
-  const daysInput = prompt("Zugang befristen? Anzahl Tage ab der Anmeldung eingeben, oder leer lassen fuer unbegrenzten Zugang:", "");
+  const daysInput = prompt("Zugang befristen? Anzahl Tage ab heute (ab dem Erzeugen des Codes) eingeben, oder leer lassen fuer unbegrenzten Zugang:", "");
   if (daysInput === null) return;
   const days = Number(daysInput.trim());
   const hasLimit = daysInput.trim() !== "" && Number.isFinite(days) && days > 0;
@@ -1677,8 +1791,8 @@ async function renderAccessManager() {
       let status = "Unbegrenzt gueltig";
       if (expiresAtDate) {
         status = expiresAtDate < now
-          ? `Abgelaufen seit ${formatDate(expiresAtDate.toISOString().slice(0, 10))}`
-          : `Gueltig bis ${formatDate(expiresAtDate.toISOString().slice(0, 10))}`;
+          ? `Abgelaufen seit ${formatDate(localIsoDate(expiresAtDate))}`
+          : `Gueltig bis ${formatDate(localIsoDate(expiresAtDate))}`;
       }
       return `
         <div class="access-row">
@@ -2043,7 +2157,7 @@ function unavailabilityReason(player, dateStr) {
 // andere Abwesenheit (Urlaub, Klassenfahrt etc.) zeigt "Abwesend". Ohne aktive Abwesenheit
 // bleibt es beim manuell gepflegten Status (Fit/Angeschlagen/Verletzt/Pause).
 function playerEffectiveStatus(player) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localIsoDate();
   const absence = activeAbsenceOn(player.id, today);
   if (!absence) return player.status;
   if (isInjuryAbsence(absence)) return "Verletzt";
@@ -2847,7 +2961,7 @@ function eventCardsHtml(events) {
 
 function renderEvents() {
   const events = filteredEvents();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localIsoDate();
   const upcoming = events.filter((event) => event.date >= today).sort((a, b) => new Date(a.date) - new Date(b.date));
   const past = events.filter((event) => event.date < today).sort((a, b) => new Date(b.date) - new Date(a.date));
 
@@ -3079,7 +3193,8 @@ function openPlayerDialog(player) {
   renderPositionPicker(positions);
   $("#playerCustomPositions").value = customPositions.join(", ");
   $("#playerNumber").value = player?.number || nextNumber();
-  $("#playerBirthdate").value = player?.birthdate || "2006-07-01";
+  // Kein vorbelegtes Geburtsdatum: das Feld ist Pflicht (ein falscher Standard verfaelscht Alter und Geburtsquartal).
+  $("#playerBirthdate").value = player?.birthdate || "";
   $("#playerStatus").value = player?.status || "Fit";
   $("#playerInjuryUntil").value = player?.injuryUntil || "";
   $("#playerConsentStatus").value = player?.consentStatus || "pending";
@@ -3337,7 +3452,7 @@ function saveDevelopmentPlan(event) {
     reviewDate: $("#developmentPlanReviewDate").value,
     status: $("#developmentPlanStatus").value,
     dueDate: $("#developmentPlanDueDate").value,
-    createdAt: state.developmentPlans[playerId].find((item) => item.id === id)?.createdAt || new Date().toISOString().slice(0, 10)
+    createdAt: state.developmentPlans[playerId].find((item) => item.id === id)?.createdAt || localIsoDate()
   };
   const existingIndex = state.developmentPlans[playerId].findIndex((item) => item.id === id);
   if (existingIndex >= 0) state.developmentPlans[playerId][existingIndex] = plan;
@@ -3453,6 +3568,14 @@ function saveAbsence(event) {
     from: $("#absenceFrom").value,
     to: $("#absenceTo").value
   };
+  // "Bis" vor "Von" waere ein Eintrag, der nie wirkt (absenceCoversDate): nicht speichern.
+  if (absence.from && absence.to && absence.to < absence.from) {
+    const toField = $("#absenceTo");
+    toField.setCustomValidity("Das Enddatum darf nicht vor dem Beginn liegen.");
+    toField.reportValidity();
+    toField.setCustomValidity("");
+    return;
+  }
   const existingIndex = state.absences[playerId].findIndex((item) => item.id === id);
   if (existingIndex >= 0) state.absences[playerId][existingIndex] = absence;
   else state.absences[playerId].push(absence);
@@ -4146,7 +4269,7 @@ function exportData() {
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = `teamkompass-export-${new Date().toISOString().slice(0, 10)}.json`;
+  link.download = `teamkompass-export-${localIsoDate()}.json`;
   link.click();
   URL.revokeObjectURL(link.href);
 }
@@ -4224,7 +4347,7 @@ function saveOpponent(event) {
     setPieces: $("#opponentSetPieces").value.trim(),
     gamePlan: $("#opponentGamePlan").value.trim(),
     notes: $("#opponentNotes").value.trim(),
-    updatedAt: new Date().toISOString().slice(0, 10)
+    updatedAt: localIsoDate()
   };
   const existingIndex = state.opponents.findIndex((item) => item.id === id);
   if (existingIndex >= 0) state.opponents[existingIndex] = opponent;
@@ -4678,6 +4801,12 @@ on("#signOutBtn", "click", handleSignOut);
 on("#migrateDataBtn", "click", migrateLegacyBlobToCollections);
 on("#addTrainerBtn", "click", createTrainerAccount);
 on("#addMedicalBtn", "click", createMedicalAccount);
+on("#absenceFrom", "change", () => { $("#absenceTo").min = $("#absenceFrom").value; });
+on("#trainerResetBtn", "click", handlePasswordReset);
+on("#changePasswordBtn", "click", openPasswordDialog);
+on("#passwordForm", "submit", handlePasswordChange);
+on("#closePasswordDialogBtn", "click", () => $("#passwordDialog").close());
+on("#cancelPasswordDialogBtn", "click", () => $("#passwordDialog").close());
 on("#accessManagerList", "click", (event) => {
   const button = event.target.closest("button[data-action='revoke-access']");
   if (!button) return;
