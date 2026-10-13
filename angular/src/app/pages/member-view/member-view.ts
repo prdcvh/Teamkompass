@@ -61,7 +61,7 @@ export class MemberView implements OnInit {
 
   protected readonly title = computed(() => {
     const role = this.role();
-    if (role === 'medical') return 'Medizinische Ansicht';
+    if (role === 'medical') return 'Scout-Ansicht';
     if (role === 'parent') return this.player() ? `Profil von ${this.player()!.name}` : 'Profil';
     return 'Mein Profil';
   });

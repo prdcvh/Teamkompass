@@ -253,7 +253,7 @@ describe('AuthService', () => {
     expect(displayNameFor('trainer', 'coach@verein.de')).toBe('coach');
     expect(displayNameFor('player', null)).toBe('Spieler');
     expect(displayNameFor('parent', null)).toBe('Eltern');
-    expect(displayNameFor('medical', null)).toBe('Medizin');
+    expect(displayNameFor('medical', null)).toBe('Scout');
     expect(soon.getTime()).toBeGreaterThan(Date.now());
   });
 });
