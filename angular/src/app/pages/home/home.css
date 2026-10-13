@@ -126,3 +126,35 @@ h2 {
 .board li > * {
   margin-right: var(--tk-space-3);
 }
+
+.lineup-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  border-radius: var(--tk-radius-md, 8px);
+}
+.lineup-link:hover .lineup-head strong {
+  text-decoration: underline;
+}
+.lineup-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.lineup-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.lineup-rows li {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 8px;
+}
+.lineup-rows .zone {
+  color: var(--tk-text-muted, #666);
+  font-size: 0.85em;
+}
