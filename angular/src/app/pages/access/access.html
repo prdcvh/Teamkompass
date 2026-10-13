@@ -2,20 +2,33 @@
   <header class="head">
     <div>
       <p class="tk-eyebrow">{{ mobile() ? 'Verwaltung' : '1. FC Königstein / Trainerbereich' }}</p>
-      <h1>Spieler-Zugänge</h1>
-      <p class="meta">{{ rows().length }} {{ rows().length === 1 ? 'Zugang' : 'Zugänge' }}</p>
+      <h1>Zugänge</h1>
+      <p class="meta">{{ tabRows().length }} {{ tabRows().length === 1 ? 'Zugang' : 'Zugänge' }}</p>
     </div>
     @if (isTrainer() && !mobile()) {
-      <button tkButton variant="primary" type="button" [disabled]="squad.load() !== 'ready'" (click)="inviteOpen.set(true)">+ Zugang erzeugen</button>
+      @if (tab() === 'players') {
+        <button tkButton variant="primary" type="button" [disabled]="squad.load() !== 'ready'" (click)="inviteOpen.set(true)">+ Zugang erzeugen</button>
+      } @else {
+        <a tkButton variant="primary" routerLink="/medizin-zugang">+ Scout-Zugang anlegen</a>
+      }
     }
   </header>
 
   @if (!isTrainer()) {
     <p class="muted">Die Zugangsverwaltung sehen nur Trainer.</p>
   } @else {
-    <p class="muted">
-      Einladungscodes für Spieler und Eltern erzeugen und bestehende Zugänge sperren. Ein Code gilt wie ein Passwort und wird nur einmal angezeigt.
-    </p>
+    <div class="tabs" role="tablist" aria-label="Art des Zugangs">
+      <button type="button" role="tab" id="access-tab-players" aria-controls="access-panel" [attr.aria-selected]="tab() === 'players'" [attr.tabindex]="tab() === 'players' ? 0 : -1" [class.on]="tab() === 'players'" (click)="select('players')" (keydown.arrowright)="selectByKey('scouts')" (keydown.arrowleft)="selectByKey('scouts')">Spieler ({{ counts().players }})</button>
+      <button type="button" role="tab" id="access-tab-scouts" aria-controls="access-panel" [attr.aria-selected]="tab() === 'scouts'" [attr.tabindex]="tab() === 'scouts' ? 0 : -1" [class.on]="tab() === 'scouts'" (click)="select('scouts')" (keydown.arrowleft)="selectByKey('players')" (keydown.arrowright)="selectByKey('players')">Scouts ({{ counts().scouts }})</button>
+    </div>
+
+    @if (tab() === 'players') {
+      <p class="muted">
+        Einladungscodes für Spieler und Eltern erzeugen (mit Befristung) und bestehende Zugänge sperren. Ein Code gilt wie ein Passwort und wird nur einmal angezeigt.
+      </p>
+    } @else {
+      <p class="muted">Scout-Zugänge lesen Spielerstatus, Abwesenheiten und Messwerte, aber keine Noten. Sie melden sich mit E-Mail und Passwort an.</p>
+    }
 
     @if (access.load() === 'error') {
       <div class="notice" role="alert">
@@ -24,16 +37,21 @@
       </div>
     } @else if (access.load() !== 'ready') {
       <p class="muted" role="status">Zugänge werden geladen …</p>
-    } @else if (rows().length === 0) {
+    } @else if (tabRows().length === 0) {
       <tk-card>
-        <div class="empty">
-          <p>Noch keine Zugänge vergeben.</p>
-          <button tkButton variant="primary" type="button" [disabled]="squad.load() !== 'ready'" (click)="inviteOpen.set(true)">+ Zugang erzeugen</button>
+        <div class="empty" id="access-panel" role="tabpanel">
+          @if (tab() === 'players') {
+            <p>Noch keine Spieler-Zugänge vergeben.</p>
+            <button tkButton variant="primary" type="button" [disabled]="squad.load() !== 'ready'" (click)="inviteOpen.set(true)">+ Zugang erzeugen</button>
+          } @else {
+            <p>Noch kein Scout-Zugang angelegt.</p>
+            <a tkButton variant="primary" routerLink="/medizin-zugang">+ Scout-Zugang anlegen</a>
+          }
         </div>
       </tk-card>
     } @else {
-      <div class="list">
-        @for (row of rows(); track row.entry.kind + row.entry.id) {
+      <div class="list" id="access-panel" role="tabpanel" [attr.aria-labelledby]="'access-tab-' + tab()">
+        @for (row of tabRows(); track row.entry.kind + row.entry.id) {
           <tk-card>
             <article class="row">
               <div class="who">
@@ -52,7 +70,11 @@
   }
 
   @if (isTrainer() && mobile()) {
-    <button type="button" class="fab" aria-label="Zugang erzeugen" [disabled]="squad.load() !== 'ready'" (click)="inviteOpen.set(true)"><tk-icon name="plus" /></button>
+    @if (tab() === 'players') {
+      <button type="button" class="fab" aria-label="Zugang erzeugen" [disabled]="squad.load() !== 'ready'" (click)="inviteOpen.set(true)"><tk-icon name="plus" /></button>
+    } @else {
+      <a class="fab" aria-label="Scout-Zugang anlegen" routerLink="/medizin-zugang"><tk-icon name="plus" /></a>
+    }
   }
 </section>
 

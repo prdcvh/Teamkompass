@@ -1780,11 +1780,12 @@ function cloudErrorSuffix(error) {
 async function renderAccessManager() {
   if (!isCloudTrainer()) return;
   const list = $("#accessManagerList");
+  const scoutList = $("#scoutManagerList");
   if (!list) return;
   try {
     const snapshot = await firestoreModule.getDocs(teamCollection("members"));
     const now = new Date();
-    list.innerHTML = snapshot.docs.filter((docSnap) => ["player", "parent", "medical"].includes(docSnap.data().role)).map((docSnap) => {
+    const row = (docSnap) => {
       const data = docSnap.data();
       const player = state.players.find((item) => item.id === data.playerId);
       const expiresAtDate = data.expiresAt?.toDate ? data.expiresAt.toDate() : null;
@@ -1800,7 +1801,16 @@ async function renderAccessManager() {
           <button class="ghost-button" data-action="revoke-access" data-uid="${docSnap.id}" type="button">Zugang sperren</button>
         </div>
       `;
-    }).join("") || `<p class="muted">Noch keine Spieler-Zugaenge vergeben.</p>`;
+    };
+    // Spieler (inkl. Eltern) und Scouts werden getrennt verwaltet (SCRUM-92).
+    const playerDocs = snapshot.docs.filter((docSnap) => ["player", "parent"].includes(docSnap.data().role));
+    const scoutDocs = snapshot.docs.filter((docSnap) => docSnap.data().role === "medical");
+    list.innerHTML = playerDocs.map(row).join("") || `<p class="muted">Noch keine Spieler-Zugaenge vergeben.</p>`;
+    if (scoutList) scoutList.innerHTML = scoutDocs.map(row).join("") || `<p class="muted">Noch kein Scout-Zugang angelegt.</p>`;
+    const playerCount = $("#playerAccessCount");
+    const scoutCount = $("#scoutAccessCount");
+    if (playerCount) playerCount.textContent = `(${playerDocs.length})`;
+    if (scoutCount) scoutCount.textContent = `(${scoutDocs.length})`;
   } catch (error) {
     console.error(error);
   }
@@ -4807,10 +4817,13 @@ on("#changePasswordBtn", "click", openPasswordDialog);
 on("#passwordForm", "submit", handlePasswordChange);
 on("#closePasswordDialogBtn", "click", () => $("#passwordDialog").close());
 on("#cancelPasswordDialogBtn", "click", () => $("#passwordDialog").close());
-on("#accessManagerList", "click", (event) => {
+["#accessManagerList", "#scoutManagerList"].forEach((selector) => on(selector, "click", (event) => {
   const button = event.target.closest("button[data-action='revoke-access']");
   if (!button) return;
   revokeAccess(button.dataset.uid);
+}));
+on("#scoutManagerPanel", "click", (event) => {
+  if (event.target.closest("button[data-action='add-scout']")) createMedicalAccount();
 });
 
 window.TeamKompass = Object.freeze({

@@ -138,3 +138,37 @@ h1 {
     min-height: var(--tk-touch);
   }
 }
+
+.tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--tk-space-1);
+  padding: var(--tk-space-1);
+  background: var(--tk-soft-neutral);
+  border-radius: var(--tk-radius-lg);
+}
+
+.tabs button {
+  min-height: var(--tk-touch);
+  color: var(--tk-muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--tk-radius-md);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tabs button.on {
+  color: var(--tk-ink);
+  background: var(--tk-surface);
+  box-shadow: var(--tk-shadow-card);
+}
+
+.tabs button:focus-visible {
+  outline: 2px solid var(--tk-red);
+  outline-offset: 2px;
+}
+
+a.fab {
+  text-decoration: none;
+}
