@@ -15,3 +15,6 @@ Aktuell abgedeckt (`roles.test.mjs`): Rollen-Matrix für Trainer, Medizin, Spiel
 abgelaufene Zugänge und Nicht-Mitglieder – wer welche Pfade lesen/schreiben darf (Spielerprofile,
 Bewertungen, interne Notizen, Förderpläne, Abwesenheiten, Messwerte, Gegner, Aufstellung,
 Mitgliedschaften, Einladungen), inklusive der Listenabfragen mit `playerId`-Filter.
+
+`invite-claim.test.mjs`: Einmalverbrauch von Einladungscodes (SCRUM-77) – gültiger Erst-Claim, zweiter Claim,
+fehlender/abgelaufener Code, falscher Spieler/Rolle, parallele Claims und die unveränderten Trainer-Wege.
