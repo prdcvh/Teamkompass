@@ -81,6 +81,9 @@ service cloud.firestore {
             && request.resource.data.role in ["player", "parent"]
             && request.resource.data.playerId is string
             && request.resource.data.claimedInviteCode is string
+            // Nur die vorgesehenen Felder, Zeitstempel vom Server (SCRUM-63).
+            && request.resource.data.keys().hasOnly(['role', 'playerId', 'claimedInviteCode', 'expiresAt', 'createdAt'])
+            && request.resource.data.createdAt == request.time
             // Einmalverbrauch (SCRUM-77): Die Mitgliedschaft darf nur angelegt werden, wenn
             // derselbe Schreibvorgang (Batch) den Einladungscode loescht. Beide Clients
             // (outputs/*/app.js, angular firebase.service.ts) schreiben so. Ein zweiter
@@ -148,6 +151,9 @@ service cloud.firestore {
             && memberDoc().data.role == "player"
             && resource.data.playerId == memberDoc().data.get('playerId', null)
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["selfReflection", "selfReflectionAt"])
+            // Typ und Laenge wie im Client (Textfeld max. 400 Zeichen, Zeitpunkt als ISO-Text) - SCRUM-63.
+            && request.resource.data.selfReflection is string && request.resource.data.selfReflection.size() <= 400
+            && request.resource.data.selfReflectionAt is string && request.resource.data.selfReflectionAt.size() <= 40
           );
         }
 

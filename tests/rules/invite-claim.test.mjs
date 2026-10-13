@@ -4,7 +4,7 @@ import { test, before, after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { initializeTestEnvironment, assertFails, assertSucceeds } from "@firebase/rules-unit-testing";
-import { doc, setDoc, deleteDoc, writeBatch, Timestamp } from "firebase/firestore";
+import { doc, setDoc, deleteDoc, writeBatch, serverTimestamp, Timestamp } from "firebase/firestore";
 
 const TEAM = "TESTTEAM";
 let env;
@@ -29,7 +29,7 @@ async function seedInvite(code, extra = {}) {
 function claim(db, uid, code, member = {}) {
   const batch = writeBatch(db);
   batch.set(doc(db, `teams/${TEAM}/members/${uid}`), {
-    role: "player", playerId: "p1", claimedInviteCode: code, expiresAt: null, createdAt: Timestamp.now(), ...member
+    role: "player", playerId: "p1", claimedInviteCode: code, expiresAt: null, createdAt: serverTimestamp(), ...member
   });
   batch.delete(doc(db, `teams/${TEAM}/invites/${code}`));
   return batch.commit();
@@ -50,7 +50,7 @@ test("members-Create ohne Loeschen des Codes wird abgewiesen", async () => {
   await seedInvite("abc");
   const db = env.authenticatedContext("u1").firestore();
   await assertFails(setDoc(doc(db, `teams/${TEAM}/members/u1`), {
-    role: "player", playerId: "p1", claimedInviteCode: "abc", expiresAt: null, createdAt: Timestamp.now()
+    role: "player", playerId: "p1", claimedInviteCode: "abc", expiresAt: null, createdAt: serverTimestamp()
   }));
 });
 
