@@ -840,6 +840,13 @@ test("Abmelden warnt Spieler und Eltern vor dem Verlust des Zugangs (SCRUM-32)",
   }
 });
 
+test("Der Suchdialog hat einen eigenen zugänglichen Namen (SCRUM-89)", async () => {
+  for (const team of teams) {
+    const script = await read(`outputs/${team}/next-level.js`);
+    assert.match(script, /dialog\.className = "command-palette";\s*dialog\.setAttribute\("aria-label", "TeamKompass durchsuchen"\)/);
+  }
+});
+
 test("Der Begriff „Medizinischer Lesezugang“ ist nirgends mehr sichtbar, die Rolle „medical“ bleibt (SCRUM-91)", async () => {
   const files = [
     ...teams.flatMap((team) => [`outputs/${team}/app.js`, `outputs/${team}/index.html`]),
