@@ -8,7 +8,7 @@ import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 
 /**
- * Trainer-Konto bzw. medizinischen Lesezugang anlegen (zwei Routen, eine Seite: `data.role`). Auth-Konto und
+ * Trainer-Konto bzw. Scout-Zugang anlegen (zwei Routen, eine Seite: `data.role`). Auth-Konto und
  * Zugang entstehen in einem Schritt; das Passwort liegt nur im Formular und wird nach dem Anlegen geleert.
  */
 @Component({
@@ -24,7 +24,7 @@ export class StaffAccount {
 
   protected readonly role: StaffRole = inject(ActivatedRoute).snapshot.data['role'] === 'medical' ? 'medical' : 'trainer';
   protected readonly isTrainer = computed(() => this.session.role() === 'trainer');
-  protected readonly title = this.role === 'medical' ? 'Medizinischer Lesezugang' : 'Trainer-Konto anlegen';
+  protected readonly title = this.role === 'medical' ? 'Scout-Zugang' : 'Trainer-Konto anlegen';
   protected readonly intro =
     this.role === 'medical'
       ? 'Legt ein Konto an, das Spielerdaten, Abwesenheiten und Messwerte nur lesen darf. Bewertungen und interne Notizen bleiben verborgen.'
@@ -52,7 +52,7 @@ export class StaffAccount {
       const email = this.email.trim();
       const result = await this.access.createStaff(this.role, email, this.password);
       if (result.ok) {
-        this.success.set(`${this.role === 'medical' ? 'Der medizinische Lesezugang' : 'Das Trainer-Konto'} für ${email} wurde angelegt.`);
+        this.success.set(`${this.role === 'medical' ? 'Der Scout-Zugang' : 'Das Trainer-Konto'} für ${email} wurde angelegt.`);
         this.email = '';
         this.password = '';
         this.repeat = '';

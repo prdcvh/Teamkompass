@@ -247,5 +247,5 @@ export function displayNameFor(role: Role, email: string | null): string {
   if (role === 'player') return 'Spieler';
   if (role === 'parent') return 'Eltern';
   if (email) return email.split('@')[0];
-  return role === 'medical' ? 'Medizin' : 'Trainer';
+  return role === 'medical' ? 'Scout' : 'Trainer';
 }

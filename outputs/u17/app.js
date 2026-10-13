@@ -685,7 +685,7 @@ function scoreToGrade(record) {
   return 6;
 }
 
-// Lokaler Zwischenspeicher fuer den Teamstand. Spieler, Eltern und der medizinische
+// Lokaler Zwischenspeicher fuer den Teamstand. Spieler, Eltern und der Scout-
 // Zugang cachen nichts: sie sehen (medizinisch: alle) personenbezogene Daten von
 // Minderjaehrigen, die nicht auf dem Geraet zurueckbleiben sollen.
 function canCacheLocally() {
@@ -1705,8 +1705,8 @@ function askStaffCredentials(label) {
 
 async function createStaffAccount(role) {
   if (!isCloudTrainer()) return;
-  const label = role === "medical" ? "medizinischen Lesezugang" : "Trainer-Konto";
-  const credentials = await askStaffCredentials(role === "medical" ? "Medizinischen Lesezugang" : "Trainer-Konto");
+  const label = role === "medical" ? "Scout-Zugang" : "Trainer-Konto";
+  const credentials = await askStaffCredentials(role === "medical" ? "Scout-Zugang" : "Trainer-Konto");
   if (!credentials) return;
   const trimmedEmail = credentials.email;
   const password = credentials.password;
@@ -1729,7 +1729,7 @@ async function createStaffAccount(role) {
       role,
       createdAt: firestoreModule.serverTimestamp()
     });
-    alert(`${role === "medical" ? "Medizinischer Lesezugang" : "Trainer-Konto"} für ${trimmedEmail} wurde angelegt.`);
+    alert(`${role === "medical" ? "Scout-Zugang" : "Trainer-Konto"} für ${trimmedEmail} wurde angelegt.`);
   } catch (error) {
     console.error(error);
     alert(`${label} konnte nicht angelegt werden. ${authErrorMessage(error)}`);
@@ -1796,7 +1796,7 @@ async function renderAccessManager() {
       }
       return `
         <div class="access-row">
-          <div><strong>${escapeHtml(data.role === "medical" ? "Medizinischer Lesezugang" : player?.name || data.playerId)}</strong><span class="muted">${data.role === "parent" ? "Eltern · " : data.role === "medical" ? "Read-only · " : "Spieler · "}${status}</span></div>
+          <div><strong>${escapeHtml(data.role === "medical" ? "Scout-Zugang" : player?.name || data.playerId)}</strong><span class="muted">${data.role === "parent" ? "Eltern · " : data.role === "medical" ? "Read-only · " : "Spieler · "}${status}</span></div>
           <button class="ghost-button" data-action="revoke-access" data-uid="${docSnap.id}" type="button">Zugang sperren</button>
         </div>
       `;
