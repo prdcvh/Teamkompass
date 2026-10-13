@@ -59,7 +59,7 @@ describe('Access (Spieler-Zugänge)', () => {
     expect(rows[0]).toContain('Code …456789');
     expect(rows[0]).toContain('Unbegrenzt gültig');
     expect(rows.some((row) => row.includes('Anna Beispiel') && row.includes('Abgelaufen seit 01.01.2020'))).toBe(true);
-    expect(rows.some((row) => row.includes('arzt@verein.de') && row.includes('Medizin (nur lesen)'))).toBe(true);
+    expect(rows.some((row) => row.includes('arzt@verein.de') && row.includes('Scout (nur lesen)'))).toBe(true);
     expect(text(root(fixture))).not.toContain('coach@verein.de');
     expect(text(root(fixture))).not.toContain('abcdef0123456789abcdef0123456789');
   });

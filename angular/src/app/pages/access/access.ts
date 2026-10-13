@@ -47,7 +47,7 @@ export class Access implements OnInit {
   }
 
   private nameOf(entry: AccessEntry): string {
-    if (entry.role === 'medical') return entry.email || 'Medizinischer Lesezugang';
+    if (entry.role === 'medical') return entry.email || 'Scout-Zugang';
     return this.squad.players().find((player) => player.id === entry.playerId)?.name ?? entry.playerId ?? 'Unbekannter Spieler';
   }
 

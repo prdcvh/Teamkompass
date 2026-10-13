@@ -111,7 +111,7 @@ export function roleLabel(role: Role): string {
     case 'parent':
       return 'Eltern';
     case 'medical':
-      return 'Medizin (nur lesen)';
+      return 'Scout (nur lesen)';
     case 'trainer':
       return 'Trainer';
     default:

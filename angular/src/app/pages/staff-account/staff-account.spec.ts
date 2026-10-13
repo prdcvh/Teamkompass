@@ -48,7 +48,7 @@ describe('StaffAccount (Trainer-/Medizin-Konto)', () => {
     expect(q<HTMLInputElement>(fixture, 'input[name="repeat"]')!.type).toBe('password');
     TestBed.resetTestingModule();
     fixture = await render('medical');
-    expect(text(q(fixture, 'h1'))).toBe('Medizinischer Lesezugang');
+    expect(text(q(fixture, 'h1'))).toBe('Scout-Zugang');
   });
 
   it('zeigt Nicht-Trainern kein Formular', async () => {
@@ -79,7 +79,7 @@ describe('StaffAccount (Trainer-/Medizin-Konto)', () => {
     await submit(fixture);
     await vi.waitFor(() => {
       fixture.detectChanges();
-      expect(text(q(fixture, '.success'))).toBe('Der medizinische Lesezugang für arzt@verein.de wurde angelegt.');
+      expect(text(q(fixture, '.success'))).toBe('Der Scout-Zugang für arzt@verein.de wurde angelegt.');
     });
     expect(firebase.calls).toContain('createStaff:medical:arzt@verein.de');
     expect(firebase.lastStaffPassword).toBe('LangGenug123');

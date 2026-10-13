@@ -839,3 +839,20 @@ test("Abmelden warnt Spieler und Eltern vor dem Verlust des Zugangs (SCRUM-32)",
     assert.match(handler, /neuen Einladungscode/);
   }
 });
+
+test("Der Begriff „Medizinischer Lesezugang“ ist nirgends mehr sichtbar, die Rolle „medical“ bleibt (SCRUM-91)", async () => {
+  const files = [
+    ...teams.flatMap((team) => [`outputs/${team}/app.js`, `outputs/${team}/index.html`]),
+    "angular/src/app/core/navigation.ts",
+    "angular/src/app/core/access.service.ts",
+    "angular/src/app/pages/access/access.ts",
+    "angular/src/app/pages/staff-account/staff-account.ts",
+    "angular/src/app/pages/member-view/member-view.ts"
+  ];
+  for (const file of files) {
+    const text = await read(file);
+    assert.doesNotMatch(text, /medizinische[rnm]? Lesezugang/i, `${file}: alter Begriff sichtbar`);
+  }
+  for (const team of teams) assert.match(await read(`outputs/${team}/app.js`), /Scout-Zugang/);
+  assert.match(await read("firestore.rules"), /role == "medical"/);
+});
