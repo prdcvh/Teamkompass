@@ -737,6 +737,21 @@ test("Suchfelder und Theme-Schalter haben zugängliche Namen ohne widersprüchli
   }
 });
 
+test("Workflows: PR-Code laeuft ohne Service-Account-Secret, Secrets nicht inline interpoliert (SCRUM-57)", async () => {
+  for (const file of [".github/workflows/firebase-hosting-pull-request.yml", ".github/workflows/firebase-hosting-merge.yml"]) {
+    const workflow = await read(file);
+    const [verifyJob, deployJob] = workflow.split(/\n  build_and_(?:preview|deploy):/);
+    assert.ok(deployJob, `${file}: Deploy-Job fehlt`);
+    assert.doesNotMatch(verifyJob, /secrets\.FIREBASE_SERVICE_ACCOUNT/, `${file}: Verify-Job darf das Secret nicht sehen`);
+    assert.match(verifyJob, /npm ci --ignore-scripts/, `${file}: npm ci ohne Install-Skripte`);
+    assert.doesNotMatch(deployJob, /npm (ci|run|install)/, `${file}: Deploy-Job fuehrt keinen Projektcode aus`);
+    assert.match(deployJob, /needs: verify/);
+  }
+  const rules = await read(".github/workflows/firestore-rules-deploy.yml");
+  assert.doesNotMatch(rules, /echo '\$\{\{ secrets/, "Secret nicht in die Shell-Zeile interpolieren");
+  assert.match(rules, /FIREBASE_SERVICE_ACCOUNT: \$\{\{ secrets\./);
+});
+
 test("Konten-Passwort wird verdeckt abgefragt und folgt der Richtlinie ab 12 Zeichen (SCRUM-58)", async () => {
   for (const team of teams) {
     const app = await read(`outputs/${team}/app.js`);
