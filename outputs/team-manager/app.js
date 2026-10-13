@@ -1429,7 +1429,7 @@ function applyRoleRestrictions() {
   document.body.classList.toggle("role-trainer-cloud", isCloudTrainer());
   $("#signOutBtn").hidden = !isCloudActive();
   $("#migrateDataBtn").hidden = !isCloudTrainer();
-  $("#importBtn").hidden = !canManageRecords() || (isCloudActive() && !isCloudTrainer());
+  $("#importBtn").hidden = !canManageRecords() || (isCloudActive() && !legacyBlobMode && !isCloudTrainer());
   $("#addTrainerBtn").hidden = !isCloudTrainer();
   $("#addMedicalBtn").hidden = !isCloudTrainer();
   $("#changePasswordBtn").hidden = !(isCloudActive() && ["trainer", "medical"].includes(currentRole));
@@ -4289,7 +4289,7 @@ function exportData() {
 const BACKUP_ID_PATTERN = /^[A-Za-z0-9_.-]{1,128}$/;
 
 function isBackupId(id) {
-  return typeof id === "string" && BACKUP_ID_PATTERN.test(id) && id !== "." && id !== "..";
+  return typeof id === "string" && BACKUP_ID_PATTERN.test(id) && id !== "." && id !== ".." && !/^__.*__$/.test(id);
 }
 
 // Prueft eine eingelesene Export-Datei streng. Anders als normalizeState() faellt sie nie auf die
@@ -4307,7 +4307,7 @@ function validateBackupData(raw) {
     for (const key of ["ratings", "privateNotes"]) {
       const map = event[key];
       if (map === undefined) continue;
-      if (!map || typeof map !== "object" || Array.isArray(map) || !Object.keys(map).every(isBackupId)) return { ok: false, error: "Mindestens ein Event enthält ungültige Bewertungen." };
+      if (!map || typeof map !== "object" || Array.isArray(map) || !Object.keys(map).every(isBackupId) || !Object.values(map).every((value) => (key === "ratings" ? value && typeof value === "object" && !Array.isArray(value) : typeof value === "string"))) return { ok: false, error: "Mindestens ein Event enthält ungültige Bewertungen." };
     }
   }
   for (const name of collections) {
@@ -4411,7 +4411,7 @@ function backupSummaryText(summary) {
 
 async function importBackupFile(file) {
   if (!file || !canManageRecords()) return;
-  if (isCloudActive() && !isCloudTrainer()) return;
+  if (isCloudActive() && !legacyBlobMode && !isCloudTrainer()) return;
   let raw;
   try {
     raw = JSON.parse(await file.text());
@@ -4424,7 +4424,7 @@ async function importBackupFile(file) {
     alert(`${check.error}\nEs wurde nichts geändert.`);
     return;
   }
-  const incoming = normalizeState({ ...raw, selectedEventId: state.selectedEventId });
+  const incoming = normalizeState({ ...raw, opponents: Array.isArray(raw.opponents) ? raw.opponents : [], selectedEventId: state.selectedEventId });
   const summary = summarizeBackupImport(state, incoming);
   const overwrites = summary.players.overwritten + summary.events.overwritten + summary.opponents.overwritten + summary.plans.overwritten + summary.absences.overwritten + summary.measurements.overwritten;
   const warning = overwrites ? "\nAchtung: Vorhandene Einträge mit gleicher Kennung werden mit dem Stand aus dem Backup überschrieben. Tipp: vorher „Daten exportieren“, um den aktuellen Stand zu sichern." : "";

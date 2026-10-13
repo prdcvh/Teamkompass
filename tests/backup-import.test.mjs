@@ -53,7 +53,7 @@ test("Root-Kopie nutzt denselben Import-Kern wie die Team-Apps", async () => {
 test("Backup-Validierung lehnt fremde oder kaputte Dateien ab, ohne auf Beispieldaten zurückzufallen", async () => {
   const { validateBackupData } = await loadBackupApi();
   assert.equal(validateBackupData(backup()).ok, true);
-  for (const bad of [null, [], "x", {}, { players: [], events: [] }, { players: [{ id: "p1" }], events: [] }, { players: [{ id: "../x", name: "A" }], events: [] }, { players: [{ id: "p1", name: "A" }], events: [{ id: "__proto__/x" }] }, { players: [{ id: "p1", name: "A" }], events: [{ id: "e1", ratings: { "a/b": {} } }] }, { players: [{ id: "p1", name: "A" }], events: [], absences: { p1: "kaputt" } }]) {
+  for (const bad of [null, [], "x", {}, { players: [], events: [] }, { players: [{ id: "p1" }], events: [] }, { players: [{ id: "../x", name: "A" }], events: [] }, { players: [{ id: "p1", name: "A" }], events: [{ id: "__proto__/x" }] }, { players: [{ id: "p1", name: "A" }], events: [{ id: "e1", ratings: { "a/b": {} } }] }, { players: [{ id: "__a__", name: "A" }], events: [] }, { players: [{ id: "p1", name: "A" }], events: [{ id: "e1", ratings: { p1: null } }] }, { players: [{ id: "p1", name: "A" }], events: [{ id: "e1", privateNotes: { p1: 5 } }] }, { players: [{ id: "p1", name: "A" }], events: [], absences: { p1: "kaputt" } }]) {
     assert.equal(validateBackupData(bad).ok, false, JSON.stringify(bad));
   }
 });
