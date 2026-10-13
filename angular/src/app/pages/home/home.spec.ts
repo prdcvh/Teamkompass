@@ -18,9 +18,10 @@ describe('Home (Start-Dashboard)', () => {
     return todayIso(date);
   };
 
-  async function render(role: 'trainer' | 'player' = 'trainer', mobile = false) {
+  async function render(role: 'trainer' | 'player' = 'trainer', mobile = false, lineup: Record<string, unknown> | null = null) {
     isMobile.set(mobile);
     firebase = new FakeFirebase();
+    firebase.lineup = lineup;
     firebase.players.set('p1', { name: 'Ali Adler', positions: ['ST'], number: 9, birthdate: '2012-05-05', status: 'Fit' });
     firebase.players.set('p2', { name: '<b>Ben</b>', positions: ['IV'], number: 4, birthdate: '2012-06-06', status: 'Verletzt' });
     firebase.events.set('e1', { type: 'Spiel', title: 'Heimspiel', date: day(-3), goalsFor: 3, goalsAgainst: 1, matchDuration: 70 });
@@ -69,11 +70,37 @@ describe('Home (Start-Dashboard)', () => {
     expect(root(fixture).querySelectorAll('.board li').length).toBeLessThanOrEqual(5);
   });
 
+  it('zeigt die Startelf als Kurzansicht, die zur Aufstellung führt', async () => {
+    const fixture = await render('trainer', false, { assignments: { ST: ['p1'], IV: ['p2'], TW: [] } });
+    await ready(fixture);
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(root(fixture).querySelector('.lineup-link')).not.toBeNull();
+    });
+    const link = root(fixture).querySelector<HTMLAnchorElement>('.lineup-link')!;
+    expect(link.getAttribute('href')).toBe('/aufstellung');
+    expect(link.getAttribute('aria-label')).toBe('Aufstellung öffnen, Formation 1-1');
+    const rows = [...link.querySelectorAll('.lineup-rows li')].map((li) => li.textContent?.replace(/\s+/g, ' ').trim());
+    expect(rows).toEqual(['AngriffAli Adler', 'Abwehr<b>Ben</b>']);
+    expect(link.querySelector('b')).toBeNull();
+  });
+
+  it('weist ohne gespeicherte Aufstellung auf die Aufstellung hin', async () => {
+    const fixture = await render();
+    await ready(fixture);
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(text(fixture)).toContain('Noch keine Aufstellung gespeichert.');
+    });
+    expect(root(fixture).querySelector('a[href="/aufstellung"]')?.textContent).toContain('Aufstellung anlegen');
+  });
+
   it('lädt für Spieler keine Teamauswertung', async () => {
     const fixture = await render('player');
     fixture.detectChanges();
     expect(text(fixture)).toContain(environment.teamName);
     expect(root(fixture).querySelector('.stats')).toBeNull();
     expect(firebase.calls).not.toContain('watchPlayers');
+    expect(firebase.lineupWatchers).toBe(0);
   });
 });
