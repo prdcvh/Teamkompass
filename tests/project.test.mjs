@@ -845,6 +845,7 @@ test("Der Suchdialog hat einen eigenen zugänglichen Namen (SCRUM-89)", async ()
     const script = await read(`outputs/${team}/next-level.js`);
     assert.match(script, /dialog\.className = "command-palette";\s*dialog\.setAttribute\("aria-label", "TeamKompass durchsuchen"\)/);
   }
+});
 
 test("Der Begriff „Medizinischer Lesezugang“ ist nirgends mehr sichtbar, die Rolle „medical“ bleibt (SCRUM-91)", async () => {
   const files = [
