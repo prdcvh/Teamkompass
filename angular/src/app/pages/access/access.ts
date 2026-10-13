@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, OnInit, computed, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { type AccessEntry, roleLabel, sortEntries, validityText, isExpired } from '../../core/access';
 import { AccessService } from '../../core/access.service';
 import { LayoutService } from '../../core/layout.service';
@@ -10,10 +11,15 @@ import { Dialog } from '../../ui/dialog/dialog';
 import { Icon } from '../../ui/icon/icon';
 import { InviteDialog } from './invite-dialog';
 
-/** Spieler-Zugänge: Einladungscodes für Spieler/Eltern erzeugen, Liste der Zugänge, Zugang sperren (nur Trainer). */
+export type AccessTab = 'players' | 'scouts';
+
+/**
+ * Zugangsverwaltung (nur Trainer), getrennt in zwei Reiter: „Spieler“ (Spieler und Eltern: Einladungscodes erzeugen,
+ * befristen, sperren) und „Scouts“ (Lesezugänge mit E-Mail und Passwort; angelegt über eine eigene Seite).
+ */
 @Component({
   selector: 'app-access',
-  imports: [Button, Card, Dialog, Icon, InviteDialog],
+  imports: [RouterLink, Button, Card, Dialog, Icon, InviteDialog],
   templateUrl: './access.html',
   styleUrl: './access.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -23,7 +29,9 @@ export class Access implements OnInit {
   protected readonly squad = inject(SquadService);
   protected readonly mobile = inject(LayoutService).isMobile;
   private readonly session = inject(SessionService);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   protected readonly isTrainer = computed(() => this.session.role() === 'trainer');
+  protected readonly tab = signal<AccessTab>('players');
 
   protected readonly inviteOpen = signal(false);
   protected readonly revoking = signal<AccessEntry | null>(null);
@@ -39,6 +47,21 @@ export class Access implements OnInit {
       expired: isExpired(entry),
     })),
   );
+
+  protected readonly tabRows = computed(() => this.rows().filter((row) => (row.entry.role === 'medical') === (this.tab() === 'scouts')));
+  protected readonly counts = computed(() => ({
+    players: this.rows().filter((row) => row.entry.role !== 'medical').length,
+    scouts: this.rows().filter((row) => row.entry.role === 'medical').length,
+  }));
+
+  protected select(tab: AccessTab): void {
+    this.tab.set(tab);
+  }
+
+  protected selectByKey(tab: AccessTab): void {
+    this.select(tab);
+    queueMicrotask(() => this.host.nativeElement.querySelector<HTMLElement>(`#access-tab-${tab}`)?.focus());
+  }
 
   ngOnInit(): void {
     if (!this.isTrainer()) return;

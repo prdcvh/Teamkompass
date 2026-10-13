@@ -245,8 +245,13 @@
             </div>
           </details>
           <details class="control-disclosure" id="accessManagerPanel">
-            <summary>Spieler-Zugänge verwalten</summary>
+            <summary>Spieler-Zugänge verwalten <span id="playerAccessCount" class="muted"></span></summary>
             <div class="access-manager" id="accessManagerList"></div>
+          </details>
+          <details class="control-disclosure" id="scoutManagerPanel">
+            <summary>Scout-Zugänge verwalten <span id="scoutAccessCount" class="muted"></span></summary>
+            <div class="access-manager" id="scoutManagerList"></div>
+            <button class="ghost-button" data-action="add-scout" type="button">Scout-Zugang anlegen</button>
           </details>
           <div class="table-wrap">
             <table>

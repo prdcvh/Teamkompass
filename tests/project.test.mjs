@@ -863,3 +863,19 @@ test("Der Begriff „Medizinischer Lesezugang“ ist nirgends mehr sichtbar, die
   for (const team of teams) assert.match(await read(`outputs/${team}/app.js`), /Scout-Zugang/);
   assert.match(await read("firestore.rules"), /role == "medical"/);
 });
+
+test("Spieler- und Scout-Zugänge werden getrennt verwaltet (SCRUM-92)", async () => {
+  for (const team of teams) {
+    const html = await read(`outputs/${team}/index.html`);
+    assert.match(html, /id="accessManagerList"/);
+    assert.match(html, /id="scoutManagerList"/);
+    assert.match(html, /data-action="add-scout"/);
+    const app = await read(`outputs/${team}/app.js`);
+    const render = app.slice(app.indexOf("async function renderAccessManager"), app.indexOf("async function revokeAccess"));
+    assert.match(render, /\["player", "parent"\]\.includes\(docSnap\.data\(\)\.role\)/);
+    assert.match(render, /docSnap\.data\(\)\.role === "medical"/);
+    const css = await read(`outputs/${team}/base.css`);
+    assert.match(css, /body\.role-medical #scoutManagerPanel/);
+    assert.match(css, /body\.role-trainer-cloud #scoutManagerPanel/);
+  }
+});
