@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
-import { LayoutService } from '../../core/layout.service';
-import { todayIso } from '../../core/dates';
+import { LayoutService } from '../../core/shell/layout.service';
+import { todayIso } from '../../core/shared/dates';
 import { CONSENT_LABELS, type ConsentStatus, PLAYER_STATUSES, type Player, type PlayerDraft, type PlayerErrors, type PlayerStatus, STANDARD_POSITIONS, draftFromPlayer, emptyDraft } from '../../core/player/player';
-import { SquadService } from '../../core/squad.service';
+import { SquadService } from '../../core/player/squad.service';
 import { Button } from '../../ui/button/button';
 import { Dialog } from '../../ui/dialog/dialog';
 

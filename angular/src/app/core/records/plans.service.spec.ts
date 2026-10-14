@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { SessionService } from '../session.service';
+import { SessionService } from '../auth/session.service';
 import type { FakeFirebase } from '../testing/fake-firebase';
 import { setupRecords } from '../testing/records-setup';
 import { emptyPlanDraft } from './plan';

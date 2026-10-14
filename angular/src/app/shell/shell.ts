@@ -1,9 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Router, RouterOutlet } from '@angular/router';
-import { LayoutService } from '../core/layout.service';
-import { MORE_GROUPS, PRIVACY_ITEM } from '../core/navigation';
-import { showsNavigation } from '../core/role';
-import { SessionService } from '../core/session.service';
+import { LayoutService } from '../core/shell/layout.service';
+import { MORE_GROUPS, PRIVACY_ITEM } from '../core/shell/navigation';
+import { showsNavigation } from '../core/auth/role';
+import { SessionService } from '../core/auth/session.service';
 import { MoreSheet } from './more-sheet/more-sheet';
 import { Sidebar } from './sidebar/sidebar';
 import { TabBar } from './tab-bar/tab-bar';

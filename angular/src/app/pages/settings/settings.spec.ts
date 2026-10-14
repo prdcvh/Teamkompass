@@ -1,9 +1,9 @@
 import { TestBed } from '@angular/core/testing';
-import { SessionService } from '../../core/session.service';
+import { SessionService } from '../../core/auth/session.service';
 import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
-import { TEAM_DATA_PREFIX } from '../../core/local-data';
-import { ThemeService } from '../../core/theme.service';
-import { WORKSPACE_KEY } from '../../core/workspace';
+import { TEAM_DATA_PREFIX } from '../../core/device/local-data';
+import { ThemeService } from '../../core/device/theme.service';
+import { WORKSPACE_KEY } from '../../core/device/workspace';
 import { Settings } from './settings';
 
 describe('Settings (Einstellungen & Datenschutz)', () => {

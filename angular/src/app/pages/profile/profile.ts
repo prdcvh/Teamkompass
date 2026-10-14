@@ -2,9 +2,9 @@ import { ChangeDetectionStrategy, Component, OnInit, computed, effect, inject, s
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { map } from 'rxjs';
-import { formatDate } from '../../core/event';
-import { LayoutService } from '../../core/layout.service';
-import { ageFromBirthdate, todayIso } from '../../core/dates';
+import { formatDate } from '../../core/events/event';
+import { LayoutService } from '../../core/shell/layout.service';
+import { ageFromBirthdate, todayIso } from '../../core/shared/dates';
 import { type Player, consentRevokedMessage, isConsentRevoked, positionText } from '../../core/player/player';
 import {
   availability,
@@ -14,15 +14,15 @@ import {
   profileFigures,
   skillAverages,
   trendChart,
-} from '../../core/profile';
-import { ProfileService } from '../../core/profile.service';
+} from '../../core/profile/profile';
+import { ProfileService } from '../../core/profile/profile.service';
 import { effectiveStatus } from '../../core/records/availability';
 import { MeasurementsService } from '../../core/records/measurements.service';
 import { RecordsStateService } from '../../core/records/records-state.service';
-import { injuryRisk } from '../../core/risk';
-import { gradeLabel } from '../../core/rating';
-import { SquadService } from '../../core/squad.service';
-import { SyncService } from '../../core/sync.service';
+import { injuryRisk } from '../../core/analysis/risk';
+import { gradeLabel } from '../../core/ratings/rating';
+import { SquadService } from '../../core/player/squad.service';
+import { SyncService } from '../../core/shell/sync.service';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 import { Status } from '../../ui/status/status';

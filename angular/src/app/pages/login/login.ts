@@ -2,10 +2,10 @@ import { ChangeDetectionStrategy, Component, ElementRef, inject, signal } from '
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { environment } from '../../../environments/environment';
-import { AccountService } from '../../core/account.service';
-import { AuthService } from '../../core/auth.service';
-import { homeFor } from '../../core/role';
-import { SessionService } from '../../core/session.service';
+import { AccountService } from '../../core/auth/account.service';
+import { AuthService } from '../../core/auth/auth.service';
+import { homeFor } from '../../core/auth/role';
+import { SessionService } from '../../core/auth/session.service';
 import { Button } from '../../ui/button/button';
 
 type Tab = 'trainer' | 'code';

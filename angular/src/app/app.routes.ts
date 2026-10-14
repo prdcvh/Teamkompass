@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard, guestGuard, memberViewGuard, trainerGuard } from './core/auth.guard';
+import { authGuard, guestGuard, memberViewGuard, trainerGuard } from './core/auth/auth.guard';
 import { Shell } from './shell/shell';
 
 export const routes: Routes = [

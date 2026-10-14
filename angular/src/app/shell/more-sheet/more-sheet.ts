@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { MORE_GROUPS, PRIVACY_ITEM } from '../../core/navigation';
-import { ThemeService } from '../../core/theme.service';
+import { MORE_GROUPS, PRIVACY_ITEM } from '../../core/shell/navigation';
+import { ThemeService } from '../../core/device/theme.service';
 import { Dialog } from '../../ui/dialog/dialog';
 import { Icon } from '../../ui/icon/icon';
 

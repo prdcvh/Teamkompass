@@ -1,11 +1,11 @@
 import { TestBed } from '@angular/core/testing';
-import { ProfileService } from '../profile.service';
+import { ProfileService } from '../profile/profile.service';
 import { AbsencesService } from '../records/absences.service';
 import { MeasurementsService } from '../records/measurements.service';
 import { PlansService } from '../records/plans.service';
 import { RecordsStateService } from '../records/records-state.service';
-import { SessionService } from '../session.service';
-import { SquadService } from '../squad.service';
+import { SessionService } from '../auth/session.service';
+import { SquadService } from '../player/squad.service';
 import { FakeFirebase, provideFakeFirebase } from './fake-firebase';
 
 /**

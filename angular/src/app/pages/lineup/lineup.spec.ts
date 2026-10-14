@@ -1,7 +1,7 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { LayoutService } from '../../core/layout.service';
-import { SessionService } from '../../core/session.service';
+import { LayoutService } from '../../core/shell/layout.service';
+import { SessionService } from '../../core/auth/session.service';
 import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
 import { Lineup } from './lineup';
 

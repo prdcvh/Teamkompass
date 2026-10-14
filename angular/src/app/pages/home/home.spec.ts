@@ -2,9 +2,9 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { environment } from '../../../environments/environment';
-import { LayoutService } from '../../core/layout.service';
-import { todayIso } from '../../core/dates';
-import { SessionService } from '../../core/session.service';
+import { LayoutService } from '../../core/shell/layout.service';
+import { todayIso } from '../../core/shared/dates';
+import { SessionService } from '../../core/auth/session.service';
 import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
 import { Home } from './home';
 

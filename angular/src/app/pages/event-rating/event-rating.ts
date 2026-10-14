@@ -2,9 +2,9 @@ import { ChangeDetectionStrategy, Component, OnInit, computed, effect, inject, s
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
-import { INTENSITIES, formatDate, resultText } from '../../core/event';
-import { EventsService } from '../../core/events.service';
-import { LayoutService } from '../../core/layout.service';
+import { INTENSITIES, formatDate, resultText } from '../../core/events/event';
+import { EventsService } from '../../core/events/events.service';
+import { LayoutService } from '../../core/shell/layout.service';
 import { type Player, consentRevokedMessage, isConsentRevoked } from '../../core/player/player';
 import {
   ATTENDANCES,
@@ -21,10 +21,10 @@ import {
   gradeLabel,
   matchesView,
   progress,
-} from '../../core/rating';
-import { RatingsService } from '../../core/ratings.service';
-import { SquadService } from '../../core/squad.service';
-import { SyncService } from '../../core/sync.service';
+} from '../../core/ratings/rating';
+import { RatingsService } from '../../core/ratings/ratings.service';
+import { SquadService } from '../../core/player/squad.service';
+import { SyncService } from '../../core/shell/sync.service';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 

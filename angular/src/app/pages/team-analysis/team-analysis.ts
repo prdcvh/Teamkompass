@@ -1,15 +1,15 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { birthQuarterCounts, positionCoverage, teamStats, teamTrend, thinPositions, trainingFocusCounts } from '../../core/analysis';
-import { LayoutService } from '../../core/layout.service';
-import { todayIso } from '../../core/dates';
-import { numberLabel } from '../../core/profile';
-import { gradeLabel } from '../../core/rating';
-import { injuryRisk } from '../../core/risk';
-import { SessionService } from '../../core/session.service';
-import { SyncService } from '../../core/sync.service';
-import { leaders } from '../../core/team';
-import { TeamService } from '../../core/team.service';
+import { birthQuarterCounts, positionCoverage, teamStats, teamTrend, thinPositions, trainingFocusCounts } from '../../core/analysis/analysis';
+import { LayoutService } from '../../core/shell/layout.service';
+import { todayIso } from '../../core/shared/dates';
+import { numberLabel } from '../../core/profile/profile';
+import { gradeLabel } from '../../core/ratings/rating';
+import { injuryRisk } from '../../core/analysis/risk';
+import { SessionService } from '../../core/auth/session.service';
+import { SyncService } from '../../core/shell/sync.service';
+import { leaders } from '../../core/team/team';
+import { TeamService } from '../../core/team/team.service';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 

@@ -1,11 +1,11 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { LayoutService } from '../../core/layout.service';
-import { ageFromBirthdate, formatDate } from '../../core/dates';
+import { LayoutService } from '../../core/shell/layout.service';
+import { ageFromBirthdate, formatDate } from '../../core/shared/dates';
 import { CONSENT_LABELS, PLAYER_STATUSES, type Player, STANDARD_POSITIONS, positionText } from '../../core/player/player';
 import { SORT_OPTIONS, type SortKey, filterPlayers, groupByLine, sortPlayers, statusCounts } from '../../core/player/squad-list';
-import { SquadService } from '../../core/squad.service';
-import { SyncService } from '../../core/sync.service';
+import { SquadService } from '../../core/player/squad.service';
+import { SyncService } from '../../core/shell/sync.service';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 import { Dialog } from '../../ui/dialog/dialog';

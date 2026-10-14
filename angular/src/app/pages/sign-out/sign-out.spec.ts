@@ -1,8 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
-import { AuthService } from '../../core/auth.service';
-import type { Role } from '../../core/role';
-import { SessionService } from '../../core/session.service';
+import { AuthService } from '../../core/auth/auth.service';
+import type { Role } from '../../core/auth/role';
+import { SessionService } from '../../core/auth/session.service';
 import { SignOut } from './sign-out';
 
 describe('SignOut (Abmelden)', () => {

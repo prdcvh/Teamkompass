@@ -1,5 +1,5 @@
 /** Förderpläne eines Spielers (`players/{id}/developmentPlans`): Modell, Prüfung und Umwandlung. Daten sind ISO-Datum-Texte (JJJJ-MM-TT). */
-import { isIsoDate } from '../dates';
+import { isIsoDate } from '../shared/dates';
 
 export const PLAN_STATUSES = ['Offen', 'In Arbeit', 'Erreicht'] as const;
 export type PlanStatus = (typeof PLAN_STATUSES)[number];

@@ -3,7 +3,7 @@
  * (`{ assignments: { <Zone>: [playerId, …] } }`), Verschieben, Tauschen, Auswechseln, Bank und Mannschaftsnote
  * (wie outputs/team-manager/app.js: movePlayerToZone, swapPlayers). Noten sind Schulnoten: kleiner ist besser.
  */
-import { roundGrade } from '../rating';
+import { roundGrade } from '../ratings/rating';
 import { MAX_ON_PITCH, PITCH_BANDS, ZONES, type Zone } from './pitch';
 import type { Candidate } from './formation-assignment';
 

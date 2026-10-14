@@ -1,9 +1,9 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { environment } from '../../../environments/environment';
-import { ADMIN_ITEMS, PRIVACY_ITEM, SIDEBAR_ITEMS } from '../../core/navigation';
-import { SessionService } from '../../core/session.service';
-import { ThemeService } from '../../core/theme.service';
+import { ADMIN_ITEMS, PRIVACY_ITEM, SIDEBAR_ITEMS } from '../../core/shell/navigation';
+import { SessionService } from '../../core/auth/session.service';
+import { ThemeService } from '../../core/device/theme.service';
 import { Icon } from '../../ui/icon/icon';
 
 /** Desktop-Navigation (Figma „Sidebar“, 240 px). */

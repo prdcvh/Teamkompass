@@ -1,4 +1,4 @@
-import type { Role } from '../role';
+import type { Role } from '../auth/role';
 
 export interface FirebaseUser {
   readonly uid: string;
