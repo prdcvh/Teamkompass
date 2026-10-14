@@ -28,14 +28,14 @@ describe('Lineup (Aufstellung)', () => {
     isMobile.set(mobile);
     firebase = new FakeFirebase();
     for (const [id, name, number, positions] of squad) {
-      firebase.players.set(id, { name, positions, number, birthdate: '2012-01-01', status: 'Fit' });
+      firebase.players.players.set(id, { name, positions, number, birthdate: '2012-01-01', status: 'Fit' });
     }
-    firebase.events.set('e1', { type: 'Training', title: 'Training', date: '2026-09-01', intensity: 2 });
+    firebase.events.events.set('e1', { type: 'Training', title: 'Training', date: '2026-09-01', intensity: 2 });
     firebase.ratings.set(
       'e1',
       new Map(squad.map(([id, , , , grade]) => [id, { attendance: 'present', effort: grade, technique: grade, tactics: grade, comprehension: grade, playerId: id }])),
     );
-    firebase.lineup = stored;
+    firebase.lineup.lineup = stored;
     TestBed.configureTestingModule({ providers: [...provideFakeFirebase(firebase), { provide: LayoutService, useValue: { isMobile } }] });
     TestBed.inject(SessionService).role.set(role);
     const fixture = TestBed.createComponent(Lineup);
@@ -58,7 +58,7 @@ describe('Lineup (Aufstellung)', () => {
     await fixture.whenStable();
     fixture.detectChanges();
   };
-  const saved = () => (firebase.lineup as { assignments: Record<string, string[]> } | null)?.assignments;
+  const saved = () => (firebase.lineup.lineup as { assignments: Record<string, string[]> } | null)?.assignments;
   const full = { assignments: { TW: ['tw'], LV: ['lv'], IV: ['iv1', 'iv2'], RV: ['rv'], ZM: ['zm1', 'zm2', 'zm3'], LA: ['la'], ST: ['st'], RA: ['ra'] } };
 
   it('zeigt ohne gespeicherte Startelf den besten Vorschlag mit Formation, Bank und Mannschaftsnote', async () => {

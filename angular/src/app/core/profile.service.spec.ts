@@ -9,8 +9,8 @@ describe('ProfileService', () => {
 
   async function setup(role: 'trainer' | null = 'trainer') {
     firebase = new FakeFirebase();
-    firebase.events.set('e1', { type: 'Training', title: 'Training', date: '2026-10-01' });
-    firebase.events.set('e2', { type: 'Spiel', title: 'Spiel', date: '2026-10-05', matchDuration: 70 });
+    firebase.events.events.set('e1', { type: 'Training', title: 'Training', date: '2026-10-01' });
+    firebase.events.events.set('e2', { type: 'Spiel', title: 'Spiel', date: '2026-10-05', matchDuration: 70 });
     firebase.ratings.set('e1', new Map([['p1', { attendance: 'present', effort: 2, technique: 2, tactics: 2, comprehension: 2, grade: 2, playerId: 'p1' }]]));
     TestBed.configureTestingModule({ providers: [...provideFakeFirebase(firebase)] });
     TestBed.inject(SessionService).role.set(role);
@@ -49,8 +49,8 @@ describe('ProfileService', () => {
     firebase.pushRatingDoc('e2', 'p1', { attendance: 'present', effort: 1, technique: 1, tactics: 1, comprehension: 1 });
     expect(profile.items()[0].rating?.attendance).toBe('present');
 
-    firebase.events.set('e3', { type: 'Training', title: 'Neu', date: '2026-10-09' });
-    firebase.emitEvents();
+    firebase.events.events.set('e3', { type: 'Training', title: 'Neu', date: '2026-10-09' });
+    firebase.events.emitEvents();
     await settle(profile);
     expect(firebase.calls).toContain('watchRatingDoc:e3:p1');
     expect(profile.items()).toHaveLength(3);
@@ -61,8 +61,8 @@ describe('ProfileService', () => {
     profile.start('p1');
     await settle(profile);
     expect(firebase.ratingDocWatchers).toBe(2);
-    firebase.events.delete('e1');
-    firebase.emitEvents();
+    firebase.events.events.delete('e1');
+    firebase.events.emitEvents();
     await settle(profile);
     expect(firebase.ratingDocWatchers).toBe(1);
     expect(profile.items().map((item) => item.event.id)).toEqual(['e2']);

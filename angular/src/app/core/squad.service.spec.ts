@@ -11,7 +11,7 @@ describe('SquadService', () => {
 
   function setup(role: 'trainer' | 'medical' | 'player' | 'parent' | null = 'trainer') {
     firebase = new FakeFirebase();
-    firebase.players.set('p1', { name: 'Ali Adler', positions: ['ST'], number: 9, birthdate: '2012-05-05', status: 'Fit' });
+    firebase.players.players.set('p1', { name: 'Ali Adler', positions: ['ST'], number: 9, birthdate: '2012-05-05', status: 'Fit' });
     TestBed.configureTestingModule({ providers: [...provideFakeFirebase(firebase)] });
     TestBed.inject(SessionService).role.set(role);
     if (role === 'player' || role === 'parent') TestBed.inject(SessionService).playerId.set('p1');
@@ -27,8 +27,8 @@ describe('SquadService', () => {
     expect(squad.players().map((p) => p.name)).toEqual(['Ali Adler']);
     expect(TestBed.inject(SyncService).state()).toBe('saved');
 
-    firebase.players.set('p2', { name: 'Zoe Zander', positions: ['TW'], number: 1, birthdate: '2013-01-01' });
-    firebase.emitPlayers();
+    firebase.players.players.set('p2', { name: 'Zoe Zander', positions: ['TW'], number: 1, birthdate: '2013-01-01' });
+    firebase.players.emitPlayers();
     expect(squad.players()).toHaveLength(2);
   });
 
@@ -38,7 +38,7 @@ describe('SquadService', () => {
     squad.start();
     await vi.waitFor(() => expect(squad.load()).toBe('ready'));
     squad.start();
-    expect(firebase.playerWatchers).toBe(1);
+    expect(firebase.players.playerWatchers).toBe(1);
   });
 
   it('zeigt Offline- und Wartezustand aus dem Snapshot', async () => {
@@ -46,11 +46,11 @@ describe('SquadService', () => {
     squad.start();
     await vi.waitFor(() => expect(squad.load()).toBe('ready'));
     const sync = TestBed.inject(SyncService);
-    firebase.emitPlayers({ fromCache: true, hasPendingWrites: false });
+    firebase.players.emitPlayers({ fromCache: true, hasPendingWrites: false });
     expect(sync.state()).toBe('offline');
-    firebase.emitPlayers({ fromCache: false, hasPendingWrites: true });
+    firebase.players.emitPlayers({ fromCache: false, hasPendingWrites: true });
     expect(sync.state()).toBe('syncing');
-    firebase.emitPlayers({ fromCache: false, hasPendingWrites: false });
+    firebase.players.emitPlayers({ fromCache: false, hasPendingWrites: false });
     expect(sync.state()).toBe('saved');
   });
 
@@ -59,19 +59,19 @@ describe('SquadService', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     squad.start();
     await vi.waitFor(() => expect(squad.load()).toBe('ready'));
-    firebase.failPlayers({ code: 'permission-denied' });
+    firebase.players.failPlayers({ code: 'permission-denied' });
     expect(squad.load()).toBe('error');
     expect(squad.error()).toContain('permission-denied');
     expect(TestBed.inject(SyncService).state()).toBe('error');
     squad.start();
     await vi.waitFor(() => expect(squad.load()).toBe('ready'));
-    expect(firebase.playerWatchers).toBe(1);
+    expect(firebase.players.playerWatchers).toBe(1);
   });
 
   it('meldet einen Fehler beim Starten des Abos', async () => {
     const squad = setup();
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    firebase.watchPlayersError = { code: 'unavailable' };
+    firebase.players.watchPlayersError = { code: 'unavailable' };
     squad.start();
     await vi.waitFor(() => expect(squad.load()).toBe('error'));
   });
@@ -111,7 +111,7 @@ describe('SquadService', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     squad.start();
     await vi.waitFor(() => expect(squad.load()).toBe('ready'));
-    firebase.savePlayerError = { code: 'permission-denied' };
+    firebase.players.savePlayerError = { code: 'permission-denied' };
     squad.save(draft());
     const sync = TestBed.inject(SyncService);
     await vi.waitFor(() => expect(sync.state()).toBe('error'));
@@ -123,10 +123,10 @@ describe('SquadService', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     squad.start();
     await vi.waitFor(() => expect(squad.load()).toBe('ready'));
-    firebase.deletePlayerError = { code: 'unavailable' };
+    firebase.players.deletePlayerError = { code: 'unavailable' };
     expect(await squad.remove('p1')).toBe(false);
     expect(squad.players()).toHaveLength(1);
-    firebase.deletePlayerError = null;
+    firebase.players.deletePlayerError = null;
     expect(await squad.remove('p1')).toBe(true);
     expect(squad.players()).toHaveLength(0);
   });
@@ -149,7 +149,7 @@ describe('SquadService', () => {
     TestBed.tick();
     expect(squad.players()).toEqual([]);
     expect(squad.load()).toBe('idle');
-    expect(firebase.playerWatchers).toBe(0);
+    expect(firebase.players.playerWatchers).toBe(0);
   });
 
   it('verwirft ein Abo, das erst nach dem Stoppen fertig wird', async () => {
@@ -158,7 +158,7 @@ describe('SquadService', () => {
     squad.stop();
     await Promise.resolve();
     await Promise.resolve();
-    expect(firebase.playerWatchers).toBe(0);
+    expect(firebase.players.playerWatchers).toBe(0);
     expect(squad.players()).toEqual([]);
   });
 
@@ -174,15 +174,15 @@ describe('SquadService', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     squad.start();
     await vi.waitFor(() => expect(squad.load()).toBe('ready'));
-    firebase.savePlayerError = { code: 'permission-denied' };
+    firebase.players.savePlayerError = { code: 'permission-denied' };
     squad.save(draft());
     const sync = TestBed.inject(SyncService);
     await vi.waitFor(() => expect(sync.state()).toBe('error'));
-    firebase.emitPlayers({ fromCache: false, hasPendingWrites: false }); // Firestore rollt zurück und meldet neu
+    firebase.players.emitPlayers({ fromCache: false, hasPendingWrites: false }); // Firestore rollt zurück und meldet neu
     expect(sync.state()).toBe('error');
     expect(sync.detail()).toContain('„Neu Neumann“');
     // Erst ein erfolgreicher Schreibvorgang nimmt den Fehler zurück.
-    firebase.savePlayerError = null;
+    firebase.players.savePlayerError = null;
     squad.save(draft());
     await vi.waitFor(() => expect(sync.state()).toBe('saved'));
     expect(sync.detail()).toBe('');
@@ -195,8 +195,8 @@ describe('SquadService', () => {
 
     async function ready() {
       const squad = setup();
-      firebase.events.set('e1', { type: 'Training', title: 'Training Mo', date: '2026-10-05' });
-      firebase.events.set('e2', { type: 'Spiel', title: 'Spiel', date: '2026-11-30' });
+      firebase.events.events.set('e1', { type: 'Training', title: 'Training Mo', date: '2026-10-05' });
+      firebase.events.events.set('e2', { type: 'Spiel', title: 'Spiel', date: '2026-11-30' });
       squad.start();
       await vi.waitFor(() => expect(squad.load()).toBe('ready'));
       return squad;
@@ -212,8 +212,8 @@ describe('SquadService', () => {
 
     it('nimmt automatisch gesetztes „Fehlt“ zurück, wenn der Spieler wieder fit ist', async () => {
       const squad = await ready();
-      firebase.players.set('p1', { name: 'Ali Adler', positions: ['ST'], number: 9, birthdate: '2012-05-05', status: 'Verletzt', injuryUntil: '2026-10-31' });
-      firebase.emitPlayers();
+      firebase.players.players.set('p1', { name: 'Ali Adler', positions: ['ST'], number: 9, birthdate: '2012-05-05', status: 'Verletzt', injuryUntil: '2026-10-31' });
+      firebase.players.emitPlayers();
       firebase.ratings.set('e1', new Map([['p1', { attendance: 'absent', autoAbsence: true, note: 'Verletzt (ca. bis 31.10.2026)' }]]));
       edit(squad, { status: 'Fit', injuryUntil: '' });
       await vi.waitFor(() => expect(saved()).toEqual(['saveRating:e1:p1']));
@@ -243,7 +243,7 @@ describe('SquadService', () => {
 
   it('Spieler und Eltern laden nur das eigene Spielerdokument, nie die Spielerliste', async () => {
     const squad = setup('player');
-    firebase.players.set('p2', { name: 'Zoe Zander', positions: ['TW'], number: 1, birthdate: '2013-01-01' });
+    firebase.players.players.set('p2', { name: 'Zoe Zander', positions: ['TW'], number: 1, birthdate: '2013-01-01' });
     TestBed.inject(SessionService).playerId.set('p1');
     squad.start();
     await vi.waitFor(() => expect(squad.load()).toBe('ready'));

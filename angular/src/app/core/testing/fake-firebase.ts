@@ -1,235 +1,32 @@
 import type { Provider } from '@angular/core';
 import { AccessApi } from '../firebase/access.api';
 import { AuthApi } from '../firebase/auth.api';
+import { EventsApi } from '../firebase/events.api';
+import { LineupApi } from '../firebase/lineup.api';
+import { OpponentsApi } from '../firebase/opponents.api';
+import { PlayersApi } from '../firebase/players.api';
 import type { RawDoc, SnapshotMeta } from '../firebase/types';
 import { FirebaseService } from '../firebase.service';
 import { FakeAccessApi } from './fake-access.api';
 import { FakeAuthApi } from './fake-auth.api';
+import { FakeEventsApi } from './fake-events.api';
+import { FakeLineupApi } from './fake-lineup.api';
+import { FakeOpponentsApi } from './fake-opponents.api';
+import { FakePlayersApi } from './fake-players.api';
 
 /**
  * Ersatz für {@link FirebaseService} in Tests: speichert Aufrufe und liefert vorgegebene Antworten.
- * Anmeldung (`auth`) und Zugänge (`access`) haben eigene Attrappen; alle drei schreiben in dieselbe
+ * Anmeldung, Zugänge, Spieler, Events, Startelf und Gegner haben eigene Attrappen; alle schreiben in dieselbe
  * Aufrufliste `calls`, damit Tests die Reihenfolge über Themen hinweg prüfen können.
  */
 export class FakeFirebase implements Pick<FirebaseService, keyof FirebaseService> {
   calls: string[] = [];
   readonly auth = new FakeAuthApi(this.calls);
   readonly access = new FakeAccessApi(this.calls);
-
-  // --- Spieler (Echtzeit-Abo wie bei Firestore: lokale Schreibvorgänge melden sofort einen neuen Stand) ---
-  players = new Map<string, Record<string, unknown>>();
-  playersMeta: SnapshotMeta = { fromCache: false, hasPendingWrites: false };
-  watchPlayersError: unknown = null;
-  savePlayerError: unknown = null;
-  deletePlayerError: unknown = null;
-  playerWatchers = 0;
-  private playersListener: ((docs: RawDoc[], meta: SnapshotMeta) => void) | null = null;
-  private playersErrorListener: ((error: unknown) => void) | null = null;
-
-  async watchPlayers(
-    onData: (docs: RawDoc[], meta: SnapshotMeta) => void,
-    onError: (error: unknown) => void,
-  ): Promise<() => void> {
-    this.calls.push('watchPlayers');
-    if (this.watchPlayersError) throw this.watchPlayersError;
-    this.playerWatchers += 1;
-    this.playersListener = onData;
-    this.playersErrorListener = onError;
-    this.emitPlayers();
-    return () => {
-      this.playerWatchers -= 1;
-      this.playersListener = null;
-      this.playersErrorListener = null;
-    };
-  }
-
-  /** Test-Hilfe: sendet den aktuellen Spielerstand an den Abonnenten. */
-  emitPlayers(meta: SnapshotMeta = this.playersMeta): void {
-    this.playersMeta = meta;
-    this.playersListener?.(
-      [...this.players].map(([id, data]) => ({ id, data })),
-      meta,
-    );
-  }
-
-  /** Test-Hilfe: Abo-Fehler (z. B. permission-denied). */
-  failPlayers(error: unknown): void {
-    this.playersErrorListener?.(error);
-  }
-
-  async savePlayer(id: string, data: Readonly<Record<string, unknown>>): Promise<void> {
-    this.calls.push(`savePlayer:${id}`);
-    if (this.savePlayerError) throw this.savePlayerError;
-    this.players.set(id, { ...this.players.get(id), ...data });
-    this.emitPlayers();
-  }
-
-  async deletePlayer(id: string): Promise<void> {
-    this.calls.push(`deletePlayer:${id}`);
-    if (this.deletePlayerError) throw this.deletePlayerError;
-    this.players.delete(id);
-    this.emitPlayers();
-  }
-
-  // --- Einzelnes Spielerdokument (Spieler/Eltern dürfen nur das eigene lesen) ---
-  watchPlayerDocError: unknown = null;
-  /** Spieler-IDs, deren Dokument gelesen werden darf; `null` = alle (wie ein Trainer). Andere melden permission-denied. */
-  readablePlayerDocs: Set<string> | null = null;
-
-  async watchPlayerDoc(
-    playerId: string,
-    onData: (data: Readonly<Record<string, unknown>> | null, meta: SnapshotMeta) => void,
-    onError: (error: unknown) => void,
-  ): Promise<() => void> {
-    this.calls.push(`watchPlayerDoc:${playerId}`);
-    if (this.watchPlayerDocError) throw this.watchPlayerDocError;
-    if (this.readablePlayerDocs && !this.readablePlayerDocs.has(playerId)) {
-      onError({ code: 'permission-denied' });
-      return () => undefined;
-    }
-    onData(this.players.get(playerId) ?? null, { fromCache: false, hasPendingWrites: false });
-    return () => undefined;
-  }
-
-  // --- Events (gleiches Muster wie bei den Spielern) ---
-  events = new Map<string, Record<string, unknown>>();
-  eventsMeta: SnapshotMeta = { fromCache: false, hasPendingWrites: false };
-  watchEventsError: unknown = null;
-  saveEventError: unknown = null;
-  deleteEventError: unknown = null;
-  eventWatchers = 0;
-  private eventsListener: ((docs: RawDoc[], meta: SnapshotMeta) => void) | null = null;
-  private eventsErrorListener: ((error: unknown) => void) | null = null;
-
-  async watchEvents(
-    onData: (docs: RawDoc[], meta: SnapshotMeta) => void,
-    onError: (error: unknown) => void,
-  ): Promise<() => void> {
-    this.calls.push('watchEvents');
-    if (this.watchEventsError) throw this.watchEventsError;
-    this.eventWatchers += 1;
-    this.eventsListener = onData;
-    this.eventsErrorListener = onError;
-    this.emitEvents();
-    return () => {
-      this.eventWatchers -= 1;
-      this.eventsListener = null;
-      this.eventsErrorListener = null;
-    };
-  }
-
-  emitEvents(meta: SnapshotMeta = this.eventsMeta): void {
-    this.eventsMeta = meta;
-    this.eventsListener?.(
-      [...this.events].map(([id, data]) => ({ id, data })),
-      meta,
-    );
-  }
-
-  failEvents(error: unknown): void {
-    this.eventsErrorListener?.(error);
-  }
-
-  async saveEvent(id: string, data: Readonly<Record<string, unknown>>): Promise<void> {
-    this.calls.push(`saveEvent:${id}`);
-    if (this.saveEventError) throw this.saveEventError;
-    this.events.set(id, { ...this.events.get(id), ...data });
-    this.emitEvents();
-  }
-
-  async deleteEvent(id: string): Promise<void> {
-    this.calls.push(`deleteEvent:${id}`);
-    if (this.deleteEventError) throw this.deleteEventError;
-    this.events.delete(id);
-    this.emitEvents();
-  }
-
-  // --- Startelf (ein Dokument meta/lineup) ---
-  lineup: Record<string, unknown> | null = null;
-  watchLineupError: unknown = null;
-  saveLineupError: unknown = null;
-  lineupWatchers = 0;
-  private lineupListener: ((data: Readonly<Record<string, unknown>> | null, meta: SnapshotMeta) => void) | null = null;
-  private lineupErrorListener: ((error: unknown) => void) | null = null;
-
-  async watchLineup(
-    onData: (data: Readonly<Record<string, unknown>> | null, meta: SnapshotMeta) => void,
-    onError: (error: unknown) => void,
-  ): Promise<() => void> {
-    this.calls.push('watchLineup');
-    if (this.watchLineupError) throw this.watchLineupError;
-    this.lineupWatchers += 1;
-    this.lineupListener = onData;
-    this.lineupErrorListener = onError;
-    this.emitLineup();
-    return () => {
-      this.lineupWatchers -= 1;
-      this.lineupListener = null;
-      this.lineupErrorListener = null;
-    };
-  }
-
-  emitLineup(meta: SnapshotMeta = { fromCache: false, hasPendingWrites: false }): void {
-    this.lineupListener?.(this.lineup, meta);
-  }
-
-  failLineup(error: unknown): void {
-    this.lineupErrorListener?.(error);
-  }
-
-  async saveLineup(data: Readonly<Record<string, unknown>>): Promise<void> {
-    this.calls.push('saveLineup');
-    if (this.saveLineupError) throw this.saveLineupError;
-    this.lineup = { ...data };
-    this.emitLineup();
-  }
-
-  // --- Gegnerprofile (gleiches Muster wie bei den Events) ---
-  opponents = new Map<string, Record<string, unknown>>();
-  opponentsMeta: SnapshotMeta = { fromCache: false, hasPendingWrites: false };
-  watchOpponentsError: unknown = null;
-  saveOpponentError: unknown = null;
-  deleteOpponentError: unknown = null;
-  opponentWatchers = 0;
-  private opponentsListener: ((docs: RawDoc[], meta: SnapshotMeta) => void) | null = null;
-  private opponentsErrorListener: ((error: unknown) => void) | null = null;
-
-  async watchOpponents(onData: (docs: RawDoc[], meta: SnapshotMeta) => void, onError: (error: unknown) => void): Promise<() => void> {
-    this.calls.push('watchOpponents');
-    if (this.watchOpponentsError) throw this.watchOpponentsError;
-    this.opponentWatchers += 1;
-    this.opponentsListener = onData;
-    this.opponentsErrorListener = onError;
-    this.emitOpponents();
-    return () => {
-      this.opponentWatchers -= 1;
-      this.opponentsListener = null;
-      this.opponentsErrorListener = null;
-    };
-  }
-
-  emitOpponents(meta: SnapshotMeta = this.opponentsMeta): void {
-    this.opponentsMeta = meta;
-    this.opponentsListener?.([...this.opponents].map(([id, data]) => ({ id, data })), meta);
-  }
-
-  failOpponents(error: unknown): void {
-    this.opponentsErrorListener?.(error);
-  }
-
-  async saveOpponent(id: string, data: Readonly<Record<string, unknown>>): Promise<void> {
-    this.calls.push(`saveOpponent:${id}`);
-    if (this.saveOpponentError) throw this.saveOpponentError;
-    this.opponents.set(id, { ...this.opponents.get(id), ...data });
-    this.emitOpponents();
-  }
-
-  async deleteOpponent(id: string): Promise<void> {
-    this.calls.push(`deleteOpponent:${id}`);
-    if (this.deleteOpponentError) throw this.deleteOpponentError;
-    this.opponents.delete(id);
-    this.emitOpponents();
-  }
+  readonly players = new FakePlayersApi(this.calls);
+  readonly events = new FakeEventsApi(this.calls);
+  readonly lineup = new FakeLineupApi(this.calls);
+  readonly opponents = new FakeOpponentsApi(this.calls);
 
   // --- Bewertungen und interne Notizen je Event ---
   ratings = new Map<string, Map<string, Record<string, unknown>>>();
@@ -418,5 +215,9 @@ export function provideFakeFirebase(fake: FakeFirebase): Provider[] {
     { provide: FirebaseService, useValue: fake },
     { provide: AuthApi, useValue: fake.auth },
     { provide: AccessApi, useValue: fake.access },
+    { provide: PlayersApi, useValue: fake.players },
+    { provide: EventsApi, useValue: fake.events },
+    { provide: LineupApi, useValue: fake.lineup },
+    { provide: OpponentsApi, useValue: fake.opponents },
   ];
 }

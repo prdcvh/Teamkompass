@@ -15,10 +15,10 @@ describe('MemberView (Ansicht für Spieler, Eltern und Medizin)', () => {
   async function render(role: Role, options: { playerId?: string | null; mutate?: (firebase: FakeFirebase) => void } = {}) {
     const playerId = options.playerId === undefined ? 'p1' : options.playerId;
     firebase = new FakeFirebase();
-    firebase.players.set('p1', { name: 'Jonas Keller', positions: ['TW'], number: 1, birthdate: '2012-05-05', status: 'Fit', consentStatus: 'granted' });
-    firebase.players.set('p2', { name: 'Elias Wagner', positions: ['RV'], number: 2, birthdate: '2012-06-06', status: 'Verletzt', injuryUntil: '2026-12-01' });
-    firebase.events.set('e1', { type: 'Training', title: 'Training Montag', date: '2026-09-01', intensity: 2, notes: 'Interne Planung' });
-    firebase.events.set('e2', { type: 'Spiel', title: 'Heimspiel', date: '2026-09-08', goalsFor: 3, goalsAgainst: 1 });
+    firebase.players.players.set('p1', { name: 'Jonas Keller', positions: ['TW'], number: 1, birthdate: '2012-05-05', status: 'Fit', consentStatus: 'granted' });
+    firebase.players.players.set('p2', { name: 'Elias Wagner', positions: ['RV'], number: 2, birthdate: '2012-06-06', status: 'Verletzt', injuryUntil: '2026-12-01' });
+    firebase.events.events.set('e1', { type: 'Training', title: 'Training Montag', date: '2026-09-01', intensity: 2, notes: 'Interne Planung' });
+    firebase.events.events.set('e2', { type: 'Spiel', title: 'Heimspiel', date: '2026-09-08', goalsFor: 3, goalsAgainst: 1 });
     firebase.ratings.set('e1', new Map([['p1', grades(3, { playerId: 'p1' })], ['p2', grades(5, { playerId: 'p2', note: 'Nur für Elias' })]]));
     firebase.ratings.set('e2', new Map([['p1', grades(1, { playerId: 'p1', note: 'Starkes Spiel', goals: 2, assists: 1 })]]));
     firebase.privateNotes.set('e2', new Map([['p1', { playerId: 'p1', note: 'GEHEIME Trainernotiz' }]]));
@@ -27,7 +27,7 @@ describe('MemberView (Ansicht für Spieler, Eltern und Medizin)', () => {
     firebase.playerRecords.set('p1/measurements', new Map([['me1', { date: '2026-07-01', height: '150', weight: '40', playerId: 'p1' }]]));
     firebase.playerRecords.set('p2/absences', new Map([['ab2', { kind: 'injury', label: 'Zerrung', from: '2026-09-01', to: '2026-12-01', playerId: 'p2' }]]));
     // Spieler und Eltern dürfen wie in den Regeln nur ihr eigenes Spielerdokument lesen.
-    if (role === 'player' || role === 'parent') firebase.readablePlayerDocs = new Set(playerId ? [playerId] : []);
+    if (role === 'player' || role === 'parent') firebase.players.readablePlayerDocs = new Set(playerId ? [playerId] : []);
     options.mutate?.(firebase);
     TestBed.configureTestingModule({
       providers: [provideRouter([]), ...provideFakeFirebase(firebase), { provide: LayoutService, useValue: { isMobile: signal(false) } }],
@@ -120,7 +120,7 @@ describe('MemberView (Ansicht für Spieler, Eltern und Medizin)', () => {
 
     it('meldet einen Fehler, wenn das Profil nicht gelesen werden darf', async () => {
       vi.spyOn(console, 'error').mockImplementation(() => undefined);
-      const fixture = await render('player', { mutate: (f) => (f.readablePlayerDocs = new Set(['p2'])) });
+      const fixture = await render('player', { mutate: (f) => (f.players.readablePlayerDocs = new Set(['p2'])) });
       expect(text(fixture, '.notice')).toContain('Kader konnte nicht geladen werden');
       expect(text(fixture)).not.toContain('Jonas Keller');
     });
@@ -132,7 +132,7 @@ describe('MemberView (Ansicht für Spieler, Eltern und Medizin)', () => {
     });
 
     it('zeigt ein nicht (mehr) vorhandenes Profil verständlich an', async () => {
-      const fixture = await render('player', { mutate: (f) => f.players.delete('p1') });
+      const fixture = await render('player', { mutate: (f) => f.players.players.delete('p1') });
       expect(text(fixture, '.empty')).toContain('nicht gefunden');
     });
   });

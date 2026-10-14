@@ -20,11 +20,11 @@ describe('Home (Start-Dashboard)', () => {
   async function render(role: 'trainer' | 'player' = 'trainer', mobile = false, lineup: Record<string, unknown> | null = null) {
     isMobile.set(mobile);
     firebase = new FakeFirebase();
-    firebase.lineup = lineup;
-    firebase.players.set('p1', { name: 'Ali Adler', positions: ['ST'], number: 9, birthdate: '2012-05-05', status: 'Fit' });
-    firebase.players.set('p2', { name: '<b>Ben</b>', positions: ['IV'], number: 4, birthdate: '2012-06-06', status: 'Verletzt' });
-    firebase.events.set('e1', { type: 'Spiel', title: 'Heimspiel', date: day(-3), goalsFor: 3, goalsAgainst: 1, matchDuration: 70 });
-    firebase.events.set('e2', { type: 'Spiel', title: '<img src=x onerror=alert(1)>', date: day(4), opponent: 'SV Nord', location: 'Kunstrasen' });
+    firebase.lineup.lineup = lineup;
+    firebase.players.players.set('p1', { name: 'Ali Adler', positions: ['ST'], number: 9, birthdate: '2012-05-05', status: 'Fit' });
+    firebase.players.players.set('p2', { name: '<b>Ben</b>', positions: ['IV'], number: 4, birthdate: '2012-06-06', status: 'Verletzt' });
+    firebase.events.events.set('e1', { type: 'Spiel', title: 'Heimspiel', date: day(-3), goalsFor: 3, goalsAgainst: 1, matchDuration: 70 });
+    firebase.events.events.set('e2', { type: 'Spiel', title: '<img src=x onerror=alert(1)>', date: day(4), opponent: 'SV Nord', location: 'Kunstrasen' });
     firebase.ratings.set('e1', new Map([['p1', { attendance: 'present', effort: 2, technique: 2, tactics: 2, comprehension: 2, playerId: 'p1' }]]));
     TestBed.configureTestingModule({
       providers: [provideRouter([]), ...provideFakeFirebase(firebase), { provide: LayoutService, useValue: { isMobile } }],
@@ -100,6 +100,6 @@ describe('Home (Start-Dashboard)', () => {
     expect(text(fixture)).toContain(environment.teamName);
     expect(root(fixture).querySelector('.stats')).toBeNull();
     expect(firebase.calls).not.toContain('watchPlayers');
-    expect(firebase.lineupWatchers).toBe(0);
+    expect(firebase.lineup.lineupWatchers).toBe(0);
   });
 });

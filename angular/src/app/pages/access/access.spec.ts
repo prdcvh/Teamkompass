@@ -13,8 +13,8 @@ describe('Access (Zugänge: Spieler und Scouts)', () => {
   async function render(role: 'trainer' | 'medical' = 'trainer', mobile = false) {
     isMobile.set(mobile);
     firebase = new FakeFirebase();
-    firebase.players.set('p1', { name: 'Anna Beispiel', positions: ['ZM'], number: 8, birthdate: '2012-03-12', status: 'Fit' });
-    firebase.players.set('p2', { name: 'Ben Widerruf', positions: ['ST'], number: 9, birthdate: '2012-05-01', status: 'Fit', consentStatus: 'revoked' });
+    firebase.players.players.set('p1', { name: 'Anna Beispiel', positions: ['ZM'], number: 8, birthdate: '2012-03-12', status: 'Fit' });
+    firebase.players.players.set('p2', { name: 'Ben Widerruf', positions: ['ST'], number: 9, birthdate: '2012-05-01', status: 'Fit', consentStatus: 'revoked' });
     firebase.access.memberDocs.set('u1', { role: 'player', playerId: 'p1', expiresAt: { toDate: () => new Date('2020-01-01T00:00:00Z') } });
     firebase.access.memberDocs.set('u2', { role: 'medical', email: 'arzt@verein.de' });
     firebase.access.memberDocs.set('u3', { role: 'trainer', email: 'coach@verein.de' });

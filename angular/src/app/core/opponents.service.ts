@@ -1,6 +1,6 @@
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { authErrorMessage, errorCode } from './auth-errors';
-import { FirebaseService } from './firebase.service';
+import { OpponentsApi } from './firebase/opponents.api';
 import {
   type Opponent,
   type OpponentDraft,
@@ -22,7 +22,7 @@ export type OpponentsLoad = 'idle' | 'loading' | 'ready' | 'error';
  */
 @Injectable({ providedIn: 'root' })
 export class OpponentsService {
-  private readonly firebase = inject(FirebaseService);
+  private readonly opponentsApi = inject(OpponentsApi);
   private readonly session = inject(SessionService);
   private readonly sync = inject(SyncService);
 
@@ -48,7 +48,7 @@ export class OpponentsService {
     const generation = ++this.generation;
     this.load.set('loading');
     this.error.set('');
-    this.firebase
+    this.opponentsApi
       .watchOpponents(
         (docs, meta) => {
           if (generation !== this.generation) return;
@@ -87,7 +87,7 @@ export class OpponentsService {
     const id = draft.id ?? `o${crypto.randomUUID()}`;
     const opponent = opponentFromDraft(draft, id);
     if (!this.sync.isFailed()) this.sync.state.set('syncing');
-    void this.firebase
+    void this.opponentsApi
       .saveOpponent(id, docFromOpponent(opponent))
       .then(() => this.sync.clearError())
       .catch((error) => this.failWrite(error, `„${opponent.name}“ konnte nicht gespeichert werden.`));
@@ -99,7 +99,7 @@ export class OpponentsService {
     if (!this.canEdit()) return false;
     if (!this.sync.isFailed()) this.sync.state.set('syncing');
     try {
-      await this.firebase.deleteOpponent(id);
+      await this.opponentsApi.deleteOpponent(id);
       this.sync.clearError();
       return true;
     } catch (error) {

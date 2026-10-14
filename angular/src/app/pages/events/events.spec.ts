@@ -13,9 +13,9 @@ describe('Events (Events-Seite)', () => {
   async function render(role: 'trainer' | 'medical' = 'trainer', mobile = false) {
     isMobile.set(mobile);
     firebase = new FakeFirebase();
-    firebase.events.set('e1', { type: 'Training', title: 'Training Montag', date: '2026-10-05', intensity: 2, location: 'Kunstrasen' });
-    firebase.events.set('e2', { type: 'Spiel', title: 'Heimspiel', date: '2026-10-10', opponent: 'SV Nord', goalsFor: 3, goalsAgainst: 1, intensity: 3 });
-    firebase.events.set('e3', { type: 'Training', title: 'Training September', date: '2026-09-28' });
+    firebase.events.events.set('e1', { type: 'Training', title: 'Training Montag', date: '2026-10-05', intensity: 2, location: 'Kunstrasen' });
+    firebase.events.events.set('e2', { type: 'Spiel', title: 'Heimspiel', date: '2026-10-10', opponent: 'SV Nord', goalsFor: 3, goalsAgainst: 1, intensity: 3 });
+    firebase.events.events.set('e3', { type: 'Training', title: 'Training September', date: '2026-09-28' });
     TestBed.configureTestingModule({
       providers: [provideRouter([]), ...provideFakeFirebase(firebase), { provide: LayoutService, useValue: { isMobile } }],
     });
@@ -87,7 +87,7 @@ describe('Events (Events-Seite)', () => {
       expect(text(dialog.querySelector('h2'))).toBe('Event anlegen');
       type(dialog.querySelector<HTMLInputElement>('input[name="title"]')!, '  Training Freitag  ');
       (dialog.querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit'));
-      await vi.waitFor(() => expect([...firebase.events.values()].some((data) => data['title'] === 'Training Freitag')).toBe(true));
+      await vi.waitFor(() => expect([...firebase.events.events.values()].some((data) => data['title'] === 'Training Freitag')).toBe(true));
     });
 
     it('zeigt Spielfelder nur bei Spielen und legt ein Spiel mit Ergebnis an', async () => {
@@ -106,7 +106,7 @@ describe('Events (Events-Seite)', () => {
       type(dialog.querySelector<HTMLInputElement>('input[name="goalsAgainst"]')!, '2');
       (dialog.querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit'));
       await vi.waitFor(() => {
-        const saved = [...firebase.events.values()].find((data) => data['title'] === 'Auswärtsspiel');
+        const saved = [...firebase.events.events.values()].find((data) => data['title'] === 'Auswärtsspiel');
         expect(saved).toMatchObject({ type: 'Spiel', opponent: 'TSV Süd', goalsFor: 2, goalsAgainst: 2 });
       });
     });
@@ -135,8 +135,8 @@ describe('Events (Events-Seite)', () => {
       type(dialog.querySelector<HTMLInputElement>('input[name="location"]')!, 'Halle');
       type(dialog.querySelector<HTMLTextAreaElement>('textarea[name="notes"]')!, 'Passspiel');
       (dialog.querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit'));
-      await vi.waitFor(() => expect(firebase.events.get('e1')).toMatchObject({ title: 'Training Dienstag', date: '2026-10-06', location: 'Halle', notes: 'Passspiel' }));
-      expect(firebase.events.size).toBe(3);
+      await vi.waitFor(() => expect(firebase.events.events.get('e1')).toMatchObject({ title: 'Training Dienstag', date: '2026-10-06', location: 'Halle', notes: 'Passspiel' }));
+      expect(firebase.events.events.size).toBe(3);
     });
 
     it('löscht erst nach Bestätigung', async () => {
@@ -155,7 +155,7 @@ describe('Events (Events-Seite)', () => {
     it('bleibt beim Löschen fehlgeschlagen im Dialog und zeigt den Fehler', async () => {
       vi.spyOn(console, 'error').mockImplementation(() => undefined);
       const fixture = await render();
-      firebase.deleteEventError = { code: 'unavailable' };
+      firebase.events.deleteEventError = { code: 'unavailable' };
       qa<HTMLButtonElement>(fixture, 'tbody tr button').find((button) => button.getAttribute('aria-label') === 'Löschen: Heimspiel')!.click();
       await flush(fixture);
       qa<HTMLButtonElement>(fixture, '.confirm-actions button').find((button) => text(button) === 'Endgültig löschen')!.click();
@@ -163,13 +163,13 @@ describe('Events (Events-Seite)', () => {
         fixture.detectChanges();
         expect(text(q(fixture, '.confirm-actions')?.parentElement?.querySelector('.error'))).toContain('Löschen fehlgeschlagen');
       });
-      expect(firebase.events.has('e2')).toBe(true);
+      expect(firebase.events.events.has('e2')).toBe(true);
     });
 
     it('maskiert Eingaben aus Nutzertexten (keine unmaskierte HTML-Ausgabe)', async () => {
       const fixture = await render();
-      firebase.events.set('e4', { type: 'Spiel', title: '<img src=x onerror=alert(1)>', date: '2026-10-11', opponent: '<b>Gegner</b>' });
-      firebase.emitEvents();
+      firebase.events.events.set('e4', { type: 'Spiel', title: '<img src=x onerror=alert(1)>', date: '2026-10-11', opponent: '<b>Gegner</b>' });
+      firebase.events.emitEvents();
       await flush(fixture);
       expect(root(fixture).querySelector('img')).toBeNull();
       expect(root(fixture).querySelector('tbody b')).toBeNull();
@@ -180,7 +180,7 @@ describe('Events (Events-Seite)', () => {
       vi.spyOn(console, 'error').mockImplementation(() => undefined);
       isMobile.set(false);
       firebase = new FakeFirebase();
-      firebase.watchEventsError = { code: 'permission-denied' };
+      firebase.events.watchEventsError = { code: 'permission-denied' };
       TestBed.configureTestingModule({
         providers: [provideRouter([]), ...provideFakeFirebase(firebase), { provide: LayoutService, useValue: { isMobile } }],
       });
@@ -191,7 +191,7 @@ describe('Events (Events-Seite)', () => {
         expect(q(fixture, '.notice')).not.toBeNull();
       });
       expect(text(q(fixture, '.notice'))).toContain('Die Events konnten nicht geladen werden');
-      firebase.watchEventsError = null;
+      firebase.events.watchEventsError = null;
       q<HTMLButtonElement>(fixture, '.notice button')!.click();
       await vi.waitFor(() => {
         fixture.detectChanges();

@@ -1,6 +1,6 @@
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { authErrorMessage, errorCode } from './auth-errors';
-import { FirebaseService } from './firebase.service';
+import { LineupApi } from './firebase/lineup.api';
 import { type Assignments, docFromLineup, emptyAssignments, normalizeLineup } from './lineup';
 import { SessionService } from './session.service';
 import { SquadService } from './squad.service';
@@ -15,7 +15,7 @@ export type LineupLoad = 'idle' | 'loading' | 'ready' | 'error';
  */
 @Injectable({ providedIn: 'root' })
 export class LineupService {
-  private readonly firebase = inject(FirebaseService);
+  private readonly lineupApi = inject(LineupApi);
   private readonly session = inject(SessionService);
   private readonly sync = inject(SyncService);
   private readonly squad = inject(SquadService);
@@ -48,7 +48,7 @@ export class LineupService {
     const generation = ++this.generation;
     this.load.set('loading');
     this.error.set('');
-    this.firebase
+    this.lineupApi
       .watchLineup(
         (data, meta) => {
           if (generation !== this.generation) return;
@@ -84,7 +84,7 @@ export class LineupService {
     const doc = docFromLineup(assignments);
     this.stored.set(doc); // sofort sichtbar, auch offline; das Abo bestätigt es
     if (!this.sync.isFailed()) this.sync.state.set('syncing');
-    void this.firebase
+    void this.lineupApi
       .saveLineup(doc)
       .then(() => this.sync.clearError())
       .catch((error) => this.failWrite(error));

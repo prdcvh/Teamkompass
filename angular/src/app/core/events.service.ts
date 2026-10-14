@@ -2,7 +2,7 @@ import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { authErrorMessage, errorCode } from './auth-errors';
 import { type EventDraft, type EventErrors, type TeamEvent, docFromEvent, eventFromDoc, eventFromDraft, validateDraft } from './event';
 import { AbsenceSyncService } from './absence-sync.service';
-import { FirebaseService } from './firebase.service';
+import { EventsApi } from './firebase/events.api';
 import { SessionService } from './session.service';
 import { SquadService } from './squad.service';
 import { SyncService } from './sync.service';
@@ -17,7 +17,7 @@ export type EventsLoad = 'idle' | 'loading' | 'ready' | 'error';
  */
 @Injectable({ providedIn: 'root' })
 export class EventsService {
-  private readonly firebase = inject(FirebaseService);
+  private readonly eventsApi = inject(EventsApi);
   private readonly session = inject(SessionService);
   private readonly sync = inject(SyncService);
   private readonly absences = inject(AbsenceSyncService);
@@ -47,7 +47,7 @@ export class EventsService {
     const generation = ++this.generation;
     this.load.set('loading');
     this.error.set('');
-    this.firebase
+    this.eventsApi
       .watchEvents(
         (docs, meta) => {
           if (generation !== this.generation) return;
@@ -108,7 +108,7 @@ export class EventsService {
     const event = eventFromDraft(draft, id);
     const previous = this.events().find((entry) => entry.id === id);
     if (!this.sync.isFailed()) this.sync.state.set('syncing');
-    void this.firebase
+    void this.eventsApi
       .saveEvent(id, docFromEvent(event))
       .then(() => this.sync.clearError())
       // Neues Event oder neues Datum: Spieler mit Abwesenheit im Zeitraum automatisch auf „Fehlt“ setzen (SCRUM-80).
@@ -122,7 +122,7 @@ export class EventsService {
     if (!this.canEdit()) return false;
     if (!this.sync.isFailed()) this.sync.state.set('syncing');
     try {
-      await this.firebase.deleteEvent(id);
+      await this.eventsApi.deleteEvent(id);
       this.sync.clearError();
       return true;
     } catch (error) {
