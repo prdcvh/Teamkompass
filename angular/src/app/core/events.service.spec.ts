@@ -11,7 +11,7 @@ describe('EventsService', () => {
 
   function setup(role: 'trainer' | 'medical' | 'player' | null = 'trainer') {
     firebase = new FakeFirebase();
-    firebase.events.set('e1', { type: 'Training', title: 'Training Mo', date: '2026-10-05', intensity: 2 });
+    firebase.events.events.set('e1', { type: 'Training', title: 'Training Mo', date: '2026-10-05', intensity: 2 });
     TestBed.configureTestingModule({ providers: [...provideFakeFirebase(firebase)] });
     TestBed.inject(SessionService).role.set(role);
     return TestBed.inject(EventsService);
@@ -25,8 +25,8 @@ describe('EventsService', () => {
     await vi.waitFor(() => expect(events.load()).toBe('ready'));
     expect(events.events().map((e) => e.title)).toEqual(['Training Mo']);
     expect(TestBed.inject(SyncService).state()).toBe('saved');
-    firebase.events.set('e2', { type: 'Spiel', title: 'Derby', date: '2026-10-10' });
-    firebase.emitEvents();
+    firebase.events.events.set('e2', { type: 'Spiel', title: 'Derby', date: '2026-10-10' });
+    firebase.events.emitEvents();
     expect(events.events()).toHaveLength(2);
   });
 
@@ -36,18 +36,18 @@ describe('EventsService', () => {
     events.start();
     await vi.waitFor(() => expect(events.load()).toBe('ready'));
     events.start();
-    expect(firebase.eventWatchers).toBe(1);
+    expect(firebase.events.eventWatchers).toBe(1);
   });
 
   it('meldet Ladefehler verständlich und erlaubt einen neuen Versuch', async () => {
     const events = setup();
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    firebase.watchEventsError = { code: 'permission-denied' };
+    firebase.events.watchEventsError = { code: 'permission-denied' };
     events.start();
     await vi.waitFor(() => expect(events.load()).toBe('error'));
     expect(events.error()).toContain('Die Events konnten nicht geladen werden');
     expect(TestBed.inject(SyncService).state()).toBe('error');
-    firebase.watchEventsError = null;
+    firebase.events.watchEventsError = null;
     events.start();
     await vi.waitFor(() => expect(events.load()).toBe('ready'));
   });
@@ -58,7 +58,7 @@ describe('EventsService', () => {
     await vi.waitFor(() => expect(events.load()).toBe('ready'));
     expect(events.save(draft({ goalsFor: '2', goalsAgainst: '1' }))).toEqual({});
     await vi.waitFor(() => expect(firebase.calls.some((c) => c.startsWith('saveEvent:e'))).toBe(true));
-    const saved = [...firebase.events.entries()].find(([, data]) => data['title'] === 'Heimspiel')!;
+    const saved = [...firebase.events.events.entries()].find(([, data]) => data['title'] === 'Heimspiel')!;
     expect(saved[0]).toMatch(/^e/);
     expect(saved[1]).toMatchObject({ type: 'Spiel', goalsFor: 2, goalsAgainst: 1, opponent: 'SV Nord' });
     expect(Object.keys(saved[1])).not.toContain('ratings');
@@ -70,8 +70,8 @@ describe('EventsService', () => {
     events.start();
     await vi.waitFor(() => expect(events.load()).toBe('ready'));
     expect(events.save({ ...draft(), id: 'e1', type: 'Training', title: 'Training Di' })).toEqual({});
-    await vi.waitFor(() => expect(firebase.events.get('e1')?.['title']).toBe('Training Di'));
-    expect(firebase.events.size).toBe(1);
+    await vi.waitFor(() => expect(firebase.events.events.get('e1')?.['title']).toBe('Training Di'));
+    expect(firebase.events.events.size).toBe(1);
   });
 
   it('schreibt bei ungültigen Eingaben nichts', async () => {
@@ -97,7 +97,7 @@ describe('EventsService', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     events.start();
     await vi.waitFor(() => expect(events.load()).toBe('ready'));
-    firebase.saveEventError = { code: 'unavailable' };
+    firebase.events.saveEventError = { code: 'unavailable' };
     events.save(draft());
     await vi.waitFor(() => expect(TestBed.inject(SyncService).state()).toBe('error'));
     expect(TestBed.inject(SyncService).detail()).toContain('Heimspiel');
@@ -108,10 +108,10 @@ describe('EventsService', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     events.start();
     await vi.waitFor(() => expect(events.load()).toBe('ready'));
-    firebase.deleteEventError = { code: 'unavailable' };
+    firebase.events.deleteEventError = { code: 'unavailable' };
     expect(await events.remove('e1')).toBe(false);
     expect(TestBed.inject(SyncService).state()).toBe('error');
-    firebase.deleteEventError = null;
+    firebase.events.deleteEventError = null;
     expect(await events.remove('e1')).toBe(true);
     expect(events.events()).toHaveLength(0);
   });
@@ -124,14 +124,14 @@ describe('EventsService', () => {
     TestBed.tick();
     expect(events.events()).toEqual([]);
     expect(events.load()).toBe('idle');
-    expect(firebase.eventWatchers).toBe(0);
+    expect(firebase.events.eventWatchers).toBe(0);
   });
 
   describe('Abwesenheit vorbelegen (SCRUM-80)', () => {
     async function ready() {
       const events = setup();
-      firebase.players.set('p1', { name: 'Ali', positions: ['ST'], number: 9, birthdate: '2012-05-05', status: 'Fit' });
-      firebase.players.set('p2', { name: 'Ben', positions: ['IV'], number: 4, birthdate: '2012-06-06', status: 'Fit' });
+      firebase.players.players.set('p1', { name: 'Ali', positions: ['ST'], number: 9, birthdate: '2012-05-05', status: 'Fit' });
+      firebase.players.players.set('p2', { name: 'Ben', positions: ['IV'], number: 4, birthdate: '2012-06-06', status: 'Fit' });
       firebase.playerRecords.set('p1/absences', new Map([['a1', { kind: 'absence', label: 'Urlaub', detail: '', from: '2026-10-01', to: '2026-10-20' }]]));
       TestBed.inject(SquadService).start();
       events.start();
@@ -144,7 +144,7 @@ describe('EventsService', () => {
       const events = await ready();
       events.save(draft({ date: '2026-10-10' }));
       await vi.waitFor(() => expect(saved()).toHaveLength(1));
-      const eventId = [...firebase.events.keys()].find((id) => id !== 'e1')!;
+      const eventId = [...firebase.events.events.keys()].find((id) => id !== 'e1')!;
       expect(saved()[0]).toBe(`saveRating:${eventId}:p1`);
       const rating = firebase.ratings.get(eventId)?.get('p1');
       expect(rating?.['attendance']).toBe('absent');

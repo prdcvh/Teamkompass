@@ -10,7 +10,7 @@ describe('OpponentsService', () => {
 
   function setup(role: 'trainer' | 'medical' | 'player' | null = 'trainer') {
     firebase = new FakeFirebase();
-    firebase.opponents.set('o1', { name: 'JSG Taunus', formation: '4-3-3', style: 'Pressing', updatedAt: '2026-10-01' });
+    firebase.opponents.opponents.set('o1', { name: 'JSG Taunus', formation: '4-3-3', style: 'Pressing', updatedAt: '2026-10-01' });
     TestBed.configureTestingModule({ providers: [...provideFakeFirebase(firebase)] });
     TestBed.inject(SessionService).role.set(role);
     return TestBed.inject(OpponentsService);
@@ -23,8 +23,8 @@ describe('OpponentsService', () => {
     await vi.waitFor(() => expect(opponents.load()).toBe('ready'));
     expect(opponents.opponents().map((entry) => entry.name)).toEqual(['JSG Taunus']);
     expect(TestBed.inject(SyncService).state()).toBe('saved');
-    firebase.opponents.set('o2', { name: 'Zeta' });
-    firebase.emitOpponents();
+    firebase.opponents.opponents.set('o2', { name: 'Zeta' });
+    firebase.opponents.emitOpponents();
     expect(opponents.opponents()).toHaveLength(2);
   });
 
@@ -33,7 +33,7 @@ describe('OpponentsService', () => {
     opponents.start();
     opponents.start();
     await vi.waitFor(() => expect(opponents.load()).toBe('ready'));
-    expect(firebase.opponentWatchers).toBe(1);
+    expect(firebase.opponents.opponentWatchers).toBe(1);
 
     TestBed.resetTestingModule();
     const other = setup('player');
@@ -45,11 +45,11 @@ describe('OpponentsService', () => {
   it('meldet Ladefehler verständlich und erlaubt einen neuen Versuch', async () => {
     const opponents = setup();
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    firebase.watchOpponentsError = { code: 'permission-denied' };
+    firebase.opponents.watchOpponentsError = { code: 'permission-denied' };
     opponents.start();
     await vi.waitFor(() => expect(opponents.load()).toBe('error'));
     expect(opponents.error()).toContain('Gegner konnten nicht geladen werden');
-    firebase.watchOpponentsError = null;
+    firebase.opponents.watchOpponentsError = null;
     opponents.stop();
     opponents.start();
     await vi.waitFor(() => expect(opponents.load()).toBe('ready'));
@@ -61,7 +61,7 @@ describe('OpponentsService', () => {
     await vi.waitFor(() => expect(opponents.load()).toBe('ready'));
     expect(opponents.save(draft())).toEqual({});
     await vi.waitFor(() => expect(firebase.calls.some((call) => call.startsWith('saveOpponent:o'))).toBe(true));
-    const [id, data] = [...firebase.opponents].find(([key]) => key !== 'o1')!;
+    const [id, data] = [...firebase.opponents.opponents].find(([key]) => key !== 'o1')!;
     expect(id.startsWith('o')).toBe(true);
     expect(data).toMatchObject({ name: 'SV Nord', formation: '3-5-2', style: 'Ballbesitz' });
     expect(String(data['updatedAt'])).toMatch(/^\d{4}-\d{2}-\d{2}$/);
@@ -72,8 +72,8 @@ describe('OpponentsService', () => {
     opponents.start();
     await vi.waitFor(() => expect(opponents.load()).toBe('ready'));
     expect(opponents.save(draft({ id: 'o1', name: 'JSG Neu' }))).toEqual({});
-    await vi.waitFor(() => expect(firebase.opponents.get('o1')?.['name']).toBe('JSG Neu'));
-    expect(firebase.opponents.size).toBe(1);
+    await vi.waitFor(() => expect(firebase.opponents.opponents.get('o1')?.['name']).toBe('JSG Neu'));
+    expect(firebase.opponents.opponents.size).toBe(1);
     firebase.calls.length = 0;
     expect(opponents.save(draft({ name: '' })).name).toBeDefined();
     expect(firebase.calls.some((call) => call.startsWith('saveOpponent'))).toBe(false);
@@ -91,7 +91,7 @@ describe('OpponentsService', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     opponents.start();
     await vi.waitFor(() => expect(opponents.load()).toBe('ready'));
-    firebase.saveOpponentError = { code: 'permission-denied' };
+    firebase.opponents.saveOpponentError = { code: 'permission-denied' };
     opponents.save(draft());
     await vi.waitFor(() => expect(TestBed.inject(SyncService).isFailed()).toBe(true));
   });
@@ -101,12 +101,12 @@ describe('OpponentsService', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     opponents.start();
     await vi.waitFor(() => expect(opponents.load()).toBe('ready'));
-    firebase.deleteOpponentError = { code: 'unavailable' };
+    firebase.opponents.deleteOpponentError = { code: 'unavailable' };
     expect(await opponents.remove('o1')).toBe(false);
-    expect(firebase.opponents.has('o1')).toBe(true);
-    firebase.deleteOpponentError = null;
+    expect(firebase.opponents.opponents.has('o1')).toBe(true);
+    firebase.opponents.deleteOpponentError = null;
     expect(await opponents.remove('o1')).toBe(true);
-    expect(firebase.opponents.has('o1')).toBe(false);
+    expect(firebase.opponents.opponents.has('o1')).toBe(false);
   });
 
   it('verwirft Daten und Abo beim Abmelden', async () => {
@@ -117,6 +117,6 @@ describe('OpponentsService', () => {
     TestBed.tick();
     expect(opponents.opponents()).toEqual([]);
     expect(opponents.load()).toBe('idle');
-    expect(firebase.opponentWatchers).toBe(0);
+    expect(firebase.opponents.opponentWatchers).toBe(0);
   });
 });

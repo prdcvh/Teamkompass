@@ -13,10 +13,10 @@ describe('Opponents (Gegneranalyse)', () => {
   async function render(role: 'trainer' | 'medical' = 'trainer', mobile = false, suche = '') {
     isMobile.set(mobile);
     firebase = new FakeFirebase();
-    firebase.opponents.set('o1', {
+    firebase.opponents.opponents.set('o1', {
       name: 'JSG Taunus', formation: '4-3-3', style: 'Pressing', strengths: 'Außen schnell', gamePlan: 'Tief stehen', updatedAt: '2026-10-01',
     });
-    firebase.opponents.set('o2', { name: '<img src=x onerror=alert(1)>', formation: '3-2-3', style: 'Ballbesitz', notes: '<b>fett</b>', updatedAt: '2026-09-15' });
+    firebase.opponents.opponents.set('o2', { name: '<img src=x onerror=alert(1)>', formation: '3-2-3', style: 'Ballbesitz', notes: '<b>fett</b>', updatedAt: '2026-09-15' });
     TestBed.configureTestingModule({ providers: [provideRouter([]), { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap(suche ? { suche } : {}) } } }, ...provideFakeFirebase(firebase), { provide: LayoutService, useValue: { isMobile } }] });
     TestBed.inject(SessionService).role.set(role);
     const fixture = TestBed.createComponent(Opponents);
@@ -94,8 +94,8 @@ describe('Opponents (Gegneranalyse)', () => {
     type(dialog.querySelector<HTMLSelectElement>('select[name="style"]')!, 'Umschaltspiel', 'change');
     type(dialog.querySelector<HTMLTextAreaElement>('textarea[name="strengths"]')!, 'Konter');
     (dialog.querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit'));
-    await vi.waitFor(() => expect([...firebase.opponents.values()].some((data) => data['name'] === 'SV Nord')).toBe(true));
-    const saved = [...firebase.opponents.values()].find((data) => data['name'] === 'SV Nord')!;
+    await vi.waitFor(() => expect([...firebase.opponents.opponents.values()].some((data) => data['name'] === 'SV Nord')).toBe(true));
+    const saved = [...firebase.opponents.opponents.values()].find((data) => data['name'] === 'SV Nord')!;
     expect(saved).toMatchObject({ style: 'Umschaltspiel', strengths: 'Konter' });
   });
 
@@ -121,8 +121,8 @@ describe('Opponents (Gegneranalyse)', () => {
     expect(dialog.querySelector<HTMLTextAreaElement>('textarea[name="gamePlan"]')!.value).toBe('Tief stehen');
     type(dialog.querySelector<HTMLInputElement>('input[name="formation"]')!, '4-4-2');
     (dialog.querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit'));
-    await vi.waitFor(() => expect(firebase.opponents.get('o1')?.['formation']).toBe('4-4-2'));
-    expect(firebase.opponents.size).toBe(2);
+    await vi.waitFor(() => expect(firebase.opponents.opponents.get('o1')?.['formation']).toBe('4-4-2'));
+    expect(firebase.opponents.opponents.size).toBe(2);
   });
 
   it('löscht nur nach Bestätigung und meldet Fehler', async () => {
@@ -131,17 +131,17 @@ describe('Opponents (Gegneranalyse)', () => {
     qa<HTMLButtonElement>(fixture, 'article.opponent .actions button.danger')[1].click(); // JSG Taunus
     await flush(fixture);
     expect(qa(fixture, 'tk-dialog h2').map(text)).toContain('Gegnerprofil löschen?');
-    expect(firebase.opponents.has('o1')).toBe(true);
-    firebase.deleteOpponentError = { code: 'unavailable' };
+    expect(firebase.opponents.opponents.has('o1')).toBe(true);
+    firebase.opponents.deleteOpponentError = { code: 'unavailable' };
     const confirm = () => qa<HTMLButtonElement>(fixture, '.confirm-actions button').find((button) => text(button).includes('löschen'))!;
     confirm().click();
     await vi.waitFor(() => {
       fixture.detectChanges();
       expect(q(fixture, '.confirm-actions')?.parentElement?.querySelector('[role="alert"]')).not.toBeNull();
     });
-    firebase.deleteOpponentError = null;
+    firebase.opponents.deleteOpponentError = null;
     confirm().click();
-    await vi.waitFor(() => expect(firebase.opponents.has('o1')).toBe(false));
+    await vi.waitFor(() => expect(firebase.opponents.opponents.has('o1')).toBe(false));
   });
 
   it('zeigt für Medizin nichts außer einem Hinweis und lädt keine Gegner', async () => {

@@ -13,9 +13,9 @@ describe('Squad (Kader-Seite)', () => {
   async function render(role: 'trainer' | 'medical' = 'trainer', mobile = false) {
     isMobile.set(mobile);
     firebase = new FakeFirebase();
-    firebase.players.set('p1', { name: 'Jonas Keller', positions: ['TW'], number: 1, birthdate: '2012-05-05', status: 'Fit' });
-    firebase.players.set('p2', { name: 'Elias Wagner', positions: ['RV'], number: 2, birthdate: '2012-06-06', status: 'Fit' });
-    firebase.players.set('p3', { name: 'Jan Braun', positions: ['RA'], number: 17, birthdate: '2013-01-01', status: 'Verletzt' });
+    firebase.players.players.set('p1', { name: 'Jonas Keller', positions: ['TW'], number: 1, birthdate: '2012-05-05', status: 'Fit' });
+    firebase.players.players.set('p2', { name: 'Elias Wagner', positions: ['RV'], number: 2, birthdate: '2012-06-06', status: 'Fit' });
+    firebase.players.players.set('p3', { name: 'Jan Braun', positions: ['RA'], number: 17, birthdate: '2013-01-01', status: 'Verletzt' });
     TestBed.configureTestingModule({
       providers: [provideRouter([]), ...provideFakeFirebase(firebase), { provide: LayoutService, useValue: { isMobile } }],
     });
@@ -101,8 +101,8 @@ describe('Squad (Kader-Seite)', () => {
       fixture.detectChanges();
       type(q<HTMLInputElement>(fixture, 'input[name="injuryUntil"]')!, '2026-12-01');
       q<HTMLFormElement>(fixture, 'form')!.dispatchEvent(new Event('submit'));
-      await vi.waitFor(() => expect(firebase.players.size).toBe(4));
-      const saved = [...firebase.players.values()].find((p) => p['name'] === 'Luca Weber')!;
+      await vi.waitFor(() => expect(firebase.players.players.size).toBe(4));
+      const saved = [...firebase.players.players.values()].find((p) => p['name'] === 'Luca Weber')!;
       expect(saved).toMatchObject({ number: 3, positions: ['ZM', 'OM'], status: 'Verletzt', injuryUntil: '2026-12-01', consentStatus: 'pending' });
       fixture.detectChanges();
       expect(qa(fixture, 'tbody tr')).toHaveLength(4);
@@ -132,8 +132,8 @@ describe('Squad (Kader-Seite)', () => {
       expect(qa(fixture, 'button.position').find((b) => text(b) === 'TW')!.getAttribute('aria-pressed')).toBe('true');
       type(q<HTMLInputElement>(fixture, 'input[name="name"]')!, 'Jonas K.');
       q<HTMLFormElement>(fixture, 'form')!.dispatchEvent(new Event('submit'));
-      await vi.waitFor(() => expect(firebase.players.get('p1')?.['name']).toBe('Jonas K.'));
-      expect(firebase.players.size).toBe(3);
+      await vi.waitFor(() => expect(firebase.players.players.get('p1')?.['name']).toBe('Jonas K.'));
+      expect(firebase.players.players.size).toBe(3);
     });
 
     it('löscht erst nach Bestätigung', async () => {
@@ -146,17 +146,17 @@ describe('Squad (Kader-Seite)', () => {
       // Abbrechen löscht nichts.
       qa<HTMLButtonElement>(fixture, '.confirm-actions button')[0].click();
       fixture.detectChanges();
-      expect(firebase.players.size).toBe(3);
+      expect(firebase.players.players.size).toBe(3);
       deleteButton().click();
       fixture.detectChanges();
       qa<HTMLButtonElement>(fixture, '.confirm-actions button')[1].click();
-      await vi.waitFor(() => expect(firebase.players.has('p3')).toBe(false));
+      await vi.waitFor(() => expect(firebase.players.players.has('p3')).toBe(false));
     });
 
     it('zeigt „verletzt bis“ und die Datennutzung', async () => {
       const fixture = await render();
-      firebase.players.set('p3', { ...firebase.players.get('p3'), injuryUntil: '2026-11-01', consentStatus: 'granted' });
-      firebase.emitPlayers();
+      firebase.players.players.set('p3', { ...firebase.players.players.get('p3'), injuryUntil: '2026-11-01', consentStatus: 'granted' });
+      firebase.players.emitPlayers();
       fixture.detectChanges();
       const row = qa(fixture, 'tbody tr').find((r) => text(r).includes('Jan Braun'))!;
       expect(text(row)).toContain('bis 01.11.2026');
@@ -171,14 +171,14 @@ describe('Squad (Kader-Seite)', () => {
       const confirm = qa<HTMLButtonElement>(fixture, '.confirm-actions button')[1];
       confirm.click();
       confirm.click();
-      await vi.waitFor(() => expect(firebase.players.has('p1')).toBe(false));
+      await vi.waitFor(() => expect(firebase.players.players.has('p1')).toBe(false));
       expect(firebase.calls.filter((c) => c === 'deletePlayer:p1')).toHaveLength(1);
     });
 
     it('meldet einen Ladefehler mit Wiederholen-Schaltfläche', async () => {
       vi.spyOn(console, 'error').mockImplementation(() => undefined);
       const fixture = await render();
-      firebase.failPlayers({ code: 'permission-denied' });
+      firebase.players.failPlayers({ code: 'permission-denied' });
       fixture.detectChanges();
       expect(q(fixture, '[role="alert"]')?.textContent).toContain('konnte nicht geladen werden');
       q<HTMLButtonElement>(fixture, '.notice button')!.click();

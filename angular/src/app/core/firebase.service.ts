@@ -3,138 +3,17 @@ import { environment } from '../../environments/environment';
 import { FirebaseConnection } from './firebase/firebase-connection';
 import type { RawDoc, SnapshotMeta } from './firebase/types';
 
-/** Unterkollektionen eines Spielers, die beim Löschen mitgehen (Entwicklungspläne, Abwesenheiten, Messwerte). */
-const PLAYER_SUBCOLLECTIONS = ['developmentPlans', 'absences', 'measurements'] as const;
-
 /** Unterkollektionen eines Spielers, die das Profil verwaltet. */
 export type PlayerRecordKind = 'developmentPlans' | 'absences' | 'measurements';
 
 /**
- * Firestore-Zugriff auf die Teamdaten (Übergangszustand der Aufteilung SCRUM-108..110):
- * Anmeldung und Zugänge liegen schon in `firebase/auth.api.ts` und `firebase/access.api.ts`,
- * die übrigen Themen folgen in eigene Zugriffsklassen. Alle Pfade liegen unter teams/{teamId}/…
+ * Firestore-Zugriff auf Bewertungen, Notizen und Spieler-Unterdaten (Übergangszustand der Aufteilung
+ * SCRUM-108..110; die übrigen Themen liegen schon in eigenen Zugriffsklassen unter `firebase/`).
+ * Alle Pfade liegen unter teams/{teamId}/…
  */
 @Injectable({ providedIn: 'root' })
 export class FirebaseService {
   private readonly connection = inject(FirebaseConnection);
-
-  /**
-   * Echtzeit-Abo auf alle Spieler des Teams. Die Regeln erlauben Lesen für Trainer und Medizin
-   * (Spieler/Eltern nur das eigene Profil); ein Fehler (z. B. permission-denied) kommt über `onError`.
-   */
-  async watchPlayers(
-    onData: (docs: RawDoc[], meta: SnapshotMeta) => void,
-    onError: (error: unknown) => void,
-  ): Promise<() => void> {
-    const { db } = await this.connection.get();
-    const { collection, onSnapshot } = await import('firebase/firestore');
-    return onSnapshot(
-      collection(db, 'teams', environment.teamId, 'players'),
-      { includeMetadataChanges: true },
-      (snapshot) =>
-        onData(
-          snapshot.docs.map((entry) => ({ id: entry.id, data: entry.data() })),
-          { fromCache: snapshot.metadata.fromCache, hasPendingWrites: snapshot.metadata.hasPendingWrites },
-        ),
-      onError,
-    );
-  }
-
-  /**
-   * Echtzeit-Abo auf EIN Spielerdokument (null = es gibt keins). Spieler und Eltern dürfen die Spielerliste nicht
-   * abfragen, nur ihr eigenes Dokument lesen (Regeln: `isPlayerFor`); ein fremdes liefert permission-denied.
-   */
-  async watchPlayerDoc(
-    playerId: string,
-    onData: (data: Readonly<Record<string, unknown>> | null, meta: SnapshotMeta) => void,
-    onError: (error: unknown) => void,
-  ): Promise<() => void> {
-    const { db } = await this.connection.get();
-    const { doc, onSnapshot } = await import('firebase/firestore');
-    return onSnapshot(
-      doc(db, 'teams', environment.teamId, 'players', playerId),
-      { includeMetadataChanges: true },
-      (snapshot) =>
-        onData(snapshot.exists() ? snapshot.data() : null, { fromCache: snapshot.metadata.fromCache, hasPendingWrites: snapshot.metadata.hasPendingWrites }),
-      onError,
-    );
-  }
-
-  /**
-   * Echtzeit-Abo auf die Events des Teams (nur Metadaten: Bewertungen und interne Notizen liegen in
-   * Unterkollektionen). Lesen dürfen alle Teammitglieder; ein Fehler kommt über `onError`.
-   */
-  async watchEvents(
-    onData: (docs: RawDoc[], meta: SnapshotMeta) => void,
-    onError: (error: unknown) => void,
-  ): Promise<() => void> {
-    const { db } = await this.connection.get();
-    const { collection, onSnapshot } = await import('firebase/firestore');
-    return onSnapshot(
-      collection(db, 'teams', environment.teamId, 'events'),
-      { includeMetadataChanges: true },
-      (snapshot) =>
-        onData(
-          snapshot.docs.map((entry) => ({ id: entry.id, data: entry.data() })),
-          { fromCache: snapshot.metadata.fromCache, hasPendingWrites: snapshot.metadata.hasPendingWrites },
-        ),
-      onError,
-    );
-  }
-
-  /** Echtzeit-Abo auf die Startelf (`meta/lineup`, ein einzelnes Dokument; null = noch keine gespeichert). Nur Trainer. */
-  async watchLineup(
-    onData: (data: Readonly<Record<string, unknown>> | null, meta: SnapshotMeta) => void,
-    onError: (error: unknown) => void,
-  ): Promise<() => void> {
-    const { db } = await this.connection.get();
-    const { doc, onSnapshot } = await import('firebase/firestore');
-    return onSnapshot(
-      doc(db, 'teams', environment.teamId, 'meta', 'lineup'),
-      { includeMetadataChanges: true },
-      (snapshot) =>
-        onData(snapshot.exists() ? snapshot.data() : null, { fromCache: snapshot.metadata.fromCache, hasPendingWrites: snapshot.metadata.hasPendingWrites }),
-      onError,
-    );
-  }
-
-  /** Schreibt die Startelf vollständig (wie die bisherige App: das Dokument wird ersetzt). */
-  async saveLineup(data: Readonly<Record<string, unknown>>): Promise<void> {
-    const { db } = await this.connection.get();
-    const { doc, setDoc } = await import('firebase/firestore');
-    await setDoc(doc(db, 'teams', environment.teamId, 'meta', 'lineup'), data);
-  }
-
-  /** Echtzeit-Abo auf die Gegnerprofile. Lesen und Schreiben dürfen nur Trainer. */
-  async watchOpponents(
-    onData: (docs: RawDoc[], meta: SnapshotMeta) => void,
-    onError: (error: unknown) => void,
-  ): Promise<() => void> {
-    const { db } = await this.connection.get();
-    const { collection, onSnapshot } = await import('firebase/firestore');
-    return onSnapshot(
-      collection(db, 'teams', environment.teamId, 'opponents'),
-      { includeMetadataChanges: true },
-      (snapshot) =>
-        onData(
-          snapshot.docs.map((entry) => ({ id: entry.id, data: entry.data() })),
-          { fromCache: snapshot.metadata.fromCache, hasPendingWrites: snapshot.metadata.hasPendingWrites },
-        ),
-      onError,
-    );
-  }
-
-  async saveOpponent(id: string, data: Readonly<Record<string, unknown>>): Promise<void> {
-    const { db } = await this.connection.get();
-    const { doc, setDoc } = await import('firebase/firestore');
-    await setDoc(doc(db, 'teams', environment.teamId, 'opponents', id), data, { merge: true });
-  }
-
-  async deleteOpponent(id: string): Promise<void> {
-    const { db } = await this.connection.get();
-    const { deleteDoc, doc } = await import('firebase/firestore');
-    await deleteDoc(doc(db, 'teams', environment.teamId, 'opponents', id));
-  }
 
   /** Echtzeit-Abo auf die Bewertungen eines Events (Dokument je Spieler). Lesen dürfen Trainer und der jeweilige Spieler. */
   async watchRatings(
@@ -276,66 +155,4 @@ export class FirebaseService {
     await setDoc(doc(db, 'teams', environment.teamId, 'events', eventId, 'privateNotes', playerId), { playerId, note }, { merge: true });
   }
 
-  /** Legt ein Event an oder aktualisiert es (merge: Felder älterer Versionen bleiben erhalten). Nur Metadaten, nie Bewertungen. */
-  async saveEvent(id: string, data: Readonly<Record<string, unknown>>): Promise<void> {
-    const { db } = await this.connection.get();
-    const { doc, setDoc } = await import('firebase/firestore');
-    await setDoc(doc(db, 'teams', environment.teamId, 'events', id), data, { merge: true });
-  }
-
-  /** Löscht das Event samt Bewertungen und internen Notizen (in Blöcken, Limit 500 je Schreibvorgang). */
-  async deleteEvent(id: string): Promise<void> {
-    const { db } = await this.connection.get();
-    const { collection, doc, getDocs, writeBatch } = await import('firebase/firestore');
-    const base = ['teams', environment.teamId, 'events', id] as const;
-    const [ratings, privateNotes] = await Promise.all([
-      getDocs(collection(db, ...base, 'ratings')),
-      getDocs(collection(db, ...base, 'privateNotes')),
-    ]);
-    const refs = [
-      ...ratings.docs.map((entry) => entry.ref),
-      ...privateNotes.docs.map((entry) => entry.ref),
-      doc(db, ...base), // zuletzt: bricht ein Block ab, bleibt das Event sichtbar und der Löschversuch wiederholbar
-    ];
-    for (let offset = 0; offset < refs.length; offset += 450) {
-      const batch = writeBatch(db);
-      refs.slice(offset, offset + 450).forEach((ref) => batch.delete(ref));
-      await batch.commit();
-    }
-  }
-
-  /** Legt einen Spieler an oder aktualisiert ihn (merge: unbekannte Felder älterer Versionen bleiben erhalten). */
-  async savePlayer(id: string, data: Readonly<Record<string, unknown>>): Promise<void> {
-    const { db } = await this.connection.get();
-    const { doc, setDoc } = await import('firebase/firestore');
-    await setDoc(doc(db, 'teams', environment.teamId, 'players', id), data, { merge: true });
-  }
-
-  /** Löscht den Spieler samt Unterdaten, Bewertungen und internen Notizen in allen Events (in Blöcken, Limit 500 je Schreibvorgang). */
-  async deletePlayer(id: string): Promise<void> {
-    const { db } = await this.connection.get();
-    const { collection, doc, getDocs, query, where, writeBatch } = await import('firebase/firestore');
-    const base = ['teams', environment.teamId] as const;
-    const [events, invites, members, ...children] = await Promise.all([
-      getDocs(collection(db, ...base, 'events')),
-      getDocs(query(collection(db, ...base, 'invites'), where('playerId', '==', id))),
-      getDocs(query(collection(db, ...base, 'members'), where('playerId', '==', id))),
-      ...PLAYER_SUBCOLLECTIONS.map((name) => getDocs(collection(db, ...base, 'players', id, name))),
-    ]);
-    const refs = [
-      ...children.flatMap((snapshot) => snapshot.docs.map((entry) => entry.ref)),
-      ...events.docs.map((event) => doc(db, ...base, 'events', event.id, 'ratings', id)),
-      // Interne Trainer-Notizen (SCRUM-14) liegen getrennt von der Bewertung.
-      ...events.docs.map((event) => doc(db, ...base, 'events', event.id, 'privateNotes', id)),
-      // Einladungscodes und Zugänge des Spielers (SCRUM-53): sonst zeigen sie auf einen gelöschten Spieler.
-      ...invites.docs.map((entry) => entry.ref),
-      ...members.docs.map((entry) => entry.ref),
-      doc(db, ...base, 'players', id), // zuletzt: bricht ein Block ab, bleibt der Spieler sichtbar und der Löschversuch wiederholbar
-    ];
-    for (let offset = 0; offset < refs.length; offset += 450) {
-      const batch = writeBatch(db);
-      refs.slice(offset, offset + 450).forEach((ref) => batch.delete(ref));
-      await batch.commit();
-    }
-  }
 }

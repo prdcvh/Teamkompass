@@ -18,12 +18,12 @@ describe('Profile (Spielerprofil)', () => {
     const { mobile = false, id = '', withData = true, consent } = options;
     isMobile.set(mobile);
     firebase = new FakeFirebase();
-    firebase.players.set('p1', { name: 'Jonas Keller', positions: ['TW'], number: 1, birthdate: '2012-05-05', status: 'Verletzt', injuryUntil: '2026-12-01', consentStatus: 'granted', consentDate: '2026-09-01' });
-    firebase.players.set('p2', { name: '<b>Elias</b> Wagner', positions: ['RV', 'LV'], number: 2, birthdate: '2012-06-06', status: 'Fit', consentStatus: consent ?? 'pending' });
+    firebase.players.players.set('p1', { name: 'Jonas Keller', positions: ['TW'], number: 1, birthdate: '2012-05-05', status: 'Verletzt', injuryUntil: '2026-12-01', consentStatus: 'granted', consentDate: '2026-09-01' });
+    firebase.players.players.set('p2', { name: '<b>Elias</b> Wagner', positions: ['RV', 'LV'], number: 2, birthdate: '2012-06-06', status: 'Fit', consentStatus: consent ?? 'pending' });
     if (withData) {
-      firebase.events.set('e1', { type: 'Training', title: 'Training Montag', date: '2026-09-01', intensity: 2, notes: 'Passspiel' });
-      firebase.events.set('e2', { type: 'Spiel', title: '<img src=x onerror=alert(1)>', date: '2026-09-08', intensity: 3, goalsFor: 3, goalsAgainst: 1, matchDuration: 80 });
-      firebase.events.set('e3', { type: 'Training', title: 'Training Zukunft', date: '2099-01-01' });
+      firebase.events.events.set('e1', { type: 'Training', title: 'Training Montag', date: '2026-09-01', intensity: 2, notes: 'Passspiel' });
+      firebase.events.events.set('e2', { type: 'Spiel', title: '<img src=x onerror=alert(1)>', date: '2026-09-08', intensity: 3, goalsFor: 3, goalsAgainst: 1, matchDuration: 80 });
+      firebase.events.events.set('e3', { type: 'Training', title: 'Training Zukunft', date: '2099-01-01' });
       firebase.ratings.set('e1', new Map([['p1', grades(3, { note: '' })]]));
       firebase.ratings.set('e2', new Map([['p1', grades(1, { note: 'Starkes Spiel', minutes: 80, goals: 2, assists: 1 })]]));
       firebase.ratings.set('e3', new Map([['p1', { attendance: 'absent' }]]));
@@ -154,8 +154,8 @@ describe('Profile (Spielerprofil)', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     isMobile.set(false);
     firebase = new FakeFirebase();
-    firebase.players.set('p1', { name: 'Jonas Keller', positions: ['TW'], number: 1, birthdate: '2012-05-05', status: 'Fit' });
-    firebase.events.set('e1', { type: 'Training', title: 'T', date: '2026-09-01' });
+    firebase.players.players.set('p1', { name: 'Jonas Keller', positions: ['TW'], number: 1, birthdate: '2012-05-05', status: 'Fit' });
+    firebase.events.events.set('e1', { type: 'Training', title: 'T', date: '2026-09-01' });
     firebase.watchRatingDocError = { code: 'permission-denied' };
     TestBed.configureTestingModule({
       providers: [
@@ -190,8 +190,8 @@ describe('Profile (Spielerprofil)', () => {
     async function renderExtras(role: 'trainer' | 'medical' = 'trainer') {
       isMobile.set(false);
       firebase = new FakeFirebase();
-      firebase.players.set('p1', { name: 'Jonas Keller', positions: ['TW'], number: 1, birthdate: '2012-05-05', status: 'Fit', consentStatus: 'granted' });
-      firebase.events.set('e1', { type: 'Training', title: 'Training Montag', date: '2026-09-01', intensity: 2 });
+      firebase.players.players.set('p1', { name: 'Jonas Keller', positions: ['TW'], number: 1, birthdate: '2012-05-05', status: 'Fit', consentStatus: 'granted' });
+      firebase.events.events.set('e1', { type: 'Training', title: 'Training Montag', date: '2026-09-01', intensity: 2 });
       firebase.playerRecords.set('p1/developmentPlans', new Map([['dp1', { focus: 'Orientierung', goal: 'Blick vor dem Ball', status: 'In Arbeit', dueDate: '2026-12-01', createdAt: '2026-09-01', selfReflection: 'Lief gut', coachReview: 'Weiter so' }]]));
       firebase.playerRecords.set('p1/absences', new Map([
         ['ab1', { kind: 'injury', label: 'Verletzung', detail: 'Zerrung', from: '2020-01-01', to: '' }],
@@ -323,7 +323,7 @@ describe('Profile (Spielerprofil)', () => {
       vi.spyOn(console, 'error').mockImplementation(() => undefined);
       isMobile.set(false);
       firebase = new FakeFirebase();
-      firebase.players.set('p1', { name: 'Jonas Keller', positions: ['TW'], number: 1, birthdate: '2012-05-05', status: 'Fit' });
+      firebase.players.players.set('p1', { name: 'Jonas Keller', positions: ['TW'], number: 1, birthdate: '2012-05-05', status: 'Fit' });
       firebase.watchPlayerRecordsError = { code: 'permission-denied' };
       TestBed.configureTestingModule({
         providers: [

@@ -13,10 +13,10 @@ describe('RecordsService', () => {
 
   async function setup(role: 'trainer' | 'player' | 'medical' = 'trainer') {
     firebase = new FakeFirebase();
-    firebase.players.set('p1', { name: 'Jonas Keller', positions: ['TW'], number: 1, birthdate: '2012-05-05', status: 'Fit' });
-    firebase.events.set('e1', { type: 'Training', title: 'Training Mo', date: '2026-10-05' });
-    firebase.events.set('e2', { type: 'Training', title: 'Training Mi', date: '2026-10-07' });
-    firebase.events.set('e3', { type: 'Training', title: 'Training Fr', date: '2026-10-20' });
+    firebase.players.players.set('p1', { name: 'Jonas Keller', positions: ['TW'], number: 1, birthdate: '2012-05-05', status: 'Fit' });
+    firebase.events.events.set('e1', { type: 'Training', title: 'Training Mo', date: '2026-10-05' });
+    firebase.events.events.set('e2', { type: 'Training', title: 'Training Mi', date: '2026-10-07' });
+    firebase.events.events.set('e3', { type: 'Training', title: 'Training Fr', date: '2026-10-20' });
     firebase.ratings.set('e2', new Map([['p1', { attendance: 'present', effort: 2, technique: 2, tactics: 2, comprehension: 2, grade: 2, playerId: 'p1' }]]));
     firebase.playerRecords.set('p1/developmentPlans', new Map([['dp1', { focus: 'Orientierung', goal: 'Blick', status: 'In Arbeit', createdAt: '2026-09-01', selfReflection: '' }]]));
     firebase.playerRecords.set('p1/absences', new Map([['ab1', { kind: 'absence', label: 'Schule', from: '2026-09-01', to: '2026-09-02' }]]));

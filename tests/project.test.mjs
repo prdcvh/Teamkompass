@@ -320,7 +320,7 @@ test("Spieler loeschen raeumt auch Einladungen und Zugaenge (invites/members) au
 });
 
 test("Angular: Spieler loeschen raeumt invites/members auf", async () => {
-  const service = await read("angular/src/app/core/firebase.service.ts");
+  const service = await read("angular/src/app/core/firebase/players.api.ts");
   assert.match(service, /collection\(db, \.\.\.base, 'invites'\), where\('playerId', '==', id\)/);
   assert.match(service, /collection\(db, \.\.\.base, 'members'\), where\('playerId', '==', id\)/);
 });
@@ -462,8 +462,17 @@ test("copy-team: Service-Account-Schluessel sind per .gitignore ausgeschlossen",
   assert.match(await read(".gitignore"), /service-account/);
 });
 
+test("Angular: Spieler loeschen entfernt Entwicklungsplaene, Abwesenheiten und Messwerte", async () => {
+  const service = await read("angular/src/app/core/firebase/players.api.ts");
+  assert.match(service, /PLAYER_SUBCOLLECTIONS = \['developmentPlans', 'absences', 'measurements'\]/);
+  const start = service.indexOf("async deletePlayer(");
+  const body = service.slice(start, service.indexOf("\n  }\n", start));
+  assert.match(body, /PLAYER_SUBCOLLECTIONS\.map\(\(name\) => getDocs\(collection\(db, \.\.\.base, 'players', id, name\)\)\)/);
+  assert.match(body, /children\.flatMap\(\(snapshot\) => snapshot\.docs\.map\(\(entry\) => entry\.ref\)\)/, "Unterdaten des Spielers bleiben beim Loeschen zurueck");
+});
+
 test("Angular: Spieler loeschen entfernt auch die internen Trainer-Notizen", async () => {
-  const service = await read("angular/src/app/core/firebase.service.ts");
+  const service = await read("angular/src/app/core/firebase/players.api.ts");
   const start = service.indexOf("async deletePlayer(");
   const body = service.slice(start, service.indexOf("\n  }\n", start));
   assert.match(body, /'events', event\.id, 'ratings', id\)/);

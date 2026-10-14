@@ -1,0 +1,33 @@
+import { Injectable, inject } from '@angular/core';
+import { environment } from '../../../environments/environment';
+import { FirebaseConnection } from './firebase-connection';
+import type { SnapshotMeta } from './types';
+
+/** Startelf (`meta/lineup`, ein einzelnes Dokument). */
+@Injectable({ providedIn: 'root' })
+export class LineupApi {
+  private readonly connection = inject(FirebaseConnection);
+
+  /** Echtzeit-Abo auf die Startelf (`meta/lineup`, ein einzelnes Dokument; null = noch keine gespeichert). Nur Trainer. */
+  async watchLineup(
+    onData: (data: Readonly<Record<string, unknown>> | null, meta: SnapshotMeta) => void,
+    onError: (error: unknown) => void,
+  ): Promise<() => void> {
+    const { db } = await this.connection.get();
+    const { doc, onSnapshot } = await import('firebase/firestore');
+    return onSnapshot(
+      doc(db, 'teams', environment.teamId, 'meta', 'lineup'),
+      { includeMetadataChanges: true },
+      (snapshot) =>
+        onData(snapshot.exists() ? snapshot.data() : null, { fromCache: snapshot.metadata.fromCache, hasPendingWrites: snapshot.metadata.hasPendingWrites }),
+      onError,
+    );
+  }
+
+  /** Schreibt die Startelf vollständig (wie die bisherige App: das Dokument wird ersetzt). */
+  async saveLineup(data: Readonly<Record<string, unknown>>): Promise<void> {
+    const { db } = await this.connection.get();
+    const { doc, setDoc } = await import('firebase/firestore');
+    await setDoc(doc(db, 'teams', environment.teamId, 'meta', 'lineup'), data);
+  }
+}

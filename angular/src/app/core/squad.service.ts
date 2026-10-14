@@ -1,7 +1,7 @@
 import { Injectable, Injector, computed, effect, inject, signal } from '@angular/core';
 import { AbsenceSyncService } from './absence-sync.service';
 import { authErrorMessage, errorCode } from './auth-errors';
-import { FirebaseService } from './firebase.service';
+import { PlayersApi } from './firebase/players.api';
 import type { SnapshotMeta } from './firebase/types';
 import {
   type Player,
@@ -25,7 +25,7 @@ export type SquadLoad = 'idle' | 'loading' | 'ready' | 'error';
  */
 @Injectable({ providedIn: 'root' })
 export class SquadService {
-  private readonly firebase = inject(FirebaseService);
+  private readonly playersApi = inject(PlayersApi);
   private readonly session = inject(SessionService);
   private readonly sync = inject(SyncService);
   private readonly absences = inject(AbsenceSyncService);
@@ -75,9 +75,9 @@ export class SquadService {
     const subscription =
       role === 'player' || role === 'parent'
         ? ownId
-          ? this.firebase.watchPlayerDoc(ownId, (data, meta) => onData(data ? [playerFromDoc(ownId, data)] : [], meta), onError)
+          ? this.playersApi.watchPlayerDoc(ownId, (data, meta) => onData(data ? [playerFromDoc(ownId, data)] : [], meta), onError)
           : Promise.reject(new Error('Kein Spielerprofil verknüpft'))
-        : this.firebase.watchPlayers((docs, meta) => onData(docs.map((entry) => playerFromDoc(entry.id, entry.data)), meta), onError);
+        : this.playersApi.watchPlayers((docs, meta) => onData(docs.map((entry) => playerFromDoc(entry.id, entry.data)), meta), onError);
     subscription
       .then((unsubscribe) => {
         // Wurde inzwischen gestoppt oder ist das Abo schon fehlgeschlagen, wird es sofort wieder beendet.
@@ -113,7 +113,7 @@ export class SquadService {
     const player = playerFromDraft(draft, id);
     const previous = this.players().find((entry) => entry.id === id);
     if (!this.sync.isFailed()) this.sync.state.set('syncing');
-    void this.firebase
+    void this.playersApi
       .savePlayer(id, docFromPlayer(player))
       .then(() => this.sync.clearError())
       // Status oder „verletzt bis“ geändert: Events dieses Spielers automatisch abgleichen (SCRUM-80).
@@ -133,7 +133,7 @@ export class SquadService {
     if (!this.canEdit()) return false;
     if (!this.sync.isFailed()) this.sync.state.set('syncing');
     try {
-      await this.firebase.deletePlayer(id);
+      await this.playersApi.deletePlayer(id);
       this.sync.clearError();
       return true;
     } catch (error) {
