@@ -417,6 +417,7 @@ function normalizeState(data) {
   const developmentPlans = normalizeDevelopmentPlans(data.developmentPlans, playerIds);
   const absences = normalizeAbsences(data.absences, playerIds);
   const lineup = normalizeLineup(data.lineup, playerIds);
+  const eventLineups = normalizeEventLineups(data.eventLineups || data.lineup?.byEvent, playerIds);
   const measurements = normalizeMeasurements(data.measurements, playerIds);
   return {
     players: players.map(normalizePlayer),
@@ -424,6 +425,7 @@ function normalizeState(data) {
     developmentPlans,
     absences,
     lineup,
+    eventLineups,
     measurements,
     opponents: Array.isArray(data.opponents) ? data.opponents.map(normalizeOpponent) : structuredClone(sampleData.opponents),
     selectedEventId: data.selectedEventId || data.events?.[0]?.id || sampleData.selectedEventId
@@ -1363,9 +1365,21 @@ function cloudDeleteMeasurement(playerId, measurementId) {
     () => firestoreModule.deleteDoc(teamDoc("players", playerId, "measurements", measurementId)));
 }
 
+// merge:true, damit die je Spiel gespeicherten Aufstellungen (Feld byEvent im selben
+// Dokument, SCRUM-29) nicht von der allgemeinen Startelf ueberschrieben werden.
 function cloudSaveLineup(lineup) {
   return cloudWrite("Aufstellung konnte nicht in der Cloud gespeichert werden - die Aenderung geht sonst verloren.",
-    () => firestoreModule.setDoc(teamDoc("meta", "lineup"), lineup));
+    () => firestoreModule.setDoc(teamDoc("meta", "lineup"), { assignments: lineup.assignments }, { merge: true }));
+}
+
+function cloudSaveEventLineup(eventId, entry) {
+  return cloudWrite("Aufstellung konnte nicht in der Cloud gespeichert werden - die Aenderung geht sonst verloren.",
+    () => firestoreModule.setDoc(teamDoc("meta", "lineup"), { byEvent: { [eventId]: entry } }, { merge: true }));
+}
+
+function cloudDeleteEventLineup(eventId) {
+  return cloudWrite("Aufstellung des Spiels konnte nicht aus der Cloud geloescht werden.",
+    () => firestoreModule.updateDoc(teamDoc("meta", "lineup"), { [`byEvent.${eventId}`]: firestoreModule.deleteField() }));
 }
 
 function cloudSaveOpponent(opponent) {
@@ -2471,6 +2485,73 @@ function lineupIsEmpty(lineup) {
   return Object.values(lineup.assignments).every((ids) => !ids.length);
 }
 
+// Je Spiel gespeicherte Aufstellung (SCRUM-29): { [eventId]: { assignments, savedAt } }.
+// Nur Trainer sehen das Dokument (meta/lineup), deshalb steht es nicht im Event-Dokument.
+function normalizeEventLineups(raw, playerIds = new Set()) {
+  const result = {};
+  Object.entries(raw && typeof raw === "object" ? raw : {}).forEach(([eventId, entry]) => {
+    const lineup = normalizeLineup(entry, playerIds);
+    if (lineupIsEmpty(lineup)) return;
+    result[eventId] = { assignments: lineup.assignments, savedAt: typeof entry?.savedAt === "string" ? entry.savedAt : "" };
+  });
+  return result;
+}
+
+// Das Taktikboard gehoert zum naechsten anstehenden Spiel; gibt es keins, bleibt es
+// die allgemeine Startelf wie bisher.
+function lineupTargetEvent() {
+  const today = localIsoDate();
+  return state.events
+    .filter((event) => event.type === "Spiel" && event.date >= today)
+    .sort((a, b) => a.date.localeCompare(b.date))[0] || null;
+}
+
+// Letztes Spiel vor dem Ziel-Spiel (bzw. vor heute), fuer das eine Aufstellung gespeichert ist.
+function previousGameWithLineup(target) {
+  const before = target?.date || localIsoDate();
+  return state.events
+    .filter((event) => event.type === "Spiel" && event.id !== target?.id && event.date < before && state.eventLineups?.[event.id])
+    .sort((a, b) => b.date.localeCompare(a.date))[0] || null;
+}
+
+function saveBoardLineup() {
+  const target = lineupTargetEvent();
+  if (!target) {
+    persist();
+    cloudSaveLineup(state.lineup);
+    return;
+  }
+  const entry = { assignments: structuredClone(state.lineup.assignments), savedAt: new Date().toISOString() };
+  state.eventLineups ||= {};
+  state.eventLineups[target.id] = entry;
+  persist();
+  cloudSaveEventLineup(target.id, entry);
+}
+
+function copyLineupFromPreviousGame() {
+  const source = previousGameWithLineup(lineupTargetEvent());
+  if (!source) return;
+  state.lineup = { assignments: structuredClone(state.eventLineups[source.id].assignments) };
+  saveBoardLineup();
+  renderPitch();
+}
+
+function eventLineupHtml(event) {
+  const entry = state.eventLineups?.[event.id];
+  if (!entry) return "";
+  const rows = Object.keys(PITCH_ZONES).map((zone) => {
+    const players = (entry.assignments[zone] || []).map((id) => state.players.find((player) => player.id === id)).filter(Boolean);
+    if (!players.length) return "";
+    return `<li><strong>${zone}</strong> ${players.map((player) => `${player.number} ${escapeHtml(player.name)}`).join(", ")}</li>`;
+  }).join("");
+  const bench = state.players.filter((player) => !Object.values(entry.assignments).flat().includes(player.id));
+  return `
+    <h3>Aufstellung ${escapeHtml(formationNameFromAssignments(entry.assignments))}</h3>
+    <ul class="event-lineup-list">${rows}</ul>
+    ${bench.length ? `<p class="muted">Bank: ${bench.map((player) => `${player.number} ${escapeHtml(player.name)}`).join(", ")}</p>` : ""}
+  `;
+}
+
 function eligibleLineupCandidates() {
   return state.players
     .filter((player) => !["Verletzt", "Gesperrt", "Abwesend"].includes(playerEffectiveStatus(player)))
@@ -2563,8 +2644,7 @@ function applyFormationPreset(presetIndex) {
   if (!preset) return;
   const { assigned } = formationPreview(preset, eligibleLineupCandidates());
   state.lineup = { assignments: assignedToAssignments(assigned) };
-  persist();
-  cloudSaveLineup(state.lineup);
+  saveBoardLineup();
   renderPitch();
 }
 
@@ -2593,8 +2673,7 @@ function movePlayerToZone(playerId, zoneLabel) {
     assignments[zone] = assignments[zone].filter((id) => id !== playerId);
   });
   assignments[zoneLabel].push(playerId);
-  persist();
-  cloudSaveLineup(state.lineup);
+  saveBoardLineup();
   renderPitch();
 }
 
@@ -2603,8 +2682,7 @@ function removePlayerFromPitch(playerId) {
   Object.keys(assignments).forEach((zone) => {
     assignments[zone] = assignments[zone].filter((id) => id !== playerId);
   });
-  persist();
-  cloudSaveLineup(state.lineup);
+  saveBoardLineup();
   renderPitch();
 }
 
@@ -2622,8 +2700,7 @@ function swapPlayers(playerIdA, playerIdB) {
   });
   if (zoneB) assignments[zoneB].push(playerIdA);
   if (zoneA) assignments[zoneA].push(playerIdB);
-  persist();
-  cloudSaveLineup(state.lineup);
+  saveBoardLineup();
   renderPitch();
 }
 
@@ -2743,6 +2820,10 @@ function renderPitchBench() {
 
 function renderPitch() {
   state.lineup ||= normalizeLineup({});
+  const target = lineupTargetEvent();
+  const storedForTarget = target && state.eventLineups?.[target.id];
+  if (storedForTarget) state.lineup = { assignments: structuredClone(storedForTarget.assignments) };
+  renderLineupTarget(target, Boolean(storedForTarget));
   if (lineupIsEmpty(state.lineup)) {
     const candidates = eligibleLineupCandidates();
     const previews = FORMATION_PRESETS.map((preset) => formationPreview(preset, candidates));
@@ -2789,6 +2870,21 @@ function renderPitch() {
 
   renderFormationPicker();
   renderPitchBench();
+}
+
+function renderLineupTarget(target, hasStored) {
+  const info = $("#pitchTarget");
+  const copyBtn = $("#copyLineupBtn");
+  if (!info || !copyBtn) return;
+  if (!target) {
+    info.textContent = "Kein anstehendes Spiel – allgemeine Startelf";
+    copyBtn.hidden = true;
+    return;
+  }
+  const source = previousGameWithLineup(target);
+  info.textContent = `Aufstellung für ${target.title} (${target.date})${hasStored ? "" : " – noch nicht gespeichert"}`;
+  copyBtn.hidden = !source;
+  if (source) copyBtn.textContent = `Aufstellung vom letzten Spiel übernehmen (${source.date})`;
 }
 
 function renderLeaders() {
@@ -3020,6 +3116,12 @@ function renderRatingTable() {
   const matchDuration = event.type === "Spiel" ? Number(event.matchDuration || 90) : "";
   $("#eventEditorMeta").textContent = `${event.type} · ${event.date}${result ? ` · Ergebnis ${result.goalsFor}:${result.goalsAgainst}` : ""} · Intensität ${intensityLabel(event.intensity)}${event.location ? ` · ${event.location}` : ""}`;
   if (matchDuration) $("#eventEditorMeta").textContent += ` · ${matchDuration} Min.`;
+  const lineupBox = $("#eventLineup");
+  if (lineupBox) {
+    const html = event.type === "Spiel" && canManageRecords() ? eventLineupHtml(event) : "";
+    lineupBox.innerHTML = html;
+    lineupBox.hidden = !html;
+  }
   $("#selectedEventIntensity").value = String(event.intensity || 2);
   $("#selectedGoalsFor").value = hasScore(event.goalsFor) ? event.goalsFor : "";
   $("#selectedGoalsAgainst").value = hasScore(event.goalsAgainst) ? event.goalsAgainst : "";
@@ -3379,8 +3481,11 @@ function deleteSelectedEvent() {
   if (!confirm(`"${event.title}" wirklich löschen? Alle Bewertungen dieses Events gehen verloren.`)) return;
   state.events = state.events.filter((item) => item.id !== event.id);
   state.selectedEventId = state.events[0]?.id || "";
+  const hadLineup = Boolean(state.eventLineups?.[event.id]);
+  if (hadLineup) delete state.eventLineups[event.id];
   persist();
   cloudDeleteEvent(event);
+  if (hadLineup) cloudDeleteEventLineup(event.id);
   renderEvents();
 }
 
@@ -4607,6 +4712,7 @@ window.addEventListener("resize", () => {
     if ($("#teamAnalysisView")?.classList.contains("active")) renderTeamAnalysis();
   }, 180);
 });
+on("#copyLineupBtn", "click", copyLineupFromPreviousGame);
 on("#formationPicker", "click", (event) => {
   const button = event.target.closest(".formation-option");
   if (!button) return;

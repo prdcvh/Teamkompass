@@ -2150,3 +2150,8 @@ menu {
   background: #4a1f1f;
   border-color: #8a3a3a;
 }
+
+/* Gespeicherte Aufstellung eines Spiels (SCRUM-29) */
+.event-lineup { margin: 0 0 16px; padding: 12px 14px; border: 1px solid var(--line, rgba(128, 128, 128, 0.3)); border-radius: 12px; }
+.event-lineup h3 { margin: 0 0 8px; font-size: 1rem; }
+.event-lineup-list { margin: 0 0 8px; padding-left: 18px; }
