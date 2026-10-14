@@ -1,8 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { FileOutput } from '../../core/file-output';
-import { FirebaseService } from '../../core/firebase.service';
 import { SessionService } from '../../core/session.service';
-import { FakeFirebase } from '../../core/testing';
+import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
 import { WorkspaceService } from '../../core/workspace.service';
 import { Export } from './export';
 
@@ -23,7 +22,7 @@ describe('Export (Daten exportieren)', () => {
     firebase.playerRecords.set('p1/developmentPlans', new Map([['f1', { focus: 'Kopfball', goal: 'Mehr Kopfballtore', status: 'Offen' }]]));
     TestBed.configureTestingModule({
       providers: [
-        { provide: FirebaseService, useValue: firebase },
+        ...provideFakeFirebase(firebase),
         { provide: FileOutput, useValue: { saveText: (name: string, text: string) => saved.push({ name, text }), print: (html: string) => printed.push(html) } },
       ],
     });

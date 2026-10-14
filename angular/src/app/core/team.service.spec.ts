@@ -1,8 +1,7 @@
 import { TestBed } from '@angular/core/testing';
-import { FirebaseService } from './firebase.service';
 import { SessionService } from './session.service';
 import { TeamService } from './team.service';
-import { FakeFirebase } from './testing';
+import { FakeFirebase, provideFakeFirebase } from './testing/fake-firebase';
 
 describe('TeamService', () => {
   let firebase: FakeFirebase;
@@ -13,7 +12,7 @@ describe('TeamService', () => {
     firebase.players.set('p2', { name: 'Ben Bauer', positions: ['IV'], number: 4, birthdate: '2012-06-06', status: 'Fit' });
     firebase.events.set('e1', { type: 'Training', title: 'Training', date: '2026-10-01' });
     firebase.ratings.set('e1', new Map([['p1', { attendance: 'present', effort: 2, technique: 2, tactics: 2, comprehension: 2, playerId: 'p1' }]]));
-    TestBed.configureTestingModule({ providers: [{ provide: FirebaseService, useValue: firebase }] });
+    TestBed.configureTestingModule({ providers: [...provideFakeFirebase(firebase)] });
     TestBed.inject(SessionService).role.set(role);
     return TestBed.inject(TeamService);
   }

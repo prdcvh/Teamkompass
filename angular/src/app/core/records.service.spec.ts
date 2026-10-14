@@ -1,13 +1,12 @@
 import { TestBed } from '@angular/core/testing';
 import { EventsService } from './events.service';
-import { FirebaseService } from './firebase.service';
 import { ProfileService } from './profile.service';
 import { RecordsService } from './records.service';
 import { emptyAbsenceDraft, emptyMeasurementDraft, emptyPlanDraft } from './records';
 import { SessionService } from './session.service';
 import { SquadService } from './squad.service';
 import { SyncService } from './sync.service';
-import { FakeFirebase } from './testing';
+import { FakeFirebase, provideFakeFirebase } from './testing/fake-firebase';
 
 describe('RecordsService', () => {
   let firebase: FakeFirebase;
@@ -22,7 +21,7 @@ describe('RecordsService', () => {
     firebase.playerRecords.set('p1/developmentPlans', new Map([['dp1', { focus: 'Orientierung', goal: 'Blick', status: 'In Arbeit', createdAt: '2026-09-01', selfReflection: '' }]]));
     firebase.playerRecords.set('p1/absences', new Map([['ab1', { kind: 'absence', label: 'Schule', from: '2026-09-01', to: '2026-09-02' }]]));
     firebase.playerRecords.set('p1/measurements', new Map([['me1', { date: '2026-07-01', height: '150', weight: '40' }]]));
-    TestBed.configureTestingModule({ providers: [{ provide: FirebaseService, useValue: firebase }] });
+    TestBed.configureTestingModule({ providers: [...provideFakeFirebase(firebase)] });
     const session = TestBed.inject(SessionService);
     session.role.set(role);
     if (role === 'player') session.playerId.set('p1');

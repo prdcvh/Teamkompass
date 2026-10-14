@@ -1,9 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { EventsService } from './events.service';
-import { FirebaseService } from './firebase.service';
 import { ProfileService } from './profile.service';
 import { SessionService } from './session.service';
-import { FakeFirebase } from './testing';
+import { FakeFirebase, provideFakeFirebase } from './testing/fake-firebase';
 
 describe('ProfileService', () => {
   let firebase: FakeFirebase;
@@ -13,7 +12,7 @@ describe('ProfileService', () => {
     firebase.events.set('e1', { type: 'Training', title: 'Training', date: '2026-10-01' });
     firebase.events.set('e2', { type: 'Spiel', title: 'Spiel', date: '2026-10-05', matchDuration: 70 });
     firebase.ratings.set('e1', new Map([['p1', { attendance: 'present', effort: 2, technique: 2, tactics: 2, comprehension: 2, grade: 2, playerId: 'p1' }]]));
-    TestBed.configureTestingModule({ providers: [{ provide: FirebaseService, useValue: firebase }] });
+    TestBed.configureTestingModule({ providers: [...provideFakeFirebase(firebase)] });
     TestBed.inject(SessionService).role.set(role);
     const events = TestBed.inject(EventsService);
     events.start();

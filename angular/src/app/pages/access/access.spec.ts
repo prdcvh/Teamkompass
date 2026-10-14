@@ -1,10 +1,9 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { FirebaseService } from '../../core/firebase.service';
 import { LayoutService } from '../../core/layout.service';
 import { SessionService } from '../../core/session.service';
-import { FakeFirebase } from '../../core/testing';
+import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
 import { Access } from './access';
 
 describe('Access (Zugänge: Spieler und Scouts)', () => {
@@ -16,11 +15,11 @@ describe('Access (Zugänge: Spieler und Scouts)', () => {
     firebase = new FakeFirebase();
     firebase.players.set('p1', { name: 'Anna Beispiel', positions: ['ZM'], number: 8, birthdate: '2012-03-12', status: 'Fit' });
     firebase.players.set('p2', { name: 'Ben Widerruf', positions: ['ST'], number: 9, birthdate: '2012-05-01', status: 'Fit', consentStatus: 'revoked' });
-    firebase.memberDocs.set('u1', { role: 'player', playerId: 'p1', expiresAt: { toDate: () => new Date('2020-01-01T00:00:00Z') } });
-    firebase.memberDocs.set('u2', { role: 'medical', email: 'arzt@verein.de' });
-    firebase.memberDocs.set('u3', { role: 'trainer', email: 'coach@verein.de' });
-    firebase.inviteDocs.set('abcdef0123456789abcdef0123456789abcdef0123456789', { role: 'parent', playerId: 'p2', expiresAt: null });
-    TestBed.configureTestingModule({ providers: [provideRouter([]), { provide: FirebaseService, useValue: firebase }, { provide: LayoutService, useValue: { isMobile } }] });
+    firebase.access.memberDocs.set('u1', { role: 'player', playerId: 'p1', expiresAt: { toDate: () => new Date('2020-01-01T00:00:00Z') } });
+    firebase.access.memberDocs.set('u2', { role: 'medical', email: 'arzt@verein.de' });
+    firebase.access.memberDocs.set('u3', { role: 'trainer', email: 'coach@verein.de' });
+    firebase.access.inviteDocs.set('abcdef0123456789abcdef0123456789abcdef0123456789', { role: 'parent', playerId: 'p2', expiresAt: null });
+    TestBed.configureTestingModule({ providers: [provideRouter([]), ...provideFakeFirebase(firebase), { provide: LayoutService, useValue: { isMobile } }] });
     TestBed.inject(SessionService).role.set(role);
     const fixture = TestBed.createComponent(Access);
     await fixture.whenStable();
@@ -93,14 +92,14 @@ describe('Access (Zugänge: Spieler und Scouts)', () => {
     fill(dialog.querySelector<HTMLSelectElement>('select[name="role"]')!, 'parent', 'change');
     fill(dialog.querySelector<HTMLInputElement>('input[name="days"]')!, '14');
     dialog.querySelector('form')!.dispatchEvent(new Event('submit'));
-    await vi.waitFor(() => expect([...firebase.inviteDocs.values()].some((invite) => invite['playerId'] === 'p1')).toBe(true));
+    await vi.waitFor(() => expect([...firebase.access.inviteDocs.values()].some((invite) => invite['playerId'] === 'p1')).toBe(true));
     await vi.waitFor(() => {
       fixture.detectChanges();
       expect(dialog.querySelector('[data-testid="invite-code"]')).not.toBeNull();
     });
     const code = text(dialog.querySelector('[data-testid="invite-code"]'));
     expect(code).toMatch(/^[0-9a-f]{48}$/);
-    expect(firebase.inviteDocs.get(code)).toMatchObject({ playerId: 'p1', role: 'parent' });
+    expect(firebase.access.inviteDocs.get(code)).toMatchObject({ playerId: 'p1', role: 'parent' });
     expect(text(dialog)).toContain('läuft am');
     expect(text(q(fixture, '.meta'))).toBe('3 Zugänge');
 
@@ -134,7 +133,7 @@ describe('Access (Zugänge: Spieler und Scouts)', () => {
   it('meldet einen Fehler beim Erzeugen und zeigt keinen Code', async () => {
     const fixture = await render();
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    firebase.createInviteError = { code: 'permission-denied' };
+    firebase.access.createInviteError = { code: 'permission-denied' };
     const dialog = await openInvite(fixture);
     fill(dialog.querySelector<HTMLSelectElement>('select[name="player"]')!, 'p1', 'change');
     dialog.querySelector('form')!.dispatchEvent(new Event('submit'));
@@ -152,9 +151,9 @@ describe('Access (Zugänge: Spieler und Scouts)', () => {
     rowOf('arzt@verein.de').querySelector<HTMLButtonElement>('button')!.click();
     await flush(fixture);
     expect(qa(fixture, 'tk-dialog h2').map(text)).toContain('Zugang sperren?');
-    expect(firebase.memberDocs.has('u2')).toBe(true);
+    expect(firebase.access.memberDocs.has('u2')).toBe(true);
     qa<HTMLButtonElement>(fixture, '.confirm-actions button').find((button) => text(button) === 'Sperren')!.click();
-    await vi.waitFor(() => expect(firebase.memberDocs.has('u2')).toBe(false));
+    await vi.waitFor(() => expect(firebase.access.memberDocs.has('u2')).toBe(false));
     await vi.waitFor(() => {
       fixture.detectChanges();
       expect(text(q(fixture, '.meta'))).toBe('0 Zugänge');
@@ -167,7 +166,7 @@ describe('Access (Zugänge: Spieler und Scouts)', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const invite = qa<HTMLElement>(fixture, 'article.row').find((row) => text(row).includes('Einladung offen'))!;
     expect(text(invite.querySelector('button'))).toBe('Code zurückziehen');
-    firebase.deleteAccessError = { code: 'unavailable' };
+    firebase.access.deleteAccessError = { code: 'unavailable' };
     invite.querySelector<HTMLButtonElement>('button')!.click();
     await flush(fixture);
     const confirm = () => qa<HTMLButtonElement>(fixture, '.confirm-actions button').find((button) => text(button) === 'Zurückziehen')!;
@@ -176,25 +175,25 @@ describe('Access (Zugänge: Spieler und Scouts)', () => {
       fixture.detectChanges();
       expect(q(fixture, 'tk-dialog .error')).not.toBeNull();
     });
-    expect(firebase.inviteDocs.size).toBe(1);
-    firebase.deleteAccessError = null;
+    expect(firebase.access.inviteDocs.size).toBe(1);
+    firebase.access.deleteAccessError = null;
     confirm().click();
-    await vi.waitFor(() => expect(firebase.inviteDocs.size).toBe(0));
+    await vi.waitFor(() => expect(firebase.access.inviteDocs.size).toBe(0));
   });
 
   it('zeigt Ladefehler mit „Erneut versuchen“', async () => {
     isMobile.set(false);
     firebase = new FakeFirebase();
-    firebase.readAccessError = { code: 'permission-denied' };
+    firebase.access.readAccessError = { code: 'permission-denied' };
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    TestBed.configureTestingModule({ providers: [provideRouter([]), { provide: FirebaseService, useValue: firebase }, { provide: LayoutService, useValue: { isMobile } }] });
+    TestBed.configureTestingModule({ providers: [provideRouter([]), ...provideFakeFirebase(firebase), { provide: LayoutService, useValue: { isMobile } }] });
     TestBed.inject(SessionService).role.set('trainer');
     const fixture = TestBed.createComponent(Access);
     await vi.waitFor(() => {
       fixture.detectChanges();
       expect(q(fixture, '.notice')).not.toBeNull();
     });
-    firebase.readAccessError = null;
+    firebase.access.readAccessError = null;
     q<HTMLButtonElement>(fixture, '.notice button')!.click();
     await vi.waitFor(() => {
       fixture.detectChanges();
@@ -226,13 +225,13 @@ describe('Access (Zugänge: Spieler und Scouts)', () => {
 
   it('zeigt im leeren Reiter einen Hinweis mit passendem Button', async () => {
     const fixture = await render();
-    firebase.memberDocs.delete('u2');
+    firebase.access.memberDocs.delete('u2');
     await openScouts(fixture);
     q<HTMLButtonElement>(fixture, '#access-tab-players')!.click();
     await flush(fixture);
     expect(text(q(fixture, '.list'))).toContain('Anna Beispiel');
-    firebase.memberDocs.clear();
-    firebase.inviteDocs.clear();
+    firebase.access.memberDocs.clear();
+    firebase.access.inviteDocs.clear();
     await (fixture.componentInstance as unknown as { access: { reload(): Promise<void> } }).access.reload();
     await openScouts(fixture);
     expect(text(q(fixture, '.empty'))).toContain('Noch kein Scout-Zugang angelegt.');

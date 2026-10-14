@@ -1,10 +1,9 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { FirebaseService } from '../../core/firebase.service';
 import { LayoutService } from '../../core/layout.service';
 import { SessionService } from '../../core/session.service';
-import { FakeFirebase } from '../../core/testing';
+import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
 import { TeamAnalysis } from './team-analysis';
 
 describe('TeamAnalysis (Teamanalyse)', () => {
@@ -24,7 +23,7 @@ describe('TeamAnalysis (Teamanalyse)', () => {
       firebase.ratings.set('e2', new Map([['p1', { ...grades(2), playerId: 'p1' }]]));
     }
     TestBed.configureTestingModule({
-      providers: [provideRouter([]), { provide: FirebaseService, useValue: firebase }, { provide: LayoutService, useValue: { isMobile } }],
+      providers: [provideRouter([]), ...provideFakeFirebase(firebase), { provide: LayoutService, useValue: { isMobile } }],
     });
     TestBed.inject(SessionService).role.set(role);
     const fixture = TestBed.createComponent(TeamAnalysis);

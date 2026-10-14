@@ -1,8 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute } from '@angular/router';
-import { FirebaseService } from '../../core/firebase.service';
 import { SessionService } from '../../core/session.service';
-import { FakeFirebase } from '../../core/testing';
+import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
 import { StaffAccount } from './staff-account';
 
 describe('StaffAccount (Trainer-/Medizin-Konto)', () => {
@@ -12,7 +11,7 @@ describe('StaffAccount (Trainer-/Medizin-Konto)', () => {
     firebase = new FakeFirebase();
     TestBed.configureTestingModule({
       providers: [
-        { provide: FirebaseService, useValue: firebase },
+        ...provideFakeFirebase(firebase),
         { provide: ActivatedRoute, useValue: { snapshot: { data: { role } } } },
       ],
     });
@@ -82,7 +81,7 @@ describe('StaffAccount (Trainer-/Medizin-Konto)', () => {
       expect(text(q(fixture, '.success'))).toBe('Der Scout-Zugang für arzt@verein.de wurde angelegt.');
     });
     expect(firebase.calls).toContain('createStaff:medical:arzt@verein.de');
-    expect(firebase.lastStaffPassword).toBe('LangGenug123');
+    expect(firebase.access.lastStaffPassword).toBe('LangGenug123');
     expect(q<HTMLInputElement>(fixture, 'input[name="password"]')!.value).toBe('');
     expect(q<HTMLInputElement>(fixture, 'input[name="repeat"]')!.value).toBe('');
     expect(q<HTMLInputElement>(fixture, 'input[name="email"]')!.value).toBe('');
@@ -91,7 +90,7 @@ describe('StaffAccount (Trainer-/Medizin-Konto)', () => {
   it('meldet Firebase-Fehler verständlich und behält die Eingabe', async () => {
     const fixture = await render('trainer');
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    firebase.createStaffError = { code: 'auth/email-already-in-use' };
+    firebase.access.createStaffError = { code: 'auth/email-already-in-use' };
     await fill(fixture, 'email', 'da@verein.de');
     await fill(fixture, 'password', 'LangGenug123');
     await fill(fixture, 'repeat', 'LangGenug123');

@@ -1,10 +1,9 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
-import { FirebaseService } from '../../core/firebase.service';
 import { LayoutService } from '../../core/layout.service';
 import { SessionService } from '../../core/session.service';
-import { FakeFirebase } from '../../core/testing';
+import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
 import { Opponents } from './opponents';
 
 describe('Opponents (Gegneranalyse)', () => {
@@ -18,7 +17,7 @@ describe('Opponents (Gegneranalyse)', () => {
       name: 'JSG Taunus', formation: '4-3-3', style: 'Pressing', strengths: 'Außen schnell', gamePlan: 'Tief stehen', updatedAt: '2026-10-01',
     });
     firebase.opponents.set('o2', { name: '<img src=x onerror=alert(1)>', formation: '3-2-3', style: 'Ballbesitz', notes: '<b>fett</b>', updatedAt: '2026-09-15' });
-    TestBed.configureTestingModule({ providers: [provideRouter([]), { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap(suche ? { suche } : {}) } } }, { provide: FirebaseService, useValue: firebase }, { provide: LayoutService, useValue: { isMobile } }] });
+    TestBed.configureTestingModule({ providers: [provideRouter([]), { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap(suche ? { suche } : {}) } } }, ...provideFakeFirebase(firebase), { provide: LayoutService, useValue: { isMobile } }] });
     TestBed.inject(SessionService).role.set(role);
     const fixture = TestBed.createComponent(Opponents);
     await fixture.whenStable();
@@ -148,7 +147,7 @@ describe('Opponents (Gegneranalyse)', () => {
   it('zeigt für Medizin nichts außer einem Hinweis und lädt keine Gegner', async () => {
     isMobile.set(false);
     firebase = new FakeFirebase();
-    TestBed.configureTestingModule({ providers: [provideRouter([]), { provide: FirebaseService, useValue: firebase }, { provide: LayoutService, useValue: { isMobile } }] });
+    TestBed.configureTestingModule({ providers: [provideRouter([]), ...provideFakeFirebase(firebase), { provide: LayoutService, useValue: { isMobile } }] });
     TestBed.inject(SessionService).role.set('medical');
     const fixture = TestBed.createComponent(Opponents);
     await fixture.whenStable();

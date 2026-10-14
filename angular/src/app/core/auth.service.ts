@@ -1,6 +1,8 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { authErrorMessage, errorCode } from './auth-errors';
-import { FirebaseService, type FirebaseUser, type InviteRecord } from './firebase.service';
+import { AccessApi } from './firebase/access.api';
+import { AuthApi } from './firebase/auth.api';
+import type { FirebaseUser, InviteRecord } from './firebase/types';
 import { clearLocalTeamData } from './local-data';
 import type { Role } from './role';
 import { SessionService } from './session.service';
@@ -18,7 +20,8 @@ export const CLAIM_RETRY_DELAY_MS = 1500;
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private readonly firebase = inject(FirebaseService);
+  private readonly authApi = inject(AuthApi);
+  private readonly accessApi = inject(AccessApi);
   private readonly session = inject(SessionService);
 
   readonly status = signal<AuthStatus>('loading');
@@ -46,7 +49,7 @@ export class AuthService {
     if (this.started) return;
     this.started = true;
     this.retryDelayMs = retryDelayMs;
-    this.firebase
+    this.authApi
       .watchAuth((user) => void this.onUser(user))
       .catch((error) => {
         console.error(error);
@@ -65,7 +68,7 @@ export class AuthService {
     this.error.set('');
     this.busy.set(true);
     try {
-      const user = await this.firebase.signInWithEmail(email.trim(), password);
+      const user = await this.authApi.signInWithEmail(email.trim(), password);
       // Erst fertig, wenn der Zugang geprüft ist – sonst steht der Status beim ersten Klick noch auf „signedOut“ (SCRUM-87).
       await this.verify(user);
     } catch (error) {
@@ -89,7 +92,7 @@ export class AuthService {
     try {
       let uid: string;
       try {
-        uid = await this.firebase.signInAnonymously();
+        uid = await this.authApi.signInAnonymously();
       } catch (error) {
         this.error.set(authErrorMessage(errorCode(error)));
         return;
@@ -97,7 +100,7 @@ export class AuthService {
 
       let invite: InviteRecord | null;
       try {
-        invite = await this.firebase.readInvite(code);
+        invite = await this.accessApi.readInvite(code);
       } catch (error) {
         this.error.set(`Code konnte nicht geprüft werden. ${authErrorMessage(errorCode(error))}`);
         await this.abandon();
@@ -126,7 +129,7 @@ export class AuthService {
 
   async signOut(): Promise<void> {
     try {
-      await this.firebase.signOut();
+      await this.authApi.signOut();
     } catch (error) {
       console.error(error);
     }
@@ -137,7 +140,7 @@ export class AuthService {
 
   private async claim(uid: string, code: string, invite: InviteRecord): Promise<boolean> {
     try {
-      await this.firebase.claimInvite(uid, code, invite);
+      await this.accessApi.claimInvite(uid, code, invite);
       return true;
     } catch (first) {
       if (!errorCode(first).includes('permission-denied')) {
@@ -150,7 +153,7 @@ export class AuthService {
     // Token noch nicht überall angekommen ist – ein zweiter Versuch behebt das meist von selbst.
     await new Promise((resolve) => setTimeout(resolve, this.retryDelayMs));
     try {
-      await this.firebase.claimInvite(uid, code, invite);
+      await this.accessApi.claimInvite(uid, code, invite);
       return true;
     } catch (second) {
       console.error(second);
@@ -162,7 +165,7 @@ export class AuthService {
   /** Bricht eine angefangene Code-Anmeldung ab, ohne den Anmeldezustand zu verändern. */
   private async abandon(): Promise<void> {
     try {
-      await this.firebase.signOut();
+      await this.authApi.signOut();
     } catch (error) {
       console.error(error);
     }
@@ -198,7 +201,7 @@ export class AuthService {
 
   private async loadMember(user: FirebaseUser, epoch: number): Promise<void> {
     try {
-      const member = await this.firebase.readMember(user.uid);
+      const member = await this.accessApi.readMember(user.uid);
       if (epoch !== this.epoch) return; // veraltet: inzwischen abgemeldet oder anderes Konto
       if (!member) {
         // Anonyme Konten ohne Mitgliedschaft sind übrig gebliebene Code-Versuche: still beenden.

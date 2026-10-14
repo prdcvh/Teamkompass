@@ -1,8 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { FirebaseService } from '../../core/firebase.service';
 import { SessionService } from '../../core/session.service';
-import { FakeFirebase } from '../../core/testing';
+import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
 import { Search } from './search';
 
 describe('Search (Suche)', () => {
@@ -14,7 +13,7 @@ describe('Search (Suche)', () => {
     firebase.players.set('p2', { name: '<b>Ben</b>', positions: ['IV'], number: 4, birthdate: '2012-11-06', status: 'Fit' });
     firebase.events.set('e1', { type: 'Spiel', title: 'Spiel gegen Eppstein', date: '2026-09-01', intensity: 3 });
     firebase.opponents.set('o1', { name: 'SG Eppstein', formation: '4-4-2', style: 'Pressing', updatedAt: '2026-10-01' });
-    TestBed.configureTestingModule({ providers: [provideRouter([]), { provide: FirebaseService, useValue: firebase }] });
+    TestBed.configureTestingModule({ providers: [provideRouter([]), ...provideFakeFirebase(firebase)] });
     TestBed.inject(SessionService).role.set(role);
     const fixture = TestBed.createComponent(Search);
     await fixture.whenStable();

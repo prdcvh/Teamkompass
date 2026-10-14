@@ -1,10 +1,9 @@
 import { TestBed } from '@angular/core/testing';
 import { EventsService } from './events.service';
-import { FirebaseService } from './firebase.service';
 import { RatingsService } from './ratings.service';
 import { SessionService } from './session.service';
 import { SyncService } from './sync.service';
-import { FakeFirebase } from './testing';
+import { FakeFirebase, provideFakeFirebase } from './testing/fake-firebase';
 
 describe('RatingsService', () => {
   let firebase: FakeFirebase;
@@ -14,7 +13,7 @@ describe('RatingsService', () => {
     firebase.events.set('e1', { type: 'Spiel', title: 'Heimspiel', date: '2026-10-10', matchDuration: 70 });
     firebase.ratings.set('e1', new Map([['p1', { attendance: 'present', effort: 2, technique: 2, tactics: 2, comprehension: 2, grade: 2, minutes: 70, goals: '', assists: '', note: 'Gut', playerId: 'p1' }]]));
     firebase.privateNotes.set('e1', new Map([['p1', { playerId: 'p1', note: 'Nur für uns' }]]));
-    TestBed.configureTestingModule({ providers: [{ provide: FirebaseService, useValue: firebase }] });
+    TestBed.configureTestingModule({ providers: [...provideFakeFirebase(firebase)] });
     TestBed.inject(SessionService).role.set(role);
     const events = TestBed.inject(EventsService);
     events.start();

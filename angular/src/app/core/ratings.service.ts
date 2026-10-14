@@ -1,7 +1,8 @@
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { authErrorMessage, errorCode } from './auth-errors';
 import { EventsService } from './events.service';
-import { FirebaseService, type RawDoc, type SnapshotMeta } from './firebase.service';
+import { FirebaseService } from './firebase.service';
+import type { RawDoc, SnapshotMeta } from './firebase/types';
 import { MAX_NOTE_LENGTH, type Rating, type RatingField, BLANK_RATING, applyChange, docFromRating, ratingFromDoc } from './rating';
 import { SessionService } from './session.service';
 import { SyncService } from './sync.service';

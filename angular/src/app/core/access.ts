@@ -1,4 +1,4 @@
-import type { RawDoc } from './firebase.service';
+import type { RawDoc } from './firebase/types';
 import type { Role } from './role';
 
 /**

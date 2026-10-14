@@ -1,7 +1,7 @@
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { type AccessEntry, type InviteRole, type StaffRole, generateInviteCode, expiryFromDays, inviteEntry, memberEntry } from './access';
 import { authErrorMessage, errorCode } from './auth-errors';
-import { FirebaseService } from './firebase.service';
+import { AccessApi } from './firebase/access.api';
 import { SessionService } from './session.service';
 
 export type AccessLoad = 'idle' | 'loading' | 'ready' | 'error';
@@ -16,7 +16,7 @@ export type InviteResult = { ok: true; code: string; expiresAt: Date | null } | 
  */
 @Injectable({ providedIn: 'root' })
 export class AccessService {
-  private readonly firebase = inject(FirebaseService);
+  private readonly accessApi = inject(AccessApi);
   private readonly session = inject(SessionService);
 
   readonly entries = signal<readonly AccessEntry[]>([]);
@@ -40,7 +40,7 @@ export class AccessService {
     if (this.load() !== 'ready') this.load.set('loading');
     this.error.set('');
     try {
-      const [members, invites] = await Promise.all([this.firebase.readMembers(), this.firebase.readInvites()]);
+      const [members, invites] = await Promise.all([this.accessApi.readMembers(), this.accessApi.readInvites()]);
       if (generation !== this.generation) return;
       this.entries.set([
         ...invites.map(inviteEntry).filter((entry) => entry !== null),
@@ -68,7 +68,7 @@ export class AccessService {
     const code = generateInviteCode();
     const expiresAt = expiryFromDays(days);
     try {
-      await this.firebase.createInvite(code, { playerId, role, expiresAt });
+      await this.accessApi.createInvite(code, { playerId, role, expiresAt });
     } catch (error) {
       console.error(error);
       return { ok: false, message: `Der Einladungscode konnte nicht erstellt werden. ${authErrorMessage(errorCode(error))}` };
@@ -81,8 +81,8 @@ export class AccessService {
   async revoke(entry: AccessEntry): Promise<ActionResult> {
     if (!this.canWrite()) return { ok: false, message: 'Nur Trainer dürfen Zugänge sperren.' };
     try {
-      if (entry.kind === 'member') await this.firebase.deleteMember(entry.id);
-      else await this.firebase.deleteInvite(entry.id);
+      if (entry.kind === 'member') await this.accessApi.deleteMember(entry.id);
+      else await this.accessApi.deleteInvite(entry.id);
     } catch (error) {
       console.error(error);
       return { ok: false, message: `Der Zugang konnte nicht gesperrt werden. ${authErrorMessage(errorCode(error))}` };
@@ -95,7 +95,7 @@ export class AccessService {
   async createStaff(role: StaffRole, email: string, password: string): Promise<ActionResult> {
     if (!this.canWrite()) return { ok: false, message: 'Nur Trainer dürfen Konten anlegen.' };
     try {
-      await this.firebase.createStaffAccount(email.trim(), password, role);
+      await this.accessApi.createStaffAccount(email.trim(), password, role);
     } catch (error) {
       console.error(error);
       const label = role === 'medical' ? 'Der Scout-Zugang' : 'Das Trainer-Konto';

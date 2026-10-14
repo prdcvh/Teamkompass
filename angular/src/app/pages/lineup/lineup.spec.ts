@@ -1,9 +1,8 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { FirebaseService } from '../../core/firebase.service';
 import { LayoutService } from '../../core/layout.service';
 import { SessionService } from '../../core/session.service';
-import { FakeFirebase } from '../../core/testing';
+import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
 import { Lineup } from './lineup';
 
 describe('Lineup (Aufstellung)', () => {
@@ -37,7 +36,7 @@ describe('Lineup (Aufstellung)', () => {
       new Map(squad.map(([id, , , , grade]) => [id, { attendance: 'present', effort: grade, technique: grade, tactics: grade, comprehension: grade, playerId: id }])),
     );
     firebase.lineup = stored;
-    TestBed.configureTestingModule({ providers: [{ provide: FirebaseService, useValue: firebase }, { provide: LayoutService, useValue: { isMobile } }] });
+    TestBed.configureTestingModule({ providers: [...provideFakeFirebase(firebase), { provide: LayoutService, useValue: { isMobile } }] });
     TestBed.inject(SessionService).role.set(role);
     const fixture = TestBed.createComponent(Lineup);
     await fixture.whenStable();

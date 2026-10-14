@@ -1,7 +1,8 @@
 import { Injectable, Injector, computed, effect, inject, signal } from '@angular/core';
 import { AbsenceSyncService } from './absence-sync.service';
 import { authErrorMessage, errorCode } from './auth-errors';
-import { FirebaseService, type SnapshotMeta } from './firebase.service';
+import { FirebaseService } from './firebase.service';
+import type { SnapshotMeta } from './firebase/types';
 import {
   type Player,
   type PlayerDraft,
