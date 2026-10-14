@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { type TeamEvent } from './event';
-import { type Player } from './player';
+import type { Player } from './player/player';
 import { escapeHtml, profileReportHtml } from './profile-report';
 import { BLANK_RATING } from './rating';
 

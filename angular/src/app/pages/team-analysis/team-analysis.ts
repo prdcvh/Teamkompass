@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, OnInit, computed, inject } from '@a
 import { RouterLink } from '@angular/router';
 import { birthQuarterCounts, positionCoverage, teamStats, teamTrend, thinPositions, trainingFocusCounts } from '../../core/analysis';
 import { LayoutService } from '../../core/layout.service';
-import { todayIso } from '../../core/player';
+import { todayIso } from '../../core/dates';
 import { numberLabel } from '../../core/profile';
 import { gradeLabel } from '../../core/rating';
 import { injuryRisk } from '../../core/risk';

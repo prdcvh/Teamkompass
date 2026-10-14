@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { environment } from '../../../environments/environment';
 import { LayoutService } from '../../core/layout.service';
-import { todayIso } from '../../core/player';
+import { todayIso } from '../../core/dates';
 import { SessionService } from '../../core/session.service';
 import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
 import { Home } from './home';

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildExport, exportFileName, revokedPlayers } from './export';
 import { type TeamEvent } from './event';
 import { type Opponent } from './opponent';
-import { type Player } from './player';
+import type { Player } from './player/player';
 import { BLANK_RATING, type Rating } from './rating';
 import type { DevelopmentPlan } from './records/plan';
 

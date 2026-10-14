@@ -1,0 +1,28 @@
+/* ---------- Handy ---------- */
+@media (max-width: 720px) {
+  .page {
+    padding: var(--tk-space-4) var(--tk-space-4) 140px;
+  }
+
+  .head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .header {
+    grid-template-columns: auto 1fr;
+  }
+
+  .grade {
+    grid-column: 1 / -1;
+    justify-items: start;
+  }
+
+  .columns {
+    grid-template-columns: 1fr;
+  }
+
+  .tk-input {
+    min-height: var(--tk-touch);
+  }
+}

@@ -4,7 +4,7 @@
  * trainingFocusCounts, renderTeamAnalysis). Noten sind Schulnoten: kleiner ist besser.
  */
 import { type TeamEvent, TRAINING_FOCUSES } from './event';
-import { type Player, parsePositions } from './player';
+import { type Player, parsePositions } from './player/player';
 import { type PlotChart, plotChart } from './profile';
 import { type Rating, calculatedGrade, roundGrade } from './rating';
 import { type RatingsByEvent, type TeamRecord, teamRecord } from './team';

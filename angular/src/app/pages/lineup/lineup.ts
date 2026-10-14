@@ -1,31 +1,11 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { LayoutService } from '../../core/layout.service';
-import {
-  type Assignments,
-  type Candidate,
-  PITCH_ZONES,
-  ZONES,
-  type Zone,
-  benchOf,
-  eligibleCandidates,
-  formationName,
-  formationOptions,
-  lineupGrade,
-  lineupIsEmpty,
-  moveToZone,
-  onPitchIds,
-  outOfPosition,
-  removeFromPitch,
-  assignmentsFromPreview,
-  suggestedLineup,
-  swapPlayers,
-  zoneOf,
-  MAX_ON_PITCH,
-  FORMATION_PRESETS,
-} from '../../core/lineup';
+import { type Candidate, eligibleCandidates, formationOptions, assignmentsFromPreview, suggestedLineup } from '../../core/lineup/formation-assignment';
+import { type Assignments, benchOf, formationName, lineupGrade, lineupIsEmpty, moveToZone, onPitchIds, removeFromPitch, swapPlayers, zoneOf } from '../../core/lineup/lineup';
+import { PITCH_ZONES, ZONES, type Zone, outOfPosition, MAX_ON_PITCH, FORMATION_PRESETS } from '../../core/lineup/pitch';
 import { LineupService } from '../../core/lineup.service';
-import { todayIso } from '../../core/player';
-import { positionText } from '../../core/player';
+import { todayIso } from '../../core/dates';
+import { positionText } from '../../core/player/player';
 import { averageGrade, gradedEvents } from '../../core/profile';
 import { gradeLabel } from '../../core/rating';
 import { effectiveStatus } from '../../core/records/availability';

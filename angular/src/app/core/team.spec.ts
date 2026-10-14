@@ -1,5 +1,5 @@
 import { type TeamEvent } from './event';
-import { type Player } from './player';
+import type { Player } from './player/player';
 import { type EventRating } from './profile';
 import { BLANK_RATING, type Rating } from './rating';
 import type { Absence } from './records/absence';

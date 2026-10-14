@@ -6,7 +6,7 @@
 import { type TeamEvent } from './event';
 import { SIDEBAR_ITEMS } from './navigation';
 import { type Opponent } from './opponent';
-import { type Player } from './player';
+import type { Player } from './player/player';
 
 export const MAX_SEARCH_HITS = 12;
 

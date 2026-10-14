@@ -6,7 +6,7 @@
  */
 import { type TeamEvent, docFromEvent } from './event';
 import { type Opponent, docFromOpponent } from './opponent';
-import { type Player, docFromPlayer, isConsentRevoked } from './player';
+import { type Player, docFromPlayer, isConsentRevoked } from './player/player';
 import { type Rating, docFromRating } from './rating';
 import { type Absence, docFromAbsence } from './records/absence';
 import { type Measurement, docFromMeasurement } from './records/measurement';

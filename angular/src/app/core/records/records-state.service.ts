@@ -2,7 +2,7 @@ import { Injectable, computed, effect, inject, signal, untracked } from '@angula
 import { authErrorMessage, errorCode } from '../auth-errors';
 import { PlayerRecordsApi, type PlayerRecordKind } from '../firebase/player-records.api';
 import type { RawDoc, SnapshotMeta } from '../firebase/types';
-import { todayIso } from '../player';
+import { todayIso } from '../dates';
 import { SessionService } from '../session.service';
 import { SyncService } from '../sync.service';
 import { type Absence, absenceFromDoc } from './absence';

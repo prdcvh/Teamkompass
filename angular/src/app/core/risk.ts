@@ -8,7 +8,7 @@
  * Rückfallfenster nach Rückkehr aus Verletzung/Abwesenheit sowie – weil es eine Jugendmannschaft ist – der
  * Wachstumsschub aus den Körpermessungen (Apophysen-Reizungen wie Morbus Osgood-Schlatter).
  */
-import { type Player } from './player';
+import type { Player } from './player/player';
 import { type EventRating } from './profile';
 import { type Absence, activeAbsenceOn, isInjuryAbsence } from './records/absence';
 import { type Measurement, sortedMeasurements } from './records/measurement';

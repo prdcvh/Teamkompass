@@ -2,7 +2,8 @@
  * Verfügbarkeit eines Spielers aus Status und Abwesenheiten: Grund der Nichtverfügbarkeit, Anzeige-Status und
  * die automatische „Fehlt“-Bewertung (wie outputs/team-manager/app.js: unavailabilityReason, applyAutoAbsence).
  */
-import { formatDate, type Player } from '../player';
+import { formatDate } from '../dates';
+import type { Player } from '../player/player';
 import { BLANK_RATING, type Rating } from '../rating';
 import { type Absence, absenceTitle, activeAbsenceOn, isInjuryAbsence } from './absence';
 

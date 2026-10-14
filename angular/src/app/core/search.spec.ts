@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { type TeamEvent } from './event';
 import { type Opponent } from './opponent';
-import { type Player } from './player';
+import type { Player } from './player/player';
 import { MAX_SEARCH_HITS, searchTeam } from './search';
 
 const player = (id: string, name: string, number: number): Player => ({

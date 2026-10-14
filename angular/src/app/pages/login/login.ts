@@ -15,7 +15,8 @@ type Tab = 'trainer' | 'code';
   selector: 'app-login',
   imports: [FormsModule, Button],
   templateUrl: './login.html',
-  styleUrl: './login.css',
+  // Reihenfolge = Kaskade (mobile/motion überschreiben die Grundregeln).
+  styleUrls: ['./login.css', './login-hero.css', './login-form.css', './login-mobile.css', './login-motion.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class Login {

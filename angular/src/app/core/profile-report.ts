@@ -5,7 +5,7 @@
  * Titel oder Typ gelangt als HTML in den Bericht.
  */
 import { formatDate } from './event';
-import { type Player, positionText } from './player';
+import { type Player, positionText } from './player/player';
 import { type EventRating, availability, gameStats, gradedEvents, numberLabel, profileFigures, skillAverages } from './profile';
 import { gradeLabel } from './rating';
 import type { Absence } from './records/absence';

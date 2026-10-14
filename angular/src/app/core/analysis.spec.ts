@@ -8,7 +8,7 @@ import {
   thinPositions,
   trainingFocusCounts,
 } from './analysis';
-import { type Player } from './player';
+import type { Player } from './player/player';
 import { type Rating, BLANK_RATING } from './rating';
 
 const rating = (grade: number, extra: Partial<Rating> = {}): Rating => ({

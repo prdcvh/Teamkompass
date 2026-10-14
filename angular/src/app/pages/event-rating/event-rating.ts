@@ -5,7 +5,7 @@ import { map } from 'rxjs';
 import { INTENSITIES, formatDate, resultText } from '../../core/event';
 import { EventsService } from '../../core/events.service';
 import { LayoutService } from '../../core/layout.service';
-import { type Player, consentRevokedMessage, isConsentRevoked } from '../../core/player';
+import { type Player, consentRevokedMessage, isConsentRevoked } from '../../core/player/player';
 import {
   ATTENDANCES,
   ATTENDANCE_LABELS,

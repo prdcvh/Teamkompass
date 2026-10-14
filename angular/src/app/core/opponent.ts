@@ -3,7 +3,7 @@
  * Das Dokument `teams/{teamId}/opponents/{id}` ist mit der bisherigen App identisch
  * (siehe outputs/team-manager/app.js: normalizeOpponent, saveOpponent). Nur Trainer dürfen Gegner lesen und schreiben.
  */
-import { formatDate, isIsoDate, todayIso } from './player';
+import { formatDate, isIsoDate, todayIso } from './dates';
 
 export { formatDate };
 

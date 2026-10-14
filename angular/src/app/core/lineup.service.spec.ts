@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { emptyAssignments, moveToZone } from './lineup';
+import { emptyAssignments, moveToZone } from './lineup/lineup';
 import { LineupService } from './lineup.service';
 import { SessionService } from './session.service';
 import { SquadService } from './squad.service';

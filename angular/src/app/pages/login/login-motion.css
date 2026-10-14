@@ -1,0 +1,86 @@
+/* ---------- Animationen ---------- */
+@keyframes draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.6);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Die Animationen werden hier zugewiesen: Angular benennt @keyframes je Stylesheet um, Name und Zuweisung
+   müssen deshalb in derselben Datei stehen. */
+.draw {
+  animation: draw 2.4s ease-out forwards;
+}
+
+.ball {
+  animation: pulse 3.2s ease-in-out 2.4s infinite;
+}
+
+.brand-inner {
+  animation: rise 0.7s ease-out both;
+}
+
+.form-inner {
+  animation: rise 0.6s ease-out 0.1s both;
+}
+
+form {
+  animation: fade 0.25s ease-out both;
+}
+
+.error {
+  animation: fade 0.25s ease-out both;
+}
+
+.spinner {
+  animation: spin 0.7s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .draw,
+  .ball,
+  .brand-inner,
+  .form-inner,
+  form,
+  .error,
+  .spinner {
+    animation: none;
+  }
+
+  .draw {
+    stroke-dashoffset: 0;
+  }
+
+  .tabs button {
+    transition: none;
+  }
+}

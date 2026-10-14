@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
-import { todayIso } from '../../core/player';
+import { todayIso } from '../../core/dates';
 import { type Measurement, type MeasurementDraft, type MeasurementErrors, draftFromMeasurement, emptyMeasurementDraft } from '../../core/records/measurement';
 import { MeasurementsService } from '../../core/records/measurements.service';
 import { Button } from '../../ui/button/button';
