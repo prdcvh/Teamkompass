@@ -40,7 +40,8 @@ export class FakeLineupApi implements Pick<LineupApi, keyof LineupApi> {
   async saveLineup(data: Readonly<Record<string, unknown>>): Promise<void> {
     this.calls.push('saveLineup');
     if (this.saveLineupError) throw this.saveLineupError;
-    this.lineup = { ...data };
+    // Wie setDoc(..., { merge: true }): Felder, die nicht mitgeschrieben werden (z. B. byEvent der alten App), bleiben erhalten.
+    this.lineup = { ...this.lineup, ...data };
     this.emitLineup();
   }
 }

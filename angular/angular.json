@@ -23,6 +23,10 @@
               {
                 "glob": "**/*",
                 "input": "public"
+              },
+              {
+                "glob": "manifest.webmanifest",
+                "input": "teams/u14"
               }
             ],
             "styles": ["src/styles.css"]
@@ -45,7 +49,10 @@
               "serviceWorker": "ngsw-config.json",
               "optimization": {
                 "scripts": true,
-                "styles": { "minify": true, "inlineCritical": false },
+                "styles": {
+                  "minify": true,
+                  "inlineCritical": false
+                },
                 "fonts": true
               }
             },
@@ -53,6 +60,63 @@
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true
+            },
+            "mein-team": {
+              "outputPath": "dist/team-mein-team",
+              "assets": [
+                {
+                  "glob": "**/*",
+                  "input": "public"
+                },
+                {
+                  "glob": "manifest.webmanifest",
+                  "input": "teams/mein-team"
+                }
+              ],
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.mein-team.ts"
+                }
+              ]
+            },
+            "u15": {
+              "outputPath": "dist/team-u15",
+              "assets": [
+                {
+                  "glob": "**/*",
+                  "input": "public"
+                },
+                {
+                  "glob": "manifest.webmanifest",
+                  "input": "teams/u15"
+                }
+              ],
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.u15.ts"
+                }
+              ]
+            },
+            "u17": {
+              "outputPath": "dist/team-u17",
+              "assets": [
+                {
+                  "glob": "**/*",
+                  "input": "public"
+                },
+                {
+                  "glob": "manifest.webmanifest",
+                  "input": "teams/u17"
+                }
+              ],
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.u17.ts"
+                }
+              ]
             }
           },
           "defaultConfiguration": "production"

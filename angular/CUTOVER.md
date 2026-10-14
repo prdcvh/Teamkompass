@@ -47,7 +47,7 @@ lege ich ein Ticket an.
 
 ## 2. PWA und Update-Verhalten
 
-- Manifest `public/manifest.webmanifest` (Name, Farben, Symbole aus dem Vereinslogo, 192/512 px und
+- Manifest je Team `teams/<team>/manifest.webmanifest` (SCRUM-124; Name, Farben, Symbole aus dem Vereinslogo, 192/512 px und
   „maskable“).
 - Service Worker von Angular (`@angular/service-worker`, Konfiguration `ngsw-config.json`): App-Dateien
   werden beim ersten Besuch vorgeladen, die App startet danach auch ohne Netz. Daten kommen weiter
