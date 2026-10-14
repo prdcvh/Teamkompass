@@ -29,6 +29,29 @@
         }
       </div>
 
+      <tk-card>
+        <div class="panel">
+          <h2>Aufstellung</h2>
+          @if (lineup.load() === 'error') {
+            <p class="muted" role="status">Die Aufstellung konnte nicht geladen werden.</p>
+          } @else if (lineup.load() !== 'ready') {
+            <p class="muted" role="status">Aufstellung wird geladen …</p>
+          } @else if (lineupSummary().empty) {
+            <p class="muted">Noch keine Aufstellung gespeichert.</p>
+            <a tkButton variant="primary" routerLink="/aufstellung">Aufstellung anlegen</a>
+          } @else {
+            <a class="lineup-link" routerLink="/aufstellung" [attr.aria-label]="'Aufstellung öffnen, Formation ' + lineupSummary().formation">
+              <span class="lineup-head"><strong>{{ lineupSummary().formation }}</strong><span class="muted">{{ lineupSummary().count }} von 11 Spielern</span></span>
+              <ul class="lineup-rows">
+                @for (row of lineupSummary().rows; track row.label) {
+                  <li><span class="zone">{{ row.label }}</span><span>{{ row.names.join(' · ') }}</span></li>
+                }
+              </ul>
+            </a>
+          }
+        </div>
+      </tk-card>
+
       <div class="columns">
         <tk-card>
           <div class="panel">

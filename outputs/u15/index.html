@@ -138,11 +138,13 @@
               <summary>Aktionen</summary>
               <div class="action-menu-list">
                 <button class="ghost-button" id="exportBtn" type="button">Daten exportieren</button>
+                <button class="ghost-button" id="importBtn" type="button">Backup importieren</button>
+                <input id="importFile" type="file" accept="application/json,.json" hidden aria-label="Backup-Datei auswählen" />
                 <button class="primary-button" id="addPlayerTop" type="button">Spieler anlegen</button>
                 <button class="ghost-button" id="privacyBtn" type="button">Datenschutz &amp; lokale Daten</button>
                 <button class="ghost-button" id="migrateDataBtn" type="button" hidden>Alte Daten migrieren</button>
                 <button class="ghost-button" id="addTrainerBtn" type="button" hidden>Trainer-Konto anlegen</button>
-                <button class="ghost-button" id="addMedicalBtn" type="button" hidden>Medizinischen Lesezugang anlegen</button>
+                <button class="ghost-button" id="addMedicalBtn" type="button" hidden>Scout-Zugang anlegen</button>
                 <button class="ghost-button" id="changePasswordBtn" type="button" hidden>Passwort ändern</button>
                 <button class="ghost-button" id="signOutBtn" type="button" hidden>Abmelden</button>
               </div>
@@ -247,8 +249,13 @@
             </div>
           </details>
           <details class="control-disclosure" id="accessManagerPanel">
-            <summary>Spieler-Zugänge verwalten</summary>
+            <summary>Spieler-Zugänge verwalten <span id="playerAccessCount" class="muted"></span></summary>
             <div class="access-manager" id="accessManagerList"></div>
+          </details>
+          <details class="control-disclosure" id="scoutManagerPanel">
+            <summary>Scout-Zugänge verwalten <span id="scoutAccessCount" class="muted"></span></summary>
+            <div class="access-manager" id="scoutManagerList"></div>
+            <button class="ghost-button" data-action="add-scout" type="button">Scout-Zugang anlegen</button>
           </details>
           <div class="table-wrap">
             <table>

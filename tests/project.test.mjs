@@ -850,3 +850,43 @@ test("Aufstellung wird je Spiel gespeichert, ohne die allgemeine Startelf zu üb
   assert.match(app, /deleteField\(\)/);
   for (const id of ["copyLineupBtn", "pitchTarget", "eventLineup"]) assert.match(html, new RegExp(`id="${id}"`));
 });
+
+test("Der Suchdialog hat einen eigenen zugänglichen Namen (SCRUM-89)", async () => {
+  for (const team of teams) {
+    const script = await read(`outputs/${team}/next-level.js`);
+    assert.match(script, /dialog\.className = "command-palette";\s*dialog\.setAttribute\("aria-label", "TeamKompass durchsuchen"\)/);
+  }
+});
+
+test("Der Begriff „Medizinischer Lesezugang“ ist nirgends mehr sichtbar, die Rolle „medical“ bleibt (SCRUM-91)", async () => {
+  const files = [
+    ...teams.flatMap((team) => [`outputs/${team}/app.js`, `outputs/${team}/index.html`]),
+    "angular/src/app/core/navigation.ts",
+    "angular/src/app/core/access.service.ts",
+    "angular/src/app/pages/access/access.ts",
+    "angular/src/app/pages/staff-account/staff-account.ts",
+    "angular/src/app/pages/member-view/member-view.ts"
+  ];
+  for (const file of files) {
+    const text = await read(file);
+    assert.doesNotMatch(text, /medizinische[rnm]? Lesezugang/i, `${file}: alter Begriff sichtbar`);
+  }
+  for (const team of teams) assert.match(await read(`outputs/${team}/app.js`), /Scout-Zugang/);
+  assert.match(await read("firestore.rules"), /role == "medical"/);
+});
+
+test("Spieler- und Scout-Zugänge werden getrennt verwaltet (SCRUM-92)", async () => {
+  for (const team of teams) {
+    const html = await read(`outputs/${team}/index.html`);
+    assert.match(html, /id="accessManagerList"/);
+    assert.match(html, /id="scoutManagerList"/);
+    assert.match(html, /data-action="add-scout"/);
+    const app = await read(`outputs/${team}/app.js`);
+    const render = app.slice(app.indexOf("async function renderAccessManager"), app.indexOf("async function revokeAccess"));
+    assert.match(render, /\["player", "parent"\]\.includes\(docSnap\.data\(\)\.role\)/);
+    assert.match(render, /docSnap\.data\(\)\.role === "medical"/);
+    const css = await read(`outputs/${team}/base.css`);
+    assert.match(css, /body\.role-medical #scoutManagerPanel/);
+    assert.match(css, /body\.role-trainer-cloud #scoutManagerPanel/);
+  }
+});

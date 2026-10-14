@@ -98,7 +98,7 @@ export class AccessService {
       await this.firebase.createStaffAccount(email.trim(), password, role);
     } catch (error) {
       console.error(error);
-      const label = role === 'medical' ? 'Der medizinische Lesezugang' : 'Das Trainer-Konto';
+      const label = role === 'medical' ? 'Der Scout-Zugang' : 'Das Trainer-Konto';
       return { ok: false, message: `${label} konnte nicht angelegt werden. ${authErrorMessage(errorCode(error))}` };
     }
     if (this.load() === 'ready') await this.reload();

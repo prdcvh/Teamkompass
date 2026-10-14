@@ -1,12 +1,13 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { FirebaseService } from '../../core/firebase.service';
 import { LayoutService } from '../../core/layout.service';
 import { SessionService } from '../../core/session.service';
 import { FakeFirebase } from '../../core/testing';
 import { Access } from './access';
 
-describe('Access (Spieler-Zugänge)', () => {
+describe('Access (Zugänge: Spieler und Scouts)', () => {
   let firebase: FakeFirebase;
   const isMobile = signal(false);
 
@@ -19,7 +20,7 @@ describe('Access (Spieler-Zugänge)', () => {
     firebase.memberDocs.set('u2', { role: 'medical', email: 'arzt@verein.de' });
     firebase.memberDocs.set('u3', { role: 'trainer', email: 'coach@verein.de' });
     firebase.inviteDocs.set('abcdef0123456789abcdef0123456789abcdef0123456789', { role: 'parent', playerId: 'p2', expiresAt: null });
-    TestBed.configureTestingModule({ providers: [{ provide: FirebaseService, useValue: firebase }, { provide: LayoutService, useValue: { isMobile } }] });
+    TestBed.configureTestingModule({ providers: [provideRouter([]), { provide: FirebaseService, useValue: firebase }, { provide: LayoutService, useValue: { isMobile } }] });
     TestBed.inject(SessionService).role.set(role);
     const fixture = TestBed.createComponent(Access);
     await fixture.whenStable();
@@ -49,17 +50,30 @@ describe('Access (Spieler-Zugänge)', () => {
     return q<HTMLElement>(fixture, 'tk-invite-dialog')!;
   };
 
+  const openScouts = async (fixture: Awaited<ReturnType<typeof render>>) => {
+    q<HTMLButtonElement>(fixture, '#access-tab-scouts')!.click();
+    await flush(fixture);
+  };
+
   it('listet Einladungen und Zugänge ohne Trainer-Konten und ohne den vollen Code', async () => {
     const fixture = await render();
     const rows = qa(fixture, 'article.row').map(text);
-    expect(rows).toHaveLength(3);
-    expect(text(q(fixture, '.meta'))).toBe('3 Zugänge');
+    expect(rows).toHaveLength(2);
+    expect(text(q(fixture, '.meta'))).toBe('2 Zugänge');
     expect(rows[0]).toContain('Ben Widerruf');
     expect(rows[0]).toContain('Eltern · Einladung offen');
     expect(rows[0]).toContain('Code …456789');
     expect(rows[0]).toContain('Unbegrenzt gültig');
     expect(rows.some((row) => row.includes('Anna Beispiel') && row.includes('Abgelaufen seit 01.01.2020'))).toBe(true);
-    expect(rows.some((row) => row.includes('arzt@verein.de') && row.includes('Medizin (nur lesen)'))).toBe(true);
+    expect(rows.some((row) => row.includes('arzt@verein.de'))).toBe(false);
+    expect(text(q(fixture, '#access-tab-players'))).toBe('Spieler (2)');
+    expect(text(q(fixture, '#access-tab-scouts'))).toBe('Scouts (1)');
+    await openScouts(fixture);
+    const scouts = qa(fixture, 'article.row').map(text);
+    expect(scouts).toHaveLength(1);
+    expect(scouts[0]).toContain('arzt@verein.de');
+    expect(scouts[0]).toContain('Scout (nur lesen)');
+    expect(text(q(fixture, '.meta'))).toBe('1 Zugang');
     expect(text(root(fixture))).not.toContain('coach@verein.de');
     expect(text(root(fixture))).not.toContain('abcdef0123456789abcdef0123456789');
   });
@@ -88,7 +102,7 @@ describe('Access (Spieler-Zugänge)', () => {
     expect(code).toMatch(/^[0-9a-f]{48}$/);
     expect(firebase.inviteDocs.get(code)).toMatchObject({ playerId: 'p1', role: 'parent' });
     expect(text(dialog)).toContain('läuft am');
-    expect(text(q(fixture, '.meta'))).toBe('4 Zugänge');
+    expect(text(q(fixture, '.meta'))).toBe('3 Zugänge');
 
     dialog.querySelector<HTMLButtonElement>('menu button:last-child')!.click(); // Fertig
     await flush(fixture);
@@ -134,6 +148,7 @@ describe('Access (Spieler-Zugänge)', () => {
   it('sperrt einen Zugang erst nach Bestätigung', async () => {
     const fixture = await render();
     const rowOf = (name: string) => qa<HTMLElement>(fixture, 'article.row').find((row) => text(row).includes(name))!;
+    await openScouts(fixture);
     rowOf('arzt@verein.de').querySelector<HTMLButtonElement>('button')!.click();
     await flush(fixture);
     expect(qa(fixture, 'tk-dialog h2').map(text)).toContain('Zugang sperren?');
@@ -142,8 +157,9 @@ describe('Access (Spieler-Zugänge)', () => {
     await vi.waitFor(() => expect(firebase.memberDocs.has('u2')).toBe(false));
     await vi.waitFor(() => {
       fixture.detectChanges();
-      expect(text(q(fixture, '.meta'))).toBe('2 Zugänge');
+      expect(text(q(fixture, '.meta'))).toBe('0 Zugänge');
     });
+    expect(text(q(fixture, '#access-tab-players'))).toBe('Spieler (2)');
   });
 
   it('zieht einen offenen Code zurück und meldet Fehler im Dialog', async () => {
@@ -171,7 +187,7 @@ describe('Access (Spieler-Zugänge)', () => {
     firebase = new FakeFirebase();
     firebase.readAccessError = { code: 'permission-denied' };
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    TestBed.configureTestingModule({ providers: [{ provide: FirebaseService, useValue: firebase }, { provide: LayoutService, useValue: { isMobile } }] });
+    TestBed.configureTestingModule({ providers: [provideRouter([]), { provide: FirebaseService, useValue: firebase }, { provide: LayoutService, useValue: { isMobile } }] });
     TestBed.inject(SessionService).role.set('trainer');
     const fixture = TestBed.createComponent(Access);
     await vi.waitFor(() => {
@@ -189,6 +205,36 @@ describe('Access (Spieler-Zugänge)', () => {
   it('zeigt am Handy den Schnellzugriff statt des Kopf-Buttons', async () => {
     const fixture = await render('trainer', true);
     expect(q(fixture, '.head button')).toBeNull();
-    expect(q(fixture, '.fab')).not.toBeNull();
+    expect(q(fixture, 'button.fab')).not.toBeNull();
+  });
+
+  it('führt im Reiter Scouts zum Anlegen eines Scout-Zugangs statt zu Einladungscodes', async () => {
+    const fixture = await render();
+    await openScouts(fixture);
+    expect(q(fixture, '#access-tab-scouts')!.getAttribute('aria-selected')).toBe('true');
+    expect(q(fixture, '.head button')).toBeNull();
+    expect(q<HTMLAnchorElement>(fixture, '.head a')!.getAttribute('href')).toBe('/medizin-zugang');
+    expect(text(q(fixture, '.head a'))).toBe('+ Scout-Zugang anlegen');
+  });
+
+  it('wechselt die Reiter auch mit den Pfeiltasten', async () => {
+    const fixture = await render();
+    q(fixture, '#access-tab-players')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
+    await flush(fixture);
+    expect(q(fixture, '#access-tab-scouts')!.getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('zeigt im leeren Reiter einen Hinweis mit passendem Button', async () => {
+    const fixture = await render();
+    firebase.memberDocs.delete('u2');
+    await openScouts(fixture);
+    q<HTMLButtonElement>(fixture, '#access-tab-players')!.click();
+    await flush(fixture);
+    expect(text(q(fixture, '.list'))).toContain('Anna Beispiel');
+    firebase.memberDocs.clear();
+    firebase.inviteDocs.clear();
+    await (fixture.componentInstance as unknown as { access: { reload(): Promise<void> } }).access.reload();
+    await openScouts(fixture);
+    expect(text(q(fixture, '.empty'))).toContain('Noch kein Scout-Zugang angelegt.');
   });
 });

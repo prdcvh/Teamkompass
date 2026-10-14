@@ -154,7 +154,7 @@ describe('MemberView (Ansicht für Spieler, Eltern und Medizin)', () => {
     it('sieht Spieler mit Status, Abwesenheiten und Messwerten – ohne Noten, Bewertungen und Förderpläne', async () => {
       const fixture = await render('medical', { playerId: null });
       await settled(fixture, () => expect(text(fixture)).toContain('Schule'));
-      expect(text(fixture, 'h1')).toBe('Medizinische Ansicht');
+      expect(text(fixture, 'h1')).toBe('Scout-Ansicht');
       expect(text(fixture, '.who strong')).toBe('Jonas Keller');
       expect(root(fixture).querySelector('.grade')).toBeNull();
       expect(root(fixture).querySelector('.chart')).toBeNull();

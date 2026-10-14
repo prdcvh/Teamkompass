@@ -687,7 +687,7 @@ function scoreToGrade(record) {
   return 6;
 }
 
-// Lokaler Zwischenspeicher fuer den Teamstand. Spieler, Eltern und der medizinische
+// Lokaler Zwischenspeicher fuer den Teamstand. Spieler, Eltern und der Scout-
 // Zugang cachen nichts: sie sehen (medizinisch: alle) personenbezogene Daten von
 // Minderjaehrigen, die nicht auf dem Geraet zurueckbleiben sollen.
 function canCacheLocally() {
@@ -1443,6 +1443,7 @@ function applyRoleRestrictions() {
   document.body.classList.toggle("role-trainer-cloud", isCloudTrainer());
   $("#signOutBtn").hidden = !isCloudActive();
   $("#migrateDataBtn").hidden = !isCloudTrainer();
+  $("#importBtn").hidden = !canManageRecords() || (isCloudActive() && !legacyBlobMode && !isCloudTrainer());
   $("#addTrainerBtn").hidden = !isCloudTrainer();
   $("#addMedicalBtn").hidden = !isCloudTrainer();
   $("#changePasswordBtn").hidden = !(isCloudActive() && ["trainer", "medical"].includes(currentRole));
@@ -1719,8 +1720,8 @@ function askStaffCredentials(label) {
 
 async function createStaffAccount(role) {
   if (!isCloudTrainer()) return;
-  const label = role === "medical" ? "medizinischen Lesezugang" : "Trainer-Konto";
-  const credentials = await askStaffCredentials(role === "medical" ? "Medizinischen Lesezugang" : "Trainer-Konto");
+  const label = role === "medical" ? "Scout-Zugang" : "Trainer-Konto";
+  const credentials = await askStaffCredentials(role === "medical" ? "Scout-Zugang" : "Trainer-Konto");
   if (!credentials) return;
   const trimmedEmail = credentials.email;
   const password = credentials.password;
@@ -1743,7 +1744,7 @@ async function createStaffAccount(role) {
       role,
       createdAt: firestoreModule.serverTimestamp()
     });
-    alert(`${role === "medical" ? "Medizinischer Lesezugang" : "Trainer-Konto"} für ${trimmedEmail} wurde angelegt.`);
+    alert(`${role === "medical" ? "Scout-Zugang" : "Trainer-Konto"} für ${trimmedEmail} wurde angelegt.`);
   } catch (error) {
     console.error(error);
     alert(`${label} konnte nicht angelegt werden. ${authErrorMessage(error)}`);
@@ -1794,11 +1795,12 @@ function cloudErrorSuffix(error) {
 async function renderAccessManager() {
   if (!isCloudTrainer()) return;
   const list = $("#accessManagerList");
+  const scoutList = $("#scoutManagerList");
   if (!list) return;
   try {
     const snapshot = await firestoreModule.getDocs(teamCollection("members"));
     const now = new Date();
-    list.innerHTML = snapshot.docs.filter((docSnap) => ["player", "parent", "medical"].includes(docSnap.data().role)).map((docSnap) => {
+    const row = (docSnap) => {
       const data = docSnap.data();
       const player = state.players.find((item) => item.id === data.playerId);
       const expiresAtDate = data.expiresAt?.toDate ? data.expiresAt.toDate() : null;
@@ -1810,11 +1812,20 @@ async function renderAccessManager() {
       }
       return `
         <div class="access-row">
-          <div><strong>${escapeHtml(data.role === "medical" ? "Medizinischer Lesezugang" : player?.name || data.playerId)}</strong><span class="muted">${data.role === "parent" ? "Eltern · " : data.role === "medical" ? "Read-only · " : "Spieler · "}${status}</span></div>
+          <div><strong>${escapeHtml(data.role === "medical" ? "Scout-Zugang" : player?.name || data.playerId)}</strong><span class="muted">${data.role === "parent" ? "Eltern · " : data.role === "medical" ? "Read-only · " : "Spieler · "}${status}</span></div>
           <button class="ghost-button" data-action="revoke-access" data-uid="${docSnap.id}" type="button">Zugang sperren</button>
         </div>
       `;
-    }).join("") || `<p class="muted">Noch keine Spieler-Zugaenge vergeben.</p>`;
+    };
+    // Spieler (inkl. Eltern) und Scouts werden getrennt verwaltet (SCRUM-92).
+    const playerDocs = snapshot.docs.filter((docSnap) => ["player", "parent"].includes(docSnap.data().role));
+    const scoutDocs = snapshot.docs.filter((docSnap) => docSnap.data().role === "medical");
+    list.innerHTML = playerDocs.map(row).join("") || `<p class="muted">Noch keine Spieler-Zugaenge vergeben.</p>`;
+    if (scoutList) scoutList.innerHTML = scoutDocs.map(row).join("") || `<p class="muted">Noch kein Scout-Zugang angelegt.</p>`;
+    const playerCount = $("#playerAccessCount");
+    const scoutCount = $("#scoutAccessCount");
+    if (playerCount) playerCount.textContent = `(${playerDocs.length})`;
+    if (scoutCount) scoutCount.textContent = `(${scoutDocs.length})`;
   } catch (error) {
     console.error(error);
   }
@@ -4379,6 +4390,172 @@ function exportData() {
   URL.revokeObjectURL(link.href);
 }
 
+// BACKUP-IMPORT START (reine Funktionen ohne Zugriff auf Seitenzustand, getestet in tests/backup-import.test.mjs)
+const BACKUP_ID_PATTERN = /^[A-Za-z0-9_.-]{1,128}$/;
+
+function isBackupId(id) {
+  return typeof id === "string" && BACKUP_ID_PATTERN.test(id) && id !== "." && id !== ".." && !/^__.*__$/.test(id);
+}
+
+// Prueft eine eingelesene Export-Datei streng. Anders als normalizeState() faellt sie nie auf die
+// Beispieldaten zurueck: eine falsche Datei darf nichts ueberschreiben.
+function validateBackupData(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { ok: false, error: "Die Datei ist kein TeamKompass-Export." };
+  if (!Array.isArray(raw.players) || !Array.isArray(raw.events)) return { ok: false, error: "In der Datei fehlen Spieler oder Events - sie stammt nicht aus „Daten exportieren“." };
+  if (!raw.players.length) return { ok: false, error: "Die Datei enthält keine Spieler. Es wurde nichts geändert." };
+  const collections = ["developmentPlans", "absences", "measurements"];
+  for (const player of raw.players) {
+    if (!player || typeof player !== "object" || !isBackupId(player.id) || typeof player.name !== "string") return { ok: false, error: "Mindestens ein Spieler in der Datei ist unvollständig oder hat eine ungültige ID." };
+  }
+  for (const event of raw.events) {
+    if (!event || typeof event !== "object" || !isBackupId(event.id)) return { ok: false, error: "Mindestens ein Event in der Datei ist unvollständig oder hat eine ungültige ID." };
+    for (const key of ["ratings", "privateNotes"]) {
+      const map = event[key];
+      if (map === undefined) continue;
+      if (!map || typeof map !== "object" || Array.isArray(map) || !Object.keys(map).every(isBackupId) || !Object.values(map).every((value) => (key === "ratings" ? value && typeof value === "object" && !Array.isArray(value) : typeof value === "string"))) return { ok: false, error: "Mindestens ein Event enthält ungültige Bewertungen." };
+    }
+  }
+  for (const name of collections) {
+    const group = raw[name];
+    if (group === undefined) continue;
+    if (!group || typeof group !== "object" || Array.isArray(group)) return { ok: false, error: "Die Datei enthält ungültige Förderpläne, Abwesenheiten oder Messungen." };
+    for (const [playerId, items] of Object.entries(group)) {
+      if (!isBackupId(playerId) || !Array.isArray(items) || items.some((item) => !item || typeof item !== "object" || (item.id !== undefined && !isBackupId(item.id)))) return { ok: false, error: "Die Datei enthält ungültige Förderpläne, Abwesenheiten oder Messungen." };
+    }
+  }
+  if (raw.opponents !== undefined && (!Array.isArray(raw.opponents) || raw.opponents.some((item) => !item || typeof item !== "object" || (item.id !== undefined && !isBackupId(item.id))))) return { ok: false, error: "Die Datei enthält ungültige Gegner." };
+  return { ok: true };
+}
+
+// Fuehrt ein (normalisiertes) Backup in den aktuellen Stand ein: gleiche IDs werden ueberschrieben,
+// neue ergaenzt, alles andere bleibt unangetastet. Es wird nie etwas geloescht.
+function mergeBackupState(current, incoming) {
+  const byId = (list) => new Map(list.map((item) => [item.id, item]));
+  const mergeList = (base, extra) => {
+    const map = byId(base);
+    extra.forEach((item) => map.set(item.id, item));
+    return [...map.values()];
+  };
+  const mergeGroups = (base = {}, extra = {}) => {
+    const result = { ...base };
+    Object.entries(extra).forEach(([playerId, items]) => {
+      result[playerId] = mergeList(base[playerId] || [], items);
+    });
+    return result;
+  };
+  const existingEvents = byId(current.events);
+  const events = mergeList(current.events, incoming.events.map((event) => {
+    const old = existingEvents.get(event.id);
+    return old ? { ...event, ratings: { ...old.ratings, ...event.ratings }, privateNotes: { ...old.privateNotes, ...event.privateNotes } } : event;
+  }));
+  const incomingHasLineup = Object.values(incoming.lineup?.assignments || {}).some((ids) => ids.length);
+  return {
+    ...current,
+    players: mergeList(current.players, incoming.players),
+    events,
+    developmentPlans: mergeGroups(current.developmentPlans, incoming.developmentPlans),
+    absences: mergeGroups(current.absences, incoming.absences),
+    measurements: mergeGroups(current.measurements, incoming.measurements),
+    opponents: mergeList(current.opponents || [], incoming.opponents || []),
+    lineup: incomingHasLineup ? incoming.lineup : current.lineup
+  };
+}
+
+// Zaehlt fuer die Sicherheitsabfrage, was das Backup neu anlegt und was es ueberschreibt.
+function summarizeBackupImport(current, incoming) {
+  const split = (base, extra) => {
+    const ids = new Set(base.map((item) => item.id));
+    const overwritten = extra.filter((item) => ids.has(item.id)).length;
+    return { created: extra.length - overwritten, overwritten };
+  };
+  const nested = (baseGroups = {}, extraGroups = {}) => {
+    const total = { created: 0, overwritten: 0 };
+    Object.entries(extraGroups).forEach(([playerId, items]) => {
+      const part = split(baseGroups[playerId] || [], items);
+      total.created += part.created;
+      total.overwritten += part.overwritten;
+    });
+    return total;
+  };
+  const ratingCount = (events) => events.reduce((sum, event) => sum + Object.keys(event.ratings || {}).length, 0);
+  return {
+    players: split(current.players, incoming.players),
+    events: split(current.events, incoming.events),
+    ratings: ratingCount(incoming.events),
+    opponents: split(current.opponents || [], incoming.opponents || []),
+    plans: nested(current.developmentPlans, incoming.developmentPlans),
+    absences: nested(current.absences, incoming.absences),
+    measurements: nested(current.measurements, incoming.measurements)
+  };
+}
+
+// Schreibliste fuer die Cloud: dieselben Dokumente und Felder wie die einzelnen cloudSave*-Funktionen.
+function backupCloudOperations(incoming) {
+  const ops = [];
+  incoming.players.forEach((player) => ops.push({ path: ["players", player.id], data: player, merge: true }));
+  incoming.events.forEach((event) => {
+    const { ratings, privateNotes, ...meta } = event;
+    ops.push({ path: ["events", event.id], data: meta, merge: true });
+    Object.entries(ratings || {}).forEach(([playerId, rating]) => ops.push({ path: ["events", event.id, "ratings", playerId], data: { ...rating, playerId }, merge: true }));
+    Object.entries(privateNotes || {}).forEach(([playerId, note]) => ops.push({ path: ["events", event.id, "privateNotes", playerId], data: { playerId, note }, merge: true }));
+  });
+  [["developmentPlans", incoming.developmentPlans], ["absences", incoming.absences], ["measurements", incoming.measurements]].forEach(([name, groups]) => {
+    Object.entries(groups || {}).forEach(([playerId, items]) => items.forEach((item) => ops.push({ path: ["players", playerId, name, item.id], data: { ...item, playerId }, merge: false })));
+  });
+  (incoming.opponents || []).forEach((opponent) => ops.push({ path: ["opponents", opponent.id], data: opponent, merge: false }));
+  if (Object.values(incoming.lineup?.assignments || {}).some((ids) => ids.length)) ops.push({ path: ["meta", "lineup"], data: incoming.lineup, merge: false });
+  return ops;
+}
+// BACKUP-IMPORT END
+
+function backupSummaryText(summary) {
+  const line = (label, part) => (part.created || part.overwritten ? `• ${label}: ${part.created} neu, ${part.overwritten} werden überschrieben\n` : "");
+  return line("Spieler", summary.players) + line("Events", summary.events) + `• Bewertungen in den Events: ${summary.ratings}\n`
+    + line("Gegner", summary.opponents) + line("Förderpläne", summary.plans) + line("Abwesenheiten", summary.absences) + line("Messungen", summary.measurements);
+}
+
+async function importBackupFile(file) {
+  if (!file || !canManageRecords()) return;
+  if (isCloudActive() && !legacyBlobMode && !isCloudTrainer()) return;
+  let raw;
+  try {
+    raw = JSON.parse(await file.text());
+  } catch {
+    alert("Die Datei konnte nicht gelesen werden. Bitte eine mit „Daten exportieren“ erstellte .json-Datei wählen.");
+    return;
+  }
+  const check = validateBackupData(raw);
+  if (!check.ok) {
+    alert(`${check.error}\nEs wurde nichts geändert.`);
+    return;
+  }
+  const incoming = normalizeState({ ...raw, opponents: Array.isArray(raw.opponents) ? raw.opponents : [], selectedEventId: state.selectedEventId });
+  const summary = summarizeBackupImport(state, incoming);
+  const overwrites = summary.players.overwritten + summary.events.overwritten + summary.opponents.overwritten + summary.plans.overwritten + summary.absences.overwritten + summary.measurements.overwritten;
+  const warning = overwrites ? "\nAchtung: Vorhandene Einträge mit gleicher Kennung werden mit dem Stand aus dem Backup überschrieben. Tipp: vorher „Daten exportieren“, um den aktuellen Stand zu sichern." : "";
+  if (!confirm(`Backup „${file.name}“ einspielen?\n\n${backupSummaryText(summary)}\nNichts wird gelöscht: Einträge, die nicht im Backup stehen, bleiben erhalten.${warning}`)) return;
+  if (!isCloudActive() || legacyBlobMode) {
+    state = normalizeState(mergeBackupState(state, incoming));
+    persist();
+    renderAll();
+    alert("Backup eingespielt.");
+    return;
+  }
+  try {
+    setSyncState("pending", "Backup wird eingespielt …");
+    const ops = backupCloudOperations(incoming);
+    for (let offset = 0; offset < ops.length; offset += 450) {
+      const batch = firestoreModule.writeBatch(firestoreDb);
+      ops.slice(offset, offset + 450).forEach((op) => batch.set(teamDoc(...op.path), op.data, op.merge ? { merge: true } : {}));
+      await batch.commit();
+    }
+    cloudWriteSucceeded();
+    alert("Backup eingespielt. Die Daten erscheinen in wenigen Sekunden.");
+  } catch (error) {
+    cloudWriteFailed(error, "Backup konnte nicht vollständig eingespielt werden – bitte prüfen und ggf. erneut versuchen (bereits geschriebene Teile bleiben bestehen).");
+  }
+}
+
 let opponentFilter = "";
 
 function renderOpponentAnalysis() {
@@ -4701,6 +4878,12 @@ on("#positionOptions", "change", () => $("#playerCustomPositions").setCustomVali
 on("#playerCustomPositions", "input", () => $("#playerCustomPositions").setCustomValidity(""));
 on("#playerNumber", "input", () => $("#playerNumber").setCustomValidity(""));
 on("#exportBtn", "click", exportData);
+on("#importBtn", "click", () => $("#importFile").click());
+on("#importFile", "change", (event) => {
+  const [file] = event.target.files;
+  event.target.value = "";
+  importBackupFile(file);
+});
 on("#themeToggle", "click", toggleTheme);
 on("#newEventBtn", "click", () => openEventDialog());
 on("#heroEventBtn", "click", () => {
@@ -4913,10 +5096,13 @@ on("#changePasswordBtn", "click", openPasswordDialog);
 on("#passwordForm", "submit", handlePasswordChange);
 on("#closePasswordDialogBtn", "click", () => $("#passwordDialog").close());
 on("#cancelPasswordDialogBtn", "click", () => $("#passwordDialog").close());
-on("#accessManagerList", "click", (event) => {
+["#accessManagerList", "#scoutManagerList"].forEach((selector) => on(selector, "click", (event) => {
   const button = event.target.closest("button[data-action='revoke-access']");
   if (!button) return;
   revokeAccess(button.dataset.uid);
+}));
+on("#scoutManagerPanel", "click", (event) => {
+  if (event.target.closest("button[data-action='add-scout']")) createMedicalAccount();
 });
 
 window.TeamKompass = Object.freeze({
