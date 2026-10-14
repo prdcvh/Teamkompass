@@ -46,6 +46,33 @@ test("Hosting setzt grundlegende Browser-Sicherheitsheader", async () => {
   }
 });
 
+test("CSP erlaubt nur den versionierten Firebase-SDK-Pfad und die benoetigten Google-Dienste (SCRUM-62)", async () => {
+  const config = JSON.parse(await read("firebase.json"));
+  for (const target of config.hosting) {
+    const csp = target.headers.flatMap((entry) => entry.headers).find((entry) => entry.key === "Content-Security-Policy").value;
+    const directive = (name) => csp.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${name} `)) || "";
+    const script = directive("script-src").split(/\s+/).slice(1);
+    const connect = directive("connect-src").split(/\s+/).slice(1);
+    for (const source of script) assert.ok(source === "'self'" || source === "https://www.gstatic.com/firebasejs/10.12.5/", `${target.target}: script-src erlaubt ${source}`);
+    assert.deepEqual(connect.sort(), ["'self'", "https://firestore.googleapis.com", "https://identitytoolkit.googleapis.com", "https://securetoken.googleapis.com"].sort(), `${target.target}: connect-src zu breit`);
+  }
+  // Die Live-Kopien laden das SDK genau aus diesem Pfad; aendert sich die Version, muss die CSP mitziehen.
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    const versions = new Set([...app.matchAll(/https:\/\/www\.gstatic\.com\/firebasejs\/([\d.]+)\//g)].map((match) => match[1]));
+    assert.deepEqual([...versions], ["10.12.5"], `${team}: SDK-Version passt nicht zur CSP`);
+  }
+});
+
+test("Druckbericht trennt das neue Fenster von der App (SCRUM-62)", async () => {
+  for (const file of ["app.js", ...teams.map((team) => `outputs/${team}/app.js`)]) {
+    const app = await read(file);
+    const start = app.indexOf('const report = window.open("", "_blank");');
+    assert.notEqual(start, -1, `${file}: Druckbericht nicht gefunden`);
+    assert.match(app.slice(start, start + 400), /report\.opener = null;/, `${file}: Bericht behaelt Zugriff auf die App (opener)`);
+  }
+});
+
 test("PWA-Dateien und alle Ansichten sind eingebunden", async () => {
   const html = await read("outputs/team-manager/index.html");
   assert.match(html, /manifest\.webmanifest/);
