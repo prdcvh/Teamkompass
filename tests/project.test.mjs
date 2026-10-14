@@ -926,3 +926,12 @@ test("Spieler- und Scout-Zugänge werden getrennt verwaltet (SCRUM-92)", async (
     assert.match(css, /body\.role-trainer-cloud #scoutManagerPanel/);
   }
 });
+
+test("Angular schreibt die Startelf mit merge, damit die Spiel-Aufstellungen (byEvent) der Live-Apps erhalten bleiben (SCRUM-126)", async () => {
+  const api = await read("angular/src/app/core/firebase/lineup.api.ts");
+  assert.match(api, /setDoc\(doc\(db, 'teams', environment\.teamId, 'meta', 'lineup'\), data, \{ merge: true \}\)/);
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    assert.match(app, /byEvent: \{ \[eventId\]: entry \} \}, \{ merge: true \}/);
+  }
+});
