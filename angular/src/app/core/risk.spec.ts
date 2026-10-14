@@ -2,7 +2,8 @@ import { type TeamEvent } from './event';
 import { type Player } from './player';
 import { type EventRating } from './profile';
 import { BLANK_RATING, type Attendance } from './rating';
-import { type Absence, type Measurement } from './records';
+import type { Absence } from './records/absence';
+import type { Measurement } from './records/measurement';
 import { injuryRisk } from './risk';
 
 /**

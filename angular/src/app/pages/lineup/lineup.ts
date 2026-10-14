@@ -28,7 +28,7 @@ import { todayIso } from '../../core/player';
 import { positionText } from '../../core/player';
 import { averageGrade, gradedEvents } from '../../core/profile';
 import { gradeLabel } from '../../core/rating';
-import { effectiveStatus } from '../../core/records';
+import { effectiveStatus } from '../../core/records/availability';
 import { SessionService } from '../../core/session.service';
 import { SyncService } from '../../core/sync.service';
 import { TeamService } from '../../core/team.service';

@@ -8,7 +8,9 @@ import { type TeamEvent, docFromEvent } from './event';
 import { type Opponent, docFromOpponent } from './opponent';
 import { type Player, docFromPlayer, isConsentRevoked } from './player';
 import { type Rating, docFromRating } from './rating';
-import { type Absence, type DevelopmentPlan, type Measurement, docFromAbsence, docFromMeasurement, docFromPlan } from './records';
+import { type Absence, docFromAbsence } from './records/absence';
+import { type Measurement, docFromMeasurement } from './records/measurement';
+import { type DevelopmentPlan, docFromPlan } from './records/plan';
 import { type RatingsByEvent } from './team';
 
 export interface ExportInput {

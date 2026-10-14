@@ -10,7 +10,8 @@
  */
 import { type Player } from './player';
 import { type EventRating } from './profile';
-import { type Absence, type Measurement, activeAbsenceOn, isInjuryAbsence, sortedMeasurements } from './records';
+import { type Absence, activeAbsenceOn, isInjuryAbsence } from './records/absence';
+import { type Measurement, sortedMeasurements } from './records/measurement';
 import { roundGrade } from './rating';
 
 export type RiskTier = 'aussetzen' | 'reduzieren' | 'anpassen' | 'beobachten' | 'unauffaellig';

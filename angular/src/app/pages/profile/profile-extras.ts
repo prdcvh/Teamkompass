@@ -2,17 +2,14 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, signal } f
 import { FormsModule } from '@angular/forms';
 import { formatDate } from '../../core/event';
 import { todayIso } from '../../core/player';
-import {
-  type Absence,
-  type DevelopmentPlan,
-  type Measurement,
-  absencePeriodText,
-  absenceTitle,
-  isInjuryAbsence,
-  measurementChart,
-  measurementText,
-} from '../../core/records';
-import { RecordsService } from '../../core/records.service';
+import { type Absence, absencePeriodText, absenceTitle, isInjuryAbsence } from '../../core/records/absence';
+import { type Measurement, measurementText } from '../../core/records/measurement';
+import { measurementChart } from '../../core/records/measurement-chart';
+import type { DevelopmentPlan } from '../../core/records/plan';
+import { AbsencesService } from '../../core/records/absences.service';
+import { MeasurementsService } from '../../core/records/measurements.service';
+import { PlansService } from '../../core/records/plans.service';
+import { RecordsStateService } from '../../core/records/records-state.service';
 import { SessionService } from '../../core/session.service';
 import { SyncService } from '../../core/sync.service';
 import { Button } from '../../ui/button/button';
@@ -38,7 +35,10 @@ interface Deleting {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProfileExtras {
-  protected readonly records = inject(RecordsService);
+  protected readonly records = inject(RecordsStateService);
+  private readonly plansService = inject(PlansService);
+  private readonly absencesService = inject(AbsencesService);
+  private readonly measurementsService = inject(MeasurementsService);
   private readonly sync = inject(SyncService);
   private readonly session = inject(SessionService);
 
@@ -51,8 +51,8 @@ export class ProfileExtras {
 
   protected readonly plans = computed(() => [...this.records.plans()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
   protected readonly absences = computed(() => [...this.records.absences()].sort((a, b) => b.from.localeCompare(a.from)));
-  protected readonly measurementsNewestFirst = computed(() => [...this.records.measurements()].reverse());
-  protected readonly chart = computed(() => measurementChart(this.records.measurements(), todayIso()));
+  protected readonly measurementsNewestFirst = computed(() => [...this.measurementsService.measurements()].reverse());
+  protected readonly chart = computed(() => measurementChart(this.measurementsService.measurements(), todayIso()));
   protected readonly canEdit = computed(() => this.editable() && this.records.canWrite());
 
   /** Nur der Spieler selbst schreibt die Selbstreflexion (Eltern lesen nur). */
@@ -87,7 +87,7 @@ export class ProfileExtras {
     this.reflectionBusy.set(plan.id);
     this.reflectionFailed.set('');
     try {
-      const ok = await this.records.saveSelfReflection(plan.id, this.reflectionText(plan));
+      const ok = await this.plansService.saveSelfReflection(plan.id, this.reflectionText(plan));
       if (!ok) this.reflectionFailed.set(plan.id);
       else this.reflections.update((map) => Object.fromEntries(Object.entries(map).filter(([id]) => id !== plan.id)));
     } finally {
@@ -140,10 +140,10 @@ export class ProfileExtras {
     try {
       const ok =
         target.kind === 'plan'
-          ? await this.records.deletePlan(target.id)
+          ? await this.plansService.deletePlan(target.id)
           : target.kind === 'absence'
-            ? await this.records.deleteAbsence(target.id)
-            : await this.records.deleteMeasurement(target.id);
+            ? await this.absencesService.deleteAbsence(target.id)
+            : await this.measurementsService.deleteMeasurement(target.id);
       if (ok) this.deleting.set(null);
       else this.deleteFailed.set(true);
     } finally {

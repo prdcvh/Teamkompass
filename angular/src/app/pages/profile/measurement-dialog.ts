@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { todayIso } from '../../core/player';
-import { type Measurement, type MeasurementDraft, type MeasurementErrors, draftFromMeasurement, emptyMeasurementDraft } from '../../core/records';
-import { RecordsService } from '../../core/records.service';
+import { type Measurement, type MeasurementDraft, type MeasurementErrors, draftFromMeasurement, emptyMeasurementDraft } from '../../core/records/measurement';
+import { MeasurementsService } from '../../core/records/measurements.service';
 import { Button } from '../../ui/button/button';
 import { Dialog } from '../../ui/dialog/dialog';
 
@@ -46,7 +46,7 @@ import { Dialog } from '../../ui/dialog/dialog';
   `,
 })
 export class MeasurementDialog {
-  private readonly records = inject(RecordsService);
+  private readonly measurements = inject(MeasurementsService);
   readonly open = input(false);
   readonly measurement = input<Measurement | null>(null);
   readonly closed = output<void>();
@@ -76,7 +76,7 @@ export class MeasurementDialog {
 
   protected submit(event: Event): void {
     event.preventDefault();
-    const errors = this.records.saveMeasurement(this.draft());
+    const errors = this.measurements.saveMeasurement(this.draft());
     this.errors.set(errors);
     if (Object.keys(errors).length === 0) this.closed.emit();
   }

@@ -15,8 +15,9 @@ import {
   trendChart,
 } from '../../core/profile';
 import { ProfileService } from '../../core/profile.service';
-import { effectiveStatus } from '../../core/records';
-import { RecordsService } from '../../core/records.service';
+import { effectiveStatus } from '../../core/records/availability';
+import { MeasurementsService } from '../../core/records/measurements.service';
+import { RecordsStateService } from '../../core/records/records-state.service';
 import { injuryRisk } from '../../core/risk';
 import { gradeLabel } from '../../core/rating';
 import { SquadService } from '../../core/squad.service';
@@ -39,7 +40,8 @@ export class Profile implements OnInit {
   private readonly router = inject(Router);
   protected readonly squad = inject(SquadService);
   protected readonly profile = inject(ProfileService);
-  protected readonly records = inject(RecordsService);
+  protected readonly records = inject(RecordsStateService);
+  private readonly measurements = inject(MeasurementsService);
   protected readonly sync = inject(SyncService);
   protected readonly mobile = inject(LayoutService).isMobile;
 
@@ -73,7 +75,7 @@ export class Profile implements OnInit {
   protected readonly risk = computed(() => {
     const player = this.player();
     if (!player || !this.records.ready() || this.profile.loading()) return null;
-    return injuryRisk(player, this.profile.items(), this.records.absences(), this.records.measurements());
+    return injuryRisk(player, this.profile.items(), this.records.absences(), this.measurements.measurements());
   });
 
   protected readonly cards = computed(() => {

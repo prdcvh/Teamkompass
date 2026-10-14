@@ -7,7 +7,9 @@ import { type TeamEvent } from './event';
 import { type Player } from './player';
 import { type EventRating, attendanceCount, averageGrade, gradedEvents } from './profile';
 import { type Rating, roundGrade } from './rating';
-import { type Absence, type Measurement, effectiveStatus } from './records';
+import type { Absence } from './records/absence';
+import { effectiveStatus } from './records/availability';
+import type { Measurement } from './records/measurement';
 import { injuryRisk } from './risk';
 
 /** Bewertungen aller Spieler je Event: eventId → (playerId → Bewertung). */

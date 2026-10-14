@@ -8,7 +8,8 @@ import { formatDate } from './event';
 import { type Player, positionText } from './player';
 import { type EventRating, availability, gameStats, gradedEvents, numberLabel, profileFigures, skillAverages } from './profile';
 import { gradeLabel } from './rating';
-import { effectiveStatus, type Absence } from './records';
+import type { Absence } from './records/absence';
+import { effectiveStatus } from './records/availability';
 
 /** Ersetzt die fünf HTML-Sonderzeichen, damit Text nie als Markup gelesen wird. */
 export function escapeHtml(value: unknown): string {

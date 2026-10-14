@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
-import { MAX_PLAN_ACTIONS, MAX_PLAN_FOCUS, MAX_PLAN_GOAL, MAX_PLAN_TEXT, PLAN_STATUSES, type DevelopmentPlan, type PlanDraft, type PlanErrors, draftFromPlan, emptyPlanDraft } from '../../core/records';
-import { RecordsService } from '../../core/records.service';
+import { MAX_PLAN_ACTIONS, MAX_PLAN_FOCUS, MAX_PLAN_GOAL, MAX_PLAN_TEXT, PLAN_STATUSES, type DevelopmentPlan, type PlanDraft, type PlanErrors, draftFromPlan, emptyPlanDraft } from '../../core/records/plan';
+import { PlansService } from '../../core/records/plans.service';
 import { Button } from '../../ui/button/button';
 import { Dialog } from '../../ui/dialog/dialog';
 
@@ -78,7 +78,7 @@ import { Dialog } from '../../ui/dialog/dialog';
   `,
 })
 export class PlanDialog {
-  private readonly records = inject(RecordsService);
+  private readonly plansService = inject(PlansService);
   readonly open = input(false);
   readonly plan = input<DevelopmentPlan | null>(null);
   readonly closed = output<void>();
@@ -110,7 +110,7 @@ export class PlanDialog {
 
   protected submit(event: Event): void {
     event.preventDefault();
-    const errors = this.records.savePlan(this.draft());
+    const errors = this.plansService.savePlan(this.draft());
     this.errors.set(errors);
     if (Object.keys(errors).length === 0) this.closed.emit();
   }

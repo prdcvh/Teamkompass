@@ -1,17 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
-import {
-  ABSENCE_FIXED_REASONS,
-  ABSENCE_INJURY_REASON,
-  ABSENCE_OTHER_REASON,
-  MAX_ABSENCE_CUSTOM,
-  MAX_ABSENCE_DETAIL,
-  type Absence,
-  type AbsenceDraft,
-  type AbsenceErrors,
-  draftFromAbsence,
-  emptyAbsenceDraft,
-} from '../../core/records';
-import { RecordsService } from '../../core/records.service';
+import { ABSENCE_FIXED_REASONS, ABSENCE_INJURY_REASON, ABSENCE_OTHER_REASON, MAX_ABSENCE_CUSTOM, MAX_ABSENCE_DETAIL, type Absence, type AbsenceDraft, type AbsenceErrors, draftFromAbsence, emptyAbsenceDraft } from '../../core/records/absence';
+import { AbsencesService } from '../../core/records/absences.service';
 import { Button } from '../../ui/button/button';
 import { Dialog } from '../../ui/dialog/dialog';
 
@@ -85,7 +74,7 @@ import { Dialog } from '../../ui/dialog/dialog';
   `,
 })
 export class AbsenceDialog {
-  private readonly records = inject(RecordsService);
+  private readonly absences = inject(AbsencesService);
   readonly open = input(false);
   readonly absence = input<Absence | null>(null);
   readonly closed = output<void>();
@@ -119,7 +108,7 @@ export class AbsenceDialog {
 
   protected submit(event: Event): void {
     event.preventDefault();
-    const errors = this.records.saveAbsence(this.draft());
+    const errors = this.absences.saveAbsence(this.draft());
     this.errors.set(errors);
     if (Object.keys(errors).length === 0) this.closed.emit();
   }

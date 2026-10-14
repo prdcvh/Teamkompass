@@ -5,7 +5,8 @@ import { PlayerRecordsApi } from './firebase/player-records.api';
 import { RatingsApi } from './firebase/ratings.api';
 import { type Player } from './player';
 import { docFromRating, ratingFromDoc } from './rating';
-import { absenceFromDoc, autoAbsenceRating, unavailabilityReason } from './records';
+import { absenceFromDoc } from './records/absence';
+import { autoAbsenceRating, unavailabilityReason } from './records/availability';
 import { SessionService } from './session.service';
 import { SyncService } from './sync.service';
 

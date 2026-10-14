@@ -7,8 +7,8 @@ import { type Player, ageFromBirthdate, positionText, todayIso } from '../../cor
 import { availability, gradeToPercent, gradedEvents, profileFigures, skillAverages, trendChart } from '../../core/profile';
 import { ProfileService } from '../../core/profile.service';
 import { gradeLabel } from '../../core/rating';
-import { effectiveStatus } from '../../core/records';
-import { RecordsService } from '../../core/records.service';
+import { effectiveStatus } from '../../core/records/availability';
+import { RecordsStateService } from '../../core/records/records-state.service';
 import { SessionService } from '../../core/session.service';
 import { SquadService } from '../../core/squad.service';
 import { SyncService } from '../../core/sync.service';
@@ -37,7 +37,7 @@ export class MemberView implements OnInit {
   private readonly session = inject(SessionService);
   protected readonly squad = inject(SquadService);
   protected readonly profile = inject(ProfileService);
-  protected readonly records = inject(RecordsService);
+  protected readonly records = inject(RecordsStateService);
   protected readonly sync = inject(SyncService);
   protected readonly mobile = inject(LayoutService).isMobile;
 
