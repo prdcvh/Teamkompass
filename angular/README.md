@@ -9,10 +9,30 @@ Angular-Neubau von TeamKompass (Jira-Epic SCRUM-40). Wird getrennt von den Live-
 npm start          # Entwicklungsserver auf http://localhost:4200/
 npm run lint       # ESLint (ng lint)
 npm run build      # Produktions-Build nach dist/
+npm run build:teams # Builds je Live-Team (mein-team, U15, U17) nach dist/team-<team>/
 npm test           # Unit-Tests (Vitest), einmalig: npm test -- --watch=false
 ```
 
 Aus dem Repo-Root prüft `npm run verify` Live-Kopien und Angular zusammen (Lint, Build, Tests).
+
+## Builds je Team
+
+Der Standard-Build (`npm run build`) ist das Testteam `U14` und ist das, was nach
+`teamkompass-u14` deployt wird. Für den Umstieg der Live-Teams (SCRUM-76) gibt es je Team eine
+Build-Konfiguration, die nur Team-ID/-Name (`src/environments/environment.<team>.ts`) und das
+App-Manifest (`teams/<team>/manifest.webmanifest`) austauscht:
+
+| Konfiguration | Team-ID     | heute live in            | Ausgabe              |
+| ------------- | ----------- | ------------------------ | -------------------- |
+| (Standard)    | `U14`       | – (Test, teamkompass-u14) | `dist/teamkompass-angular/` |
+| `mein-team`   | `mein-team` | `outputs/team-manager`   | `dist/team-mein-team/` |
+| `u15`         | `U15`       | `outputs/u15`            | `dist/team-u15/`     |
+| `u17`         | `U17`       | `outputs/u17`            | `dist/team-u17/`     |
+
+Bauen: `ng build -c production,u17`. Diese Builds sprechen **echte Teamdaten** an; es gibt
+bewusst keine `ng serve`-Konfiguration dafür, und kein Hosting-Ziel zeigt bisher auf sie. Umstellen
+der Live-Teams nur mit PO-Freigabe (Ablaufplan in SCRUM-76). Ein neues Team braucht eine Zeile mehr
+in `angular.json`, `environment.<team>.ts`, `teams/<team>/manifest.webmanifest` und `build:teams`.
 
 ## Code-Struktur: eine Datei = ein Thema
 

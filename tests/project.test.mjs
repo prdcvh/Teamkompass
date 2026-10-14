@@ -935,3 +935,42 @@ test("Angular schreibt die Startelf mit merge, damit die Spiel-Aufstellungen (by
     assert.match(app, /byEvent: \{ \[eventId\]: entry \} \}, \{ merge: true \}/);
   }
 });
+
+test("Angular: Build je Live-Team mit derselben Team-ID wie die heutige App (SCRUM-124)", async () => {
+  const angular = JSON.parse(await read("angular/angular.json"));
+  const architect = angular.projects["teamkompass-angular"].architect;
+  const configs = architect.build.configurations;
+  const field = (source, key) => source.match(new RegExp(`${key}:\\s*["']([^"']+)["']`))?.[1];
+  const buildTeams = JSON.parse(await read("angular/package.json")).scripts["build:teams"];
+
+  // Standard-Build (Hosting-Ziel u14) bleibt das Testteam U14 – sonst schriebe teamkompass-u14 in Live-Daten.
+  const base = await read("angular/src/environments/environment.ts");
+  assert.equal(field(base, "teamId"), "U14");
+  assert.ok(architect.build.options.assets.some((asset) => asset.input === "teams/u14"), "Standard-Build ohne U14-Manifest");
+
+  const liveToConfig = { "team-manager": "mein-team", u15: "u15", u17: "u17" };
+  assert.deepEqual(Object.keys(liveToConfig), teams, "Neues Live-Team? Dann braucht es auch eine Angular-Build-Konfiguration");
+  for (const [live, name] of Object.entries(liveToConfig)) {
+    const liveConfig = await read(`outputs/${live}/firebase-config.js`);
+    const config = configs[name];
+    assert.ok(config, `${name}: Build-Konfiguration fehlt`);
+    assert.deepEqual(config.fileReplacements, [
+      { replace: "src/environments/environment.ts", with: `src/environments/environment.${name}.ts` },
+    ]);
+    const env = await read(`angular/src/environments/environment.${name}.ts`);
+    assert.equal(field(env, "teamId"), field(liveConfig, "teamId"), `${name}: Team-ID weicht von outputs/${live} ab`);
+    assert.equal(field(env, "teamName"), field(liveConfig, "teamName"), `${name}: Teamname weicht von outputs/${live} ab`);
+
+    const manifest = JSON.parse(await read(`angular/teams/${name}/manifest.webmanifest`));
+    assert.equal(manifest.name, `TeamKompass – ${field(env, "teamName")}`);
+    assert.ok(config.assets.some((asset) => asset.input === `teams/${name}` && asset.glob === "manifest.webmanifest"));
+    assert.ok(config.assets.some((asset) => asset.input === "public"), `${name}: public-Dateien fehlen im Build`);
+
+    // Eigener Ausgabeordner, damit der u14-Deploy nie ein Live-Team-Bundle erwischt.
+    assert.equal(config.outputPath, `dist/team-${name}`);
+    assert.match(buildTeams, new RegExp(`-c production,${name}(\\s|$)`), `${name}: wird in verify nicht gebaut`);
+    // Kein Entwicklungsserver gegen Live-Daten.
+    assert.ok(!architect.serve.configurations[name], `${name}: ng serve darf nicht auf Live-Daten zeigen`);
+  }
+  assert.match(await read("package.json"), /npm --prefix angular run build:teams/, "verify baut die Team-Konfigurationen nicht");
+});

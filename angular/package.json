@@ -7,7 +7,8 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "lint": "ng lint"
+    "lint": "ng lint",
+    "build:teams": "ng build -c production,mein-team && ng build -c production,u15 && ng build -c production,u17"
   },
   "private": true,
   "packageManager": "npm@10.9.4",
