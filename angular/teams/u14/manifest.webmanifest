@@ -1,0 +1,11 @@
+{
+  "name": "TeamKompass – 1. FC Königstein U14",
+  "short_name": "TeamKompass U14",
+  "description": "Mannschaftsplanung, Spieltagssteuerung und Spielerentwicklung.",
+  "lang": "de",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f7f7f5",
+  "theme_color": "#d8072e"
+}
