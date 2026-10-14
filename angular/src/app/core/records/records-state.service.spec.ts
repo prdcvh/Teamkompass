@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
-import { EventsService } from '../events.service';
-import { SessionService } from '../session.service';
-import { SyncService } from '../sync.service';
+import { EventsService } from '../events/events.service';
+import { SessionService } from '../auth/session.service';
+import { SyncService } from '../shell/sync.service';
 import type { FakeFirebase } from '../testing/fake-firebase';
 import { setupRecords } from '../testing/records-setup';
 import { emptyAbsenceDraft } from './absence';

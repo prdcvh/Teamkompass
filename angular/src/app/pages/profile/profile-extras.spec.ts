@@ -1,8 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
-import { LayoutService } from '../../core/layout.service';
-import { SessionService } from '../../core/session.service';
+import { LayoutService } from '../../core/shell/layout.service';
+import { SessionService } from '../../core/auth/session.service';
 import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
 import { Profile } from './profile';
 import { clickByText, isMobile, q, qa, root, settle, text, typeInto, renderProfileExtras } from './testing/profile-fixture';

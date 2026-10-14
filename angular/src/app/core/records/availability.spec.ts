@@ -1,5 +1,5 @@
 import type { Player } from '../player/player';
-import { BLANK_RATING, type Rating } from '../rating';
+import { BLANK_RATING, type Rating } from '../ratings/rating';
 import type { Absence } from './absence';
 import { autoAbsenceRating, effectiveStatus, unavailabilityReason } from './availability';
 

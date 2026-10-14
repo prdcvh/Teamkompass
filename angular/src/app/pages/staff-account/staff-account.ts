@@ -1,9 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
-import { MIN_PASSWORD_LENGTH, type StaffErrors, type StaffRole, validateStaffDraft } from '../../core/access';
-import { AccessService } from '../../core/access.service';
-import { SessionService } from '../../core/session.service';
+import { MIN_PASSWORD_LENGTH, type StaffErrors, type StaffRole, validateStaffDraft } from '../../core/access/access';
+import { AccessService } from '../../core/access/access.service';
+import { SessionService } from '../../core/auth/session.service';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 

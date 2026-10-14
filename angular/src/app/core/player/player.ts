@@ -3,7 +3,7 @@
  * Formulars. Das Dokument `teams/{teamId}/players/{id}` ist mit der bisherigen App identisch (siehe
  * outputs/team-manager/app.js, savePlayer/normalizePlayer).
  */
-import { isIsoDate, todayIso } from '../dates';
+import { isIsoDate, todayIso } from '../shared/dates';
 
 export const STANDARD_POSITIONS = ['TW', 'IV', 'LIB', 'LV', 'RV', 'DM', 'ZM', 'OM', 'LM', 'RM', 'LA', 'RA', 'HS', 'ST'] as const;
 

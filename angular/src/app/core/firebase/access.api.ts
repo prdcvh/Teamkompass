@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { environment } from '../../../environments/environment';
-import type { Role } from '../role';
+import type { Role } from '../auth/role';
 import { FirebaseConnection } from './firebase-connection';
 import type { InviteRecord, MemberRecord, RawDoc } from './types';
 

@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { AuthService } from '../../core/auth.service';
-import { homeFor } from '../../core/role';
-import { SessionService } from '../../core/session.service';
+import { AuthService } from '../../core/auth/auth.service';
+import { homeFor } from '../../core/auth/role';
+import { SessionService } from '../../core/auth/session.service';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 

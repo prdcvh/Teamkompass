@@ -1,18 +1,18 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { environment } from '../../../environments/environment';
-import { formatDate, resultText } from '../../core/event';
-import { LayoutService } from '../../core/layout.service';
+import { formatDate, resultText } from '../../core/events/event';
+import { LayoutService } from '../../core/shell/layout.service';
 import { formationName, lineupIsEmpty, onPitchCount } from '../../core/lineup/lineup';
 import { PITCH_BANDS } from '../../core/lineup/pitch';
-import { LineupService } from '../../core/lineup.service';
-import { todayIso } from '../../core/dates';
-import { numberLabel } from '../../core/profile';
-import { SessionService } from '../../core/session.service';
-import { SquadService } from '../../core/squad.service';
-import { SyncService } from '../../core/sync.service';
-import { dashboardFigures, leaders } from '../../core/team';
-import { TeamService } from '../../core/team.service';
+import { LineupService } from '../../core/lineup/lineup.service';
+import { todayIso } from '../../core/shared/dates';
+import { numberLabel } from '../../core/profile/profile';
+import { SessionService } from '../../core/auth/session.service';
+import { SquadService } from '../../core/player/squad.service';
+import { SyncService } from '../../core/shell/sync.service';
+import { dashboardFigures, leaders } from '../../core/team/team';
+import { TeamService } from '../../core/team/team.service';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 

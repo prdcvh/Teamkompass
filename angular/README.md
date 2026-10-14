@@ -20,29 +20,36 @@ Aus dem Repo-Root prüft `npm run verify` Live-Kopien und Angular zusammen (Lint
   Bewertungen, Abwesenheiten). Wer ein Thema sucht, findet es an einer Stelle; wer eine Datei
   öffnet, muss nicht an fremden Themen vorbeilesen.
 - **Höchstens 300 Zeilen pro `.ts`-Datei** (ohne Leer- und Kommentarzeilen). ESLint (`max-lines`)
-  meldet größere Dateien. Bis die Aufteilung (SCRUM-107 bis SCRUM-113) fertig ist, ist das eine
-  Warnung; mit SCRUM-113 wird es ein Fehler. Wird eine Datei zu groß, nach Fachthema teilen —
-  nicht nach „Teil 1/Teil 2“.
+  bricht bei größeren Dateien mit einem Fehler ab. Wird eine Datei zu groß, nach Fachthema teilen —
+  nicht nach „Teil 1/Teil 2“. Für CSS, HTML und Tests gilt dieselbe Grenze als Richtwert.
 - **Tests liegen neben dem Code**: `foo.ts` → `foo.spec.ts` im selben Ordner. Für Testdateien gilt
   dieselbe Grenze; große Spezifikationen werden mit ihrem Code mit aufgeteilt.
 - **Reine Logik und Angular-Dienste getrennt**: reine Funktionen (`player.ts`, `lineup.ts`, …) ohne
   Angular/Firebase, Dienste (`*.service.ts`) für Zustand und Speichern.
 
-Zielstruktur unter `src/app/`:
+Struktur unter `src/app/`:
 
 ```
-core/
-  firebase/      Datenbankzugriff, eine Zugriffsklasse je Thema (SCRUM-108..110):
-                 firebase-connection, auth, access, players, events, lineup,
-                 opponents, ratings, player-records (+ types.ts)
+core/            fachliche Logik und Dienste, nur Fachordner (keine losen Dateien):
+  access/        Zugänge (Einladungscodes, Trainer-/Scout-Konten)
+  analysis/      Teamanalyse und Belastungsindikator
+  auth/          Anmeldung, Sitzung, Rollen, Konto, Route-Guards
+  device/        Geräte-Einstellungen, lokale Daten, Design
+  events/        Events (Modell + Dienst)
+  export/        Export und Datei-Ausgabe
+  firebase/      Datenbankzugriff, eine Zugriffsklasse je Thema (+ types.ts)
+  lineup/        Spielfeld/Formationen, automatische Aufstellung, Startelf
+  opponents/     Gegnerprofile
+  player/        Spieler-Modell, Kaderliste, Kader-Dienst
+  profile/       Spielerprofil und Profilbericht
+  ratings/       Bewertungen
+  records/       Förderpläne, Abwesenheiten, Verfügbarkeit, Messwerte
+  shared/        allgemeine Hilfen (Datum)
+  shell/         App-Rahmen: Navigation, Layout, Sync-Status, globale Suche
+  team/          Team-Kennzahlen
   testing/       Test-Attrappen, je Zugriffsklasse eine (fake-*.api.ts);
                  FakeFirebase + provideFakeFirebase bündeln sie für TestBed
                  (Ordner `testing/` gehören nicht zum App-Build, siehe tsconfig.app.json)
-  player/        Spieler-Modell und Kaderliste (Filter, Sortierung, Gruppen)
-  lineup/        Spielfeld/Formationen, automatische Aufstellung, Startelf bearbeiten
-  records/       Förderpläne, Abwesenheiten, Verfügbarkeit, Messwerte (+ Services)
-  dates.ts       allgemeine Datumshilfen
-  …              übrige Fachlogik und Dienste (werden mit SCRUM-113 in Fachordner sortiert)
 pages/<seite>/   eine Komponente je Seite (Template, Styles, Test daneben); große Seiten haben
                  mehrere Stylesheets (`styleUrls`, Reihenfolge = Kaskade) und mehrere Specs
 shell/           Rahmen: Seitenleiste, Tab-Leiste, Mehr-Menü
@@ -50,8 +57,8 @@ ui/              wiederverwendbare Basis-Bausteine (Button, Karte, Dialog, …)
 ```
 
 Ein Dienst injiziert nur die Zugriffsklassen, die er braucht (z. B. `SquadService` nur `PlayersApi`).
-
-Die übrigen Dateien liegen noch flach in `core/` und werden mit SCRUM-113 in Fachordner sortiert.
+Neue Dateien kommen in den passenden Fachordner; passt keiner, einen neuen anlegen statt sie lose
+in `core/` abzulegen.
 
 **Achtung beim Aufteilen von Stylesheets:** Angular benennt `@keyframes` je Stylesheet um. Eine
 `animation`, die eine Keyframe-Animation aus einer anderen Datei nutzt, läuft dann ins Leere. Name und

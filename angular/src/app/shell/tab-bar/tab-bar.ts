@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
-import { TAB_ITEMS } from '../../core/navigation';
+import { TAB_ITEMS } from '../../core/shell/navigation';
 import { Icon } from '../../ui/icon/icon';
 
 /** Handy-Navigation (Figma „Tab Bar“): vier Bereiche plus „Mehr“. */

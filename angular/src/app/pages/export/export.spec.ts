@@ -1,8 +1,8 @@
 import { TestBed } from '@angular/core/testing';
-import { FileOutput } from '../../core/file-output';
-import { SessionService } from '../../core/session.service';
+import { FileOutput } from '../../core/export/file-output';
+import { SessionService } from '../../core/auth/session.service';
 import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
-import { WorkspaceService } from '../../core/workspace.service';
+import { WorkspaceService } from '../../core/device/workspace.service';
 import { Export } from './export';
 
 describe('Export (Daten exportieren)', () => {

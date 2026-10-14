@@ -2,7 +2,7 @@
  * Abwesenheiten und Verletzungen eines Spielers (`players/{id}/absences`): Modell, Prüfung, Umwandlung und
  * Zeitraum-Logik (wie outputs/team-manager/app.js: absenceCoversDate). Daten sind ISO-Datum-Texte (JJJJ-MM-TT).
  */
-import { formatDate, isIsoDate } from '../dates';
+import { formatDate, isIsoDate } from '../shared/dates';
 
 export const ABSENCE_INJURY_REASON = 'Verletzung';
 export const ABSENCE_FIXED_REASONS = [ABSENCE_INJURY_REASON, 'Urlaub', 'Klassenfahrt', 'Schule', 'Sperre'] as const;

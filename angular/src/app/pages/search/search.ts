@@ -1,10 +1,10 @@
 import { ChangeDetectionStrategy, Component, ElementRef, OnInit, afterNextRender, computed, inject, signal, viewChild } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { EventsService } from '../../core/events.service';
-import { OpponentsService } from '../../core/opponents.service';
-import { type SearchHit, searchTeam } from '../../core/search';
-import { SessionService } from '../../core/session.service';
-import { SquadService } from '../../core/squad.service';
+import { EventsService } from '../../core/events/events.service';
+import { OpponentsService } from '../../core/opponents/opponents.service';
+import { type SearchHit, searchTeam } from '../../core/shell/search';
+import { SessionService } from '../../core/auth/session.service';
+import { SquadService } from '../../core/player/squad.service';
 import { Card } from '../../ui/card/card';
 
 const KIND_LABEL: Record<SearchHit['kind'], string> = {

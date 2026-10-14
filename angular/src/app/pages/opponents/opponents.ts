@@ -1,10 +1,10 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
-import { LayoutService } from '../../core/layout.service';
-import { type Opponent, detailsOf, filterOpponents, formatDate } from '../../core/opponent';
-import { OpponentsService } from '../../core/opponents.service';
-import { SessionService } from '../../core/session.service';
-import { SyncService } from '../../core/sync.service';
+import { LayoutService } from '../../core/shell/layout.service';
+import { type Opponent, detailsOf, filterOpponents, formatDate } from '../../core/opponents/opponent';
+import { OpponentsService } from '../../core/opponents/opponents.service';
+import { SessionService } from '../../core/auth/session.service';
+import { SyncService } from '../../core/shell/sync.service';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 import { Dialog } from '../../ui/dialog/dialog';

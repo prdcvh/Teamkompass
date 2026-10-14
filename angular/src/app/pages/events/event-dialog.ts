@@ -13,9 +13,9 @@ import {
   TRAINING_FOCUSES,
   draftFromEvent,
   emptyDraft,
-} from '../../core/event';
-import { EventsService } from '../../core/events.service';
-import { todayIso } from '../../core/dates';
+} from '../../core/events/event';
+import { EventsService } from '../../core/events/events.service';
+import { todayIso } from '../../core/shared/dates';
 import { Button } from '../../ui/button/button';
 import { Dialog } from '../../ui/dialog/dialog';
 

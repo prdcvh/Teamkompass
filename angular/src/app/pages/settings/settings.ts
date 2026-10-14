@@ -1,11 +1,11 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
-import { AccountService } from '../../core/account.service';
-import { MIN_PASSWORD_LENGTH } from '../../core/access';
-import { SessionService } from '../../core/session.service';
-import { RETENTION_OPTIONS } from '../../core/workspace';
-import { ThemeService } from '../../core/theme.service';
-import { WorkspaceService } from '../../core/workspace.service';
+import { AccountService } from '../../core/auth/account.service';
+import { MIN_PASSWORD_LENGTH } from '../../core/access/access';
+import { SessionService } from '../../core/auth/session.service';
+import { RETENTION_OPTIONS } from '../../core/device/workspace';
+import { ThemeService } from '../../core/device/theme.service';
+import { WorkspaceService } from '../../core/device/workspace.service';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 import { Dialog } from '../../ui/dialog/dialog';

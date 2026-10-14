@@ -4,7 +4,7 @@
  * Noten sind Schulnoten: kleiner ist besser.
  */
 import { type Player, parsePositions } from '../player/player';
-import { roundGrade } from '../rating';
+import { roundGrade } from '../ratings/rating';
 import { FORMATION_PRESETS, type Preset, UNAVAILABLE_STATUSES, ZONES, type Zone, presetName } from './pitch';
 import { type Assignments, emptyAssignments } from './lineup';
 

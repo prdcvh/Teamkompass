@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { PlayerRecordsApi } from '../firebase/player-records.api';
-import { todayIso } from '../dates';
-import { SessionService } from '../session.service';
+import { todayIso } from '../shared/dates';
+import { SessionService } from '../auth/session.service';
 import { type DevelopmentPlan, type PlanDraft, type PlanErrors, docFromPlan, planFromDraft, validatePlan } from './plan';
 import { RecordsStateService } from './records-state.service';
 

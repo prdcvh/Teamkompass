@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { LayoutService } from '../../core/layout.service';
+import { LayoutService } from '../../core/shell/layout.service';
 import {
   EVENT_SORT_OPTIONS,
   EVENT_TYPES,
@@ -13,9 +13,9 @@ import {
   groupByMonth,
   resultText,
   sortEvents,
-} from '../../core/event';
-import { EventsService } from '../../core/events.service';
-import { SyncService } from '../../core/sync.service';
+} from '../../core/events/event';
+import { EventsService } from '../../core/events/events.service';
+import { SyncService } from '../../core/shell/sync.service';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 import { Dialog } from '../../ui/dialog/dialog';

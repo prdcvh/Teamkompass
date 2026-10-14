@@ -1,9 +1,9 @@
 import { Injectable, inject } from '@angular/core';
 import { PlayerRecordsApi } from '../firebase/player-records.api';
 import { RatingsApi } from '../firebase/ratings.api';
-import { ProfileService } from '../profile.service';
-import { docFromRating } from '../rating';
-import { SquadService } from '../squad.service';
+import { ProfileService } from '../profile/profile.service';
+import { docFromRating } from '../ratings/rating';
+import { SquadService } from '../player/squad.service';
 import { type Absence, type AbsenceDraft, type AbsenceErrors, absenceFromDraft, docFromAbsence, validateAbsence } from './absence';
 import { autoAbsenceRating, unavailabilityReason } from './availability';
 import { RecordsStateService } from './records-state.service';

@@ -10,8 +10,8 @@ import {
   type OpponentErrors,
   draftFromOpponent,
   emptyDraft,
-} from '../../core/opponent';
-import { OpponentsService } from '../../core/opponents.service';
+} from '../../core/opponents/opponent';
+import { OpponentsService } from '../../core/opponents/opponents.service';
 import { Button } from '../../ui/button/button';
 import { Dialog } from '../../ui/dialog/dialog';
 

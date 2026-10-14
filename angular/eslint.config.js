@@ -31,9 +31,8 @@ module.exports = defineConfig([
           style: 'kebab-case',
         },
       ],
-      // Eine Datei = ein Thema. Vorerst nur Warnung, bis die Aufteilung
-      // (SCRUM-108..113) durch ist; SCRUM-113 macht daraus einen Fehler.
-      'max-lines': ['warn', { max: 300, skipBlankLines: true, skipComments: true }],
+      // Eine Datei = ein Thema, höchstens 300 Zeilen (SCRUM-107..113).
+      'max-lines': ['error', { max: 300, skipBlankLines: true, skipComments: true }],
     },
   },
   {

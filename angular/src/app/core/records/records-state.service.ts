@@ -1,10 +1,10 @@
 import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
-import { authErrorMessage, errorCode } from '../auth-errors';
+import { authErrorMessage, errorCode } from '../auth/auth-errors';
 import { PlayerRecordsApi, type PlayerRecordKind } from '../firebase/player-records.api';
 import type { RawDoc, SnapshotMeta } from '../firebase/types';
-import { todayIso } from '../dates';
-import { SessionService } from '../session.service';
-import { SyncService } from '../sync.service';
+import { todayIso } from '../shared/dates';
+import { SessionService } from '../auth/session.service';
+import { SyncService } from '../shell/sync.service';
 import { type Absence, absenceFromDoc } from './absence';
 import { type Measurement, measurementFromDoc } from './measurement';
 import { type DevelopmentPlan, planFromDoc } from './plan';

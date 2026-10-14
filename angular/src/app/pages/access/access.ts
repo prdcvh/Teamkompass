@@ -1,10 +1,10 @@
 import { ChangeDetectionStrategy, Component, ElementRef, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { type AccessEntry, roleLabel, sortEntries, validityText, isExpired } from '../../core/access';
-import { AccessService } from '../../core/access.service';
-import { LayoutService } from '../../core/layout.service';
-import { SessionService } from '../../core/session.service';
-import { SquadService } from '../../core/squad.service';
+import { type AccessEntry, roleLabel, sortEntries, validityText, isExpired } from '../../core/access/access';
+import { AccessService } from '../../core/access/access.service';
+import { LayoutService } from '../../core/shell/layout.service';
+import { SessionService } from '../../core/auth/session.service';
+import { SquadService } from '../../core/player/squad.service';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 import { Dialog } from '../../ui/dialog/dialog';
