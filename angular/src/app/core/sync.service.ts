@@ -1,5 +1,5 @@
 import { Injectable, computed, signal } from '@angular/core';
-import type { SnapshotMeta } from './firebase.service';
+import type { SnapshotMeta } from './firebase/types';
 
 /**
  * idle: noch nichts geladen

@@ -1,11 +1,10 @@
 import { TestBed } from '@angular/core/testing';
 import { emptyDraft } from './event';
 import { EventsService } from './events.service';
-import { FirebaseService } from './firebase.service';
 import { SessionService } from './session.service';
 import { SquadService } from './squad.service';
 import { SyncService } from './sync.service';
-import { FakeFirebase } from './testing';
+import { FakeFirebase, provideFakeFirebase } from './testing/fake-firebase';
 
 describe('EventsService', () => {
   let firebase: FakeFirebase;
@@ -13,7 +12,7 @@ describe('EventsService', () => {
   function setup(role: 'trainer' | 'medical' | 'player' | null = 'trainer') {
     firebase = new FakeFirebase();
     firebase.events.set('e1', { type: 'Training', title: 'Training Mo', date: '2026-10-05', intensity: 2 });
-    TestBed.configureTestingModule({ providers: [{ provide: FirebaseService, useValue: firebase }] });
+    TestBed.configureTestingModule({ providers: [...provideFakeFirebase(firebase)] });
     TestBed.inject(SessionService).role.set(role);
     return TestBed.inject(EventsService);
   }

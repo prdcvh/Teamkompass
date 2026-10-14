@@ -1,7 +1,6 @@
 import { TestBed } from '@angular/core/testing';
-import { FirebaseService } from '../../core/firebase.service';
 import { SessionService } from '../../core/session.service';
-import { FakeFirebase } from '../../core/testing';
+import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
 import { TEAM_DATA_PREFIX } from '../../core/local-data';
 import { ThemeService } from '../../core/theme.service';
 import { WORKSPACE_KEY } from '../../core/workspace';
@@ -14,7 +13,7 @@ describe('Settings (Einstellungen & Datenschutz)', () => {
 
   async function render(role: 'trainer' | 'medical' | 'player' | null = null) {
     firebase = new FakeFirebase();
-    await TestBed.configureTestingModule({ imports: [Settings], providers: [{ provide: FirebaseService, useValue: firebase }] }).compileComponents();
+    await TestBed.configureTestingModule({ imports: [Settings], providers: [...provideFakeFirebase(firebase)] }).compileComponents();
     if (role) TestBed.inject(SessionService).role.set(role);
     const fixture = TestBed.createComponent(Settings);
     await fixture.whenStable();
@@ -129,7 +128,7 @@ describe('Settings (Einstellungen & Datenschutz)', () => {
     it('meldet ein falsches aktuelles Passwort', async () => {
       const fixture = await render('trainer');
       fixture.detectChanges();
-      firebase.changePasswordError = { code: 'auth/invalid-credential' };
+      firebase.auth.changePasswordError = { code: 'auth/invalid-credential' };
       fill(fixture, 'current', 'Falsch');
       fill(fixture, 'next', 'NeuesPasswort1');
       fill(fixture, 'repeat', 'NeuesPasswort1');

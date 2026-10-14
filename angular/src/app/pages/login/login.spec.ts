@@ -1,9 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
-import { FirebaseService } from '../../core/firebase.service';
 import { SessionService } from '../../core/session.service';
-import { FakeFirebase } from '../../core/testing';
+import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
 import { Login } from './login';
 
 describe('Login', () => {
@@ -13,7 +12,7 @@ describe('Login', () => {
     firebase = new FakeFirebase();
     await TestBed.configureTestingModule({
       imports: [Login],
-      providers: [provideRouter([]), { provide: FirebaseService, useValue: firebase }],
+      providers: [provideRouter([]), ...provideFakeFirebase(firebase)],
     }).compileComponents();
     TestBed.inject(AuthService).start(0);
     const fixture = TestBed.createComponent(Login);
@@ -49,7 +48,7 @@ describe('Login', () => {
 
   it('geht nach erfolgreicher Anmeldung zur Startseite', async () => {
     const fixture = await render();
-    firebase.members.set('uid-1', { role: 'trainer', playerId: null });
+    firebase.access.members.set('uid-1', { role: 'trainer', playerId: null });
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
     const email = root(fixture).querySelector('input[type="email"]') as HTMLInputElement;
     const password = root(fixture).querySelector('input[type="password"]') as HTMLInputElement;
@@ -63,7 +62,7 @@ describe('Login', () => {
 
   it('führt Spieler nach dem Einlösen des Einladungscodes zur eigenen Ansicht', async () => {
     const fixture = await render();
-    firebase.invites.set('ABC123', { role: 'player', playerId: 'p1', expiresAt: null });
+    firebase.access.invites.set('ABC123', { role: 'player', playerId: 'p1', expiresAt: null });
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
     (root(fixture).querySelector('#tab-code') as HTMLButtonElement).click();
     fixture.detectChanges();
@@ -164,7 +163,7 @@ describe('Login', () => {
 
     it('bestätigt auch bei unbekannter Adresse gleich (keine Konto-Erkennung)', async () => {
       const fixture = await render();
-      firebase.resetError = { code: 'auth/user-not-found' };
+      firebase.auth.resetError = { code: 'auth/user-not-found' };
       await openReset(fixture);
       await sendTo(fixture, 'unbekannt@verein.de');
       expect(root(fixture).querySelector('[role="status"]')?.textContent).toContain('Wenn zu dieser E-Mail-Adresse ein Konto existiert');

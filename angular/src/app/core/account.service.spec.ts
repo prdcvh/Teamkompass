@@ -1,7 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { AccountService } from './account.service';
-import { FirebaseService } from './firebase.service';
-import { FakeFirebase } from './testing';
+import { FakeFirebase, provideFakeFirebase } from './testing/fake-firebase';
 
 describe('AccountService', () => {
   let firebase: FakeFirebase;
@@ -9,7 +8,7 @@ describe('AccountService', () => {
 
   beforeEach(() => {
     firebase = new FakeFirebase();
-    TestBed.configureTestingModule({ providers: [{ provide: FirebaseService, useValue: firebase }] });
+    TestBed.configureTestingModule({ providers: [...provideFakeFirebase(firebase)] });
     account = TestBed.inject(AccountService);
   });
 
@@ -25,12 +24,12 @@ describe('AccountService', () => {
     });
 
     it('verrät nicht, ob ein Konto existiert', async () => {
-      firebase.resetError = { code: 'auth/user-not-found' };
+      firebase.auth.resetError = { code: 'auth/user-not-found' };
       expect(await account.requestReset('unbekannt@verein.de')).toEqual({ ok: true });
     });
 
     it('meldet andere Fehler verständlich', async () => {
-      firebase.resetError = { code: 'auth/too-many-requests' };
+      firebase.auth.resetError = { code: 'auth/too-many-requests' };
       expect(await account.requestReset('a@b.de')).toEqual({ ok: false, message: 'Zu viele Versuche. Bitte kurz warten und dann erneut versuchen.' });
     });
   });
@@ -50,12 +49,12 @@ describe('AccountService', () => {
     });
 
     it('meldet ein falsches aktuelles Passwort', async () => {
-      firebase.changePasswordError = { code: 'auth/invalid-credential' };
+      firebase.auth.changePasswordError = { code: 'auth/invalid-credential' };
       expect(await account.changePassword('Falsch', 'NeuesPasswort1', 'NeuesPasswort1')).toEqual({ ok: false, message: 'Das aktuelle Passwort ist falsch.' });
     });
 
     it('verlangt bei abgelaufener Anmeldung eine neue Anmeldung', async () => {
-      firebase.changePasswordError = { code: 'auth/requires-recent-login' };
+      firebase.auth.changePasswordError = { code: 'auth/requires-recent-login' };
       expect(await account.changePassword('Alt', 'NeuesPasswort1', 'NeuesPasswort1')).toEqual({ ok: false, message: 'Bitte melde dich neu an und versuche es dann erneut.' });
     });
   });

@@ -1,7 +1,8 @@
 import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { authErrorMessage, errorCode } from './auth-errors';
 import { EventsService } from './events.service';
-import { FirebaseService, type RawDoc, type SnapshotMeta } from './firebase.service';
+import { FirebaseService } from './firebase.service';
+import type { RawDoc, SnapshotMeta } from './firebase/types';
 import { todayIso } from './player';
 import { type Rating, ratingFromDoc } from './rating';
 import { type Absence, type Measurement, absenceFromDoc, measurementFromDoc } from './records';

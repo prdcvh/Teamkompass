@@ -2,10 +2,9 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
-import { FirebaseService } from '../../core/firebase.service';
 import { LayoutService } from '../../core/layout.service';
 import { SessionService } from '../../core/session.service';
-import { FakeFirebase } from '../../core/testing';
+import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
 import { Profile } from './profile';
 
 describe('Profile (Spielerprofil)', () => {
@@ -32,7 +31,7 @@ describe('Profile (Spielerprofil)', () => {
     navigate = vi.fn().mockResolvedValue(true);
     TestBed.configureTestingModule({
       providers: [
-        { provide: FirebaseService, useValue: firebase },
+        ...provideFakeFirebase(firebase),
         { provide: LayoutService, useValue: { isMobile } },
         { provide: ActivatedRoute, useValue: { paramMap: new BehaviorSubject(convertToParamMap(id ? { id } : {})) } },
         { provide: Router, useValue: { navigate } },
@@ -136,7 +135,7 @@ describe('Profile (Spielerprofil)', () => {
     firebase = new FakeFirebase();
     TestBed.configureTestingModule({
       providers: [
-        { provide: FirebaseService, useValue: firebase },
+        ...provideFakeFirebase(firebase),
         { provide: LayoutService, useValue: { isMobile } },
         { provide: ActivatedRoute, useValue: { paramMap: new BehaviorSubject(convertToParamMap({})) } },
         { provide: Router, useValue: { navigate: vi.fn() } },
@@ -160,7 +159,7 @@ describe('Profile (Spielerprofil)', () => {
     firebase.watchRatingDocError = { code: 'permission-denied' };
     TestBed.configureTestingModule({
       providers: [
-        { provide: FirebaseService, useValue: firebase },
+        ...provideFakeFirebase(firebase),
         { provide: LayoutService, useValue: { isMobile } },
         { provide: ActivatedRoute, useValue: { paramMap: new BehaviorSubject(convertToParamMap({})) } },
         { provide: Router, useValue: { navigate: vi.fn() } },
@@ -205,7 +204,7 @@ describe('Profile (Spielerprofil)', () => {
       navigate = vi.fn().mockResolvedValue(true);
       TestBed.configureTestingModule({
         providers: [
-          { provide: FirebaseService, useValue: firebase },
+          ...provideFakeFirebase(firebase),
           { provide: LayoutService, useValue: { isMobile } },
           { provide: ActivatedRoute, useValue: { paramMap: new BehaviorSubject(convertToParamMap({})) } },
           { provide: Router, useValue: { navigate } },
@@ -328,7 +327,7 @@ describe('Profile (Spielerprofil)', () => {
       firebase.watchPlayerRecordsError = { code: 'permission-denied' };
       TestBed.configureTestingModule({
         providers: [
-          { provide: FirebaseService, useValue: firebase },
+          ...provideFakeFirebase(firebase),
           { provide: LayoutService, useValue: { isMobile } },
           { provide: ActivatedRoute, useValue: { paramMap: new BehaviorSubject(convertToParamMap({})) } },
           { provide: Router, useValue: { navigate: vi.fn() } },

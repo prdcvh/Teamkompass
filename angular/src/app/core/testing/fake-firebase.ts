@@ -1,141 +1,20 @@
-import {
-  FirebaseService,
-  type FirebaseUser,
-  type InviteRecord,
-  type MemberRecord,
-  type RawDoc,
-  type SnapshotMeta,
-} from './firebase.service';
+import type { Provider } from '@angular/core';
+import { AccessApi } from '../firebase/access.api';
+import { AuthApi } from '../firebase/auth.api';
+import type { RawDoc, SnapshotMeta } from '../firebase/types';
+import { FirebaseService } from '../firebase.service';
+import { FakeAccessApi } from './fake-access.api';
+import { FakeAuthApi } from './fake-auth.api';
 
-/** Ersatz für das Firebase-SDK in Tests: speichert Aufrufe und liefert vorgegebene Antworten. */
+/**
+ * Ersatz für {@link FirebaseService} in Tests: speichert Aufrufe und liefert vorgegebene Antworten.
+ * Anmeldung (`auth`) und Zugänge (`access`) haben eigene Attrappen; alle drei schreiben in dieselbe
+ * Aufrufliste `calls`, damit Tests die Reihenfolge über Themen hinweg prüfen können.
+ */
 export class FakeFirebase implements Pick<FirebaseService, keyof FirebaseService> {
-  members = new Map<string, MemberRecord>();
-  invites = new Map<string, InviteRecord>();
   calls: string[] = [];
-  watchError: unknown = null;
-  emailError: unknown = null;
-  readInviteError: unknown = null;
-  /** Fehler für die nächsten Aufrufe von claimInvite (jeweils einer pro Versuch). */
-  claimErrors: unknown[] = [];
-  nextUid = 'uid-1';
-  private listener: ((user: FirebaseUser | null) => void) | null = null;
-
-  async watchAuth(callback: (user: FirebaseUser | null) => void): Promise<() => void> {
-    if (this.watchError) throw this.watchError;
-    this.listener = callback;
-    return () => (this.listener = null);
-  }
-
-  /** Test-Hilfe: meldet einen Anmeldezustand, wie ihn Firebase melden würde. */
-  emit(user: FirebaseUser | null): void {
-    this.listener?.(user);
-  }
-
-  async signInWithEmail(email: string): Promise<FirebaseUser> {
-    this.calls.push(`email:${email}`);
-    if (this.emailError) throw this.emailError;
-    const user = { uid: this.nextUid, isAnonymous: false, email };
-    this.emit(user);
-    return user;
-  }
-
-  resetError: unknown = null;
-  changePasswordError: unknown = null;
-
-  async sendPasswordReset(email: string): Promise<void> {
-    this.calls.push(`reset:${email}`);
-    if (this.resetError) throw this.resetError;
-  }
-
-  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
-    this.calls.push(`changePassword:${currentPassword}:${newPassword}`);
-    if (this.changePasswordError) throw this.changePasswordError;
-  }
-
-  async signInAnonymously(): Promise<string> {
-    this.calls.push('anonymous');
-    this.emit({ uid: this.nextUid, isAnonymous: true, email: null });
-    return this.nextUid;
-  }
-
-  async signOut(): Promise<void> {
-    this.calls.push('signOut');
-    this.emit(null);
-  }
-
-  /** Test-Hilfe: hält die Antwort von readMember für eine uid zurück, bis das Versprechen aufgelöst wird. */
-  memberGates = new Map<string, Promise<void>>();
-  /** Test-Hilfe: lässt readMember für eine uid mit diesem Fehler scheitern (nach dem Gate). */
-  memberErrors = new Map<string, unknown>();
-
-  async readMember(uid: string): Promise<MemberRecord | null> {
-    this.calls.push(`member:${uid}`);
-    await this.memberGates.get(uid);
-    if (this.memberErrors.has(uid)) throw this.memberErrors.get(uid);
-    return this.members.get(uid) ?? null;
-  }
-
-  async readInvite(code: string): Promise<InviteRecord | null> {
-    this.calls.push(`invite:${code}`);
-    if (this.readInviteError) throw this.readInviteError;
-    return this.invites.get(code) ?? null;
-  }
-
-  async claimInvite(uid: string, code: string, invite: InviteRecord): Promise<void> {
-    this.calls.push(`claim:${code}`);
-    const error = this.claimErrors.shift();
-    if (error) throw error;
-    this.members.set(uid, { role: invite.role, playerId: invite.playerId });
-    this.invites.delete(code);
-  }
-
-  // --- Zugangsverwaltung (members/invites, Konten über zweite App-Instanz) ---
-  memberDocs = new Map<string, Record<string, unknown>>();
-  inviteDocs = new Map<string, Record<string, unknown>>();
-  readAccessError: unknown = null;
-  createInviteError: unknown = null;
-  deleteAccessError: unknown = null;
-  createStaffError: unknown = null;
-  nextStaffUid = 'staff-uid-1';
-  lastStaffPassword = '';
-
-  async readMembers(): Promise<RawDoc[]> {
-    this.calls.push('readMembers');
-    if (this.readAccessError) throw this.readAccessError;
-    return [...this.memberDocs].map(([id, data]) => ({ id, data }));
-  }
-
-  async readInvites(): Promise<RawDoc[]> {
-    this.calls.push('readInvites');
-    if (this.readAccessError) throw this.readAccessError;
-    return [...this.inviteDocs].map(([id, data]) => ({ id, data }));
-  }
-
-  async createInvite(code: string, data: { playerId: string; role: 'player' | 'parent'; expiresAt: Date | null }): Promise<void> {
-    this.calls.push(`createInvite:${code}`);
-    if (this.createInviteError) throw this.createInviteError;
-    this.inviteDocs.set(code, { ...data });
-  }
-
-  async deleteMember(uid: string): Promise<void> {
-    this.calls.push(`deleteMember:${uid}`);
-    if (this.deleteAccessError) throw this.deleteAccessError;
-    this.memberDocs.delete(uid);
-  }
-
-  async deleteInvite(code: string): Promise<void> {
-    this.calls.push(`deleteInvite:${code}`);
-    if (this.deleteAccessError) throw this.deleteAccessError;
-    this.inviteDocs.delete(code);
-  }
-
-  async createStaffAccount(email: string, password: string, role: 'trainer' | 'medical'): Promise<string> {
-    this.calls.push(`createStaff:${role}:${email}`);
-    this.lastStaffPassword = password;
-    if (this.createStaffError) throw this.createStaffError;
-    this.memberDocs.set(this.nextStaffUid, { role, email });
-    return this.nextStaffUid;
-  }
+  readonly auth = new FakeAuthApi(this.calls);
+  readonly access = new FakeAccessApi(this.calls);
 
   // --- Spieler (Echtzeit-Abo wie bei Firestore: lokale Schreibvorgänge melden sofort einen neuen Stand) ---
   players = new Map<string, Record<string, unknown>>();
@@ -531,4 +410,13 @@ export class FakeFirebase implements Pick<FirebaseService, keyof FirebaseService
     this.playerRecords.set(key, store);
     this.emitRecords(key);
   }
+}
+
+/** Stellt die Attrappe für alle Firebase-Zugriffsklassen bereit. */
+export function provideFakeFirebase(fake: FakeFirebase): Provider[] {
+  return [
+    { provide: FirebaseService, useValue: fake },
+    { provide: AuthApi, useValue: fake.auth },
+    { provide: AccessApi, useValue: fake.access },
+  ];
 }

@@ -1,9 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { AuthService, displayNameFor } from './auth.service';
-import { FirebaseService } from './firebase.service';
 import { SessionService } from './session.service';
 import { TEAM_DATA_PREFIX } from './local-data';
-import { FakeFirebase } from './testing';
+import { FakeFirebase, provideFakeFirebase } from './testing/fake-firebase';
 
 describe('AuthService', () => {
   let firebase: FakeFirebase;
@@ -12,7 +11,7 @@ describe('AuthService', () => {
 
   function setup(): void {
     firebase = new FakeFirebase();
-    TestBed.configureTestingModule({ providers: [{ provide: FirebaseService, useValue: firebase }] });
+    TestBed.configureTestingModule({ providers: [...provideFakeFirebase(firebase)] });
     auth = TestBed.inject(AuthService);
     session = TestBed.inject(SessionService);
   }
@@ -34,14 +33,14 @@ describe('AuthService', () => {
   it('ist ohne Anmeldung ausgeloggt und leert lokale Teamdaten', async () => {
     localStorage.setItem(`${TEAM_DATA_PREFIX}players`, '[]');
     auth.start(0);
-    firebase.emit(null);
+    firebase.auth.emit(null);
     await auth.whenResolved();
     expect(auth.status()).toBe('signedOut');
     expect(localStorage.getItem(`${TEAM_DATA_PREFIX}players`)).toBeNull();
   });
 
   it('bleibt gesperrt, wenn Firebase nicht erreichbar ist', async () => {
-    firebase.watchError = new Error('offline');
+    firebase.auth.watchError = new Error('offline');
     auth.start(0);
     await auth.whenResolved();
     expect(auth.status()).toBe('unavailable');
@@ -49,7 +48,7 @@ describe('AuthService', () => {
   });
 
   it('meldet einen Trainer mit seiner Rolle an', async () => {
-    firebase.members.set('uid-1', { role: 'trainer', playerId: null });
+    firebase.access.members.set('uid-1', { role: 'trainer', playerId: null });
     auth.start(0);
     await auth.signInTrainer(' coach@verein.de ', 'geheim');
     await vi.waitFor(() => expect(auth.status()).toBe('ready'));
@@ -59,7 +58,7 @@ describe('AuthService', () => {
   });
 
   it('zeigt bei falschem Passwort eine verständliche Meldung', async () => {
-    firebase.emailError = { code: 'auth/invalid-credential' };
+    firebase.auth.emailError = { code: 'auth/invalid-credential' };
     auth.start(0);
     await auth.signInTrainer('a@b.de', 'x');
     expect(auth.error()).toBe('E-Mail oder Passwort ist falsch.');
@@ -79,7 +78,7 @@ describe('AuthService', () => {
 
   describe('Einladungscode', () => {
     beforeEach(() => {
-      firebase.invites.set('abc', { role: 'player', playerId: 'p1', expiresAt: null, expiresAtRaw: null });
+      firebase.access.invites.set('abc', { role: 'player', playerId: 'p1', expiresAt: null, expiresAtRaw: null });
       auth.start(0);
     });
 
@@ -88,7 +87,7 @@ describe('AuthService', () => {
       expect(auth.status()).toBe('ready');
       expect(session.role()).toBe('player');
       expect(session.playerId()).toBe('p1');
-      expect(firebase.invites.has('abc')).toBe(false);
+      expect(firebase.access.invites.has('abc')).toBe(false);
     });
 
     it('lehnt unbekannte Codes ab und räumt das anonyme Konto weg', async () => {
@@ -99,10 +98,10 @@ describe('AuthService', () => {
     });
 
     it('lehnt abgelaufene Codes ab', async () => {
-      firebase.invites.set('alt', { role: 'parent', playerId: 'p2', expiresAt: new Date(Date.now() - 1000) });
+      firebase.access.invites.set('alt', { role: 'parent', playerId: 'p2', expiresAt: new Date(Date.now() - 1000) });
       await auth.signInWithCode('alt');
       expect(auth.error()).toBe('Dieser Code ist abgelaufen.');
-      expect(firebase.members.size).toBe(0);
+      expect(firebase.access.members.size).toBe(0);
     });
 
     it('verlangt einen Code', async () => {
@@ -112,14 +111,14 @@ describe('AuthService', () => {
     });
 
     it('versucht es nach permission-denied einmal erneut', async () => {
-      firebase.claimErrors = [{ code: 'permission-denied' }];
+      firebase.access.claimErrors = [{ code: 'permission-denied' }];
       await auth.signInWithCode('abc');
       expect(firebase.calls.filter((call) => call === 'claim:abc')).toHaveLength(2);
       expect(auth.status()).toBe('ready');
     });
 
     it('gibt nach zwei permission-denied auf', async () => {
-      firebase.claimErrors = [{ code: 'permission-denied' }, { code: 'permission-denied' }];
+      firebase.access.claimErrors = [{ code: 'permission-denied' }, { code: 'permission-denied' }];
       await auth.signInWithCode('abc');
       expect(auth.status()).not.toBe('ready');
       expect(auth.error()).toContain('Zugang konnte nicht angelegt werden');
@@ -141,7 +140,7 @@ describe('AuthService', () => {
     const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
     it('SCRUM-87: ein einziger Anmelde-Aufruf liefert den fertigen Zustand (kein zweiter Klick nötig)', async () => {
-      firebase.members.set('uid-1', { role: 'trainer', playerId: null });
+      firebase.access.members.set('uid-1', { role: 'trainer', playerId: null });
       auth.start(0);
       await auth.signInTrainer('coach@verein.de', 'geheim');
       expect(auth.status()).toBe('ready');
@@ -150,8 +149,8 @@ describe('AuthService', () => {
 
     it('SCRUM-87: bleibt im Ladezustand, solange der Zugang geprüft wird', async () => {
       const held = gate();
-      firebase.memberGates.set('uid-1', held.promise);
-      firebase.members.set('uid-1', { role: 'trainer', playerId: null });
+      firebase.access.memberGates.set('uid-1', held.promise);
+      firebase.access.members.set('uid-1', { role: 'trainer', playerId: null });
       auth.start(0);
       const done = auth.signInTrainer('coach@verein.de', 'geheim');
       await tick();
@@ -173,10 +172,10 @@ describe('AuthService', () => {
 
     it('SCRUM-88: eine verspätete Rollenprüfung stellt nach dem Abmelden nichts wieder her', async () => {
       const held = gate();
-      firebase.memberGates.set('uid-1', held.promise);
-      firebase.members.set('uid-1', { role: 'trainer', playerId: null });
+      firebase.access.memberGates.set('uid-1', held.promise);
+      firebase.access.members.set('uid-1', { role: 'trainer', playerId: null });
       auth.start(0);
-      firebase.emit({ uid: 'uid-1', isAnonymous: false, email: 'coach@verein.de' });
+      firebase.auth.emit({ uid: 'uid-1', isAnonymous: false, email: 'coach@verein.de' });
       await tick();
       await auth.signOut();
       held.open();
@@ -189,12 +188,12 @@ describe('AuthService', () => {
 
     it('SCRUM-88: bei Identitätswechsel überschreibt die ältere Antwort die neue Rolle nicht', async () => {
       const held = gate();
-      firebase.memberGates.set('uid-a', held.promise);
-      firebase.members.set('uid-a', { role: 'trainer', playerId: null });
-      firebase.members.set('uid-b', { role: 'player', playerId: 'p1' });
+      firebase.access.memberGates.set('uid-a', held.promise);
+      firebase.access.members.set('uid-a', { role: 'trainer', playerId: null });
+      firebase.access.members.set('uid-b', { role: 'player', playerId: 'p1' });
       auth.start(0);
-      firebase.emit({ uid: 'uid-a', isAnonymous: false, email: 'a@verein.de' });
-      firebase.emit({ uid: 'uid-b', isAnonymous: false, email: null });
+      firebase.auth.emit({ uid: 'uid-a', isAnonymous: false, email: 'a@verein.de' });
+      firebase.auth.emit({ uid: 'uid-b', isAnonymous: false, email: null });
       await tick();
       await tick();
       expect(session.role()).toBe('player');
@@ -208,12 +207,12 @@ describe('AuthService', () => {
 
     it('SCRUM-88: auch ein verspäteter Fehler einer früheren Prüfung beeinflusst die aktuelle Sitzung nicht', async () => {
       const held = gate();
-      firebase.memberGates.set('uid-a', held.promise);
-      firebase.memberErrors.set('uid-a', { code: 'permission-denied' });
-      firebase.members.set('uid-b', { role: 'trainer', playerId: null });
+      firebase.access.memberGates.set('uid-a', held.promise);
+      firebase.access.memberErrors.set('uid-a', { code: 'permission-denied' });
+      firebase.access.members.set('uid-b', { role: 'trainer', playerId: null });
       auth.start(0);
-      firebase.emit({ uid: 'uid-a', isAnonymous: false, email: 'a@verein.de' });
-      firebase.emit({ uid: 'uid-b', isAnonymous: false, email: 'b@verein.de' });
+      firebase.auth.emit({ uid: 'uid-a', isAnonymous: false, email: 'a@verein.de' });
+      firebase.auth.emit({ uid: 'uid-b', isAnonymous: false, email: 'b@verein.de' });
       await tick();
       await tick();
       expect(auth.status()).toBe('ready');
@@ -226,19 +225,19 @@ describe('AuthService', () => {
     });
 
     it('SCRUM-88: nach Abmelden und erneuter Anmeldung desselben Kontos wird der Zugang neu geprüft', async () => {
-      firebase.members.set('uid-1', { role: 'trainer', playerId: null });
+      firebase.access.members.set('uid-1', { role: 'trainer', playerId: null });
       auth.start(0);
       await auth.signInTrainer('coach@verein.de', 'x');
       await auth.signOut();
       expect(auth.status()).toBe('signedOut');
-      firebase.members.set('uid-1', { role: 'medical', playerId: null });
+      firebase.access.members.set('uid-1', { role: 'medical', playerId: null });
       await auth.signInTrainer('coach@verein.de', 'x');
       expect(session.role()).toBe('medical');
     });
   });
 
   it('Abmelden leert Sitzung und lokale Daten', async () => {
-    firebase.members.set('uid-1', { role: 'trainer', playerId: null });
+    firebase.access.members.set('uid-1', { role: 'trainer', playerId: null });
     auth.start(0);
     await auth.signInTrainer('coach@verein.de', 'x');
     await vi.waitFor(() => expect(auth.status()).toBe('ready'));

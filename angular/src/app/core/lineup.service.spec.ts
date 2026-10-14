@@ -1,11 +1,10 @@
 import { TestBed } from '@angular/core/testing';
-import { FirebaseService } from './firebase.service';
 import { emptyAssignments, moveToZone } from './lineup';
 import { LineupService } from './lineup.service';
 import { SessionService } from './session.service';
 import { SquadService } from './squad.service';
 import { SyncService } from './sync.service';
-import { FakeFirebase } from './testing';
+import { FakeFirebase, provideFakeFirebase } from './testing/fake-firebase';
 
 describe('LineupService', () => {
   let firebase: FakeFirebase;
@@ -14,7 +13,7 @@ describe('LineupService', () => {
     firebase = new FakeFirebase();
     firebase.players.set('p1', { name: 'Ali', positions: ['TW'], number: 1, birthdate: '2012-01-01', status: 'Fit' });
     firebase.players.set('p2', { name: 'Ben', positions: ['ST'], number: 9, birthdate: '2012-01-01', status: 'Fit' });
-    TestBed.configureTestingModule({ providers: [{ provide: FirebaseService, useValue: firebase }] });
+    TestBed.configureTestingModule({ providers: [...provideFakeFirebase(firebase)] });
     TestBed.inject(SessionService).role.set(role);
     const squad = TestBed.inject(SquadService);
     squad.start();

@@ -1,45 +1,7 @@
-import { Injectable } from '@angular/core';
-import type { FirebaseApp } from 'firebase/app';
-import type { Auth } from 'firebase/auth';
-import type { Firestore } from 'firebase/firestore';
+import { Injectable, inject } from '@angular/core';
 import { environment } from '../../environments/environment';
-import type { Role } from './role';
-
-export interface FirebaseUser {
-  readonly uid: string;
-  readonly isAnonymous: boolean;
-  readonly email: string | null;
-}
-
-/** members/{uid}: verknüpft die Anmeldung mit Rolle und – für Spieler/Eltern – dem Spielerprofil. */
-export interface MemberRecord {
-  readonly role: Role;
-  readonly playerId: string | null;
-}
-
-/** invites/{code}: Einladungscode eines Spielers/Elternteils. */
-export interface InviteRecord {
-  readonly role: Role;
-  readonly playerId: string;
-  readonly expiresAt: Date | null;
-  /**
-   * Originalwert aus Firestore. Beim Einlösen muss `expiresAt` laut Regeln exakt gleich sein;
-   * eine Umrechnung über Date könnte Nanosekunden abschneiden und die Regel verletzen.
-   */
-  readonly expiresAtRaw?: unknown;
-}
-
-/** Rohes Dokument aus einer Sammlung (ID + Felder). */
-export interface RawDoc {
-  readonly id: string;
-  readonly data: Readonly<Record<string, unknown>>;
-}
-
-/** Zustand eines Echtzeit-Snapshots: Cache-Stand (offline) und noch nicht bestätigte lokale Änderungen. */
-export interface SnapshotMeta {
-  readonly fromCache: boolean;
-  readonly hasPendingWrites: boolean;
-}
+import { FirebaseConnection } from './firebase/firebase-connection';
+import type { RawDoc, SnapshotMeta } from './firebase/types';
 
 /** Unterkollektionen eines Spielers, die beim Löschen mitgehen (Entwicklungspläne, Abwesenheiten, Messwerte). */
 const PLAYER_SUBCOLLECTIONS = ['developmentPlans', 'absences', 'measurements'] as const;
@@ -47,192 +9,14 @@ const PLAYER_SUBCOLLECTIONS = ['developmentPlans', 'absences', 'measurements'] a
 /** Unterkollektionen eines Spielers, die das Profil verwaltet. */
 export type PlayerRecordKind = 'developmentPlans' | 'absences' | 'measurements';
 
-const ROLES: readonly Role[] = ['trainer', 'player', 'parent', 'medical'];
-
 /**
- * Einzige Stelle, die das Firebase-SDK kennt. Alle Pfade liegen unter teams/{teamId}/…
- * (Datenmodell und Zugriffsregeln: firestore.rules). Das SDK wird erst beim ersten Zugriff
- * geladen, damit der Start der App nicht darauf wartet.
+ * Firestore-Zugriff auf die Teamdaten (Übergangszustand der Aufteilung SCRUM-108..110):
+ * Anmeldung und Zugänge liegen schon in `firebase/auth.api.ts` und `firebase/access.api.ts`,
+ * die übrigen Themen folgen in eigene Zugriffsklassen. Alle Pfade liegen unter teams/{teamId}/…
  */
 @Injectable({ providedIn: 'root' })
 export class FirebaseService {
-  private sdk?: Promise<{ app: FirebaseApp; auth: Auth; db: Firestore }>;
-
-  private init() {
-    this.sdk ??= (async () => {
-      const [{ initializeApp }, { getAuth }, { getFirestore }] = await Promise.all([
-        import('firebase/app'),
-        import('firebase/auth'),
-        import('firebase/firestore'),
-      ]);
-      const app = initializeApp(environment.firebase);
-      return { app, auth: getAuth(app), db: getFirestore(app) };
-    })();
-    return this.sdk;
-  }
-
-  /** Meldet jede Änderung des Anmeldezustands. Gibt die Funktion zum Beenden zurück. */
-  async watchAuth(callback: (user: FirebaseUser | null) => void): Promise<() => void> {
-    const { auth } = await this.init();
-    const { onAuthStateChanged } = await import('firebase/auth');
-    return onAuthStateChanged(auth, (user) =>
-      callback(user ? { uid: user.uid, isAnonymous: user.isAnonymous, email: user.email } : null),
-    );
-  }
-
-  async signInWithEmail(email: string, password: string): Promise<FirebaseUser> {
-    const { auth } = await this.init();
-    const { signInWithEmailAndPassword } = await import('firebase/auth');
-    const { user } = await signInWithEmailAndPassword(auth, email, password);
-    return { uid: user.uid, isAnonymous: user.isAnonymous, email: user.email };
-  }
-
-  /**
-   * Anonyme Anmeldung für Spieler/Eltern. Erst danach darf der Code gelesen werden (die
-   * Regeln erlauben das nur Angemeldeten); der frische Token wird erzwungen, weil es sonst
-   * kurz zu permission-denied kommen kann.
-   */
-  async signInAnonymously(): Promise<string> {
-    const { auth } = await this.init();
-    const { signInAnonymously } = await import('firebase/auth');
-    const credential = await signInAnonymously(auth);
-    await credential.user.getIdToken(true);
-    return credential.user.uid;
-  }
-
-  /** Schickt die Mail zum Zurücksetzen des Passworts (der Nutzer setzt es selbst über den Link in der Mail). */
-  async sendPasswordReset(email: string): Promise<void> {
-    const { auth } = await this.init();
-    const { sendPasswordResetEmail } = await import('firebase/auth');
-    await sendPasswordResetEmail(auth, email);
-  }
-
-  /** Ändert das Passwort des angemeldeten Kontos; das aktuelle Passwort wird dafür erneut bestätigt. */
-  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
-    const { auth } = await this.init();
-    const { EmailAuthProvider, reauthenticateWithCredential, updatePassword } = await import('firebase/auth');
-    const user = auth.currentUser;
-    if (!user?.email) throw Object.assign(new Error('no-email-user'), { code: 'auth/requires-recent-login' });
-    await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, currentPassword));
-    await updatePassword(user, newPassword);
-  }
-
-  async signOut(): Promise<void> {
-    const { auth } = await this.init();
-    const { signOut } = await import('firebase/auth');
-    await signOut(auth);
-  }
-
-  async readMember(uid: string): Promise<MemberRecord | null> {
-    const { db } = await this.init();
-    const { doc, getDoc } = await import('firebase/firestore');
-    const snapshot = await getDoc(doc(db, 'teams', environment.teamId, 'members', uid));
-    if (!snapshot.exists()) return null;
-    const data = snapshot.data();
-    const role = ROLES.find((value) => value === data['role']);
-    if (!role) return null;
-    return { role, playerId: typeof data['playerId'] === 'string' ? data['playerId'] : null };
-  }
-
-  async readInvite(code: string): Promise<InviteRecord | null> {
-    const { db } = await this.init();
-    const { doc, getDoc } = await import('firebase/firestore');
-    const snapshot = await getDoc(doc(db, 'teams', environment.teamId, 'invites', code));
-    if (!snapshot.exists()) return null;
-    const data = snapshot.data();
-    const expires = data['expiresAt'] as { toDate?: () => Date } | null | undefined;
-    return {
-      role: ROLES.find((value) => value === data['role']) ?? 'player',
-      playerId: String(data['playerId'] ?? ''),
-      expiresAt: expires?.toDate ? expires.toDate() : null,
-      expiresAtRaw: data['expiresAt'] ?? null,
-    };
-  }
-
-  /**
-   * Legt die Mitgliedschaft an und verbraucht den Code in einem Schritt (atomar): ein Code
-   * kann dadurch weder wiederverwendet noch nach erfolgreicher Anmeldung weitergegeben werden.
-   */
-  async claimInvite(uid: string, code: string, invite: InviteRecord): Promise<void> {
-    const { db } = await this.init();
-    const { doc, serverTimestamp, writeBatch } = await import('firebase/firestore');
-    const batch = writeBatch(db);
-    batch.set(doc(db, 'teams', environment.teamId, 'members', uid), {
-      role: invite.role,
-      playerId: invite.playerId,
-      claimedInviteCode: code,
-      expiresAt: invite.expiresAtRaw ?? null,
-      createdAt: serverTimestamp(),
-    });
-    batch.delete(doc(db, 'teams', environment.teamId, 'invites', code));
-    await batch.commit();
-  }
-
-  /** Alle Zugänge (members) lesen. Die Regeln erlauben die Liste nur Trainern. */
-  async readMembers(): Promise<RawDoc[]> {
-    const { db } = await this.init();
-    const { collection, getDocs } = await import('firebase/firestore');
-    const snapshot = await getDocs(collection(db, 'teams', environment.teamId, 'members'));
-    return snapshot.docs.map((entry) => ({ id: entry.id, data: entry.data() }));
-  }
-
-  /** Alle offenen Einladungscodes lesen (nur Trainer dürfen auflisten). */
-  async readInvites(): Promise<RawDoc[]> {
-    const { db } = await this.init();
-    const { collection, getDocs } = await import('firebase/firestore');
-    const snapshot = await getDocs(collection(db, 'teams', environment.teamId, 'invites'));
-    return snapshot.docs.map((entry) => ({ id: entry.id, data: entry.data() }));
-  }
-
-  /** Legt einen Einladungscode für einen Spieler oder ein Elternteil an (`expiresAt` null = unbefristet). */
-  async createInvite(code: string, data: { playerId: string; role: 'player' | 'parent'; expiresAt: Date | null }): Promise<void> {
-    const { db } = await this.init();
-    const { Timestamp, doc, serverTimestamp, setDoc } = await import('firebase/firestore');
-    await setDoc(doc(db, 'teams', environment.teamId, 'invites', code), {
-      playerId: data.playerId,
-      role: data.role,
-      expiresAt: data.expiresAt ? Timestamp.fromDate(data.expiresAt) : null,
-      createdAt: serverTimestamp(),
-    });
-  }
-
-  /** Sperrt einen Zugang (löscht das members-Dokument). */
-  async deleteMember(uid: string): Promise<void> {
-    const { db } = await this.init();
-    const { deleteDoc, doc } = await import('firebase/firestore');
-    await deleteDoc(doc(db, 'teams', environment.teamId, 'members', uid));
-  }
-
-  /** Zieht einen noch nicht eingelösten Einladungscode zurück. */
-  async deleteInvite(code: string): Promise<void> {
-    const { db } = await this.init();
-    const { deleteDoc, doc } = await import('firebase/firestore');
-    await deleteDoc(doc(db, 'teams', environment.teamId, 'invites', code));
-  }
-
-  /**
-   * Legt ein Trainer- oder Medizin-Konto an: Anmeldekonto und members-Dokument in einem Schritt.
-   * Das Anmeldekonto entsteht über eine zweite, temporäre App-Instanz: `createUserWithEmailAndPassword`
-   * meldet sonst die eigene, gerade aktive Trainer-Sitzung ab und als das neue Konto an. Das members-Dokument
-   * schreibt die normale Instanz, also weiterhin als der eingeloggte Trainer (so verlangen es die Regeln).
-   * Die zweite Instanz wird immer wieder abgemeldet und entfernt. Gibt die UID des neuen Kontos zurück.
-   */
-  async createStaffAccount(email: string, password: string, role: 'trainer' | 'medical'): Promise<string> {
-    const { app, db } = await this.init();
-    const [{ deleteApp, initializeApp }, { createUserWithEmailAndPassword, getAuth, signOut }, { doc, serverTimestamp, setDoc }] =
-      await Promise.all([import('firebase/app'), import('firebase/auth'), import('firebase/firestore')]);
-    const secondary = initializeApp(app.options, `staff-create-${Date.now()}`);
-    const secondaryAuth = getAuth(secondary);
-    try {
-      const credential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
-      const uid = credential.user.uid;
-      await setDoc(doc(db, 'teams', environment.teamId, 'members', uid), { role, email, createdAt: serverTimestamp() });
-      return uid;
-    } finally {
-      await signOut(secondaryAuth).catch(() => undefined);
-      await deleteApp(secondary).catch(() => undefined);
-    }
-  }
+  private readonly connection = inject(FirebaseConnection);
 
   /**
    * Echtzeit-Abo auf alle Spieler des Teams. Die Regeln erlauben Lesen für Trainer und Medizin
@@ -242,7 +26,7 @@ export class FirebaseService {
     onData: (docs: RawDoc[], meta: SnapshotMeta) => void,
     onError: (error: unknown) => void,
   ): Promise<() => void> {
-    const { db } = await this.init();
+    const { db } = await this.connection.get();
     const { collection, onSnapshot } = await import('firebase/firestore');
     return onSnapshot(
       collection(db, 'teams', environment.teamId, 'players'),
@@ -265,7 +49,7 @@ export class FirebaseService {
     onData: (data: Readonly<Record<string, unknown>> | null, meta: SnapshotMeta) => void,
     onError: (error: unknown) => void,
   ): Promise<() => void> {
-    const { db } = await this.init();
+    const { db } = await this.connection.get();
     const { doc, onSnapshot } = await import('firebase/firestore');
     return onSnapshot(
       doc(db, 'teams', environment.teamId, 'players', playerId),
@@ -284,7 +68,7 @@ export class FirebaseService {
     onData: (docs: RawDoc[], meta: SnapshotMeta) => void,
     onError: (error: unknown) => void,
   ): Promise<() => void> {
-    const { db } = await this.init();
+    const { db } = await this.connection.get();
     const { collection, onSnapshot } = await import('firebase/firestore');
     return onSnapshot(
       collection(db, 'teams', environment.teamId, 'events'),
@@ -303,7 +87,7 @@ export class FirebaseService {
     onData: (data: Readonly<Record<string, unknown>> | null, meta: SnapshotMeta) => void,
     onError: (error: unknown) => void,
   ): Promise<() => void> {
-    const { db } = await this.init();
+    const { db } = await this.connection.get();
     const { doc, onSnapshot } = await import('firebase/firestore');
     return onSnapshot(
       doc(db, 'teams', environment.teamId, 'meta', 'lineup'),
@@ -316,7 +100,7 @@ export class FirebaseService {
 
   /** Schreibt die Startelf vollständig (wie die bisherige App: das Dokument wird ersetzt). */
   async saveLineup(data: Readonly<Record<string, unknown>>): Promise<void> {
-    const { db } = await this.init();
+    const { db } = await this.connection.get();
     const { doc, setDoc } = await import('firebase/firestore');
     await setDoc(doc(db, 'teams', environment.teamId, 'meta', 'lineup'), data);
   }
@@ -326,7 +110,7 @@ export class FirebaseService {
     onData: (docs: RawDoc[], meta: SnapshotMeta) => void,
     onError: (error: unknown) => void,
   ): Promise<() => void> {
-    const { db } = await this.init();
+    const { db } = await this.connection.get();
     const { collection, onSnapshot } = await import('firebase/firestore');
     return onSnapshot(
       collection(db, 'teams', environment.teamId, 'opponents'),
@@ -341,13 +125,13 @@ export class FirebaseService {
   }
 
   async saveOpponent(id: string, data: Readonly<Record<string, unknown>>): Promise<void> {
-    const { db } = await this.init();
+    const { db } = await this.connection.get();
     const { doc, setDoc } = await import('firebase/firestore');
     await setDoc(doc(db, 'teams', environment.teamId, 'opponents', id), data, { merge: true });
   }
 
   async deleteOpponent(id: string): Promise<void> {
-    const { db } = await this.init();
+    const { db } = await this.connection.get();
     const { deleteDoc, doc } = await import('firebase/firestore');
     await deleteDoc(doc(db, 'teams', environment.teamId, 'opponents', id));
   }
@@ -376,7 +160,7 @@ export class FirebaseService {
     onData: (docs: RawDoc[], meta: SnapshotMeta) => void,
     onError: (error: unknown) => void,
   ): Promise<() => void> {
-    const { db } = await this.init();
+    const { db } = await this.connection.get();
     const { collection, onSnapshot } = await import('firebase/firestore');
     return onSnapshot(
       collection(db, 'teams', environment.teamId, 'events', eventId, name),
@@ -400,7 +184,7 @@ export class FirebaseService {
     onData: (data: Readonly<Record<string, unknown>> | null, meta: SnapshotMeta) => void,
     onError: (error: unknown) => void,
   ): Promise<() => void> {
-    const { db } = await this.init();
+    const { db } = await this.connection.get();
     const { doc, onSnapshot } = await import('firebase/firestore');
     return onSnapshot(
       doc(db, 'teams', environment.teamId, 'events', eventId, 'ratings', playerId),
@@ -422,7 +206,7 @@ export class FirebaseService {
     onError: (error: unknown) => void,
     options: { readonly ownOnly?: boolean } = {},
   ): Promise<() => void> {
-    const { db } = await this.init();
+    const { db } = await this.connection.get();
     const { collection, onSnapshot, query, where } = await import('firebase/firestore');
     const records = collection(db, 'teams', environment.teamId, 'players', playerId, name);
     // Spieler und Eltern: die Regeln prüfen das Feld `playerId` der Dokumente, deshalb muss die Abfrage exakt danach filtern.
@@ -440,7 +224,7 @@ export class FirebaseService {
 
   /** Einmaliges Lesen einer Unterkollektion eines Spielers (Förderpläne, Abwesenheiten, Messwerte). */
   async readPlayerRecords(playerId: string, name: PlayerRecordKind): Promise<RawDoc[]> {
-    const { db } = await this.init();
+    const { db } = await this.connection.get();
     const { collection, getDocs } = await import('firebase/firestore');
     const snapshot = await getDocs(collection(db, 'teams', environment.teamId, 'players', playerId, name));
     return snapshot.docs.map((entry) => ({ id: entry.id, data: entry.data() }));
@@ -448,7 +232,7 @@ export class FirebaseService {
 
   /** Einmaliges Lesen der Bewertung eines Spielers in einem Event (null = es gibt keine). */
   async readRatingDoc(eventId: string, playerId: string): Promise<Readonly<Record<string, unknown>> | null> {
-    const { db } = await this.init();
+    const { db } = await this.connection.get();
     const { doc, getDoc } = await import('firebase/firestore');
     const snapshot = await getDoc(doc(db, 'teams', environment.teamId, 'events', eventId, 'ratings', playerId));
     return snapshot.exists() ? snapshot.data() : null;
@@ -456,20 +240,20 @@ export class FirebaseService {
 
   /** Schreibt einen Eintrag vollständig (wie die bisherige App, mit `playerId` für Abfragen und Regeln). */
   async savePlayerRecord(playerId: string, name: PlayerRecordKind, id: string, data: Readonly<Record<string, unknown>>): Promise<void> {
-    const { db } = await this.init();
+    const { db } = await this.connection.get();
     const { doc, setDoc } = await import('firebase/firestore');
     await setDoc(doc(db, 'teams', environment.teamId, 'players', playerId, name, id), { ...data, playerId });
   }
 
   async deletePlayerRecord(playerId: string, name: PlayerRecordKind, id: string): Promise<void> {
-    const { db } = await this.init();
+    const { db } = await this.connection.get();
     const { deleteDoc, doc } = await import('firebase/firestore');
     await deleteDoc(doc(db, 'teams', environment.teamId, 'players', playerId, name, id));
   }
 
   /** Selbstreflexion: ändert nur diese beiden Felder des Förderplans (so erlauben es die Regeln dem Spieler). */
   async saveSelfReflection(playerId: string, planId: string, text: string, at: string): Promise<void> {
-    const { db } = await this.init();
+    const { db } = await this.connection.get();
     const { doc, setDoc } = await import('firebase/firestore');
     await setDoc(
       doc(db, 'teams', environment.teamId, 'players', playerId, 'developmentPlans', planId),
@@ -480,28 +264,28 @@ export class FirebaseService {
 
   /** Schreibt die Bewertung eines Spielers (merge, mit `playerId` für die Regeln und Abfragen der Spieleransicht). */
   async saveRating(eventId: string, playerId: string, data: Readonly<Record<string, unknown>>): Promise<void> {
-    const { db } = await this.init();
+    const { db } = await this.connection.get();
     const { doc, setDoc } = await import('firebase/firestore');
     await setDoc(doc(db, 'teams', environment.teamId, 'events', eventId, 'ratings', playerId), { ...data, playerId }, { merge: true });
   }
 
   /** Schreibt die interne Notiz. Sie liegt bewusst getrennt von der Bewertung, die Spieler und Eltern lesen dürfen. */
   async savePrivateNote(eventId: string, playerId: string, note: string): Promise<void> {
-    const { db } = await this.init();
+    const { db } = await this.connection.get();
     const { doc, setDoc } = await import('firebase/firestore');
     await setDoc(doc(db, 'teams', environment.teamId, 'events', eventId, 'privateNotes', playerId), { playerId, note }, { merge: true });
   }
 
   /** Legt ein Event an oder aktualisiert es (merge: Felder älterer Versionen bleiben erhalten). Nur Metadaten, nie Bewertungen. */
   async saveEvent(id: string, data: Readonly<Record<string, unknown>>): Promise<void> {
-    const { db } = await this.init();
+    const { db } = await this.connection.get();
     const { doc, setDoc } = await import('firebase/firestore');
     await setDoc(doc(db, 'teams', environment.teamId, 'events', id), data, { merge: true });
   }
 
   /** Löscht das Event samt Bewertungen und internen Notizen (in Blöcken, Limit 500 je Schreibvorgang). */
   async deleteEvent(id: string): Promise<void> {
-    const { db } = await this.init();
+    const { db } = await this.connection.get();
     const { collection, doc, getDocs, writeBatch } = await import('firebase/firestore');
     const base = ['teams', environment.teamId, 'events', id] as const;
     const [ratings, privateNotes] = await Promise.all([
@@ -522,14 +306,14 @@ export class FirebaseService {
 
   /** Legt einen Spieler an oder aktualisiert ihn (merge: unbekannte Felder älterer Versionen bleiben erhalten). */
   async savePlayer(id: string, data: Readonly<Record<string, unknown>>): Promise<void> {
-    const { db } = await this.init();
+    const { db } = await this.connection.get();
     const { doc, setDoc } = await import('firebase/firestore');
     await setDoc(doc(db, 'teams', environment.teamId, 'players', id), data, { merge: true });
   }
 
   /** Löscht den Spieler samt Unterdaten, Bewertungen und internen Notizen in allen Events (in Blöcken, Limit 500 je Schreibvorgang). */
   async deletePlayer(id: string): Promise<void> {
-    const { db } = await this.init();
+    const { db } = await this.connection.get();
     const { collection, doc, getDocs, query, where, writeBatch } = await import('firebase/firestore');
     const base = ['teams', environment.teamId] as const;
     const [events, invites, members, ...children] = await Promise.all([

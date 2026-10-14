@@ -1,10 +1,9 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { FirebaseService } from '../../core/firebase.service';
 import { LayoutService } from '../../core/layout.service';
 import { SessionService } from '../../core/session.service';
-import { FakeFirebase } from '../../core/testing';
+import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
 import { Squad } from './squad';
 
 describe('Squad (Kader-Seite)', () => {
@@ -18,7 +17,7 @@ describe('Squad (Kader-Seite)', () => {
     firebase.players.set('p2', { name: 'Elias Wagner', positions: ['RV'], number: 2, birthdate: '2012-06-06', status: 'Fit' });
     firebase.players.set('p3', { name: 'Jan Braun', positions: ['RA'], number: 17, birthdate: '2013-01-01', status: 'Verletzt' });
     TestBed.configureTestingModule({
-      providers: [provideRouter([]), { provide: FirebaseService, useValue: firebase }, { provide: LayoutService, useValue: { isMobile } }],
+      providers: [provideRouter([]), ...provideFakeFirebase(firebase), { provide: LayoutService, useValue: { isMobile } }],
     });
     TestBed.inject(SessionService).role.set(role);
     const fixture = TestBed.createComponent(Squad);

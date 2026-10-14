@@ -1,11 +1,10 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { FirebaseService } from '../../core/firebase.service';
 import { LayoutService } from '../../core/layout.service';
 import type { Role } from '../../core/role';
 import { SessionService } from '../../core/session.service';
-import { FakeFirebase } from '../../core/testing';
+import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
 import { MemberView } from './member-view';
 
 describe('MemberView (Ansicht für Spieler, Eltern und Medizin)', () => {
@@ -31,7 +30,7 @@ describe('MemberView (Ansicht für Spieler, Eltern und Medizin)', () => {
     if (role === 'player' || role === 'parent') firebase.readablePlayerDocs = new Set(playerId ? [playerId] : []);
     options.mutate?.(firebase);
     TestBed.configureTestingModule({
-      providers: [provideRouter([]), { provide: FirebaseService, useValue: firebase }, { provide: LayoutService, useValue: { isMobile: signal(false) } }],
+      providers: [provideRouter([]), ...provideFakeFirebase(firebase), { provide: LayoutService, useValue: { isMobile: signal(false) } }],
     });
     const session = TestBed.inject(SessionService);
     session.role.set(role);

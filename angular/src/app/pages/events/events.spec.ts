@@ -1,10 +1,9 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { FirebaseService } from '../../core/firebase.service';
 import { LayoutService } from '../../core/layout.service';
 import { SessionService } from '../../core/session.service';
-import { FakeFirebase } from '../../core/testing';
+import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
 import { Events } from './events';
 
 describe('Events (Events-Seite)', () => {
@@ -18,7 +17,7 @@ describe('Events (Events-Seite)', () => {
     firebase.events.set('e2', { type: 'Spiel', title: 'Heimspiel', date: '2026-10-10', opponent: 'SV Nord', goalsFor: 3, goalsAgainst: 1, intensity: 3 });
     firebase.events.set('e3', { type: 'Training', title: 'Training September', date: '2026-09-28' });
     TestBed.configureTestingModule({
-      providers: [provideRouter([]), { provide: FirebaseService, useValue: firebase }, { provide: LayoutService, useValue: { isMobile } }],
+      providers: [provideRouter([]), ...provideFakeFirebase(firebase), { provide: LayoutService, useValue: { isMobile } }],
     });
     TestBed.inject(SessionService).role.set(role);
     const fixture = TestBed.createComponent(Events);
@@ -183,7 +182,7 @@ describe('Events (Events-Seite)', () => {
       firebase = new FakeFirebase();
       firebase.watchEventsError = { code: 'permission-denied' };
       TestBed.configureTestingModule({
-        providers: [provideRouter([]), { provide: FirebaseService, useValue: firebase }, { provide: LayoutService, useValue: { isMobile } }],
+        providers: [provideRouter([]), ...provideFakeFirebase(firebase), { provide: LayoutService, useValue: { isMobile } }],
       });
       TestBed.inject(SessionService).role.set('trainer');
       const fixture = TestBed.createComponent(Events);

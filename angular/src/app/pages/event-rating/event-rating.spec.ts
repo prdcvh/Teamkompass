@@ -2,10 +2,9 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
-import { FirebaseService } from '../../core/firebase.service';
 import { LayoutService } from '../../core/layout.service';
 import { SessionService } from '../../core/session.service';
-import { FakeFirebase } from '../../core/testing';
+import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
 import { EventRating } from './event-rating';
 
 describe('EventRating (Event bewerten)', () => {
@@ -30,7 +29,7 @@ describe('EventRating (Event bewerten)', () => {
     const params = new BehaviorSubject(convertToParamMap({ id: eventId }));
     TestBed.configureTestingModule({
       providers: [
-        { provide: FirebaseService, useValue: firebase },
+        ...provideFakeFirebase(firebase),
         { provide: LayoutService, useValue: { isMobile } },
         { provide: ActivatedRoute, useValue: { paramMap: params } },
       ],
@@ -137,7 +136,7 @@ describe('EventRating (Event bewerten)', () => {
       firebase.watchRatingsError = { code: 'permission-denied' };
       TestBed.configureTestingModule({
         providers: [
-          { provide: FirebaseService, useValue: firebase },
+          ...provideFakeFirebase(firebase),
           { provide: LayoutService, useValue: { isMobile } },
           { provide: ActivatedRoute, useValue: { paramMap: new BehaviorSubject(convertToParamMap({ id: 'e1' })) } },
         ],
