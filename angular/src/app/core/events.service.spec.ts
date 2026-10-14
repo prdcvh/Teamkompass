@@ -132,7 +132,7 @@ describe('EventsService', () => {
       const events = setup();
       firebase.players.players.set('p1', { name: 'Ali', positions: ['ST'], number: 9, birthdate: '2012-05-05', status: 'Fit' });
       firebase.players.players.set('p2', { name: 'Ben', positions: ['IV'], number: 4, birthdate: '2012-06-06', status: 'Fit' });
-      firebase.playerRecords.set('p1/absences', new Map([['a1', { kind: 'absence', label: 'Urlaub', detail: '', from: '2026-10-01', to: '2026-10-20' }]]));
+      firebase.records.playerRecords.set('p1/absences', new Map([['a1', { kind: 'absence', label: 'Urlaub', detail: '', from: '2026-10-01', to: '2026-10-20' }]]));
       TestBed.inject(SquadService).start();
       events.start();
       await vi.waitFor(() => expect(events.load() === 'ready' && TestBed.inject(SquadService).load() === 'ready').toBe(true));
@@ -146,11 +146,11 @@ describe('EventsService', () => {
       await vi.waitFor(() => expect(saved()).toHaveLength(1));
       const eventId = [...firebase.events.events.keys()].find((id) => id !== 'e1')!;
       expect(saved()[0]).toBe(`saveRating:${eventId}:p1`);
-      const rating = firebase.ratings.get(eventId)?.get('p1');
+      const rating = firebase.ratings.ratings.get(eventId)?.get('p1');
       expect(rating?.['attendance']).toBe('absent');
       expect(rating?.['autoAbsence']).toBe(true);
       expect(String(rating?.['note'])).toContain('Urlaub');
-      expect(firebase.ratings.get(eventId)?.has('p2')).toBe(false);
+      expect(firebase.ratings.ratings.get(eventId)?.has('p2')).toBe(false);
     });
 
     it('prüft bei geändertem Datum erneut, bei gleichem Datum nicht', async () => {
@@ -164,7 +164,7 @@ describe('EventsService', () => {
 
     it('setzt eine von Hand gesetzte Anwesenheit nicht zurück', async () => {
       const events = await ready();
-      firebase.ratings.set('e1', new Map([['p1', { attendance: 'present', effort: 2, technique: 2, tactics: 2, comprehension: 2 }]]));
+      firebase.ratings.ratings.set('e1', new Map([['p1', { attendance: 'present', effort: 2, technique: 2, tactics: 2, comprehension: 2 }]]));
       events.save(draft({ id: 'e1', date: '2026-10-12', title: 'Training Mo' }));
       await vi.waitFor(() => expect(firebase.calls.some((call) => call === 'readRatingDoc:e1:p1')).toBe(true));
       await new Promise((resolve) => setTimeout(resolve, 20));
@@ -174,7 +174,7 @@ describe('EventsService', () => {
     it('meldet einen Lesefehler im Sync-Status und speichert das Event trotzdem', async () => {
       const events = await ready();
       vi.spyOn(console, 'error').mockImplementation(() => undefined);
-      firebase.readPlayerRecordsError = { code: 'permission-denied' };
+      firebase.records.readPlayerRecordsError = { code: 'permission-denied' };
       events.save(draft({ date: '2026-10-10' }));
       await vi.waitFor(() => expect(TestBed.inject(SyncService).isFailed()).toBe(true));
       expect(firebase.calls.some((call) => call.startsWith('saveEvent:'))).toBe(true);

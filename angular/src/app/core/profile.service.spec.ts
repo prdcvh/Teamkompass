@@ -11,7 +11,7 @@ describe('ProfileService', () => {
     firebase = new FakeFirebase();
     firebase.events.events.set('e1', { type: 'Training', title: 'Training', date: '2026-10-01' });
     firebase.events.events.set('e2', { type: 'Spiel', title: 'Spiel', date: '2026-10-05', matchDuration: 70 });
-    firebase.ratings.set('e1', new Map([['p1', { attendance: 'present', effort: 2, technique: 2, tactics: 2, comprehension: 2, grade: 2, playerId: 'p1' }]]));
+    firebase.ratings.ratings.set('e1', new Map([['p1', { attendance: 'present', effort: 2, technique: 2, tactics: 2, comprehension: 2, grade: 2, playerId: 'p1' }]]));
     TestBed.configureTestingModule({ providers: [...provideFakeFirebase(firebase)] });
     TestBed.inject(SessionService).role.set(role);
     const events = TestBed.inject(EventsService);
@@ -46,7 +46,7 @@ describe('ProfileService', () => {
     const profile = await setup();
     profile.start('p1');
     await settle(profile);
-    firebase.pushRatingDoc('e2', 'p1', { attendance: 'present', effort: 1, technique: 1, tactics: 1, comprehension: 1 });
+    firebase.ratings.pushRatingDoc('e2', 'p1', { attendance: 'present', effort: 1, technique: 1, tactics: 1, comprehension: 1 });
     expect(profile.items()[0].rating?.attendance).toBe('present');
 
     firebase.events.events.set('e3', { type: 'Training', title: 'Neu', date: '2026-10-09' });
@@ -60,11 +60,11 @@ describe('ProfileService', () => {
     const profile = await setup();
     profile.start('p1');
     await settle(profile);
-    expect(firebase.ratingDocWatchers).toBe(2);
+    expect(firebase.ratings.ratingDocWatchers).toBe(2);
     firebase.events.events.delete('e1');
     firebase.events.emitEvents();
     await settle(profile);
-    expect(firebase.ratingDocWatchers).toBe(1);
+    expect(firebase.ratings.ratingDocWatchers).toBe(1);
     expect(profile.items().map((item) => item.event.id)).toEqual(['e2']);
   });
 
@@ -74,7 +74,7 @@ describe('ProfileService', () => {
     await settle(profile);
     profile.start('p2');
     await settle(profile);
-    expect(firebase.ratingDocWatchers).toBe(2);
+    expect(firebase.ratings.ratingDocWatchers).toBe(2);
     expect(firebase.calls).toContain('watchRatingDoc:e1:p2');
     expect(profile.items().every((item) => item.rating === null)).toBe(true);
   });
@@ -82,10 +82,10 @@ describe('ProfileService', () => {
   it('meldet Fehler verständlich und startet mit „Erneut versuchen“ neu', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const profile = await setup();
-    firebase.watchRatingDocError = { code: 'permission-denied' };
+    firebase.ratings.watchRatingDocError = { code: 'permission-denied' };
     profile.start('p1');
     await vi.waitFor(() => expect(profile.error()).toContain('Das Profil konnte nicht geladen werden'));
-    firebase.watchRatingDocError = null;
+    firebase.ratings.watchRatingDocError = null;
     profile.retry();
     await settle(profile);
     expect(profile.error()).toBe('');
@@ -100,6 +100,6 @@ describe('ProfileService', () => {
     TestBed.tick();
     expect(profile.playerId()).toBeNull();
     expect(profile.items()).toEqual([]);
-    expect(firebase.ratingDocWatchers).toBe(0);
+    expect(firebase.ratings.ratingDocWatchers).toBe(0);
   });
 });

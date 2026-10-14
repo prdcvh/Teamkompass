@@ -31,18 +31,22 @@ Aus dem Repo-Root prüft `npm run verify` Live-Kopien und Angular zusammen (Lint
 Zielstruktur unter `src/app/`:
 
 ```
-core/            fachliche Logik und Dienste, nach Thema in Unterordnern
-  firebase/      Verbindung, Anmeldung, Zugänge (SCRUM-108)
-  squad/ events/ lineup/ opponents/   Firestore-Zugriff + Logik je Thema (SCRUM-109)
-  ratings/ notes/ records/            Bewertungen, Notizen, Spieler-Unterdaten (SCRUM-110/111)
-  testing/       gemeinsame Test-Hilfen, nach Thema aufgeteilt
+core/
+  firebase/      Datenbankzugriff, eine Zugriffsklasse je Thema (SCRUM-108..110):
+                 firebase-connection, auth, access, players, events, lineup,
+                 opponents, ratings, player-records (+ types.ts)
+  testing/       Test-Attrappen, je Zugriffsklasse eine (fake-*.api.ts);
+                 FakeFirebase + provideFakeFirebase bündeln sie für TestBed
+  …              fachliche Logik und Dienste, nach Thema in Unterordnern (SCRUM-111..113)
 pages/<seite>/   eine Komponente je Seite (Template, Styles, Test daneben)
 shell/           Rahmen: Seitenleiste, Tab-Leiste, Mehr-Menü
 ui/              wiederverwendbare Basis-Bausteine (Button, Karte, Dialog, …)
 ```
 
-Die Ordner unter `core/` entstehen schrittweise mit den Tickets der Reihe; bis dahin liegen die
-Dateien noch flach in `core/`.
+Ein Dienst injiziert nur die Zugriffsklassen, die er braucht (z. B. `SquadService` nur `PlayersApi`).
+
+Die übrigen Dateien liegen noch flach in `core/` und werden mit SCRUM-111 bis SCRUM-113 in
+Fachordner sortiert.
 
 ## Abhängigkeiten und `npm audit` (SCRUM-56)
 

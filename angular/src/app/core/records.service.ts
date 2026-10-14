@@ -1,6 +1,7 @@
 import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { authErrorMessage, errorCode } from './auth-errors';
-import { FirebaseService, type PlayerRecordKind } from './firebase.service';
+import { PlayerRecordsApi, type PlayerRecordKind } from './firebase/player-records.api';
+import { RatingsApi } from './firebase/ratings.api';
 import type { RawDoc, SnapshotMeta } from './firebase/types';
 import { todayIso } from './player';
 import { ProfileService } from './profile.service';
@@ -42,7 +43,8 @@ import { SyncService } from './sync.service';
  */
 @Injectable({ providedIn: 'root' })
 export class RecordsService {
-  private readonly firebase = inject(FirebaseService);
+  private readonly playerRecordsApi = inject(PlayerRecordsApi);
+  private readonly ratingsApi = inject(RatingsApi);
   private readonly session = inject(SessionService);
   private readonly sync = inject(SyncService);
   private readonly squad = inject(SquadService);
@@ -119,7 +121,7 @@ export class RecordsService {
     const id = draft.id ?? `dp${crypto.randomUUID()}`;
     const plan = planFromDraft(draft, id, this.plans().find((item) => item.id === id), todayIso());
     this.plans.update((list) => [...list.filter((item) => item.id !== id), plan]);
-    this.write('Förderplan konnte nicht gespeichert werden.', () => this.firebase.savePlayerRecord(playerId, 'developmentPlans', id, docFromPlan(plan)));
+    this.write('Förderplan konnte nicht gespeichert werden.', () => this.playerRecordsApi.savePlayerRecord(playerId, 'developmentPlans', id, docFromPlan(plan)));
     return {};
   }
 
@@ -137,7 +139,7 @@ export class RecordsService {
     this.plans.update((list) => list.map((plan) => (plan.id === planId ? { ...plan, selfReflection: reflection, selfReflectionAt: at } : plan)));
     this.markSyncing();
     try {
-      await this.firebase.saveSelfReflection(playerId, planId, reflection, at);
+      await this.playerRecordsApi.saveSelfReflection(playerId, planId, reflection, at);
       this.sync.clearError();
       return true;
     } catch (error) {
@@ -157,7 +159,7 @@ export class RecordsService {
     const absence = absenceFromDraft(draft, id);
     const next = [...this.absences().filter((item) => item.id !== id), absence];
     this.absences.set(next);
-    this.write('Abwesenheit konnte nicht gespeichert werden.', () => this.firebase.savePlayerRecord(playerId, 'absences', id, docFromAbsence(absence)));
+    this.write('Abwesenheit konnte nicht gespeichert werden.', () => this.playerRecordsApi.savePlayerRecord(playerId, 'absences', id, docFromAbsence(absence)));
     this.reconcileAbsences(playerId, next);
     return {};
   }
@@ -183,7 +185,7 @@ export class RecordsService {
       if (!next) continue;
       changed += 1;
       this.write('Abwesenheit konnte nicht in die Event-Bewertung übernommen werden.', () =>
-        this.firebase.saveRating(event.id, playerId, docFromRating(next, { clearAuto: true })),
+        this.ratingsApi.saveRating(event.id, playerId, docFromRating(next, { clearAuto: true })),
       );
     }
     return changed;
@@ -199,7 +201,7 @@ export class RecordsService {
     const id = draft.id ?? `me${crypto.randomUUID()}`;
     const measurement = measurementFromDraft(draft, id);
     this.measurementList.update((list) => [...list.filter((item) => item.id !== id), measurement]);
-    this.write('Messung konnte nicht gespeichert werden.', () => this.firebase.savePlayerRecord(playerId, 'measurements', id, docFromMeasurement(measurement)));
+    this.write('Messung konnte nicht gespeichert werden.', () => this.playerRecordsApi.savePlayerRecord(playerId, 'measurements', id, docFromMeasurement(measurement)));
     return {};
   }
 
@@ -225,7 +227,7 @@ export class RecordsService {
     if (!playerId) return false;
     this.markSyncing();
     try {
-      await this.firebase.deletePlayerRecord(playerId, kind, id);
+      await this.playerRecordsApi.deletePlayerRecord(playerId, kind, id);
       set(current.filter((item) => item.id !== id));
       this.sync.clearError();
       return true;
@@ -243,7 +245,7 @@ export class RecordsService {
   }
 
   private open(generation: number, playerId: string, kind: PlayerRecordKind, ownOnly: boolean, apply: (docs: RawDoc[]) => void): void {
-    this.firebase
+    this.playerRecordsApi
       .watchPlayerRecords(
         playerId,
         kind,

@@ -21,11 +21,11 @@ describe('EventRating (Event bewerten)', () => {
     firebase.players.players.set('p1', { name: 'Jonas Keller', positions: ['TW'], number: 1, birthdate: '2012-05-05', status: 'Fit' });
     firebase.players.players.set('p2', { name: 'Elias Wagner', positions: ['RV'], number: 2, birthdate: '2012-06-06', status: 'Fit', ...(consent ? { consentStatus: consent } : {}) });
     firebase.players.players.set('p3', { name: '<b>Jan</b> Braun', positions: ['ST'], number: 9, birthdate: '2013-01-01', status: 'Fit' });
-    firebase.ratings.set('e1', new Map([
+    firebase.ratings.ratings.set('e1', new Map([
       ['p1', { attendance: 'present', effort: 1, technique: 2, tactics: 3, comprehension: 4, grade: 2.3, minutes: 70, goals: 1, assists: '', note: 'Starkes Spiel', playerId: 'p1' }],
       ['p3', { attendance: 'absent', note: 'Verletzt', autoAbsence: true, playerId: 'p3' }],
     ]));
-    firebase.privateNotes.set('e1', new Map([['p1', { playerId: 'p1', note: 'Vertraulich' }]]));
+    firebase.ratings.privateNotes.set('e1', new Map([['p1', { playerId: 'p1', note: 'Vertraulich' }]]));
     const params = new BehaviorSubject(convertToParamMap({ id: eventId }));
     TestBed.configureTestingModule({
       providers: [
@@ -92,7 +92,7 @@ describe('EventRating (Event bewerten)', () => {
       pick(q<HTMLSelectElement>(fixture, 'select[aria-label="Anwesenheit: Jonas Keller"]')!, 'absent');
       fixture.detectChanges();
       expect(text(qa(fixture, 'tbody tr')[0].querySelector('.grade-total'))).toBe('–');
-      await vi.waitFor(() => expect(firebase.ratings.get('e1')?.get('p1')).toMatchObject({ attendance: 'absent', effort: '', grade: '', minutes: '' }));
+      await vi.waitFor(() => expect(firebase.ratings.ratings.get('e1')?.get('p1')).toMatchObject({ attendance: 'absent', effort: '', grade: '', minutes: '' }));
     });
 
     it('speichert Feedback sichtbar und interne Notiz getrennt', async () => {
@@ -100,10 +100,10 @@ describe('EventRating (Event bewerten)', () => {
       pick(q<HTMLInputElement>(fixture, 'input[aria-label="Feedback an Elias Wagner"]')!, 'Gute Laufwege');
       pick(q<HTMLInputElement>(fixture, 'input[aria-label="Interne Notiz für Elias Wagner"]')!, 'Gespräch nötig');
       await vi.waitFor(() => {
-        expect(firebase.ratings.get('e1')?.get('p2')?.['note']).toBe('Gute Laufwege');
-        expect(firebase.privateNotes.get('e1')?.get('p2')?.['note']).toBe('Gespräch nötig');
+        expect(firebase.ratings.ratings.get('e1')?.get('p2')?.['note']).toBe('Gute Laufwege');
+        expect(firebase.ratings.privateNotes.get('e1')?.get('p2')?.['note']).toBe('Gespräch nötig');
       });
-      expect(JSON.stringify([...firebase.ratings.get('e1')!.values()])).not.toContain('Gespräch nötig');
+      expect(JSON.stringify([...firebase.ratings.ratings.get('e1')!.values()])).not.toContain('Gespräch nötig');
     });
 
     it('filtert nach „Nur anwesend“ und „Nur fehlend“', async () => {
@@ -133,7 +133,7 @@ describe('EventRating (Event bewerten)', () => {
       vi.spyOn(console, 'error').mockImplementation(() => undefined);
       isMobile.set(false);
       firebase = new FakeFirebase();
-      firebase.watchRatingsError = { code: 'permission-denied' };
+      firebase.ratings.watchRatingsError = { code: 'permission-denied' };
       TestBed.configureTestingModule({
         providers: [
           ...provideFakeFirebase(firebase),
@@ -188,7 +188,7 @@ describe('EventRating (Event bewerten)', () => {
       }
       expect(q(fixture, 'button[aria-label="Einsatz Note 2"]')?.getAttribute('aria-pressed')).toBe('true');
       expect(text(q(fixture, '.card-head'))).toContain('Gesamtnote 2,0');
-      await vi.waitFor(() => expect(firebase.ratings.get('e1')?.get('p2')).toMatchObject({ attendance: 'present', grade: 2, effort: 2, comprehension: 2 }));
+      await vi.waitFor(() => expect(firebase.ratings.ratings.get('e1')?.get('p2')).toMatchObject({ attendance: 'present', grade: 2, effort: 2, comprehension: 2 }));
       q<HTMLButtonElement>(fixture, 'button[aria-label="Einsatz nicht erfasst"]')!.click();
       fixture.detectChanges();
       expect(text(q(fixture, '.card-head'))).toContain('Gesamtnote –');

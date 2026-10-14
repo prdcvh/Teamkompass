@@ -206,18 +206,18 @@ describe('SquadService', () => {
       const squad = await ready();
       expect(edit(squad, { status: 'Verletzt', injuryUntil: '2026-10-31' })).toEqual({});
       await vi.waitFor(() => expect(saved()).toEqual(['saveRating:e1:p1']));
-      expect(firebase.ratings.get('e1')?.get('p1')?.['autoAbsence']).toBe(true);
-      expect(firebase.ratings.get('e2')?.has('p1') ?? false).toBe(false); // nach „verletzt bis“
+      expect(firebase.ratings.ratings.get('e1')?.get('p1')?.['autoAbsence']).toBe(true);
+      expect(firebase.ratings.ratings.get('e2')?.has('p1') ?? false).toBe(false); // nach „verletzt bis“
     });
 
     it('nimmt automatisch gesetztes „Fehlt“ zurück, wenn der Spieler wieder fit ist', async () => {
       const squad = await ready();
       firebase.players.players.set('p1', { name: 'Ali Adler', positions: ['ST'], number: 9, birthdate: '2012-05-05', status: 'Verletzt', injuryUntil: '2026-10-31' });
       firebase.players.emitPlayers();
-      firebase.ratings.set('e1', new Map([['p1', { attendance: 'absent', autoAbsence: true, note: 'Verletzt (ca. bis 31.10.2026)' }]]));
+      firebase.ratings.ratings.set('e1', new Map([['p1', { attendance: 'absent', autoAbsence: true, note: 'Verletzt (ca. bis 31.10.2026)' }]]));
       edit(squad, { status: 'Fit', injuryUntil: '' });
       await vi.waitFor(() => expect(saved()).toEqual(['saveRating:e1:p1']));
-      expect(firebase.ratings.get('e1')?.get('p1')?.['attendance']).toBe('open');
+      expect(firebase.ratings.ratings.get('e1')?.get('p1')?.['attendance']).toBe('open');
     });
 
     it('fasst Events nicht an, wenn sich Status und „verletzt bis“ nicht ändern', async () => {

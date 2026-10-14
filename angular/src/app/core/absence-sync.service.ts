@@ -1,7 +1,8 @@
 import { Injectable, inject } from '@angular/core';
 import { authErrorMessage, errorCode } from './auth-errors';
 import { type TeamEvent } from './event';
-import { FirebaseService } from './firebase.service';
+import { PlayerRecordsApi } from './firebase/player-records.api';
+import { RatingsApi } from './firebase/ratings.api';
 import { type Player } from './player';
 import { docFromRating, ratingFromDoc } from './rating';
 import { absenceFromDoc, autoAbsenceRating, unavailabilityReason } from './records';
@@ -16,7 +17,8 @@ import { SyncService } from './sync.service';
  */
 @Injectable({ providedIn: 'root' })
 export class AbsenceSyncService {
-  private readonly firebase = inject(FirebaseService);
+  private readonly playerRecordsApi = inject(PlayerRecordsApi);
+  private readonly ratingsApi = inject(RatingsApi);
   private readonly session = inject(SessionService);
   private readonly sync = inject(SyncService);
 
@@ -37,14 +39,14 @@ export class AbsenceSyncService {
   private async reconcileOne(event: TeamEvent, player: Player): Promise<number> {
     try {
       const [absenceDocs, ratingDoc] = await Promise.all([
-        this.firebase.readPlayerRecords(player.id, 'absences'),
-        this.firebase.readRatingDoc(event.id, player.id),
+        this.playerRecordsApi.readPlayerRecords(player.id, 'absences'),
+        this.ratingsApi.readRatingDoc(event.id, player.id),
       ]);
       const absences = absenceDocs.map((entry) => absenceFromDoc(entry.id, entry.data));
       const existing = ratingDoc ? ratingFromDoc(ratingDoc) : null;
       const next = autoAbsenceRating(existing, unavailabilityReason(player, absences, event.date));
       if (!next) return 0;
-      await this.firebase.saveRating(event.id, player.id, docFromRating(next, { clearAuto: true }));
+      await this.ratingsApi.saveRating(event.id, player.id, docFromRating(next, { clearAuto: true }));
       return 1;
     } catch (error) {
       console.error(error);

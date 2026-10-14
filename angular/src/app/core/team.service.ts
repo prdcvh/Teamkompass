@@ -1,7 +1,8 @@
 import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { authErrorMessage, errorCode } from './auth-errors';
 import { EventsService } from './events.service';
-import { FirebaseService } from './firebase.service';
+import { PlayerRecordsApi } from './firebase/player-records.api';
+import { RatingsApi } from './firebase/ratings.api';
 import type { RawDoc, SnapshotMeta } from './firebase/types';
 import { todayIso } from './player';
 import { type Rating, ratingFromDoc } from './rating';
@@ -18,7 +19,8 @@ import { type PlayerData, type RatingsByEvent, itemsFor } from './team';
  */
 @Injectable({ providedIn: 'root' })
 export class TeamService {
-  private readonly firebase = inject(FirebaseService);
+  private readonly playerRecordsApi = inject(PlayerRecordsApi);
+  private readonly ratingsApi = inject(RatingsApi);
   private readonly session = inject(SessionService);
   private readonly sync = inject(SyncService);
   private readonly squad = inject(SquadService);
@@ -143,8 +145,8 @@ export class TeamService {
     };
     const subscribe =
       key.startsWith('r:')
-        ? this.firebase.watchRatings(id, onData, onError)
-        : this.firebase.watchPlayerRecords(id, key.startsWith('a:') ? 'absences' : 'measurements', onData, onError);
+        ? this.ratingsApi.watchRatings(id, onData, onError)
+        : this.playerRecordsApi.watchPlayerRecords(id, key.startsWith('a:') ? 'absences' : 'measurements', onData, onError);
     subscribe
       .then((unsubscribe) => {
         this.opening.delete(key);

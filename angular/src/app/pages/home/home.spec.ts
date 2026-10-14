@@ -25,7 +25,7 @@ describe('Home (Start-Dashboard)', () => {
     firebase.players.players.set('p2', { name: '<b>Ben</b>', positions: ['IV'], number: 4, birthdate: '2012-06-06', status: 'Verletzt' });
     firebase.events.events.set('e1', { type: 'Spiel', title: 'Heimspiel', date: day(-3), goalsFor: 3, goalsAgainst: 1, matchDuration: 70 });
     firebase.events.events.set('e2', { type: 'Spiel', title: '<img src=x onerror=alert(1)>', date: day(4), opponent: 'SV Nord', location: 'Kunstrasen' });
-    firebase.ratings.set('e1', new Map([['p1', { attendance: 'present', effort: 2, technique: 2, tactics: 2, comprehension: 2, playerId: 'p1' }]]));
+    firebase.ratings.ratings.set('e1', new Map([['p1', { attendance: 'present', effort: 2, technique: 2, tactics: 2, comprehension: 2, playerId: 'p1' }]]));
     TestBed.configureTestingModule({
       providers: [provideRouter([]), ...provideFakeFirebase(firebase), { provide: LayoutService, useValue: { isMobile } }],
     });
