@@ -337,6 +337,32 @@ test("Angular-Target u14: Output, SPA-Rewrite, Caching, CSP und Deploy-Schritt",
   assert.match(deploy, /npm run verify/, "Der Angular-Build laeuft ueber verify vor dem Deploy");
 });
 
+test("Angular-PWA (SCRUM-76): Manifest, Service Worker im Produktions-Build, Update-Dateien nie lange gecacht", async () => {
+  const angular = JSON.parse(await read("angular/angular.json"));
+  const build = angular.projects["teamkompass-angular"].architect.build;
+  assert.equal(build.configurations.production.serviceWorker, "ngsw-config.json");
+  const ngsw = JSON.parse(await read("angular/ngsw-config.json"));
+  assert.equal(ngsw.index, "/index.html");
+  assert.ok(ngsw.assetGroups.some((group) => group.installMode === "prefetch" && group.resources.files.includes("/index.html")), "App-Shell muss vorgeladen werden (Offline-Start)");
+  assert.ok(!JSON.stringify(ngsw).includes("googleapis"), "Firestore-/Auth-Anfragen gehoeren nicht in den Service-Worker-Cache");
+
+  const manifest = JSON.parse(await read("angular/public/manifest.webmanifest"));
+  assert.equal(manifest.display, "standalone");
+  for (const icon of manifest.icons) await read(`angular/public/${icon.src}`);
+  assert.ok(manifest.icons.some((icon) => icon.purpose === "maskable"));
+  const index = await read("angular/src/index.html");
+  assert.match(index, /<link rel="manifest" href="manifest.webmanifest">/);
+
+  // ngsw.json/ngsw-worker.js duerfen nicht unter die Jahres-Cache-Regel fallen, sonst sieht niemand ein Update.
+  const config = JSON.parse(await read("firebase.json"));
+  const target = config.hosting.find((entry) => entry.target === "u14");
+  const immutableSources = target.headers.filter((entry) => entry.headers.some((header) => /immutable/.test(header.value))).map((entry) => entry.source);
+  for (const source of immutableSources) {
+    assert.notEqual(source, "**", "Die Sammelregel darf nicht immutable sein");
+    assert.doesNotMatch(source, /ngsw|\.json|webmanifest/, `${source} wuerde den Service Worker einfrieren`);
+  }
+});
+
 test("Spieler loeschen raeumt auch Einladungen und Zugaenge (invites/members) auf", async () => {
   for (const team of teams) {
     const app = await read(`outputs/${team}/app.js`);

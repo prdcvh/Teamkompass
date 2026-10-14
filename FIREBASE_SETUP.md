@@ -216,6 +216,9 @@ Die Angular-Neuentwicklung (Jira-Epic SCRUM-40) wird als eigene Hosting-Site
   `npm run verify`; danach deployt ein eigener Schritt `target: u14` (als letzter Schritt,
   damit ein Problem dort die Live-Teams nicht aufhaelt).
 - Fuer Pull-Request-Vorschauen wird das Target nicht gebaut (es gibt dafuer noch keine Site).
+- PWA (SCRUM-76): Manifest `angular/public/manifest.webmanifest`, Service Worker von Angular
+  (`angular/ngsw-config.json`, nur im Produktions-Build). `ngsw.json`/`ngsw-worker.js` fallen unter
+  die `no-cache`-Regel `**`, Updates kommen also sofort an (Hinweis "Neue Version verfuegbar").
 
 **Einmalig vor dem Merge (nur Product Owner):**
 1. Site anlegen: `firebase hosting:sites:create teamkompass-u14 --project teamkompass-b8aac`
