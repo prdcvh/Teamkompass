@@ -19,13 +19,13 @@ describe('MemberView (Ansicht für Spieler, Eltern und Medizin)', () => {
     firebase.players.players.set('p2', { name: 'Elias Wagner', positions: ['RV'], number: 2, birthdate: '2012-06-06', status: 'Verletzt', injuryUntil: '2026-12-01' });
     firebase.events.events.set('e1', { type: 'Training', title: 'Training Montag', date: '2026-09-01', intensity: 2, notes: 'Interne Planung' });
     firebase.events.events.set('e2', { type: 'Spiel', title: 'Heimspiel', date: '2026-09-08', goalsFor: 3, goalsAgainst: 1 });
-    firebase.ratings.set('e1', new Map([['p1', grades(3, { playerId: 'p1' })], ['p2', grades(5, { playerId: 'p2', note: 'Nur für Elias' })]]));
-    firebase.ratings.set('e2', new Map([['p1', grades(1, { playerId: 'p1', note: 'Starkes Spiel', goals: 2, assists: 1 })]]));
-    firebase.privateNotes.set('e2', new Map([['p1', { playerId: 'p1', note: 'GEHEIME Trainernotiz' }]]));
-    firebase.playerRecords.set('p1/developmentPlans', new Map([['dp1', { focus: 'Orientierung', goal: 'Blick heben', status: 'In Arbeit', createdAt: '2026-09-01', selfReflection: '', coachReview: 'Gut dran' }]]));
-    firebase.playerRecords.set('p1/absences', new Map([['ab1', { kind: 'absence', label: 'Schule', from: '2026-09-01', to: '2026-09-02', playerId: 'p1' }]]));
-    firebase.playerRecords.set('p1/measurements', new Map([['me1', { date: '2026-07-01', height: '150', weight: '40', playerId: 'p1' }]]));
-    firebase.playerRecords.set('p2/absences', new Map([['ab2', { kind: 'injury', label: 'Zerrung', from: '2026-09-01', to: '2026-12-01', playerId: 'p2' }]]));
+    firebase.ratings.ratings.set('e1', new Map([['p1', grades(3, { playerId: 'p1' })], ['p2', grades(5, { playerId: 'p2', note: 'Nur für Elias' })]]));
+    firebase.ratings.ratings.set('e2', new Map([['p1', grades(1, { playerId: 'p1', note: 'Starkes Spiel', goals: 2, assists: 1 })]]));
+    firebase.ratings.privateNotes.set('e2', new Map([['p1', { playerId: 'p1', note: 'GEHEIME Trainernotiz' }]]));
+    firebase.records.playerRecords.set('p1/developmentPlans', new Map([['dp1', { focus: 'Orientierung', goal: 'Blick heben', status: 'In Arbeit', createdAt: '2026-09-01', selfReflection: '', coachReview: 'Gut dran' }]]));
+    firebase.records.playerRecords.set('p1/absences', new Map([['ab1', { kind: 'absence', label: 'Schule', from: '2026-09-01', to: '2026-09-02', playerId: 'p1' }]]));
+    firebase.records.playerRecords.set('p1/measurements', new Map([['me1', { date: '2026-07-01', height: '150', weight: '40', playerId: 'p1' }]]));
+    firebase.records.playerRecords.set('p2/absences', new Map([['ab2', { kind: 'injury', label: 'Zerrung', from: '2026-09-01', to: '2026-12-01', playerId: 'p2' }]]));
     // Spieler und Eltern dürfen wie in den Regeln nur ihr eigenes Spielerdokument lesen.
     if (role === 'player' || role === 'parent') firebase.players.readablePlayerDocs = new Set(playerId ? [playerId] : []);
     options.mutate?.(firebase);
@@ -102,7 +102,7 @@ describe('MemberView (Ansicht für Spieler, Eltern und Medizin)', () => {
       const save = [...root(fixture).querySelectorAll('button')].find((button) => button.textContent?.includes('Reflexion speichern')) as HTMLButtonElement;
       save.click();
       await vi.waitFor(() => expect(firebase.calls).toContain('saveSelfReflection:p1:dp1'));
-      expect(firebase.playerRecords.get('p1/developmentPlans')?.get('dp1')?.['selfReflection']).toBe('Ich achte mehr auf den Blick.');
+      expect(firebase.records.playerRecords.get('p1/developmentPlans')?.get('dp1')?.['selfReflection']).toBe('Ich achte mehr auf den Blick.');
     });
 
     it('hat keine Schaltflächen zum Ändern von Plänen, Abwesenheiten oder Messwerten', async () => {

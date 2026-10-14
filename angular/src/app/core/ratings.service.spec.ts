@@ -11,8 +11,8 @@ describe('RatingsService', () => {
   async function setup(role: 'trainer' | 'medical' | 'player' | null = 'trainer') {
     firebase = new FakeFirebase();
     firebase.events.events.set('e1', { type: 'Spiel', title: 'Heimspiel', date: '2026-10-10', matchDuration: 70 });
-    firebase.ratings.set('e1', new Map([['p1', { attendance: 'present', effort: 2, technique: 2, tactics: 2, comprehension: 2, grade: 2, minutes: 70, goals: '', assists: '', note: 'Gut', playerId: 'p1' }]]));
-    firebase.privateNotes.set('e1', new Map([['p1', { playerId: 'p1', note: 'Nur für uns' }]]));
+    firebase.ratings.ratings.set('e1', new Map([['p1', { attendance: 'present', effort: 2, technique: 2, tactics: 2, comprehension: 2, grade: 2, minutes: 70, goals: '', assists: '', note: 'Gut', playerId: 'p1' }]]));
+    firebase.ratings.privateNotes.set('e1', new Map([['p1', { playerId: 'p1', note: 'Nur für uns' }]]));
     TestBed.configureTestingModule({ providers: [...provideFakeFirebase(firebase)] });
     TestBed.inject(SessionService).role.set(role);
     const events = TestBed.inject(EventsService);
@@ -38,10 +38,10 @@ describe('RatingsService', () => {
     ratings.start('e1');
     ratings.start('e1');
     await vi.waitFor(() => expect(ratings.load()).toBe('ready'));
-    expect(firebase.ratingWatchers).toBe(2); // Bewertungen + interne Notizen, je ein Abo
+    expect(firebase.ratings.ratingWatchers).toBe(2); // Bewertungen + interne Notizen, je ein Abo
     ratings.start('e2');
     await vi.waitFor(() => expect(ratings.load()).toBe('ready'));
-    expect(firebase.ratingWatchers).toBe(2);
+    expect(firebase.ratings.ratingWatchers).toBe(2);
     expect(firebase.calls).toContain('watchRatings:e2');
     expect(ratings.ratingFor('p1').attendance).toBe('open');
   });
@@ -64,8 +64,8 @@ describe('RatingsService', () => {
     expect(ratings.setField('p2', 'attendance', 'present')).toBe(true);
     expect(ratings.ratingFor('p2').attendance).toBe('present');
     for (const [field, value] of [['effort', '1'], ['technique', '2'], ['tactics', '3'], ['comprehension', '4']] as const) ratings.setField('p2', field, value);
-    await vi.waitFor(() => expect(firebase.ratings.get('e1')?.get('p2')?.['grade']).toBe(2.3));
-    expect(firebase.ratings.get('e1')?.get('p2')).toMatchObject({ playerId: 'p2', attendance: 'present', effort: 1, technique: 2, tactics: 3, comprehension: 4 });
+    await vi.waitFor(() => expect(firebase.ratings.ratings.get('e1')?.get('p2')?.['grade']).toBe(2.3));
+    expect(firebase.ratings.ratings.get('e1')?.get('p2')).toMatchObject({ playerId: 'p2', attendance: 'present', effort: 1, technique: 2, tactics: 3, comprehension: 4 });
   });
 
   it('schnelle aufeinanderfolgende Änderungen am selben Spieler überschreiben sich nicht', async () => {
@@ -91,34 +91,34 @@ describe('RatingsService', () => {
     ratings.start('e1');
     await vi.waitFor(() => expect(ratings.load()).toBe('ready'));
     expect(ratings.setPrivateNote('p1', 'Vertraulich')).toBe(true);
-    await vi.waitFor(() => expect(firebase.privateNotes.get('e1')?.get('p1')?.['note']).toBe('Vertraulich'));
-    expect(JSON.stringify([...(firebase.ratings.get('e1')?.values() ?? [])])).not.toContain('Vertraulich');
+    await vi.waitFor(() => expect(firebase.ratings.privateNotes.get('e1')?.get('p1')?.['note']).toBe('Vertraulich'));
+    expect(JSON.stringify([...(firebase.ratings.ratings.get('e1')?.values() ?? [])])).not.toContain('Vertraulich');
     expect(ratings.setPrivateNote('p1', 'Vertraulich')).toBe(false);
   });
 
   it('nimmt bei einer Handänderung die Abwesenheits-Markierung zurück', async () => {
     const ratings = await setup();
-    firebase.ratings.get('e1')?.set('p9', { attendance: 'absent', note: 'Verletzt', autoAbsence: true, playerId: 'p9' });
+    firebase.ratings.ratings.get('e1')?.set('p9', { attendance: 'absent', note: 'Verletzt', autoAbsence: true, playerId: 'p9' });
     ratings.start('e1');
     await vi.waitFor(() => expect(ratings.load()).toBe('ready'));
     ratings.setField('p9', 'note', 'Doch krank');
-    await vi.waitFor(() => expect(firebase.ratings.get('e1')?.get('p9')?.['autoAbsence']).toBe(false));
+    await vi.waitFor(() => expect(firebase.ratings.ratings.get('e1')?.get('p9')?.['autoAbsence']).toBe(false));
   });
 
   it('meldet Lade- und Speicherfehler', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const ratings = await setup();
-    firebase.watchRatingsError = { code: 'permission-denied' };
+    firebase.ratings.watchRatingsError = { code: 'permission-denied' };
     ratings.start('e1');
     await vi.waitFor(() => expect(ratings.load()).toBe('error'));
     expect(ratings.error()).toContain('Die Bewertungen konnten nicht geladen werden');
-    firebase.watchRatingsError = null;
+    firebase.ratings.watchRatingsError = null;
     ratings.stop();
     ratings.start('e1');
     await vi.waitFor(() => expect(ratings.load()).toBe('ready'));
     TestBed.inject(SyncService).clearError();
 
-    firebase.saveRatingError = { code: 'unavailable' };
+    firebase.ratings.saveRatingError = { code: 'unavailable' };
     ratings.setField('p1', 'effort', '3');
     await vi.waitFor(() => expect(TestBed.inject(SyncService).state()).toBe('error'));
     expect(TestBed.inject(SyncService).detail()).toContain('Bewertung konnte nicht gespeichert werden');
@@ -132,6 +132,6 @@ describe('RatingsService', () => {
     TestBed.tick();
     expect(ratings.load()).toBe('idle');
     expect(ratings.ratingFor('p1').attendance).toBe('open');
-    expect(firebase.ratingWatchers).toBe(0);
+    expect(firebase.ratings.ratingWatchers).toBe(0);
   });
 });

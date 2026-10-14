@@ -1,18 +1,11 @@
 import { Injectable, inject } from '@angular/core';
-import { environment } from '../../environments/environment';
-import { FirebaseConnection } from './firebase/firebase-connection';
-import type { RawDoc, SnapshotMeta } from './firebase/types';
+import { environment } from '../../../environments/environment';
+import { FirebaseConnection } from './firebase-connection';
+import type { RawDoc, SnapshotMeta } from './types';
 
-/** Unterkollektionen eines Spielers, die das Profil verwaltet. */
-export type PlayerRecordKind = 'developmentPlans' | 'absences' | 'measurements';
-
-/**
- * Firestore-Zugriff auf Bewertungen, Notizen und Spieler-Unterdaten (Übergangszustand der Aufteilung
- * SCRUM-108..110; die übrigen Themen liegen schon in eigenen Zugriffsklassen unter `firebase/`).
- * Alle Pfade liegen unter teams/{teamId}/…
- */
+/** Bewertungen je Event und Spieler sowie die internen Trainer-Notizen (getrennt gespeichert, nur Trainer lesen sie). */
 @Injectable({ providedIn: 'root' })
-export class FirebaseService {
+export class RatingsApi {
   private readonly connection = inject(FirebaseConnection);
 
   /** Echtzeit-Abo auf die Bewertungen eines Events (Dokument je Spieler). Lesen dürfen Trainer und der jeweilige Spieler. */
@@ -74,71 +67,12 @@ export class FirebaseService {
     );
   }
 
-  /**
-   * Echtzeit-Abo auf eine Unterkollektion eines Spielers (Förderpläne, Abwesenheiten, Messwerte). Lesen dürfen
-   * Trainer, der Spieler selbst (und seine Eltern); Abwesenheiten und Messwerte zusätzlich die medizinische Rolle.
-   */
-  async watchPlayerRecords(
-    playerId: string,
-    name: PlayerRecordKind,
-    onData: (docs: RawDoc[], meta: SnapshotMeta) => void,
-    onError: (error: unknown) => void,
-    options: { readonly ownOnly?: boolean } = {},
-  ): Promise<() => void> {
-    const { db } = await this.connection.get();
-    const { collection, onSnapshot, query, where } = await import('firebase/firestore');
-    const records = collection(db, 'teams', environment.teamId, 'players', playerId, name);
-    // Spieler und Eltern: die Regeln prüfen das Feld `playerId` der Dokumente, deshalb muss die Abfrage exakt danach filtern.
-    return onSnapshot(
-      options.ownOnly ? query(records, where('playerId', '==', playerId)) : records,
-      { includeMetadataChanges: true },
-      (snapshot) =>
-        onData(
-          snapshot.docs.map((entry) => ({ id: entry.id, data: entry.data() })),
-          { fromCache: snapshot.metadata.fromCache, hasPendingWrites: snapshot.metadata.hasPendingWrites },
-        ),
-      onError,
-    );
-  }
-
-  /** Einmaliges Lesen einer Unterkollektion eines Spielers (Förderpläne, Abwesenheiten, Messwerte). */
-  async readPlayerRecords(playerId: string, name: PlayerRecordKind): Promise<RawDoc[]> {
-    const { db } = await this.connection.get();
-    const { collection, getDocs } = await import('firebase/firestore');
-    const snapshot = await getDocs(collection(db, 'teams', environment.teamId, 'players', playerId, name));
-    return snapshot.docs.map((entry) => ({ id: entry.id, data: entry.data() }));
-  }
-
   /** Einmaliges Lesen der Bewertung eines Spielers in einem Event (null = es gibt keine). */
   async readRatingDoc(eventId: string, playerId: string): Promise<Readonly<Record<string, unknown>> | null> {
     const { db } = await this.connection.get();
     const { doc, getDoc } = await import('firebase/firestore');
     const snapshot = await getDoc(doc(db, 'teams', environment.teamId, 'events', eventId, 'ratings', playerId));
     return snapshot.exists() ? snapshot.data() : null;
-  }
-
-  /** Schreibt einen Eintrag vollständig (wie die bisherige App, mit `playerId` für Abfragen und Regeln). */
-  async savePlayerRecord(playerId: string, name: PlayerRecordKind, id: string, data: Readonly<Record<string, unknown>>): Promise<void> {
-    const { db } = await this.connection.get();
-    const { doc, setDoc } = await import('firebase/firestore');
-    await setDoc(doc(db, 'teams', environment.teamId, 'players', playerId, name, id), { ...data, playerId });
-  }
-
-  async deletePlayerRecord(playerId: string, name: PlayerRecordKind, id: string): Promise<void> {
-    const { db } = await this.connection.get();
-    const { deleteDoc, doc } = await import('firebase/firestore');
-    await deleteDoc(doc(db, 'teams', environment.teamId, 'players', playerId, name, id));
-  }
-
-  /** Selbstreflexion: ändert nur diese beiden Felder des Förderplans (so erlauben es die Regeln dem Spieler). */
-  async saveSelfReflection(playerId: string, planId: string, text: string, at: string): Promise<void> {
-    const { db } = await this.connection.get();
-    const { doc, setDoc } = await import('firebase/firestore');
-    await setDoc(
-      doc(db, 'teams', environment.teamId, 'players', playerId, 'developmentPlans', planId),
-      { selfReflection: text, selfReflectionAt: at },
-      { merge: true },
-    );
   }
 
   /** Schreibt die Bewertung eines Spielers (merge, mit `playerId` für die Regeln und Abfragen der Spieleransicht). */
@@ -154,5 +88,4 @@ export class FirebaseService {
     const { doc, setDoc } = await import('firebase/firestore');
     await setDoc(doc(db, 'teams', environment.teamId, 'events', eventId, 'privateNotes', playerId), { playerId, note }, { merge: true });
   }
-
 }

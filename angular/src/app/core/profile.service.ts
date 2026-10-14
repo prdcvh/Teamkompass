@@ -1,7 +1,7 @@
 import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { authErrorMessage, errorCode } from './auth-errors';
 import { EventsService } from './events.service';
-import { FirebaseService } from './firebase.service';
+import { RatingsApi } from './firebase/ratings.api';
 import { type EventRating } from './profile';
 import { type Rating, ratingFromDoc } from './rating';
 import { SessionService } from './session.service';
@@ -14,7 +14,7 @@ import { SyncService } from './sync.service';
  */
 @Injectable({ providedIn: 'root' })
 export class ProfileService {
-  private readonly firebase = inject(FirebaseService);
+  private readonly ratingsApi = inject(RatingsApi);
   private readonly session = inject(SessionService);
   private readonly sync = inject(SyncService);
   private readonly events = inject(EventsService);
@@ -99,7 +99,7 @@ export class ProfileService {
       this.pending.delete(eventId);
       this.waiting.set([...this.pending].filter((key) => !key.startsWith('open:')).length);
     };
-    this.firebase
+    this.ratingsApi
       .watchRatingDoc(
         eventId,
         playerId,

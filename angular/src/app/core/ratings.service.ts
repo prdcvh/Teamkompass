@@ -1,7 +1,7 @@
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { authErrorMessage, errorCode } from './auth-errors';
 import { EventsService } from './events.service';
-import { FirebaseService } from './firebase.service';
+import { RatingsApi } from './firebase/ratings.api';
 import type { RawDoc, SnapshotMeta } from './firebase/types';
 import { MAX_NOTE_LENGTH, type Rating, type RatingField, BLANK_RATING, applyChange, docFromRating, ratingFromDoc } from './rating';
 import { SessionService } from './session.service';
@@ -17,7 +17,7 @@ export type RatingsLoad = 'idle' | 'loading' | 'ready' | 'error';
  */
 @Injectable({ providedIn: 'root' })
 export class RatingsService {
-  private readonly firebase = inject(FirebaseService);
+  private readonly ratingsApi = inject(RatingsApi);
   private readonly session = inject(SessionService);
   private readonly sync = inject(SyncService);
   private readonly events = inject(EventsService);
@@ -66,7 +66,7 @@ export class RatingsService {
     };
     this.subscribe(
       generation,
-      (onData, onError) => this.firebase.watchRatings(eventId, onData, onError),
+      (onData, onError) => this.ratingsApi.watchRatings(eventId, onData, onError),
       (docs) => {
         this.ratings.set(new Map(docs.map((entry) => [entry.id, ratingFromDoc(entry.data)])));
         finish('ratings');
@@ -76,7 +76,7 @@ export class RatingsService {
     if (this.canWrite()) {
       this.subscribe(
         generation,
-        (onData, onError) => this.firebase.watchPrivateNotes(eventId, onData, onError),
+        (onData, onError) => this.ratingsApi.watchPrivateNotes(eventId, onData, onError),
         (docs) => {
           this.notes.set(new Map(docs.map((entry) => [entry.id, typeof entry.data['note'] === 'string' ? entry.data['note'] : ''])));
           finish('notes');
@@ -108,7 +108,7 @@ export class RatingsService {
     if (rating === current) return false;
     this.ratings.update((map) => new Map(map).set(playerId, rating));
     this.markSyncing();
-    void this.firebase
+    void this.ratingsApi
       .saveRating(eventId, playerId, docFromRating(rating, { clearAuto: clearedAuto }))
       .then(() => this.sync.clearError())
       .catch((error) => this.failWrite(error, 'Bewertung konnte nicht gespeichert werden.'));
@@ -122,7 +122,7 @@ export class RatingsService {
     if (note === this.noteFor(playerId)) return false;
     this.notes.update((map) => new Map(map).set(playerId, note));
     this.markSyncing();
-    void this.firebase
+    void this.ratingsApi
       .savePrivateNote(eventId, playerId, note)
       .then(() => this.sync.clearError())
       .catch((error) => this.failWrite(error, 'Interne Notiz konnte nicht gespeichert werden.'));

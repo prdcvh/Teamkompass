@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } 
 import { environment } from '../../../environments/environment';
 import { buildExport, exportFileName, revokedPlayers } from '../../core/export';
 import { FileOutput } from '../../core/file-output';
-import { FirebaseService } from '../../core/firebase.service';
+import { PlayerRecordsApi } from '../../core/firebase/player-records.api';
 import { OpponentsService } from '../../core/opponents.service';
 import { consentRevokedMessage, todayIso } from '../../core/player';
 import { profileReportHtml } from '../../core/profile-report';
@@ -28,7 +28,7 @@ type Kind = 'json' | 'pdf';
 export class Export implements OnInit {
   private readonly team = inject(TeamService);
   private readonly opponents = inject(OpponentsService);
-  private readonly firebase = inject(FirebaseService);
+  private readonly playerRecordsApi = inject(PlayerRecordsApi);
   private readonly files = inject(FileOutput);
   private readonly workspace = inject(WorkspaceService);
   private readonly session = inject(SessionService);
@@ -102,7 +102,7 @@ export class Export implements OnInit {
     const plans = new Map<string, readonly DevelopmentPlan[]>(
       await Promise.all(
         players.map(async (player) => {
-          const docs = await this.firebase.readPlayerRecords(player.id, 'developmentPlans');
+          const docs = await this.playerRecordsApi.readPlayerRecords(player.id, 'developmentPlans');
           return [player.id, docs.map((doc) => planFromDoc(doc.id, doc.data, today))] as const;
         }),
       ),

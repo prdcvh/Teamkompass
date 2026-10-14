@@ -11,7 +11,7 @@ describe('TeamService', () => {
     firebase.players.players.set('p1', { name: 'Ali Adler', positions: ['ST'], number: 9, birthdate: '2012-05-05', status: 'Fit' });
     firebase.players.players.set('p2', { name: 'Ben Bauer', positions: ['IV'], number: 4, birthdate: '2012-06-06', status: 'Fit' });
     firebase.events.events.set('e1', { type: 'Training', title: 'Training', date: '2026-10-01' });
-    firebase.ratings.set('e1', new Map([['p1', { attendance: 'present', effort: 2, technique: 2, tactics: 2, comprehension: 2, playerId: 'p1' }]]));
+    firebase.ratings.ratings.set('e1', new Map([['p1', { attendance: 'present', effort: 2, technique: 2, tactics: 2, comprehension: 2, playerId: 'p1' }]]));
     TestBed.configureTestingModule({ providers: [...provideFakeFirebase(firebase)] });
     TestBed.inject(SessionService).role.set(role);
     return TestBed.inject(TeamService);
@@ -49,11 +49,11 @@ describe('TeamService', () => {
     expect(firebase.calls).toContain('watchRatings:e2');
     expect(firebase.calls).toContain('watchPlayerRecords:p3:absences');
 
-    const before = firebase.ratingWatchers;
+    const before = firebase.ratings.ratingWatchers;
     firebase.events.events.delete('e2');
     firebase.events.emitEvents();
     TestBed.tick();
-    expect(firebase.ratingWatchers).toBe(before - 1);
+    expect(firebase.ratings.ratingWatchers).toBe(before - 1);
     expect(team.data()[0].items.map((item) => item.event.id)).toEqual(['e1']);
   });
 
@@ -72,13 +72,13 @@ describe('TeamService', () => {
     TestBed.tick();
     expect(team.active()).toBe(false);
     expect(team.data()).toEqual([]);
-    expect(firebase.ratingWatchers).toBe(0);
-    expect(firebase.recordWatchers).toBe(0);
+    expect(firebase.ratings.ratingWatchers).toBe(0);
+    expect(firebase.records.recordWatchers).toBe(0);
   });
 
   it('meldet einen Abo-Fehler mit verständlichem Text und kann es erneut versuchen', async () => {
     const team = setup();
-    firebase.watchRatingsError = { code: 'permission-denied' };
+    firebase.ratings.watchRatingsError = { code: 'permission-denied' };
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     team.start();
     await vi.waitFor(() => {
@@ -87,7 +87,7 @@ describe('TeamService', () => {
     });
     expect(team.error()).toContain('Teamauswertung');
     expect(team.loading()).toBe(false);
-    firebase.watchRatingsError = null;
+    firebase.ratings.watchRatingsError = null;
     team.retry();
     await settle(team);
     expect(team.error()).toBe('');

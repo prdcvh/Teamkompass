@@ -17,9 +17,9 @@ describe('Export (Daten exportieren)', () => {
     firebase.players.players.set('p1', { name: 'Ali Adler', positions: ['ST'], number: 9, birthdate: '2012-02-05', status: 'Fit', consentStatus: 'granted' });
     firebase.players.players.set('p2', { name: '<b>Ben</b>', positions: ['IV'], number: 4, birthdate: '2012-11-06', status: 'Fit', consentStatus: consent2 });
     firebase.events.events.set('e1', { type: 'Spiel', title: 'Spiel gegen Eppstein', date: '2026-09-01', goalsFor: 3, goalsAgainst: 1, intensity: 3 });
-    firebase.ratings.set('e1', new Map([['p1', { attendance: 'present', effort: 2, technique: 2, tactics: 2, comprehension: 2, playerId: 'p1' }]]));
+    firebase.ratings.ratings.set('e1', new Map([['p1', { attendance: 'present', effort: 2, technique: 2, tactics: 2, comprehension: 2, playerId: 'p1' }]]));
     firebase.opponents.opponents.set('o1', { name: 'SG Eppstein', formation: '4-4-2', style: 'Pressing', updatedAt: '2026-10-01' });
-    firebase.playerRecords.set('p1/developmentPlans', new Map([['f1', { focus: 'Kopfball', goal: 'Mehr Kopfballtore', status: 'Offen' }]]));
+    firebase.records.playerRecords.set('p1/developmentPlans', new Map([['f1', { focus: 'Kopfball', goal: 'Mehr Kopfballtore', status: 'Offen' }]]));
     TestBed.configureTestingModule({
       providers: [
         ...provideFakeFirebase(firebase),
@@ -117,7 +117,7 @@ describe('Export (Daten exportieren)', () => {
 
   it('meldet einen Fehler beim Export und lädt nichts herunter', async () => {
     const fixture = await render();
-    firebase.readPlayerRecordsError = new Error('offline');
+    firebase.records.readPlayerRecordsError = new Error('offline');
     byText(fixture, 'Sicherung herunterladen')!.click();
     await vi.waitFor(() => {
       fixture.detectChanges();

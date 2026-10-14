@@ -24,9 +24,9 @@ describe('Profile (Spielerprofil)', () => {
       firebase.events.events.set('e1', { type: 'Training', title: 'Training Montag', date: '2026-09-01', intensity: 2, notes: 'Passspiel' });
       firebase.events.events.set('e2', { type: 'Spiel', title: '<img src=x onerror=alert(1)>', date: '2026-09-08', intensity: 3, goalsFor: 3, goalsAgainst: 1, matchDuration: 80 });
       firebase.events.events.set('e3', { type: 'Training', title: 'Training Zukunft', date: '2099-01-01' });
-      firebase.ratings.set('e1', new Map([['p1', grades(3, { note: '' })]]));
-      firebase.ratings.set('e2', new Map([['p1', grades(1, { note: 'Starkes Spiel', minutes: 80, goals: 2, assists: 1 })]]));
-      firebase.ratings.set('e3', new Map([['p1', { attendance: 'absent' }]]));
+      firebase.ratings.ratings.set('e1', new Map([['p1', grades(3, { note: '' })]]));
+      firebase.ratings.ratings.set('e2', new Map([['p1', grades(1, { note: 'Starkes Spiel', minutes: 80, goals: 2, assists: 1 })]]));
+      firebase.ratings.ratings.set('e3', new Map([['p1', { attendance: 'absent' }]]));
     }
     navigate = vi.fn().mockResolvedValue(true);
     TestBed.configureTestingModule({
@@ -156,7 +156,7 @@ describe('Profile (Spielerprofil)', () => {
     firebase = new FakeFirebase();
     firebase.players.players.set('p1', { name: 'Jonas Keller', positions: ['TW'], number: 1, birthdate: '2012-05-05', status: 'Fit' });
     firebase.events.events.set('e1', { type: 'Training', title: 'T', date: '2026-09-01' });
-    firebase.watchRatingDocError = { code: 'permission-denied' };
+    firebase.ratings.watchRatingDocError = { code: 'permission-denied' };
     TestBed.configureTestingModule({
       providers: [
         ...provideFakeFirebase(firebase),
@@ -172,7 +172,7 @@ describe('Profile (Spielerprofil)', () => {
       expect(q(fixture, '.notice')).not.toBeNull();
     });
     expect(text(q(fixture, '.notice'))).toContain('Das Profil konnte nicht geladen werden');
-    firebase.watchRatingDocError = null;
+    firebase.ratings.watchRatingDocError = null;
     q<HTMLButtonElement>(fixture, '.notice button')!.click();
     await vi.waitFor(() => {
       fixture.detectChanges();
@@ -192,12 +192,12 @@ describe('Profile (Spielerprofil)', () => {
       firebase = new FakeFirebase();
       firebase.players.players.set('p1', { name: 'Jonas Keller', positions: ['TW'], number: 1, birthdate: '2012-05-05', status: 'Fit', consentStatus: 'granted' });
       firebase.events.events.set('e1', { type: 'Training', title: 'Training Montag', date: '2026-09-01', intensity: 2 });
-      firebase.playerRecords.set('p1/developmentPlans', new Map([['dp1', { focus: 'Orientierung', goal: 'Blick vor dem Ball', status: 'In Arbeit', dueDate: '2026-12-01', createdAt: '2026-09-01', selfReflection: 'Lief gut', coachReview: 'Weiter so' }]]));
-      firebase.playerRecords.set('p1/absences', new Map([
+      firebase.records.playerRecords.set('p1/developmentPlans', new Map([['dp1', { focus: 'Orientierung', goal: 'Blick vor dem Ball', status: 'In Arbeit', dueDate: '2026-12-01', createdAt: '2026-09-01', selfReflection: 'Lief gut', coachReview: 'Weiter so' }]]));
+      firebase.records.playerRecords.set('p1/absences', new Map([
         ['ab1', { kind: 'injury', label: 'Verletzung', detail: 'Zerrung', from: '2020-01-01', to: '' }],
         ['ab2', { kind: 'absence', label: 'Urlaub', from: '2026-08-01', to: '2026-08-10' }],
       ]));
-      firebase.playerRecords.set('p1/measurements', new Map([
+      firebase.records.playerRecords.set('p1/measurements', new Map([
         ['me1', { date: '2026-07-01', height: '150', weight: '40' }],
         ['me2', { date: '2026-10-01', height: '155', weight: '43' }],
       ]));
@@ -271,7 +271,7 @@ describe('Profile (Spielerprofil)', () => {
       typeInto(dialog.querySelector<HTMLInputElement>('input[name="focus"]')!, 'Mut');
       typeInto(dialog.querySelector<HTMLInputElement>('input[name="goal"]')!, 'Mehr 1 gegen 1');
       (dialog.querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit'));
-      await vi.waitFor(() => expect([...firebase.playerRecords.get('p1/developmentPlans')!.values()].some((data) => data['focus'] === 'Mut')).toBe(true));
+      await vi.waitFor(() => expect([...firebase.records.playerRecords.get('p1/developmentPlans')!.values()].some((data) => data['focus'] === 'Mut')).toBe(true));
       await settle(fixture);
       expect(text(qa(fixture, 'tk-profile-extras .items')[0])).toContain('Mut');
     });
@@ -288,10 +288,10 @@ describe('Profile (Spielerprofil)', () => {
       expect(text(dialog.querySelector('#err-to'))).toContain('Enddatum');
       typeInto(dialog.querySelector<HTMLInputElement>('input[name="to"]')!, '2026-10-16');
       (dialog.querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit'));
-      await vi.waitFor(() => expect([...firebase.playerRecords.get('p1/absences')!.values()].some((data) => data['label'] === 'Klassenfahrt')).toBe(true));
+      await vi.waitFor(() => expect([...firebase.records.playerRecords.get('p1/absences')!.values()].some((data) => data['label'] === 'Klassenfahrt')).toBe(true));
       // Das Event vom 01.09. liegt nicht in der Klassenfahrt, wohl aber in der laufenden Verletzung ohne Ende (seit 2020):
       // der Spieler wird dafür automatisch auf „Fehlt“ gesetzt (SCRUM-18).
-      await vi.waitFor(() => expect(firebase.ratings.get('e1')?.get('p1')).toMatchObject({ attendance: 'absent', autoAbsence: true, note: 'Verletzung · Zerrung (Ende offen)' }));
+      await vi.waitFor(() => expect(firebase.ratings.ratings.get('e1')?.get('p1')).toMatchObject({ attendance: 'absent', autoAbsence: true, note: 'Verletzung · Zerrung (Ende offen)' }));
     });
 
     it('trägt eine Messung ein und prüft die Werte', async () => {
@@ -305,7 +305,7 @@ describe('Profile (Spielerprofil)', () => {
       typeInto(dialog.querySelector<HTMLInputElement>('input[name="height"]')!, '160,5');
       typeInto(dialog.querySelector<HTMLInputElement>('input[name="weight"]')!, '48');
       (dialog.querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit'));
-      await vi.waitFor(() => expect([...firebase.playerRecords.get('p1/measurements')!.values()].some((data) => data['height'] === '160.5' && data['weight'] === '48')).toBe(true));
+      await vi.waitFor(() => expect([...firebase.records.playerRecords.get('p1/measurements')!.values()].some((data) => data['height'] === '160.5' && data['weight'] === '48')).toBe(true));
     });
 
     it('löscht erst nach Bestätigung', async () => {
@@ -324,7 +324,7 @@ describe('Profile (Spielerprofil)', () => {
       isMobile.set(false);
       firebase = new FakeFirebase();
       firebase.players.players.set('p1', { name: 'Jonas Keller', positions: ['TW'], number: 1, birthdate: '2012-05-05', status: 'Fit' });
-      firebase.watchPlayerRecordsError = { code: 'permission-denied' };
+      firebase.records.watchPlayerRecordsError = { code: 'permission-denied' };
       TestBed.configureTestingModule({
         providers: [
           ...provideFakeFirebase(firebase),
@@ -343,11 +343,11 @@ describe('Profile (Spielerprofil)', () => {
 
     it('maskiert Texte der Zusatzdaten (keine unmaskierte HTML-Ausgabe)', async () => {
       const fixture = await renderExtras();
-      firebase.playerRecords.get('p1/developmentPlans')!.set('dp2', { focus: '<img src=x onerror=alert(1)>', goal: '<b>fett</b>', status: 'Offen', createdAt: '2026-10-01' });
-      firebase.playerRecords.get('p1/developmentPlans')!.set('dp1', { ...firebase.playerRecords.get('p1/developmentPlans')!.get('dp1') });
+      firebase.records.playerRecords.get('p1/developmentPlans')!.set('dp2', { focus: '<img src=x onerror=alert(1)>', goal: '<b>fett</b>', status: 'Offen', createdAt: '2026-10-01' });
+      firebase.records.playerRecords.get('p1/developmentPlans')!.set('dp1', { ...firebase.records.playerRecords.get('p1/developmentPlans')!.get('dp1') });
       // Echtzeit-Update über Speichern eines weiteren Eintrags
-      await firebase.savePlayerRecord('p1', 'absences', 'ab3', { kind: 'absence', label: '<script>x</script>', from: '2026-10-01', to: '2026-10-02' });
-      await firebase.savePlayerRecord('p1', 'developmentPlans', 'dp3', { focus: '<img src=x onerror=alert(1)>', goal: '<b>fett</b>', status: 'Offen', createdAt: '2026-10-02' });
+      await firebase.records.savePlayerRecord('p1', 'absences', 'ab3', { kind: 'absence', label: '<script>x</script>', from: '2026-10-01', to: '2026-10-02' });
+      await firebase.records.savePlayerRecord('p1', 'developmentPlans', 'dp3', { focus: '<img src=x onerror=alert(1)>', goal: '<b>fett</b>', status: 'Offen', createdAt: '2026-10-02' });
       await settle(fixture);
       expect(root(fixture).querySelector('tk-profile-extras img')).toBeNull();
       expect(root(fixture).querySelector('tk-profile-extras b')).toBeNull();

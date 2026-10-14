@@ -31,7 +31,7 @@ describe('Lineup (Aufstellung)', () => {
       firebase.players.players.set(id, { name, positions, number, birthdate: '2012-01-01', status: 'Fit' });
     }
     firebase.events.events.set('e1', { type: 'Training', title: 'Training', date: '2026-09-01', intensity: 2 });
-    firebase.ratings.set(
+    firebase.ratings.ratings.set(
       'e1',
       new Map(squad.map(([id, , , , grade]) => [id, { attendance: 'present', effort: grade, technique: grade, tactics: grade, comprehension: grade, playerId: id }])),
     );

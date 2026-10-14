@@ -19,8 +19,8 @@ describe('TeamAnalysis (Teamanalyse)', () => {
       firebase.players.players.set('p2', { name: '<b>Ben</b>', positions: ['IV'], number: 4, birthdate: '2012-11-06', status: 'Fit' });
       firebase.events.events.set('e1', { type: 'Spiel', title: '<img src=x onerror=alert(1)>', date: '2026-09-01', goalsFor: 3, goalsAgainst: 1, intensity: 3 });
       firebase.events.events.set('e2', { type: 'Training', title: 'Training', date: '2026-09-03', trainingFocus: 'Umschalten', intensity: 2 });
-      firebase.ratings.set('e1', new Map([['p1', { ...grades(2), playerId: 'p1' }], ['p2', { ...grades(4), playerId: 'p2' }]]));
-      firebase.ratings.set('e2', new Map([['p1', { ...grades(2), playerId: 'p1' }]]));
+      firebase.ratings.ratings.set('e1', new Map([['p1', { ...grades(2), playerId: 'p1' }], ['p2', { ...grades(4), playerId: 'p2' }]]));
+      firebase.ratings.ratings.set('e2', new Map([['p1', { ...grades(2), playerId: 'p1' }]]));
     }
     TestBed.configureTestingModule({
       providers: [provideRouter([]), ...provideFakeFirebase(firebase), { provide: LayoutService, useValue: { isMobile } }],
