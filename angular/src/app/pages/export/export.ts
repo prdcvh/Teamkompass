@@ -6,7 +6,7 @@ import { PlayerRecordsApi } from '../../core/firebase/player-records.api';
 import { OpponentsService } from '../../core/opponents.service';
 import { consentRevokedMessage, todayIso } from '../../core/player';
 import { profileReportHtml } from '../../core/profile-report';
-import { type DevelopmentPlan, planFromDoc } from '../../core/records';
+import { type DevelopmentPlan, planFromDoc } from '../../core/records/plan';
 import { SessionService } from '../../core/session.service';
 import { SyncService } from '../../core/sync.service';
 import { TeamService } from '../../core/team.service';

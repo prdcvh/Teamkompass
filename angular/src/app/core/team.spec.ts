@@ -2,7 +2,7 @@ import { type TeamEvent } from './event';
 import { type Player } from './player';
 import { type EventRating } from './profile';
 import { BLANK_RATING, type Rating } from './rating';
-import { type Absence } from './records';
+import type { Absence } from './records/absence';
 import { type PlayerData, dashboardFigures, itemsFor, leaders, matchResult, nextUpcomingEvent, teamRecord } from './team';
 
 describe('team (Dashboard-Auswertungen)', () => {

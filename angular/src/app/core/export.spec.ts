@@ -4,7 +4,7 @@ import { type TeamEvent } from './event';
 import { type Opponent } from './opponent';
 import { type Player } from './player';
 import { BLANK_RATING, type Rating } from './rating';
-import { type DevelopmentPlan } from './records';
+import type { DevelopmentPlan } from './records/plan';
 
 const player = (id: string, name: string, consentStatus: Player['consentStatus'] = 'granted'): Player => ({
   id,
