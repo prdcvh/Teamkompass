@@ -199,7 +199,9 @@
                 <div>
                   <h2>Startelf <span id="pitchFormationName" class="pitch-formation-name">-</span></h2>
                   <span class="muted" id="pitchTeamGrade">Mannschaftsnote –</span>
+                  <span class="muted" id="pitchTarget"></span>
                 </div>
+                <button class="ghost-button" type="button" id="copyLineupBtn" hidden>Aufstellung vom letzten Spiel übernehmen</button>
               </div>
               <div class="formation-picker" id="formationPicker"></div>
               <div class="pitch" id="pitch"></div>
@@ -310,6 +312,7 @@
                   <button class="ghost-button danger" id="deleteEventBtn" type="button">Event löschen</button>
                 </div>
               </div>
+              <div class="event-lineup" id="eventLineup" hidden></div>
               <div class="rating-toolbar">
                 <label>
                   Event

@@ -839,3 +839,14 @@ test("Abmelden warnt Spieler und Eltern vor dem Verlust des Zugangs (SCRUM-32)",
     assert.match(handler, /neuen Einladungscode/);
   }
 });
+
+test("Aufstellung wird je Spiel gespeichert, ohne die allgemeine Startelf zu überschreiben (SCRUM-29)", async () => {
+  const app = await read("outputs/team-manager/app.js");
+  const html = await read("outputs/team-manager/index.html");
+  assert.match(app, /function lineupTargetEvent\(\)/);
+  assert.match(app, /byEvent: \{ \[eventId\]: entry \}[^\n]*merge: true/);
+  assert.match(app, /setDoc\(teamDoc\("meta", "lineup"\), \{ assignments: lineup\.assignments \}, \{ merge: true \}\)/);
+  assert.doesNotMatch(app, /persist\(\);\s*cloudSaveLineup\(state\.lineup\);\s*renderPitch/);
+  assert.match(app, /deleteField\(\)/);
+  for (const id of ["copyLineupBtn", "pitchTarget", "eventLineup"]) assert.match(html, new RegExp(`id="${id}"`));
+});
