@@ -1247,6 +1247,9 @@ function downloadProfilePdf() {
     `).join("");
   const report = window.open("", "_blank");
   if (!report) return;
+  // Der Bericht soll nicht auf die App zurückgreifen können (SCRUM-62); "noopener" ginge hier nicht,
+  // weil window.open dann null liefert und wir nicht mehr hineinschreiben könnten.
+  report.opener = null;
   report.document.write(`
     <!doctype html>
     <html lang="de">
