@@ -3,15 +3,7 @@ import { AbsenceSyncService } from './absence-sync.service';
 import { authErrorMessage, errorCode } from './auth-errors';
 import { PlayersApi } from './firebase/players.api';
 import type { SnapshotMeta } from './firebase/types';
-import {
-  type Player,
-  type PlayerDraft,
-  type PlayerErrors,
-  playerFromDoc,
-  playerFromDraft,
-  docFromPlayer,
-  validateDraft,
-} from './player';
+import { type Player, type PlayerDraft, type PlayerErrors, playerFromDoc, playerFromDraft, docFromPlayer, validateDraft } from './player/player';
 import { EventsService } from './events.service';
 import { SessionService } from './session.service';
 import { SyncService } from './sync.service';

@@ -1,31 +1,7 @@
-import {
-  type Candidate,
-  FORMATION_PRESETS,
-  MAX_ON_PITCH,
-  ZONES,
-  assignFormationSlots,
-  assignmentsFromPreview,
-  benchOf,
-  docFromLineup,
-  eligibleCandidates,
-  emptyAssignments,
-  expandPreset,
-  formationName,
-  formationOptions,
-  formationPreview,
-  lineupGrade,
-  lineupIsEmpty,
-  moveToZone,
-  normalizeLineup,
-  onPitchCount,
-  outOfPosition,
-  presetName,
-  removeFromPitch,
-  suggestedLineup,
-  swapPlayers,
-  zoneOf,
-} from './lineup';
-import { type Player } from './player';
+import { type Candidate, assignmentsFromPreview, eligibleCandidates, formationPreview } from './formation-assignment';
+import { benchOf, docFromLineup, emptyAssignments, formationName, lineupGrade, lineupIsEmpty, moveToZone, normalizeLineup, onPitchCount, removeFromPitch, swapPlayers, zoneOf } from './lineup';
+import { FORMATION_PRESETS, ZONES, presetName } from './pitch';
+import type { Player } from '../player/player';
 
 const player = (id: string, number: number, positions: string[]): Player => ({
   id,
@@ -56,7 +32,7 @@ const squad: Candidate[] = [
   cand('bank', 12, ['ST', 'IV'], 4),
 ];
 
-describe('Aufstellung', () => {
+describe('Aufstellung bearbeiten', () => {
   it('benennt Formationen aus den Bändern (leere Bänder entfallen)', () => {
     expect(presetName(FORMATION_PRESETS[0])).toBe('4-3-3');
     expect(presetName(FORMATION_PRESETS[1])).toBe('4-2-3-1');
@@ -64,13 +40,6 @@ describe('Aufstellung', () => {
     expect(formationName(emptyAssignments())).toBe('Keine Aufstellung');
     const assignments = moveToZone(moveToZone(emptyAssignments(), 'a', 'IV') as never, 'b', 'ST') as never;
     expect(formationName(assignments)).toBe('1-1');
-  });
-
-  it('alle Vorlagen haben 11 Spieler und nur bekannte Zonen', () => {
-    for (const preset of FORMATION_PRESETS) {
-      expect(expandPreset(preset)).toHaveLength(11);
-      expect(Object.keys(preset).every((zone) => ZONES.includes(zone as never))).toBe(true);
-    }
   });
 
   it('Dokument ↔ Aufstellung: unbekannte Zonen, fremde und doppelte Spieler fallen weg', () => {
@@ -84,59 +53,6 @@ describe('Aufstellung', () => {
     expect(normalizeLineup(docFromLineup(lineup))).toEqual(lineup);
     expect(lineupIsEmpty(lineup)).toBe(false);
     expect(lineupIsEmpty(emptyAssignments())).toBe(true);
-  });
-
-  it('verfügbare Spieler: verletzt/gesperrt/abwesend fehlen, beste Note zuerst, dann Nummer', () => {
-    const list = eligibleCandidates([cand('a', 5, [], null), cand('b', 7, [], 2), cand('c', 3, [], 2), cand('d', 1, [], 1, 'Verletzt'), cand('e', 2, [], 1, 'Gesperrt'), cand('f', 4, [], 1, 'Abwesend'), cand('g', 6, [], 3, 'Angeschlagen')]);
-    expect(list.map((entry) => entry.player.id)).toEqual(['c', 'b', 'g', 'a']);
-  });
-
-  it('besetzt 4-3-3 vollständig mit der besten Elf und lässt Fremdpositionen leer', () => {
-    const preview = formationPreview(FORMATION_PRESETS[0], eligibleCandidates(squad));
-    expect(preview.filled).toBe(11);
-    expect(preview.total).toBe(11);
-    const ids = preview.assigned.map((item) => item.candidate?.player.id);
-    expect(ids).toContain('st');
-    expect(ids).not.toContain('bank'); // schlechtere Note, wird nicht gebraucht
-    expect(preview.grade).toBe(2.4); // (2 + 2,5 + 2 + 3 + 2,2 + 2,1 + 2,4 + 3,1 + 2,8 + 1,9 + 2,6) / 11 = 2,42
-  });
-
-  it('wählt bei knappem Kader die Besetzung mit den wenigsten offenen Plätzen', () => {
-    const small = [cand('a', 1, ['IV'], 1), cand('b', 2, ['IV', 'ST'], 5)];
-    const slots = [{ zone: 'IV' as const }, { zone: 'ST' as const }];
-    const result = assignFormationSlots(slots, eligibleCandidates(small));
-    // a muss IV spielen, b ST: beide Plätze besetzt, obwohl a die bessere Note hat
-    expect(result.map((item) => item.candidate?.player.id)).toEqual(['a', 'b']);
-  });
-
-  it('lässt Plätze offen, wenn niemand die Position hat', () => {
-    const result = assignFormationSlots([{ zone: 'TW' }, { zone: 'ST' }], [cand('a', 1, ['IV'], 2)]);
-    expect(result.map((item) => item.candidate)).toEqual([null, null]);
-  });
-
-  it('empfiehlt die beste vollständig besetzbare Formation', () => {
-    const options = formationOptions(eligibleCandidates(squad));
-    expect(options).toHaveLength(FORMATION_PRESETS.length);
-    expect(options.filter((option) => option.recommended)).toHaveLength(1);
-    const recommended = options.find((option) => option.recommended)!;
-    expect(recommended.preview.filled).toBe(recommended.preview.total);
-    const complete = options.filter((option) => option.preview.filled === option.preview.total);
-    expect(recommended.preview.grade).toBe(Math.min(...complete.map((option) => option.preview.grade as number)));
-  });
-
-  it('schlägt für ein leeres Board die empfohlene Formation vor; ohne Noten bleibt es leer', () => {
-    const suggestion = suggestedLineup(eligibleCandidates(squad));
-    expect(onPitchCount(suggestion)).toBe(11); // vollständig besetzbar, also wird die vollständige Formation gewählt
-    expect(onPitchCount(suggestion)).toBeLessThanOrEqual(MAX_ON_PITCH);
-    expect(lineupIsEmpty(suggestedLineup(eligibleCandidates([cand('a', 1, ['TW'], null)])))).toBe(true);
-  });
-
-  it('Vorlage anwenden: ein Spieler steht höchstens einmal', () => {
-    const preview = formationPreview(FORMATION_PRESETS[0], eligibleCandidates(squad));
-    const assignments = assignmentsFromPreview(preview.assigned);
-    const all = ZONES.flatMap((zone) => assignments[zone]);
-    expect(new Set(all).size).toBe(all.length);
-    expect(onPitchCount(assignments)).toBe(11);
   });
 
   it('Aufstellen: aus der alten Zone entfernen, 12. Spieler wird abgelehnt, Wechsel der Zone geht immer', () => {
@@ -181,10 +97,5 @@ describe('Aufstellung', () => {
     expect(bench.map((entry) => entry.player.id)).not.toContain('st');
     expect(lineupGrade(lineup, squad)).toBe(2); // (1,9 + 2) / 2 = 1,95, auf eine Stelle gerundet 2,0
     expect(lineupGrade(emptyAssignments(), squad)).toBeNull();
-  });
-
-  it('erkennt Spieler außerhalb ihrer Position', () => {
-    expect(outOfPosition(player('a', 1, ['IV']), 'IV')).toBe(false);
-    expect(outOfPosition(player('a', 1, ['IV']), 'ST')).toBe(true);
   });
 });

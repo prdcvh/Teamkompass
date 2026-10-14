@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { INVITE_ROLES, type InviteRole, parseExpiryDays } from '../../core/access';
 import { AccessService } from '../../core/access.service';
-import { consentRevokedMessage, isConsentRevoked, type Player } from '../../core/player';
+import { consentRevokedMessage, isConsentRevoked, type Player } from '../../core/player/player';
 import { Button } from '../../ui/button/button';
 import { Dialog } from '../../ui/dialog/dialog';
 

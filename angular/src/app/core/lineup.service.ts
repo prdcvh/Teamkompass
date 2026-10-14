@@ -1,7 +1,7 @@
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { authErrorMessage, errorCode } from './auth-errors';
 import { LineupApi } from './firebase/lineup.api';
-import { type Assignments, docFromLineup, emptyAssignments, normalizeLineup } from './lineup';
+import { type Assignments, docFromLineup, emptyAssignments, normalizeLineup } from './lineup/lineup';
 import { SessionService } from './session.service';
 import { SquadService } from './squad.service';
 import { SyncService } from './sync.service';

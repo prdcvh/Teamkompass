@@ -1,5 +1,5 @@
 /** Messwerte eines Spielers (`players/{id}/measurements`): Modell, Prüfung, Umwandlung und BMI. */
-import { isIsoDate } from '../player';
+import { isIsoDate } from '../dates';
 
 export interface Measurement {
   readonly id: string;

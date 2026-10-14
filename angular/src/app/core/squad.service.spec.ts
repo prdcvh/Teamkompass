@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { emptyDraft } from './player';
+import { emptyDraft } from './player/player';
 import { EventsService } from './events.service';
 import { SessionService } from './session.service';
 import { SquadService } from './squad.service';

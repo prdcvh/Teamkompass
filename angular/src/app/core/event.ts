@@ -4,7 +4,7 @@
  * identisch (siehe outputs/team-manager/app.js, saveEvent/normalizeEvent). Bewertungen und
  * interne Notizen liegen in Unterkollektionen und gehören nie ins Event-Dokument.
  */
-import { formatDate, isIsoDate } from './player';
+import { formatDate, isIsoDate } from './dates';
 
 export { formatDate };
 

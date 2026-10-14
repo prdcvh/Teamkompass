@@ -4,7 +4,7 @@
  * renderLeaders, nextUpcomingEvent). Noten sind Schulnoten: kleiner ist besser.
  */
 import { type TeamEvent } from './event';
-import { type Player } from './player';
+import type { Player } from './player/player';
 import { type EventRating, attendanceCount, averageGrade, gradedEvents } from './profile';
 import { type Rating, roundGrade } from './rating';
 import type { Absence } from './records/absence';

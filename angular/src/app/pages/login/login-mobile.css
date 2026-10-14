@@ -1,0 +1,50 @@
+/* ---------- Handy: Hero als Kopf, Formular darunter ---------- */
+@media (max-width: 720px) {
+  .login {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .brand {
+    align-items: flex-end;
+    min-height: 260px;
+  }
+
+  .brand-inner {
+    max-width: none;
+    gap: var(--tk-space-2);
+    padding: 56px var(--tk-space-4) var(--tk-space-5);
+  }
+
+  .pitch {
+    opacity: 0.12;
+  }
+
+  h1 {
+    margin-top: var(--tk-space-3);
+    font-size: 30px;
+  }
+
+  .claim {
+    font-size: 18px;
+  }
+
+  .lead,
+  .points {
+    display: none;
+  }
+
+  .form-area {
+    flex: 1;
+    align-items: flex-start;
+    padding: var(--tk-space-5) var(--tk-space-4) var(--tk-space-6);
+    border-radius: var(--tk-radius-xl) var(--tk-radius-xl) 0 0;
+    margin-top: calc(var(--tk-space-4) * -1);
+    position: relative;
+  }
+
+  h2,
+  .sub {
+    display: none;
+  }
+}

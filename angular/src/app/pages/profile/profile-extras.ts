@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { formatDate } from '../../core/event';
-import { todayIso } from '../../core/player';
+import { todayIso } from '../../core/dates';
 import { type Absence, absencePeriodText, absenceTitle, isInjuryAbsence } from '../../core/records/absence';
 import { type Measurement, measurementText } from '../../core/records/measurement';
 import { measurementChart } from '../../core/records/measurement-chart';

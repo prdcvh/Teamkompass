@@ -4,7 +4,7 @@ import { EventsService } from './events.service';
 import { PlayerRecordsApi } from './firebase/player-records.api';
 import { RatingsApi } from './firebase/ratings.api';
 import type { RawDoc, SnapshotMeta } from './firebase/types';
-import { todayIso } from './player';
+import { todayIso } from './dates';
 import { type Rating, ratingFromDoc } from './rating';
 import { type Absence, absenceFromDoc } from './records/absence';
 import { type Measurement, measurementFromDoc } from './records/measurement';

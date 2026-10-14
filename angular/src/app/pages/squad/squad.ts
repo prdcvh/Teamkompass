@@ -1,21 +1,9 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { LayoutService } from '../../core/layout.service';
-import {
-  CONSENT_LABELS,
-  PLAYER_STATUSES,
-  type Player,
-  SORT_OPTIONS,
-  type SortKey,
-  STANDARD_POSITIONS,
-  ageFromBirthdate,
-  filterPlayers,
-  formatDate,
-  groupByLine,
-  positionText,
-  sortPlayers,
-  statusCounts,
-} from '../../core/player';
+import { ageFromBirthdate, formatDate } from '../../core/dates';
+import { CONSENT_LABELS, PLAYER_STATUSES, type Player, STANDARD_POSITIONS, positionText } from '../../core/player/player';
+import { SORT_OPTIONS, type SortKey, filterPlayers, groupByLine, sortPlayers, statusCounts } from '../../core/player/squad-list';
 import { SquadService } from '../../core/squad.service';
 import { SyncService } from '../../core/sync.service';
 import { Button } from '../../ui/button/button';

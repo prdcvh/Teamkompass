@@ -37,16 +37,25 @@ core/
                  opponents, ratings, player-records (+ types.ts)
   testing/       Test-Attrappen, je Zugriffsklasse eine (fake-*.api.ts);
                  FakeFirebase + provideFakeFirebase bündeln sie für TestBed
-  …              fachliche Logik und Dienste, nach Thema in Unterordnern (SCRUM-111..113)
-pages/<seite>/   eine Komponente je Seite (Template, Styles, Test daneben)
+                 (Ordner `testing/` gehören nicht zum App-Build, siehe tsconfig.app.json)
+  player/        Spieler-Modell und Kaderliste (Filter, Sortierung, Gruppen)
+  lineup/        Spielfeld/Formationen, automatische Aufstellung, Startelf bearbeiten
+  records/       Förderpläne, Abwesenheiten, Verfügbarkeit, Messwerte (+ Services)
+  dates.ts       allgemeine Datumshilfen
+  …              übrige Fachlogik und Dienste (werden mit SCRUM-113 in Fachordner sortiert)
+pages/<seite>/   eine Komponente je Seite (Template, Styles, Test daneben); große Seiten haben
+                 mehrere Stylesheets (`styleUrls`, Reihenfolge = Kaskade) und mehrere Specs
 shell/           Rahmen: Seitenleiste, Tab-Leiste, Mehr-Menü
 ui/              wiederverwendbare Basis-Bausteine (Button, Karte, Dialog, …)
 ```
 
 Ein Dienst injiziert nur die Zugriffsklassen, die er braucht (z. B. `SquadService` nur `PlayersApi`).
 
-Die übrigen Dateien liegen noch flach in `core/` und werden mit SCRUM-111 bis SCRUM-113 in
-Fachordner sortiert.
+Die übrigen Dateien liegen noch flach in `core/` und werden mit SCRUM-113 in Fachordner sortiert.
+
+**Achtung beim Aufteilen von Stylesheets:** Angular benennt `@keyframes` je Stylesheet um. Eine
+`animation`, die eine Keyframe-Animation aus einer anderen Datei nutzt, läuft dann ins Leere. Name und
+Zuweisung gehören in dieselbe Datei (siehe `pages/login/login-motion.css`).
 
 ## Abhängigkeiten und `npm audit` (SCRUM-56)
 

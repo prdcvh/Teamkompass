@@ -15,7 +15,7 @@ import {
   emptyDraft,
 } from '../../core/event';
 import { EventsService } from '../../core/events.service';
-import { todayIso } from '../../core/player';
+import { todayIso } from '../../core/dates';
 import { Button } from '../../ui/button/button';
 import { Dialog } from '../../ui/dialog/dialog';
 

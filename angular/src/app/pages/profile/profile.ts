@@ -4,7 +4,8 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { map } from 'rxjs';
 import { formatDate } from '../../core/event';
 import { LayoutService } from '../../core/layout.service';
-import { type Player, ageFromBirthdate, consentRevokedMessage, isConsentRevoked, positionText, todayIso } from '../../core/player';
+import { ageFromBirthdate, todayIso } from '../../core/dates';
+import { type Player, consentRevokedMessage, isConsentRevoked, positionText } from '../../core/player/player';
 import {
   availability,
   gradeToPercent,
@@ -32,7 +33,8 @@ import { ProfileExtras } from './profile-extras';
   selector: 'app-profile',
   imports: [Button, Card, Status, ProfileExtras],
   templateUrl: './profile.html',
-  styleUrl: './profile.css',
+  // Reihenfolge = Kaskade (die Handy-Regeln überschreiben Kopf und Auswertung).
+  styleUrls: ['./profile.css', './profile-stats.css', './profile-mobile.css', './profile-risk.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class Profile implements OnInit {

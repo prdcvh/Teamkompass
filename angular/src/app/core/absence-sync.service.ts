@@ -3,7 +3,7 @@ import { authErrorMessage, errorCode } from './auth-errors';
 import { type TeamEvent } from './event';
 import { PlayerRecordsApi } from './firebase/player-records.api';
 import { RatingsApi } from './firebase/ratings.api';
-import { type Player } from './player';
+import type { Player } from './player/player';
 import { docFromRating, ratingFromDoc } from './rating';
 import { absenceFromDoc } from './records/absence';
 import { autoAbsenceRating, unavailabilityReason } from './records/availability';
