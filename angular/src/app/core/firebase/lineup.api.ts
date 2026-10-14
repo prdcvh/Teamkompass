@@ -24,10 +24,13 @@ export class LineupApi {
     );
   }
 
-  /** Schreibt die Startelf vollständig (wie die bisherige App: das Dokument wird ersetzt). */
+  /**
+   * Schreibt die Startelf (`assignments`) und führt sie mit dem bestehenden Dokument zusammen (merge, wie die bisherige App):
+   * die Aufstellungen je Spiel (`byEvent`) der alten App liegen im selben Dokument und dürfen nicht verloren gehen.
+   */
   async saveLineup(data: Readonly<Record<string, unknown>>): Promise<void> {
     const { db } = await this.connection.get();
     const { doc, setDoc } = await import('firebase/firestore');
-    await setDoc(doc(db, 'teams', environment.teamId, 'meta', 'lineup'), data);
+    await setDoc(doc(db, 'teams', environment.teamId, 'meta', 'lineup'), data, { merge: true });
   }
 }
