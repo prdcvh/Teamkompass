@@ -35,6 +35,32 @@
       </div>
     </tk-card>
   } @else {
+    @if (lineupView(); as lineup) {
+      <tk-card>
+        <section class="lineup" aria-label="Aufstellung">
+          <h2>Aufstellung {{ lineup.name }}</h2>
+          <ul>
+            @for (row of lineup.rows; track row.zone) {
+              <li>
+                <strong>{{ row.zone }}</strong>
+                @for (player of row.players; track player.id; let last = $last) {
+                  {{ player.number }} {{ player.name }}{{ last ? '' : ',' }}
+                }
+              </li>
+            }
+          </ul>
+          @if (lineup.bench.length) {
+            <p class="bench">
+              Bank:
+              @for (player of lineup.bench; track player.id; let last = $last) {
+                {{ player.number }} {{ player.name }}{{ last ? '' : ',' }}
+              }
+            </p>
+          }
+        </section>
+      </tk-card>
+    }
+
     <div class="toolbar">
       <div class="progress" [attr.data-complete]="progress().total > 0 && progress().done === progress().total">
         <span class="progress-label">{{ progress().done }} von {{ progress().total }} Spielern erfasst</span>

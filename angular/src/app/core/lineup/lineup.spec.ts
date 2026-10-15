@@ -1,7 +1,8 @@
 import { type Candidate, assignmentsFromPreview, eligibleCandidates, formationPreview } from './formation-assignment';
-import { benchOf, docFromLineup, emptyAssignments, formationName, lineupGrade, lineupIsEmpty, moveToZone, normalizeLineup, onPitchCount, removeFromPitch, swapPlayers, zoneOf } from './lineup';
+import { benchOf, docFromEventLineup, docFromLineup, lineupSummary, nextGame, normalizeEventLineups, previousGameWithLineup, emptyAssignments, formationName, lineupGrade, lineupIsEmpty, moveToZone, normalizeLineup, onPitchCount, removeFromPitch, swapPlayers, zoneOf } from './lineup';
 import { FORMATION_PRESETS, ZONES, presetName } from './pitch';
 import type { Player } from '../player/player';
+import { eventFromDoc } from '../events/event';
 
 const player = (id: string, number: number, positions: string[]): Player => ({
   id,
@@ -97,5 +98,58 @@ describe('Aufstellung bearbeiten', () => {
     expect(bench.map((entry) => entry.player.id)).not.toContain('st');
     expect(lineupGrade(lineup, squad)).toBe(2); // (1,9 + 2) / 2 = 1,95, auf eine Stelle gerundet 2,0
     expect(lineupGrade(emptyAssignments(), squad)).toBeNull();
+  });
+});
+
+describe('Aufstellung je Spiel (SCRUM-122, Format der Live-App SCRUM-29)', () => {
+  const game = (id: string, date: string, type = 'Spiel') => eventFromDoc(id, { type, title: id, date, intensity: 2 });
+  const one = { TW: ['a'], ST: ['b'] };
+  const entry = (assignments: Record<string, string[]>) => ({ assignments, savedAt: '2026-10-01T10:00:00.000Z' });
+
+  it('liest byEvent wie die Live-App: leere Einträge, unbekannte Spieler und fehlendes savedAt', () => {
+    const lineups = normalizeEventLineups({ e1: entry(one), e2: { assignments: { TW: ['a'] } }, e3: entry({}), e4: entry({ TW: ['weg'] }), e5: null }, new Set(['a', 'b']));
+    expect(Object.keys(lineups).sort()).toEqual(['e1', 'e2']);
+    expect(lineups['e1'].assignments.ST).toEqual(['b']);
+    expect(lineups['e1'].savedAt).toBe('2026-10-01T10:00:00.000Z');
+    expect(lineups['e2'].savedAt).toBe('');
+    expect(normalizeEventLineups(undefined)).toEqual({});
+    expect(normalizeEventLineups([1, 2])).toEqual({});
+  });
+
+  it('schreibt genau { assignments (alle 14 Zonen), savedAt } – Live-Eintrag überlebt Lesen und Schreiben', () => {
+    const live = entry(one);
+    const read = normalizeEventLineups({ e1: live })['e1'];
+    const written = docFromEventLineup(read.assignments, read.savedAt);
+    expect(Object.keys(written).sort()).toEqual(['assignments', 'savedAt']);
+    expect(Object.keys(written['assignments'] as object)).toHaveLength(14);
+    expect(written['assignments']).toMatchObject(live.assignments);
+    expect(written['savedAt']).toBe(live.savedAt);
+    // Was Angular schreibt, versteht die Live-Normalisierung (gleiche Struktur) wieder.
+    expect(normalizeEventLineups({ e1: written })['e1'].assignments).toEqual(read.assignments);
+  });
+
+  it('wählt als Ziel das nächste Spiel ab heute (Trainings und vergangene Spiele zählen nicht)', () => {
+    const events = [game('alt', '2026-09-01'), game('training', '2026-10-16', 'Training'), game('spaet', '2026-11-01'), game('heute', '2026-10-15'), game('mitte', '2026-10-20')];
+    expect(nextGame(events, '2026-10-15')?.id).toBe('heute');
+    expect(nextGame(events, '2026-10-16')?.id).toBe('mitte');
+    expect(nextGame(events, '2026-12-01')).toBeNull();
+    expect(nextGame([], '2026-10-15')).toBeNull();
+  });
+
+  it('übernimmt vom letzten Spiel VOR dem Ziel, das eine Aufstellung hat', () => {
+    const events = [game('a', '2026-09-01'), game('b', '2026-09-15'), game('c', '2026-09-29'), game('ziel', '2026-10-20'), game('danach', '2026-11-01')];
+    const lineups = normalizeEventLineups({ a: entry(one), b: entry(one), danach: entry(one), ziel: entry(one) });
+    const target = events[3];
+    expect(previousGameWithLineup(events, lineups, target, '2026-10-15')?.id).toBe('b'); // c hat keine, ziel/danach zählen nicht
+    expect(previousGameWithLineup(events, {}, target, '2026-10-15')).toBeNull();
+    expect(previousGameWithLineup(events, lineups, null, '2026-09-20')?.id).toBe('b');
+  });
+
+  it('fasst eine Aufstellung zum Lesen zusammen: Formation, Zeilen je Zone, Bank', () => {
+    const players = [player('a', 1, ['TW']), player('b', 9, ['ST']), player('c', 5, ['IV'])];
+    const summary = lineupSummary(normalizeEventLineups({ e1: entry(one) })['e1'].assignments, players);
+    expect(summary.name).toBe('1');
+    expect(summary.rows.map((row) => `${row.zone}:${row.players.map((p) => p.id)}`)).toEqual(['TW:a', 'ST:b']);
+    expect(summary.bench.map((p) => p.id)).toEqual(['c']);
   });
 });

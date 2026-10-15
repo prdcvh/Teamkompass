@@ -256,3 +256,32 @@ tr[data-attendance='excluded'] td {
   font-size: var(--tk-text-xs);
   font-weight: 600;
 }
+
+.lineup {
+  display: grid;
+  gap: var(--tk-space-2);
+  padding: var(--tk-space-4);
+}
+
+.lineup h2,
+.lineup p,
+.lineup ul {
+  margin: 0;
+}
+
+.lineup h2 {
+  font-size: var(--tk-text-lg);
+}
+
+.lineup ul {
+  display: grid;
+  gap: var(--tk-space-1);
+  padding: 0;
+  list-style: none;
+  font-size: var(--tk-text-sm);
+}
+
+.lineup .bench {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}

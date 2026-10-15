@@ -4,6 +4,8 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
 import { INTENSITIES, formatDate, resultText } from '../../core/events/event';
 import { EventsService } from '../../core/events/events.service';
+import { LineupService } from '../../core/lineup/lineup.service';
+import { lineupSummary } from '../../core/lineup/lineup';
 import { LayoutService } from '../../core/shell/layout.service';
 import { type Player, consentRevokedMessage, isConsentRevoked } from '../../core/player/player';
 import {
@@ -47,6 +49,7 @@ export class EventRating implements OnInit {
   protected readonly squad = inject(SquadService);
   protected readonly eventsService = inject(EventsService);
   protected readonly sync = inject(SyncService);
+  private readonly lineupService = inject(LineupService);
   protected readonly mobile = inject(LayoutService).isMobile;
 
   protected readonly attendances = ATTENDANCES;
@@ -66,6 +69,14 @@ export class EventRating implements OnInit {
   protected readonly ready = computed(() => this.ratings.load() === 'ready' && this.squad.load() === 'ready' && this.eventsService.load() === 'ready');
   protected readonly failed = computed(() => this.ratings.load() === 'error' || this.squad.load() === 'error' || this.eventsService.load() === 'error');
   protected readonly errorText = computed(() => this.ratings.error() || this.squad.error() || this.eventsService.error());
+
+  /** Für dieses Spiel gespeicherte Aufstellung (nur lesend, nur Trainer; fehlt sie oder lädt sie nicht, bleibt der Block weg). */
+  protected readonly lineupView = computed(() => {
+    const event = this.event();
+    if (!event || event.type !== 'Spiel' || !this.lineupService.canWrite() || this.lineupService.load() !== 'ready') return null;
+    const entry = this.lineupService.eventLineups()[event.id];
+    return entry ? lineupSummary(entry.assignments, this.allPlayers()) : null;
+  });
 
   protected readonly allPlayers = computed(() => [...this.squad.players()].sort((a, b) => a.number - b.number));
   protected readonly players = computed(() => this.allPlayers().filter((player) => matchesView(this.ratings.ratingFor(player.id), this.view())));
@@ -88,6 +99,7 @@ export class EventRating implements OnInit {
   ngOnInit(): void {
     this.squad.start();
     this.eventsService.start();
+    this.lineupService.start(); // startet nur für Trainer
   }
 
   protected formatDate = formatDate;

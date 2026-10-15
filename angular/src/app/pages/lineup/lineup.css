@@ -276,3 +276,16 @@ h2 {
     min-height: var(--tk-touch);
   }
 }
+
+.target {
+  align-items: start;
+}
+
+.target .tk-input {
+  width: 100%;
+  min-height: var(--tk-touch);
+}
+
+.copy {
+  justify-self: start;
+}
