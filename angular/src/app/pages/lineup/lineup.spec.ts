@@ -3,7 +3,10 @@ import { TestBed } from '@angular/core/testing';
 import { LayoutService } from '../../core/shell/layout.service';
 import { SessionService } from '../../core/auth/session.service';
 import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
+import { todayIso } from '../../core/shared/dates';
 import { Lineup } from './lineup';
+
+const day = (offset: number) => todayIso(new Date(Date.now() + offset * 86_400_000));
 
 describe('Lineup (Aufstellung)', () => {
   let firebase: FakeFirebase;
@@ -24,7 +27,7 @@ describe('Lineup (Aufstellung)', () => {
     ['bank', 'Ben Bank', 12, ['ST', 'IV'], 4],
   ];
 
-  async function render(role: 'trainer' | 'medical' = 'trainer', mobile = false, stored: Record<string, unknown> | null = null) {
+  async function render(role: 'trainer' | 'medical' = 'trainer', mobile = false, stored: Record<string, unknown> | null = null, games: [string, number][] = []) {
     isMobile.set(mobile);
     firebase = new FakeFirebase();
     for (const [id, name, number, positions] of squad) {
@@ -35,6 +38,7 @@ describe('Lineup (Aufstellung)', () => {
       'e1',
       new Map(squad.map(([id, , , , grade]) => [id, { attendance: 'present', effort: grade, technique: grade, tactics: grade, comprehension: grade, playerId: id }])),
     );
+    for (const [id, offset] of games) firebase.events.events.set(id, { type: 'Spiel', title: `Spiel ${id}`, date: day(offset), intensity: 3, opponent: 'SV Nord' });
     firebase.lineup.lineup = stored;
     TestBed.configureTestingModule({ providers: [...provideFakeFirebase(firebase), { provide: LayoutService, useValue: { isMobile } }] });
     TestBed.inject(SessionService).role.set(role);
@@ -169,5 +173,79 @@ describe('Lineup (Aufstellung)', () => {
     expect(text(root(fixture))).toContain('nur Trainer');
     expect(q(fixture, '.pitch')).toBeNull();
     expect(firebase.calls).not.toContain('watchLineup');
+  });
+
+  describe('je Spiel (SCRUM-122)', () => {
+    const select = (fixture: { nativeElement: unknown }) => q<HTMLSelectElement>(fixture, 'select[aria-label="Aufstellung für"]')!;
+    const byEvent = () => (firebase.lineup.lineup as { byEvent?: Record<string, { assignments: Record<string, string[]>; savedAt: string }> } | null)?.byEvent;
+    const stChip = (fixture: { nativeElement: unknown }) => qa<HTMLButtonElement>(fixture, '.chip').find((chip) => chip.getAttribute('aria-label')?.includes('Stu'))!;
+
+    it('wählt standardmäßig das nächste Spiel und zeigt „noch nicht gespeichert“', async () => {
+      const fixture = await render('trainer', false, null, [['alt', -7], ['spaet', 14], ['bald', 3]]);
+      expect(select(fixture).value).toBe('bald');
+      expect(text(q(fixture, '.target .meta'))).toContain('Spiel bald');
+      expect(text(q(fixture, '.target .meta'))).toContain('noch nicht gespeichert');
+      expect(qa(fixture, 'select[aria-label="Aufstellung für"] option').map(text)).toContain('Allgemeine Startelf (ohne Spiel)');
+    });
+
+    it('speichert Änderungen am Spiel (byEvent, Live-Format) und nicht als allgemeine Startelf', async () => {
+      const fixture = await render('trainer', false, full, [['bald', 3]]);
+      stChip(fixture).click();
+      await flush(fixture);
+      qa<HTMLButtonElement>(fixture, '.pick button').find((button) => text(button).includes('Ben Bank'))!.click();
+      await vi.waitFor(() => expect(firebase.calls).toContain('saveEventLineup'));
+      expect(firebase.calls).not.toContain('saveLineup');
+      const entry = byEvent()!['bald'];
+      expect(entry.assignments['ST']).toEqual(['bank']);
+      expect(Object.keys(entry.assignments)).toHaveLength(14);
+      expect(new Date(entry.savedAt).toISOString()).toBe(entry.savedAt);
+      expect((firebase.lineup.lineup as { assignments: Record<string, string[]> }).assignments['ST']).toEqual(['st']); // allgemeine Startelf unverändert
+      await flush(fixture);
+      expect(text(q(fixture, '.target .meta'))).not.toContain('noch nicht gespeichert');
+    });
+
+    it('zeigt die Aufstellung des gewählten Spiels und wechselt das Ziel', async () => {
+      const other = { assignments: { ...full.assignments, ST: ['bank'] }, savedAt: '2026-10-01T10:00:00.000Z' };
+      const fixture = await render('trainer', false, { assignments: full.assignments, byEvent: { alt: other } }, [['alt', -7], ['bald', 3]]);
+      expect(text(q(fixture, '.pitch'))).toContain('10 <b>Stu</b>'); // bald: nichts gespeichert → allgemeine Startelf
+      select(fixture).value = 'alt';
+      select(fixture).dispatchEvent(new Event('change'));
+      await flush(fixture);
+      expect(text(q(fixture, '.pitch'))).toContain('12 Ben');
+      expect(text(q(fixture, '.pitch'))).not.toContain('<b>Stu</b>');
+      select(fixture).value = '';
+      select(fixture).dispatchEvent(new Event('change'));
+      await flush(fixture);
+      expect(text(q(fixture, '.target .meta'))).toContain('allgemeine Startelf');
+      stChip(fixture).click();
+      await flush(fixture);
+      q<HTMLButtonElement>(fixture, '.actions button')!.click();
+      await vi.waitFor(() => expect(firebase.calls).toContain('saveLineup')); // ohne Spiel: wie bisher die allgemeine Startelf
+    });
+
+    it('übernimmt die Aufstellung vom letzten Spiel mit Aufstellung', async () => {
+      const old = { assignments: { ...full.assignments, ST: ['bank'] }, savedAt: '2026-09-01T10:00:00.000Z' };
+      const fixture = await render('trainer', false, { byEvent: { vorletzt: old } }, [['vorletzt', -14], ['letztes', -7], ['bald', 3]]);
+      const button = q<HTMLButtonElement>(fixture, '.copy')!;
+      expect(text(button)).toContain('vom letzten Spiel übernehmen');
+      button.click();
+      await vi.waitFor(() => expect(byEvent()?.['bald']).toBeDefined());
+      expect(byEvent()!['bald'].assignments['ST']).toEqual(['bank']);
+      expect(byEvent()!['vorletzt']).toEqual(old); // Quelle bleibt unverändert
+      await flush(fixture);
+      expect(text(q(fixture, '.pitch'))).toContain('12 Ben');
+    });
+
+    it('bietet „übernehmen“ nicht an, wenn kein früheres Spiel eine Aufstellung hat', async () => {
+      const fixture = await render('trainer', false, { byEvent: { bald: { assignments: full.assignments, savedAt: '' } } }, [['letztes', -7], ['bald', 3]]);
+      expect(q(fixture, '.copy')).toBeNull();
+    });
+
+    it('ohne anstehendes Spiel bleibt es die allgemeine Startelf', async () => {
+      const fixture = await render('trainer', false, full, [['alt', -7]]);
+      expect(select(fixture).value).toBe('');
+      expect(text(q(fixture, '.target .meta'))).toContain('allgemeine Startelf');
+      expect(q(fixture, '.copy')).toBeNull();
+    });
   });
 });

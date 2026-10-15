@@ -33,4 +33,14 @@ export class LineupApi {
     const { doc, setDoc } = await import('firebase/firestore');
     await setDoc(doc(db, 'teams', environment.teamId, 'meta', 'lineup'), data, { merge: true });
   }
+
+  /**
+   * Schreibt die Aufstellung eines Spiels (`byEvent.<id>`) per merge in dasselbe Dokument – genau wie die Live-App
+   * (cloudSaveEventLineup). Die allgemeine Startelf (`assignments`) und die anderen Spiele bleiben unberührt.
+   */
+  async saveEventLineup(eventId: string, entry: Readonly<Record<string, unknown>>): Promise<void> {
+    const { db } = await this.connection.get();
+    const { doc, setDoc } = await import('firebase/firestore');
+    await setDoc(doc(db, 'teams', environment.teamId, 'meta', 'lineup'), { byEvent: { [eventId]: entry } }, { merge: true });
+  }
 }
