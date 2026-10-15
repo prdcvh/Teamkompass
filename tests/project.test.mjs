@@ -54,7 +54,9 @@ test("CSP erlaubt nur den versionierten Firebase-SDK-Pfad und die benoetigten Go
     const script = directive("script-src").split(/\s+/).slice(1);
     const connect = directive("connect-src").split(/\s+/).slice(1);
     for (const source of script) assert.ok(source === "'self'" || source === "https://www.gstatic.com/firebasejs/10.12.5/", `${target.target}: script-src erlaubt ${source}`);
-    assert.deepEqual(connect.sort(), ["'self'", "https://firestore.googleapis.com", "https://identitytoolkit.googleapis.com", "https://securetoken.googleapis.com"].sort(), `${target.target}: connect-src zu breit`);
+    // Nur das Angular-Target u14 darf zusaetzlich das Wetter von Open-Meteo abrufen (SCRUM-96).
+    const weather = target.target === "u14" ? ["https://api.open-meteo.com", "https://geocoding-api.open-meteo.com"] : [];
+    assert.deepEqual(connect.sort(), ["'self'", "https://firestore.googleapis.com", "https://identitytoolkit.googleapis.com", "https://securetoken.googleapis.com", ...weather].sort(), `${target.target}: connect-src zu breit`);
   }
   // Die Live-Kopien laden das SDK genau aus diesem Pfad; aendert sich die Version, muss die CSP mitziehen.
   for (const team of teams) {
