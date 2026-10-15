@@ -27,6 +27,7 @@ async function setup(team, events) {
     const intensityLabel = () => "";
     const selectedEvent = () => state.events.find((e) => e.id === state.selectedEventId) || state.events[0];
     const renderRatingTable = () => {};
+    function syncEventSelect() {} // SCRUM-129 (liegt ausserhalb des ausgeschnittenen Bereichs)
     ${listPart}
     ${resetPart}
     return { renderEvents, resetEventFilter, setFilter: (f) => { eventFilter = f; } };
