@@ -7,7 +7,7 @@ import { FileOutput } from '../../core/export/file-output';
 import { PlayerRecordsApi } from '../../core/firebase/player-records.api';
 import { OpponentsService } from '../../core/opponents/opponents.service';
 import { todayIso } from '../../core/shared/dates';
-import { consentRevokedMessage } from '../../core/player/player';
+import { type Player, consentRevokedMessage } from '../../core/player/player';
 import { profileReportHtml } from '../../core/profile/profile-report';
 import { type DevelopmentPlan, planFromDoc } from '../../core/records/plan';
 import { SessionService } from '../../core/auth/session.service';
@@ -51,7 +51,7 @@ export class Export implements OnInit {
   protected readonly ready = computed(() => this.team.ready() && this.opponents.load() === 'ready');
   protected readonly loadFailed = computed(() => !!this.team.error() || this.opponents.load() === 'error');
   protected readonly selectedId = signal('');
-  protected readonly selected = computed(() => this.players().find((player) => player.id === this.selectedId()) ?? this.players()[0] ?? null);
+  protected readonly selected = computed<Player | null>(() => this.players().find((player) => player.id === this.selectedId()) ?? this.players()[0] ?? null);
 
   protected readonly busy = signal(false);
   protected readonly failure = signal('');
