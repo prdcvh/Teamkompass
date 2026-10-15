@@ -52,18 +52,12 @@
   align-items: center;
 }
 
-.badge {
-  display: grid;
-  place-items: center;
-  width: 52px;
+.logo {
+  display: block;
+  width: auto;
   height: 52px;
-  color: var(--hero-deep);
-  background: var(--hero-text);
-  border-radius: var(--tk-radius-lg);
-  font-size: var(--tk-text-lg);
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  box-shadow: 0 8px 24px rgb(0 0 0 / 30%);
+  object-fit: contain;
+  filter: drop-shadow(0 8px 24px rgb(0 0 0 / 30%));
 }
 
 .club,

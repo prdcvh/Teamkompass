@@ -24,17 +24,11 @@ nav {
   align-items: center;
 }
 
-.badge {
-  display: grid;
-  place-items: center;
-  min-width: 38px;
-  height: 28px;
-  padding: 0 6px;
-  color: var(--tk-on-red);
-  background: var(--tk-red);
-  border-radius: var(--tk-radius-sm);
-  font-size: 12px;
-  font-weight: 600;
+.logo {
+  display: block;
+  width: auto;
+  height: 34px;
+  object-fit: contain;
 }
 
 .brand strong {

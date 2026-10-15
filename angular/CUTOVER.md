@@ -34,13 +34,13 @@ Legende: ✅ vorhanden · ≈ anders gelöst (gleicher Zweck) · ❌ fehlt → T
 | Hell/Dunkel | Schalter | Einstellungen | ✅ |
 | Sync-Status | „Cloud synchronisiert …“, offline, Fehler | gleiche Texte | ✅ |
 | Barrierefreiheit Diagramme | Textzusammenfassung für Screenreader | vorhanden | ✅ |
-| Vereinslogo im Kopf | Vereinslogo-Bild | „TK“-Zeichen (Login-Neugestaltung SCRUM-84) | ≈ |
-| Altdaten-Migration | Knopf „Daten migrieren“ (altes Ein-Dokument-Format → Sammlungen) | – | ✂️ |
+| Vereinslogo im Kopf | Vereinslogo-Bild | Vereinslogo in Seitenleiste und Anmeldeseite (statt „TK“) | ✅ |
+| Altdaten-Migration | Knopf „Daten migrieren“ (altes Ein-Dokument-Format → Sammlungen) | wird nicht übernommen (PO-Entscheid 15.10.) | ✂️ |
 | PWA | Manifest, Service Worker, offline startbar | **neu mit diesem Ticket** (siehe 2.) | ✅ |
 | Je Team ein Build | ein Ordner je Team (`outputs/<team>`) | fest auf U14 | ❌ SCRUM-124 |
 | Datenformat alt ↔ neu | – | für einen Rückweg nötig | ❌ SCRUM-125 |
 
-**Vorschlag zum Streichen (✂️):** Die Altdaten-Migration war ein Einmal-Werkzeug für den Wechsel
+**Gestrichen (✂️, PO-Entscheid 15.10.2026):** Die Altdaten-Migration war ein Einmal-Werkzeug für den Wechsel
 vom alten Ein-Dokument-Format auf Sammlungen. Alle Live-Teams sind längst umgestellt; Angular braucht
 sie nicht. Die „≈“-Punkte halte ich für gleichwertig; wenn du einen davon genau wie bisher willst,
 lege ich ein Ticket an.
@@ -85,7 +85,13 @@ kopieren. Dann gibt es keinen Datenumzug und keinen Stichtag, an dem zwei Ständ
    Root-Referenzkopie entfernen, `CLAUDE.md` anpassen. Die Testinstanz `U14` bleibt bestehen oder
    wird nach PO-Entscheid gelöscht.
 
-**Offene Fragen an den PO:**
-- Einverstanden mit „direkt auf die bisherigen Daten“ statt Datenkopie?
-- Mit welchem Team anfangen?
-- Altdaten-Migration streichen?
+**Entscheidungen des PO (15.10.2026):**
+- Angular nutzt direkt die bisherigen Daten, keine Kopie. ✅
+- Reihenfolge: **U17**, danach **U15**, zuletzt das **Haupt-Team** (`mein-team`).
+- Das Haupt-Team wird danach zum **Dummy-/Entwicklungs-Team**: neue Ideen werden dort zuerst gebaut und erprobt;
+  was sich bewährt, kommt auf die anderen Teams.
+- Die Altdaten-Migration wird nicht übernommen. ✅
+- Antippen statt Ziehen, Monatsgruppen bei vergangenen Events: in Ordnung. Das Vereinslogo muss statt „TK“ erscheinen
+  (umgesetzt). ✅
+- Noch offen vor dem Umschalten von U17: SCRUM-122, SCRUM-123 (Funktionen der Live-App, die in Angular noch fehlen),
+  SCRUM-78 (Testkonto) und ein Testlauf gegen die echten U17-Daten auf einer Vorschau-Adresse.

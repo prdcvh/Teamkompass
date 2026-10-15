@@ -1003,3 +1003,13 @@ test("Angular: Build je Live-Team mit derselben Team-ID wie die heutige App (SCR
   }
   assert.match(await read("package.json"), /npm --prefix angular run build:teams/, "verify baut die Team-Konfigurationen nicht");
 });
+
+test("Angular zeigt das Vereinslogo statt des „TK“-Zeichens (SCRUM-76)", async () => {
+  for (const file of ["angular/src/app/shell/sidebar/sidebar.html", "angular/src/app/pages/login/login.html"]) {
+    const html = await read(file);
+    assert.match(html, /<img class="logo" src="club-logo\.png"/);
+    assert.doesNotMatch(html, />TK</);
+  }
+  const logo = await readFile(new URL("../angular/public/club-logo.png", import.meta.url));
+  assert.equal(logo.subarray(1, 4).toString(), "PNG");
+});
