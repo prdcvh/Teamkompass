@@ -29,7 +29,7 @@ Legende: ✅ vorhanden · ≈ anders gelöst (gleicher Zweck) · ❌ fehlt → T
 | Zugänge | Einladungscodes, Trainer-Konto, Scout-Zugang, getrennte Listen, widerrufen | `/zugaenge` (SCRUM-73, SCRUM-92) | ✅ |
 | Globale Suche | Strg/⌘+K, Spieler/Events/Gegner | `/suche` | ✅ |
 | Export | JSON, PDF | `/export` | ✅ |
-| **Backup einspielen** | JSON-Import mit Prüfung und Zusammenfassung (SCRUM-28, #158) | nur Export | ❌ SCRUM-123 |
+| **Backup einspielen** | JSON-Import mit Prüfung und Zusammenfassung (SCRUM-28, #158) | Export-Seite: Datei wählen, Prüfung, Zusammenfassung, Bestätigung; gegenseitig mit der Live-App einspielbar | ✅ SCRUM-123 |
 | Datenschutz & lokale Daten | Aufbewahrungsdauer, Aktivitätsverlauf, lokale Daten löschen | Einstellungen | ✅ |
 | Hell/Dunkel | Schalter | Einstellungen | ✅ |
 | Sync-Status | „Cloud synchronisiert …“, offline, Fehler | gleiche Texte | ✅ |

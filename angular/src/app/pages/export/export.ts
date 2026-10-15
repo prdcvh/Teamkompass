@@ -1,6 +1,8 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { environment } from '../../../environments/environment';
+import { type Backup, MAX_BACKUP_BYTES, type CurrentIds, backupOperations, overwriteCount, parseBackup, summarizeBackup, summaryLines, validateBackup } from '../../core/export/backup-import';
 import { buildExport, exportFileName, revokedPlayers } from '../../core/export/export';
+import { BackupApi } from '../../core/firebase/backup.api';
 import { FileOutput } from '../../core/export/file-output';
 import { PlayerRecordsApi } from '../../core/firebase/player-records.api';
 import { OpponentsService } from '../../core/opponents/opponents.service';
@@ -18,6 +20,14 @@ import { Dialog } from '../../ui/dialog/dialog';
 
 type Kind = 'json' | 'pdf';
 
+/** Eine geprüfte Sicherungsdatei, die auf die Bestätigung wartet. */
+interface PendingImport {
+  readonly fileName: string;
+  readonly backup: Backup;
+  readonly lines: string[];
+  readonly overwrites: number;
+}
+
 /** Daten exportieren: Sicherung aller Teamdaten (JSON) und Spielerprofil als PDF (nur Trainer). */
 @Component({
   selector: 'app-export',
@@ -31,6 +41,7 @@ export class Export implements OnInit {
   private readonly opponents = inject(OpponentsService);
   private readonly playerRecordsApi = inject(PlayerRecordsApi);
   private readonly files = inject(FileOutput);
+  private readonly backupApi = inject(BackupApi);
   private readonly workspace = inject(WorkspaceService);
   private readonly session = inject(SessionService);
   protected readonly sync = inject(SyncService);
@@ -51,6 +62,12 @@ export class Export implements OnInit {
     const names = this.confirming()?.names ?? [];
     return names.map((name) => consentRevokedMessage(name)).join(' ');
   });
+
+  /** Sicherung einspielen: geprüfte Datei wartet auf Bestätigung; Fehler der Dateiprüfung stehen im Hinweis. */
+  protected readonly pendingImport = signal<PendingImport | null>(null);
+  protected readonly importError = signal('');
+  protected readonly importDone = signal('');
+  protected readonly importing = signal(false);
 
   ngOnInit(): void {
     if (this.isTrainer()) {
@@ -134,5 +151,84 @@ export class Export implements OnInit {
     );
     this.workspace.record(`Spielerprofil als PDF vorbereitet (${player.name})`);
     this.done.set('Der Druckdialog wurde geöffnet – dort „Als PDF speichern“ wählen.');
+  }
+
+  /** Liest und prüft die gewählte Datei und zeigt die Zusammenfassung. Geschrieben wird erst nach der Bestätigung. */
+  protected async chooseBackup(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file || !this.isTrainer() || !this.ready() || this.importing()) return;
+    this.importError.set('');
+    this.importDone.set('');
+    this.pendingImport.set(null);
+    if (file.size > MAX_BACKUP_BYTES) {
+      this.importError.set('Die Datei ist zu groß für eine Sicherung. Es wurde nichts geändert.');
+      return;
+    }
+    let raw: unknown;
+    try {
+      raw = JSON.parse(await file.text());
+    } catch {
+      this.importError.set('Die Datei konnte nicht gelesen werden. Bitte eine mit „Sicherung herunterladen“ erstellte .json-Datei wählen. Es wurde nichts geändert.');
+      return;
+    }
+    const check = validateBackup(raw);
+    if (!check.ok) {
+      this.importError.set(`${check.error} Es wurde nichts geändert.`);
+      return;
+    }
+    try {
+      const backup = parseBackup(raw as Record<string, unknown>, todayIso());
+      const summary = summarizeBackup(await this.currentIds(backup), backup);
+      this.pendingImport.set({ fileName: file.name, backup, lines: summaryLines(summary), overwrites: overwriteCount(summary) });
+    } catch {
+      this.importError.set('Die Datei konnte nicht geprüft werden. Bitte erneut versuchen. Es wurde nichts geändert.');
+    }
+  }
+
+  /** Kennungen, die es schon gibt (Förderpläne werden für die Spieler der Datei aus der Datenbank gelesen). */
+  private async currentIds(backup: Backup): Promise<CurrentIds> {
+    const today = todayIso();
+    const entries = this.team.data();
+    const ids = (items: readonly { id: string }[]) => new Set(items.map((item) => item.id));
+    const plans = new Map<string, ReadonlySet<string>>(
+      await Promise.all(
+        Object.keys(backup.developmentPlans).map(async (playerId) => {
+          const docs = await this.playerRecordsApi.readPlayerRecords(playerId, 'developmentPlans');
+          return [playerId, ids(docs.map((doc) => planFromDoc(doc.id, doc.data, today)))] as const;
+        }),
+      ),
+    );
+    return {
+      players: ids(entries.map((entry) => entry.player)),
+      events: ids(this.team.events()),
+      opponents: ids(this.opponents.opponents()),
+      developmentPlans: plans,
+      absences: new Map(entries.map((entry) => [entry.player.id, ids(entry.absences)])),
+      measurements: new Map(entries.map((entry) => [entry.player.id, ids(entry.measurements)])),
+    };
+  }
+
+  protected cancelImport(): void {
+    this.pendingImport.set(null);
+  }
+
+  protected async confirmImport(): Promise<void> {
+    const pending = this.pendingImport();
+    this.pendingImport.set(null);
+    if (!pending || !this.isTrainer() || this.importing()) return;
+    this.importing.set(true);
+    this.importError.set('');
+    this.importDone.set('');
+    try {
+      await this.backupApi.writeAll(backupOperations(pending.backup));
+      this.workspace.record(`Sicherung eingespielt (${pending.fileName})`);
+      this.importDone.set('Die Sicherung wurde eingespielt. Die Daten erscheinen in wenigen Sekunden.');
+    } catch {
+      this.importError.set('Die Sicherung konnte nicht vollständig eingespielt werden. Bitte prüfen und ggf. erneut versuchen – bereits geschriebene Teile bleiben bestehen.');
+    } finally {
+      this.importing.set(false);
+    }
   }
 }
