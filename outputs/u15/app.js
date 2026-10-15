@@ -175,6 +175,96 @@ const views = {
   teamAnalysis: $("#teamAnalysisView")
 };
 
+// RENDER-SCHEDULER START
+// SCRUM-35: Rendern nach Cloud-Snapshots. Reine Logik ohne DOM-Zugriff (testbar).
+// - request() buendelt viele Snapshots auf hoechstens einen Durchlauf je `delay` ms.
+// - Ein Durchlauf rendert nur die sichtbare Ansicht; alle anderen gelten als veraltet
+//   ("dirty") und werden beim Aktivieren per consume() nachgerendert.
+// - clear() verwirft einen geplanten Durchlauf (ein synchrones renderAll() war schneller).
+function createRenderScheduler({ viewNames, activeView, renderShared, renderView, onFlush, delay = 80, timers = { set: (fn, ms) => setTimeout(fn, ms), clear: (id) => clearTimeout(id) } }) {
+  const dirty = new Set();
+  let pending = null;
+  const flush = () => {
+    pending = null;
+    renderShared();
+    const active = activeView();
+    viewNames.forEach((name) => {
+      if (name === active) {
+        dirty.delete(name);
+        renderView(name);
+      } else {
+        dirty.add(name);
+      }
+    });
+    if (onFlush) onFlush();
+  };
+  return {
+    request() {
+      if (pending === null) pending = timers.set(flush, delay);
+    },
+    clear() {
+      if (pending !== null) timers.clear(pending);
+      pending = null;
+      dirty.clear();
+    },
+    consume(name) {
+      return dirty.delete(name);
+    },
+    isPending: () => pending !== null,
+    isDirty: (name) => dirty.has(name),
+    flush
+  };
+}
+
+// Kennzahlen (Durchschnittsnote, Verletzungsrisiko, sortierte Events) sind innerhalb eines
+// Render-Durchlaufs konstant. Ausserhalb eines Durchlaufs (Eingabe-Handler) wird nie gecacht.
+function createRenderPassMemo() {
+  let memo = null;
+  return {
+    run(fn) {
+      if (memo) return fn();
+      memo = new Map();
+      try {
+        return fn();
+      } finally {
+        memo = null;
+      }
+    },
+    get(kind, key, compute) {
+      if (!memo) return compute();
+      const id = `${kind}:${key}`;
+      if (!memo.has(id)) memo.set(id, compute());
+      return memo.get(id);
+    }
+  };
+}
+// RENDER-SCHEDULER END
+
+const renderPassMemoizer = createRenderPassMemo();
+const renderPassMemo = (kind, key, compute) => renderPassMemoizer.get(kind, key, compute);
+const withRenderPass = (fn) => renderPassMemoizer.run(fn);
+
+const VIEW_RENDER_STEPS = {
+  dashboard: [[() => renderMetrics(), "Dashboard-Kennzahlen"], [() => renderPitch(), "Startelf"], [() => renderLeaders(), "Formkurve"]],
+  squad: [[() => renderSquad(), "Kader"]],
+  events: [[() => renderEvents(), "Events"]],
+  profiles: [[() => drawProfile(), "Spielerprofile"]],
+  opponents: [[() => renderOpponentAnalysis(), "Gegneranalyse"]],
+  teamAnalysis: [[() => renderTeamAnalysis(), "Teamanalyse"]]
+};
+
+const renderScheduler = createRenderScheduler({
+  viewNames: Object.keys(VIEW_RENDER_STEPS),
+  activeView: () => Object.keys(views).find((name) => views[name].classList.contains("active")),
+  renderShared: () => withRenderPass(() => safeRender(renderSelects, "Auswahllisten")),
+  renderView: (name) => withRenderPass(() => VIEW_RENDER_STEPS[name].forEach(([fn, label]) => safeRender(fn, label))),
+  onFlush: () => document.dispatchEvent(new CustomEvent("teamkompass:render"))
+});
+
+function requestCloudRender() {
+  renderScheduler.request();
+}
+
 window.addEventListener("error", (event) => {
   console.error(event.error || event.message);
   const storageState = $("#storageState");
@@ -1228,7 +1318,9 @@ function rebuildStateFromCloudCache() {
   if (isCloudTrainer()) {
     $("#migrateDataBtn").hidden = state.players.length > 0;
   }
-  renderAll();
+  // SCRUM-35: Beim Start feuern >160 Listener nacheinander. Statt jedes Mal alle Ansichten
+  // zu rendern, werden die Snapshots gebuendelt und nur die sichtbare Ansicht gezeichnet.
+  requestCloudRender();
 }
 
 // ---- Granulare Cloud-Schreibvorgaenge (greifen nur im Rollen-Modus als Trainer,
@@ -2110,15 +2202,22 @@ function setView(viewName) {
   }
   if ($("#mobileViewSelect")) $("#mobileViewSelect").value = viewName;
   $("#pageTitle").textContent = titles[viewName];
-  if (viewName === "dashboard") { renderMetrics(); renderPitch(); renderLeaders(); }
-  if (viewName === "squad") {
-    renderSquad();
-    if (isCloudTrainer()) renderAccessManager();
-  }
-  if (viewName === "events") setEventStep("list");
-  if (viewName === "profiles") drawProfile();
-  if (viewName === "opponents") renderOpponentAnalysis();
-  if (viewName === "teamAnalysis") renderTeamAnalysis();
+  // SCRUM-35: Ansichten, die im Hintergrund veraltet sind, werden erst jetzt aktualisiert.
+  const wasStale = renderScheduler.consume(viewName);
+  withRenderPass(() => {
+    if (viewName === "dashboard") { renderMetrics(); renderPitch(); renderLeaders(); }
+    if (viewName === "squad") {
+      renderSquad();
+      if (isCloudTrainer()) renderAccessManager();
+    }
+    if (viewName === "events") {
+      if (wasStale) renderEvents();
+      setEventStep("list");
+    }
+    if (viewName === "profiles") drawProfile();
+    if (viewName === "opponents") renderOpponentAnalysis();
+    if (viewName === "teamAnalysis") renderTeamAnalysis();
+  });
   prepareMobileAccordions();
 }
 
@@ -2151,7 +2250,7 @@ function selectedEvent() {
 }
 
 function sortedEvents() {
-  return [...state.events].sort((a, b) => new Date(b.date) - new Date(a.date));
+  return renderPassMemo("events", "all", () => [...state.events].sort((a, b) => new Date(b.date) - new Date(a.date)));
 }
 
 function playerRatings(playerId) {
@@ -2161,6 +2260,10 @@ function playerRatings(playerId) {
 }
 
 function playerAverageGrade(playerId) {
+  return renderPassMemo("grade", playerId, () => computePlayerAverageGrade(playerId));
+}
+
+function computePlayerAverageGrade(playerId) {
   const ratings = playerRatings(playerId);
   if (!ratings.length) return null;
   const sum = ratings.reduce((total, item) => total + Number(item.rating.grade), 0);
@@ -2219,6 +2322,10 @@ const INJURY_RISK_TIERS = [
 // Koerpermessungen (schnelles Laengenwachstum korreliert mit Apophysen-Reizungen wie
 // Morbus Osgood-Schlatter).
 function playerInjuryRisk(playerId) {
+  return renderPassMemo("risk", playerId, () => computePlayerInjuryRisk(playerId));
+}
+
+function computePlayerInjuryRisk(playerId) {
   const player = state.players.find((item) => item.id === playerId);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -4870,15 +4977,19 @@ function deleteOpponent(opponentId) {
 }
 
 function renderAll() {
-  safeRender(renderMetrics, "Dashboard-Kennzahlen");
-  safeRender(renderPitch, "Startelf");
-  safeRender(renderLeaders, "Formkurve");
-  safeRender(renderSelects, "Auswahllisten");
-  safeRender(renderSquad, "Kader");
-  safeRender(renderEvents, "Events");
-  safeRender(drawProfile, "Spielerprofile");
-  safeRender(renderOpponentAnalysis, "Gegneranalyse");
-  safeRender(renderTeamAnalysis, "Teamanalyse");
+  // Ein vollstaendiger Durchlauf macht geplante und "veraltete" Ansichten hinfaellig.
+  renderScheduler.clear();
+  withRenderPass(() => {
+    safeRender(renderMetrics, "Dashboard-Kennzahlen");
+    safeRender(renderPitch, "Startelf");
+    safeRender(renderLeaders, "Formkurve");
+    safeRender(renderSelects, "Auswahllisten");
+    safeRender(renderSquad, "Kader");
+    safeRender(renderEvents, "Events");
+    safeRender(drawProfile, "Spielerprofile");
+    safeRender(renderOpponentAnalysis, "Gegneranalyse");
+    safeRender(renderTeamAnalysis, "Teamanalyse");
+  });
   document.dispatchEvent(new CustomEvent("teamkompass:render"));
 }
 

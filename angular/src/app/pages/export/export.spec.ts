@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { BackupApi, type WriteOperation } from '../../core/firebase/backup.api';
 import { FileOutput } from '../../core/export/file-output';
 import { SessionService } from '../../core/auth/session.service';
 import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
@@ -9,11 +10,15 @@ describe('Export (Daten exportieren)', () => {
   let firebase: FakeFirebase;
   let saved: { name: string; text: string }[];
   let printed: string[];
+  let writes: WriteOperation[][];
+  let writeError: unknown;
 
   async function render(role: 'trainer' | 'player' = 'trainer', consent2 = 'granted') {
     firebase = new FakeFirebase();
     saved = [];
     printed = [];
+    writes = [];
+    writeError = null;
     firebase.players.players.set('p1', { name: 'Ali Adler', positions: ['ST'], number: 9, birthdate: '2012-02-05', status: 'Fit', consentStatus: 'granted' });
     firebase.players.players.set('p2', { name: '<b>Ben</b>', positions: ['IV'], number: 4, birthdate: '2012-11-06', status: 'Fit', consentStatus: consent2 });
     firebase.events.events.set('e1', { type: 'Spiel', title: 'Spiel gegen Eppstein', date: '2026-09-01', goalsFor: 3, goalsAgainst: 1, intensity: 3 });
@@ -23,6 +28,15 @@ describe('Export (Daten exportieren)', () => {
     TestBed.configureTestingModule({
       providers: [
         ...provideFakeFirebase(firebase),
+        {
+          provide: BackupApi,
+          useValue: {
+            writeAll: async (ops: WriteOperation[]) => {
+              if (writeError) throw writeError;
+              writes.push(ops);
+            },
+          },
+        },
         { provide: FileOutput, useValue: { saveText: (name: string, text: string) => saved.push({ name, text }), print: (html: string) => printed.push(html) } },
       ],
     });
@@ -124,6 +138,85 @@ describe('Export (Daten exportieren)', () => {
       expect(root(fixture).querySelector('[role="alert"]')?.textContent).toContain('Export hat nicht geklappt');
     });
     expect(saved).toHaveLength(0);
+  });
+
+  const choose = async (fixture: { nativeElement: unknown; detectChanges: () => void; whenStable: () => Promise<unknown> }, content: string, name = 'sicherung.json') => {
+    const input = root(fixture).querySelector<HTMLInputElement>('input[type="file"]')!;
+    Object.defineProperty(input, 'files', { value: [{ name, size: content.length, text: async () => content }], configurable: true });
+    input.dispatchEvent(new Event('change'));
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(root(fixture).querySelector('[role="alert"]') ?? root(fixture).querySelector('.backup-dialog li')).toBeTruthy();
+    });
+  };
+  const dialogButton = (fixture: { nativeElement: unknown }, label: string) =>
+    [...root(fixture).querySelectorAll<HTMLButtonElement>('.backup-dialog button')].find((button) => button.textContent?.trim() === label)!;
+  const backupFile = (extra: Record<string, unknown> = {}) =>
+    JSON.stringify({
+      players: [{ id: 'p1', name: 'Ali Neu', positions: ['ST'], number: 9 }, { id: 'p9', name: 'Neuer Spieler', positions: ['TW'], number: 1 }],
+      events: [{ id: 'e1', type: 'Training', title: 'Neu', date: '2026-09-01', ratings: { p1: { attendance: 'present', effort: 1 } }, privateNotes: { p1: 'intern' } }],
+      developmentPlans: { p1: [{ id: 'f1', focus: 'Kopfball neu' }, { id: 'f2', focus: 'Neu' }] },
+      ...extra,
+    });
+
+  it('Sicherung einspielen: zeigt erst die Zusammenfassung und schreibt nichts vor der Bestätigung', async () => {
+    const fixture = await render();
+    await choose(fixture, backupFile());
+    const dialog = root(fixture).querySelector('.backup-dialog')!;
+    expect(dialog.textContent).toContain('Spieler: 1 neu, 1 werden aktualisiert');
+    expect(dialog.textContent).toContain('Events: 0 neu, 1 werden aktualisiert');
+    expect(dialog.textContent).toContain('Förderpläne: 1 neu, 1 werden aktualisiert');
+    expect(dialog.textContent).toContain('Nichts wird gelöscht');
+    expect(dialog.textContent).toContain('überschrieben');
+    expect(writes).toHaveLength(0);
+  });
+
+  it('Sicherung einspielen: schreibt nach der Bestätigung genau die Dokumente der Datei und vermerkt es', async () => {
+    const fixture = await render();
+    await choose(fixture, backupFile());
+    dialogButton(fixture, 'Sicherung einspielen').click();
+    await vi.waitFor(() => expect(writes).toHaveLength(1));
+    const paths = writes[0].map((op) => op.path.join('/'));
+    expect(paths).toContain('players/p9');
+    expect(paths).toContain('events/e1/privateNotes/p1');
+    expect(paths).toContain('players/p1/developmentPlans/f2');
+    expect(paths.every((path) => !path.startsWith('players/p2') && !path.startsWith('opponents'))).toBe(true);
+    expect(TestBed.inject(WorkspaceService).activity()[0].action).toContain('Sicherung eingespielt');
+    await settle(fixture);
+    expect(root(fixture).textContent).toContain('Die Sicherung wurde eingespielt');
+  });
+
+  it('Sicherung einspielen: Abbrechen schreibt nichts', async () => {
+    const fixture = await render();
+    await choose(fixture, backupFile());
+    dialogButton(fixture, 'Abbrechen').click();
+    await settle(fixture);
+    expect(writes).toHaveLength(0);
+  });
+
+  it('Sicherung einspielen: eine falsche Datei wird abgelehnt und ändert nichts', async () => {
+    const fixture = await render();
+    await choose(fixture, JSON.stringify({ players: [], events: [] }));
+    expect(root(fixture).querySelector('[role="alert"]')!.textContent).toContain('keine Spieler');
+    await choose(fixture, 'kein json');
+    expect(root(fixture).querySelector('[role="alert"]')!.textContent).toContain('nicht gelesen');
+    expect(writes).toHaveLength(0);
+  });
+
+  it('Sicherung einspielen: meldet einen Schreibfehler', async () => {
+    const fixture = await render();
+    writeError = new Error('offline');
+    await choose(fixture, backupFile());
+    dialogButton(fixture, 'Sicherung einspielen').click();
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(root(fixture).querySelector('[role="alert"]')?.textContent).toContain('nicht vollständig eingespielt');
+    });
+  });
+
+  it('Sicherung einspielen: für Nicht-Trainer gibt es keine Dateiauswahl', async () => {
+    const fixture = await render('player');
+    expect(root(fixture).querySelector('input[type="file"]')).toBeNull();
   });
 
   it('ist für Nicht-Trainer nicht verfügbar', async () => {

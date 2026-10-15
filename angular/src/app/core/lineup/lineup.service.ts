@@ -1,7 +1,7 @@
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { authErrorMessage, errorCode } from '../auth/auth-errors';
 import { LineupApi } from '../firebase/lineup.api';
-import { type Assignments, docFromLineup, emptyAssignments, normalizeLineup } from './lineup';
+import { type Assignments, type EventLineups, docFromEventLineup, docFromLineup, emptyAssignments, normalizeEventLineups, normalizeLineup } from './lineup';
 import { SessionService } from '../auth/session.service';
 import { SquadService } from '../player/squad.service';
 import { SyncService } from '../shell/sync.service';
@@ -31,6 +31,13 @@ export class LineupService {
     const doc = this.stored();
     if (!doc) return emptyAssignments();
     return normalizeLineup(doc, new Set(this.squad.players().map((player) => player.id)));
+  });
+
+  /** Je Spiel gespeicherte Aufstellungen (`byEvent`), ohne Spieler, die nicht (mehr) im Kader stehen. */
+  readonly eventLineups = computed<EventLineups>(() => {
+    const doc = this.stored();
+    if (!doc) return {};
+    return normalizeEventLineups(doc['byEvent'], new Set(this.squad.players().map((player) => player.id)));
   });
 
   private unsubscribe: (() => void) | null = null;
@@ -82,10 +89,28 @@ export class LineupService {
   save(assignments: Assignments): boolean {
     if (!this.canEdit()) return false;
     const doc = docFromLineup(assignments);
-    this.stored.set(doc); // sofort sichtbar, auch offline; das Abo bestätigt es
+    this.stored.set({ ...this.stored(), ...doc }); // sofort sichtbar, auch offline; das Abo bestätigt es
     if (!this.sync.isFailed()) this.sync.state.set('syncing');
     void this.lineupApi
       .saveLineup(doc)
+      .then(() => this.sync.clearError())
+      .catch((error) => this.failWrite(error));
+    return true;
+  }
+
+  /**
+   * Speichert die Aufstellung für ein Spiel am Eintrag `byEvent.<eventId>` (Format der Live-App); die allgemeine Startelf
+   * und die anderen Spiele bleiben unberührt. Rückgabe: false, wenn nicht erlaubt oder noch nicht geladen.
+   */
+  saveForEvent(eventId: string, assignments: Assignments, now: Date = new Date()): boolean {
+    if (!this.canEdit() || !eventId) return false;
+    const entry = docFromEventLineup(assignments, now.toISOString());
+    const current = this.stored();
+    const byEvent = { ...((current?.['byEvent'] as Record<string, unknown> | undefined) ?? {}), [eventId]: entry };
+    this.stored.set({ ...current, byEvent }); // sofort sichtbar, auch offline; das Abo bestätigt es
+    if (!this.sync.isFailed()) this.sync.state.set('syncing');
+    void this.lineupApi
+      .saveEventLineup(eventId, entry)
       .then(() => this.sync.clearError())
       .catch((error) => this.failWrite(error));
     return true;
