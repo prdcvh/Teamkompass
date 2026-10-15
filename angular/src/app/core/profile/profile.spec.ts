@@ -18,7 +18,7 @@ describe('profile (Auswertungen)', () => {
   const TODAY = '2026-10-10';
   const event = (id: string, date: string, overrides: Partial<TeamEvent> = {}): TeamEvent => ({
     id, type: 'Training', title: `Event ${id}`, date, intensity: 2, location: '', trainingFocus: 'Umschalten', opponent: '',
-    goalsFor: null, goalsAgainst: null, matchDuration: null, notes: '', ...overrides,
+    goalsFor: null, goalsAgainst: null, matchDuration: null, startTime: null, durationMinutes: null, locationCoords: null, notes: '', ...overrides,
   });
   const game = (id: string, date: string, duration = 90) => event(id, date, { type: 'Spiel', matchDuration: duration, trainingFocus: '' });
   const rated = (grade: number, overrides: Partial<Rating> = {}): Rating => ({

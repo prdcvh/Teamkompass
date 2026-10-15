@@ -25,6 +25,17 @@ export const MAX_NOTES_LENGTH = 1000;
 export const MAX_SCORE = 99;
 export const DEFAULT_MATCH_DURATION = 90;
 export const MAX_MATCH_DURATION = 150;
+export const MAX_TRAINING_DURATION = 300;
+export const MAX_COORDS_NAME_LENGTH = 120;
+/** Alle Zeiten der Events gelten in dieser Zeitzone. */
+export const EVENT_TIME_ZONE = 'Europe/Berlin';
+
+/** Ort mit Koordinaten (z. B. aus der Ortssuche); `name` ist die Bezeichnung des Treffers. */
+export interface LocationCoords {
+  readonly lat: number;
+  readonly lon: number;
+  readonly name: string;
+}
 
 export interface TeamEvent {
   readonly id: string;
@@ -42,6 +53,12 @@ export interface TeamEvent {
   readonly goalsAgainst: number | null;
   /** Nur bei Spielen (Minuten). */
   readonly matchDuration: number | null;
+  /** Startzeit `HH:MM` (Europe/Berlin); null = unbekannt (ältere Events). */
+  readonly startTime: string | null;
+  /** Nur bei Training (Minuten, 1–300); Spiele nutzen `matchDuration`. */
+  readonly durationMinutes: number | null;
+  /** Koordinaten des Orts; null = keine hinterlegt. */
+  readonly locationCoords: LocationCoords | null;
   readonly notes: string;
 }
 
@@ -58,10 +75,34 @@ export interface EventDraft {
   readonly goalsFor: string;
   readonly goalsAgainst: string;
   readonly matchDuration: string;
+  readonly startTime: string;
+  readonly durationMinutes: string;
+  /** Wird im Formular nicht bearbeitet (kommt mit der Ortssuche), aber beim Bearbeiten erhalten. */
+  readonly locationCoords: LocationCoords | null;
   readonly notes: string;
 }
 
-export type EventErrors = Partial<Record<'title' | 'date' | 'intensity' | 'location' | 'opponent' | 'goalsFor' | 'goalsAgainst' | 'matchDuration' | 'notes', string>>;
+export type EventErrors = Partial<
+  Record<'title' | 'date' | 'intensity' | 'location' | 'opponent' | 'goalsFor' | 'goalsAgainst' | 'matchDuration' | 'startTime' | 'durationMinutes' | 'locationCoords' | 'notes', string>
+>;
+
+const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** Gültige Uhrzeit `HH:MM` (00:00–23:59). */
+export function isTime(value: unknown): value is string {
+  return typeof value === 'string' && TIME_PATTERN.test(value);
+}
+
+/** Koordinaten im gültigen Bereich (Breite −90…90, Länge −180…180) mit nicht zu langem Namen. */
+export function isLocationCoords(value: unknown): value is LocationCoords {
+  if (typeof value !== 'object' || value === null) return false;
+  const { lat, lon, name } = value as Record<string, unknown>;
+  return (
+    typeof lat === 'number' && Number.isFinite(lat) && lat >= -90 && lat <= 90 &&
+    typeof lon === 'number' && Number.isFinite(lon) && lon >= -180 && lon <= 180 &&
+    typeof name === 'string' && name.length <= MAX_COORDS_NAME_LENGTH
+  );
+}
 
 export function emptyDraft(today: string): EventDraft {
   return {
@@ -76,6 +117,9 @@ export function emptyDraft(today: string): EventDraft {
     goalsFor: '',
     goalsAgainst: '',
     matchDuration: String(DEFAULT_MATCH_DURATION),
+    startTime: '',
+    durationMinutes: '',
+    locationCoords: null,
     notes: '',
   };
 }
@@ -93,6 +137,9 @@ export function draftFromEvent(event: TeamEvent): EventDraft {
     goalsFor: event.goalsFor === null ? '' : String(event.goalsFor),
     goalsAgainst: event.goalsAgainst === null ? '' : String(event.goalsAgainst),
     matchDuration: String(event.matchDuration ?? DEFAULT_MATCH_DURATION),
+    startTime: event.startTime ?? '',
+    durationMinutes: event.durationMinutes === null ? '' : String(event.durationMinutes),
+    locationCoords: event.locationCoords,
     notes: event.notes,
   };
 }
@@ -114,7 +161,13 @@ export function validateDraft(draft: EventDraft): EventErrors {
   if (!isIsoDate(draft.date)) errors.date = 'Bitte ein gültiges Datum eingeben.';
   if (!INTENSITIES.some((entry) => entry.value === draft.intensity)) errors.intensity = 'Bitte eine Intensität von 1 bis 3 wählen.';
   if (draft.location.trim().length > MAX_TEXT_LENGTH) errors.location = `Der Ort darf höchstens ${MAX_TEXT_LENGTH} Zeichen lang sein.`;
+  if (draft.startTime.trim() !== '' && !isTime(draft.startTime.trim())) errors.startTime = 'Bitte eine Uhrzeit im Format HH:MM eingeben.';
+  if (draft.locationCoords !== null && !isLocationCoords(draft.locationCoords)) errors.locationCoords = 'Die Koordinaten des Orts sind ungültig.';
   if (draft.notes.trim().length > MAX_NOTES_LENGTH) errors.notes = `Die Notiz darf höchstens ${MAX_NOTES_LENGTH} Zeichen lang sein.`;
+
+  if (draft.type === 'Training' && Number.isNaN(wholeNumber(draft.durationMinutes, 1, MAX_TRAINING_DURATION))) {
+    errors.durationMinutes = `Bitte eine Dauer von 1 bis ${MAX_TRAINING_DURATION} Minuten eingeben.`;
+  }
 
   if (draft.type === 'Spiel') {
     if (draft.opponent.trim().length > MAX_TEXT_LENGTH) errors.opponent = `Der Gegner darf höchstens ${MAX_TEXT_LENGTH} Zeichen lang sein.`;
@@ -148,6 +201,9 @@ export function eventFromDraft(draft: EventDraft, id: string): TeamEvent {
     goalsFor: game ? wholeNumber(draft.goalsFor, 0, MAX_SCORE) : null,
     goalsAgainst: game ? wholeNumber(draft.goalsAgainst, 0, MAX_SCORE) : null,
     matchDuration: game ? (wholeNumber(draft.matchDuration, 1, MAX_MATCH_DURATION) ?? DEFAULT_MATCH_DURATION) : null,
+    startTime: draft.startTime.trim() === '' ? null : draft.startTime.trim(),
+    durationMinutes: game ? null : wholeNumber(draft.durationMinutes, 1, MAX_TRAINING_DURATION),
+    locationCoords: draft.locationCoords,
     notes: draft.notes.trim(),
   };
 }
@@ -163,6 +219,9 @@ export function eventFromDoc(id: string, data: Readonly<Record<string, unknown>>
   const type = EVENT_TYPES.find((value) => value === data['type']) ?? 'Training';
   const intensity = Number(data['intensity']);
   const duration = Number(data['matchDuration']);
+  const trainingMinutes = Number(data['durationMinutes']);
+  const startTime = typeof data['startTime'] === 'string' ? data['startTime'].trim() : '';
+  const coords = data['locationCoords'];
   return {
     id,
     type,
@@ -175,6 +234,12 @@ export function eventFromDoc(id: string, data: Readonly<Record<string, unknown>>
     goalsFor: type === 'Spiel' ? score(data['goalsFor']) : null,
     goalsAgainst: type === 'Spiel' ? score(data['goalsAgainst']) : null,
     matchDuration: type === 'Spiel' ? (Number.isFinite(duration) && duration > 0 ? duration : DEFAULT_MATCH_DURATION) : null,
+    startTime: isTime(startTime) ? startTime : null,
+    durationMinutes:
+      type === 'Training' && data['durationMinutes'] !== '' && Number.isInteger(trainingMinutes) && trainingMinutes >= 1 && trainingMinutes <= MAX_TRAINING_DURATION
+        ? trainingMinutes
+        : null,
+    locationCoords: isLocationCoords(coords) ? { lat: coords.lat, lon: coords.lon, name: coords.name } : null,
     notes: text(data['notes']),
   };
 }
@@ -193,8 +258,46 @@ export function docFromEvent(event: TeamEvent): Record<string, unknown> {
     goalsFor: event.goalsFor ?? '',
     goalsAgainst: event.goalsAgainst ?? '',
     matchDuration: event.matchDuration ?? '',
+    startTime: event.startTime ?? '',
+    durationMinutes: event.durationMinutes ?? '',
+    locationCoords: event.locationCoords ?? null,
     notes: event.notes,
   };
+}
+
+/** Versatz von Europe/Berlin gegenüber UTC in Minuten zum Zeitpunkt `utcMs`. */
+function berlinOffsetMinutes(utcMs: number): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: EVENT_TIME_ZONE, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric',
+  }).formatToParts(new Date(utcMs));
+  const part = (type: string) => Number(parts.find((entry) => entry.type === type)?.value);
+  const asUtc = Date.UTC(part('year'), part('month') - 1, part('day'), part('hour'), part('minute'), part('second'));
+  return Math.round((asUtc - Math.floor(utcMs / 1000) * 1000) / 60000);
+}
+
+/** Zeitpunkt, an dem es in Europe/Berlin am `date` (ISO) um `time` (HH:MM) ist; null bei ungültiger Eingabe. */
+export function berlinInstant(date: string, time: string): Date | null {
+  if (!isIsoDate(date) || !isTime(time)) return null;
+  const [year, month, day] = date.split('-').map(Number);
+  const [hour, minute] = time.split(':').map(Number);
+  const wall = Date.UTC(year, month - 1, day, hour, minute);
+  // Zweimal angleichen, damit auch Zeiten rund um die Zeitumstellung stimmen.
+  let utc = wall - berlinOffsetMinutes(wall) * 60000;
+  utc = wall - berlinOffsetMinutes(utc) * 60000;
+  return new Date(utc);
+}
+
+/** Startzeitpunkt (Europe/Berlin) oder null, wenn Datum oder Startzeit fehlen. */
+export function eventStart(event: TeamEvent): Date | null {
+  return event.startTime === null ? null : berlinInstant(event.date, event.startTime);
+}
+
+/** Endzeitpunkt: Start + Dauer (Spiel: `matchDuration`, Training: `durationMinutes`); null, wenn Zeit oder Dauer fehlen. */
+export function eventEnd(event: TeamEvent): Date | null {
+  const start = eventStart(event);
+  const minutes = event.type === 'Spiel' ? event.matchDuration : event.durationMinutes;
+  if (start === null || minutes === null || !Number.isFinite(minutes) || minutes <= 0) return null;
+  return new Date(start.getTime() + minutes * 60000);
 }
 
 export function resultText(event: TeamEvent): string {

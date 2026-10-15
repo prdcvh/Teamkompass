@@ -75,6 +75,52 @@
       </div>
     </div>
 
+    <div class="grid">
+      <div class="field">
+        <label class="tk-label">
+          Startzeit (optional)
+          <input
+            class="tk-input"
+            name="startTime"
+            type="time"
+            [value]="draft().startTime"
+            [attr.aria-invalid]="errors().startTime ? 'true' : null"
+            [attr.aria-describedby]="errors().startTime ? 'err-start' : null"
+            (input)="patch({ startTime: value($event) })"
+          />
+        </label>
+        @if (errors().startTime) {
+          <span class="error" id="err-start" role="alert">{{ errors().startTime }}</span>
+        }
+      </div>
+      @if (draft().type === 'Training') {
+        <div class="field">
+          <label class="tk-label">
+            Dauer (Minuten, optional)
+            <input
+              class="tk-input"
+              name="durationMinutes"
+              type="number"
+              inputmode="numeric"
+              min="1"
+              [max]="limits.trainingDuration"
+              placeholder="z. B. 90"
+              [value]="draft().durationMinutes"
+              [attr.aria-invalid]="errors().durationMinutes ? 'true' : null"
+              [attr.aria-describedby]="errors().durationMinutes ? 'err-training-duration' : null"
+              (input)="patch({ durationMinutes: value($event) })"
+            />
+          </label>
+          @if (errors().durationMinutes) {
+            <span class="error" id="err-training-duration" role="alert">{{ errors().durationMinutes }}</span>
+          }
+        </div>
+      }
+    </div>
+    @if (errors().locationCoords) {
+      <span class="error" role="alert">{{ errors().locationCoords }}</span>
+    }
+
     @if (draft().type === 'Training') {
       <label class="tk-label">
         Trainingsfokus

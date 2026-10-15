@@ -111,6 +111,35 @@ describe('Events (Events-Seite)', () => {
       });
     });
 
+    it('speichert Startzeit und Trainingsdauer; Dauerfeld nur bei Training; ohne beides weiter möglich (SCRUM-95)', async () => {
+      const fixture = await render();
+      qa<HTMLButtonElement>(fixture, '.head button')[0].click();
+      await flush(fixture);
+      const dialog = q<HTMLElement>(fixture, 'tk-event-dialog')!;
+      expect(dialog.querySelector('input[name="startTime"]')).not.toBeNull();
+      type(dialog.querySelector<HTMLInputElement>('input[name="title"]')!, 'Abendtraining');
+      type(dialog.querySelector<HTMLInputElement>('input[name="startTime"]')!, '18:00');
+      type(dialog.querySelector<HTMLInputElement>('input[name="durationMinutes"]')!, '90');
+      (dialog.querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit'));
+      await vi.waitFor(() => {
+        const saved = [...firebase.events.events.values()].find((data) => data['title'] === 'Abendtraining');
+        expect(saved).toMatchObject({ startTime: '18:00', durationMinutes: 90 });
+      });
+    });
+
+    it('meldet eine ungültige Startzeit', async () => {
+      const fixture = await render();
+      qa<HTMLButtonElement>(fixture, '.head button')[0].click();
+      await flush(fixture);
+      const dialog = q<HTMLElement>(fixture, 'tk-event-dialog')!;
+      type(dialog.querySelector<HTMLInputElement>('input[name="title"]')!, 'Zeittest');
+      type(dialog.querySelector<HTMLInputElement>('input[name="durationMinutes"]')!, '301');
+      (dialog.querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit'));
+      await flush(fixture);
+      expect(text(dialog.querySelector('#err-training-duration'))).toContain('300');
+      expect([...firebase.events.events.values()].some((data) => data['title'] === 'Zeittest')).toBe(false);
+    });
+
     it('zeigt Eingabefehler und speichert dann nichts', async () => {
       const fixture = await render();
       qa<HTMLButtonElement>(fixture, '.head button')[0].click();

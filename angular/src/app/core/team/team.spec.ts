@@ -10,7 +10,7 @@ describe('team (Dashboard-Auswertungen)', () => {
   const NOW = new Date('2026-10-10T12:00:00');
   const event = (id: string, date: string, overrides: Partial<TeamEvent> = {}): TeamEvent => ({
     id, type: 'Training', title: `Event ${id}`, date, intensity: 2, location: '', trainingFocus: '', opponent: '',
-    goalsFor: null, goalsAgainst: null, matchDuration: null, notes: '', ...overrides,
+    goalsFor: null, goalsAgainst: null, matchDuration: null, startTime: null, durationMinutes: null, locationCoords: null, notes: '', ...overrides,
   });
   const game = (id: string, date: string, goalsFor: number | null, goalsAgainst: number | null) => event(id, date, { type: 'Spiel', goalsFor, goalsAgainst, matchDuration: 90 });
   const player = (id: string, overrides: Partial<Player> = {}): Player => ({
