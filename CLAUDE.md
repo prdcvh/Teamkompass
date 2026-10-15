@@ -145,6 +145,21 @@ keeps the board current, reports at sprint end).
   player-profile fix). Tickets that overlap run one after another. The main
   session checks and merges one PR at a time; before each merge it brings
   the latest `main` into that PR and re-runs `npm run verify`.
+  The 3 slots are a rolling pool, not rounds: as soon as one sub-agent
+  reports back, the main session immediately starts a fresh sub-agent on the
+  next suitable (non-overlapping) ticket and checks the finished one while
+  the new one works. It keeps refilling until the sprint has no `Zu
+  erledigen` tickets left or the usage quota is nearly used up.
+- **Quota: use it up, but never stop mid-ticket (PO, 2026-10-15).** The
+  exact remaining quota isn't visible, so the main session keeps a running
+  tally (estimated vs. actual tokens per ticket) and only starts a ticket it
+  expects to finish completely, including the check and any rework. Once the
+  system warns that the usage limit is near, no new tickets start; running
+  ones are finished and checked, then the final report is written. Late in
+  the night prefer small tickets over starting a large one. As a safety net
+  against a hard stop anyway, sub-agents push early and open a Draft PR
+  after the first meaningful commit (marked ready at the end) and keep the
+  Jira status current.
 - **Night plan first (PO, 2026-10-15).** At the start of every night
   session, before any ticket work, the main session writes a plan: per
   ticket a rough token estimate (S ≈ 50k, M ≈ 150k, L ≈ 400k, incl.

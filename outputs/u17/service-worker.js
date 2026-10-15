@@ -1,5 +1,5 @@
-const CACHE = "teamkompass-shell-v2";
-const SHELL = ["./", "./index.html", "./base.css", "./styles.css", "./mobile.css", "./app.js", "./next-level.js", "./manifest.webmanifest", "./assets/club-logo.png"];
+const CACHE = "teamkompass-shell-v3";
+const SHELL = ["./", "./index.html", "./base.css", "./styles.css", "./mobile.css", "./app.js", "./qr-code.js", "./next-level.js", "./manifest.webmanifest", "./assets/club-logo.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)));

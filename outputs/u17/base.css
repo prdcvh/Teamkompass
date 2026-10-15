@@ -149,6 +149,8 @@ body.role-medical #addPlayerFabMobile,
 body.role-medical #exportBtn,
 body.role-medical #accessManagerPanel,
 body.role-medical #scoutManagerPanel,
+body.role-medical #trainerManagerPanel,
+body.role-medical #inviteManagerPanel,
 body.role-medical .row-actions,
 body.role-medical .card-menu,
 body.role-medical .measurement-cell button,
@@ -171,13 +173,59 @@ body.role-trainer-cloud [data-action="invite"] {
 
 /* Zugaenge-Panel nur fuer den Trainer im Rollen-Modus sichtbar */
 #accessManagerPanel,
-#scoutManagerPanel {
+#scoutManagerPanel,
+#trainerManagerPanel,
+#inviteManagerPanel {
   display: none;
 }
 
 body.role-trainer-cloud #accessManagerPanel,
-body.role-trainer-cloud #scoutManagerPanel {
+body.role-trainer-cloud #scoutManagerPanel,
+body.role-trainer-cloud #trainerManagerPanel,
+body.role-trainer-cloud #inviteManagerPanel {
   display: block;
+}
+
+/* Einladungen teilen (SCRUM-30): Code/Link kopieren, QR-Code, Aktionen in den Zugangs-Zeilen. */
+.access-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.access-self {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.invite-share {
+  display: grid;
+  gap: 12px;
+}
+
+.invite-share input[readonly] {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+}
+
+.invite-share-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.invite-share-qr {
+  justify-self: center;
+  width: min(240px, 100%);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+
+.invite-share-qr svg {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 /* Startzustand im Rollen-Modus: keine Formulare, bis Firebase geladen ist (bzw. gar nicht, wenn es ausfaellt). */
