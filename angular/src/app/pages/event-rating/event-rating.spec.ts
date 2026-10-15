@@ -122,6 +122,15 @@ describe('EventRating (Event bewerten)', () => {
       expect(text(qa(fixture, 'tbody tr')[1].querySelector('.grade-total'))).toBe('1,2'); // 0.3+0.3+0.25+0.3 = 1.15 → 1,2 (Gleitkomma-Rundung wie in der bisherigen App)
     });
 
+    it('färbt die Zeile sofort nach der Anwesenheit ein', async () => {
+      const fixture = await render();
+      const rows = qa(fixture, 'tbody tr');
+      expect(rows.map((row) => row.getAttribute('data-tone'))).toEqual(['green', 'none', 'red']);
+      pick(q<HTMLSelectElement>(fixture, 'select[aria-label="Anwesenheit: Elias Wagner"]')!, 'limited');
+      fixture.detectChanges();
+      expect(qa(fixture, 'tbody tr')[1].getAttribute('data-tone')).toBe('amber');
+    });
+
     it('„Fehlt“ löscht die Noten, die Gesamtnote verschwindet', async () => {
       const fixture = await render();
       pick(q<HTMLSelectElement>(fixture, 'select[aria-label="Anwesenheit: Jonas Keller"]')!, 'absent');
