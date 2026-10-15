@@ -126,6 +126,18 @@ keeps the board current, reports at sprint end).
   comment saying exactly what the PO has to decide. Everything else follows
   the normal merge workflow. Finish with a short report (what is done, what
   waits for the PO).
+- **One sub-agent per ticket (standing instruction from the PO,
+  2026-10-15).** In the night session, the main session only orchestrates:
+  for each ticket it sends a separate sub-agent (Agent tool, one ticket at a
+  time) that does the whole ticket — status `In Bearbeitung`, the change in
+  every app copy, test, `npm run verify` green, commit, push, PR, the PO
+  ticket comment, status `In Überprüfung`. The sub-agent never merges. The
+  main session then checks the result: diff against the acceptance
+  criteria, every app copy touched, test present, verify/CI green, ticket
+  comment as required above. If something is off, the sub-agent fixes it
+  (via SendMessage, or a new sub-agent given a concrete list of the
+  problems). Only after that check passes does the main session merge (per the merge
+  workflow) and set the ticket to `Erledigt`.
 - **Morning reminder.** A scheduled job (07:49 Europe/Berlin, daily) pushes
   the list of tickets in `In Überprüfung` and Draft PRs waiting for the PO.
 - **Sprint rollover is automatic.** As soon as every ticket of the active
