@@ -56,3 +56,17 @@ h2 {
   gap: var(--tk-space-2);
   margin-top: var(--tk-space-3);
 }
+
+.file {
+  display: none;
+}
+
+.summary {
+  margin: var(--tk-space-2) 0;
+  padding-left: var(--tk-space-5);
+}
+
+.warn {
+  color: var(--tk-red-dark);
+  font-size: var(--tk-text-sm);
+}
