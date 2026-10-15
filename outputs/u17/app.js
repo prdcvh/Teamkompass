@@ -3604,8 +3604,17 @@ function renderSelects() {
 
   const eventOptions = sortedEvents().map((event) => `<option value="${escapeHtml(event.id)}">${escapeHtml(event.date)} · ${escapeHtml(event.type)} · ${escapeHtml(event.title)}</option>`).join("");
   $("#eventSelect").innerHTML = eventOptions;
-  if (selectedEvent()) $("#eventSelect").value = selectedEvent().id;
+  syncEventSelect();
 }
+
+// EVENT-SELECT-SYNC START (SCRUM-129, getestet in tests/event-select-sync.test.mjs)
+// Haelt das Auswahlfeld "Event" auf dem intern gewaehlten Event. Reine
+// Navigation: schreibt nichts in Cloud oder lokalen Speicher.
+function syncEventSelect(select = $("#eventSelect"), eventId = selectedEvent()?.id) {
+  if (!select || !eventId) return;
+  if (select.value !== eventId) select.value = eventId;
+}
+// EVENT-SELECT-SYNC END
 
 let eventFilter = { query: "", type: "all" };
 let ratingStepperIndex = 0;
@@ -3652,6 +3661,7 @@ function eventCardsHtml(events) {
 }
 
 function renderEvents() {
+  syncEventSelect();
   const events = filteredEvents();
   const today = localIsoDate();
   const upcoming = events.filter((event) => event.date >= today).sort((a, b) => new Date(a.date) - new Date(b.date));
