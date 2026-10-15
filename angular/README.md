@@ -15,6 +15,9 @@ npm test           # Unit-Tests (Vitest), einmalig: npm test -- --watch=false
 
 Aus dem Repo-Root prüft `npm run verify` Live-Kopien und Angular zusammen (Lint, Build, Tests).
 
+Paritätsliste, PWA/Update-Verhalten und Ablaufplan für den Umstieg der Live-Teams: [CUTOVER.md](CUTOVER.md).
+Der Service Worker ist nur im Produktions-Build aktiv (`npm start` läuft ohne).
+
 ## Builds je Team
 
 Der Standard-Build (`npm run build`) ist das Testteam `U14` und ist das, was nach

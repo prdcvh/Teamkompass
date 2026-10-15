@@ -337,6 +337,35 @@ test("Angular-Target u14: Output, SPA-Rewrite, Caching, CSP und Deploy-Schritt",
   assert.match(deploy, /npm run verify/, "Der Angular-Build laeuft ueber verify vor dem Deploy");
 });
 
+test("Angular-PWA (SCRUM-76): Manifest, Service Worker im Produktions-Build, Update-Dateien nie lange gecacht", async () => {
+  const angular = JSON.parse(await read("angular/angular.json"));
+  const build = angular.projects["teamkompass-angular"].architect.build;
+  assert.equal(build.configurations.production.serviceWorker, "ngsw-config.json");
+  const ngsw = JSON.parse(await read("angular/ngsw-config.json"));
+  assert.equal(ngsw.index, "/index.html");
+  assert.ok(ngsw.assetGroups.some((group) => group.installMode === "prefetch" && group.resources.files.includes("/index.html")), "App-Shell muss vorgeladen werden (Offline-Start)");
+  assert.ok(!JSON.stringify(ngsw).includes("googleapis"), "Firestore-/Auth-Anfragen gehoeren nicht in den Service-Worker-Cache");
+
+  // Je Team ein Manifest (SCRUM-124); die Symbole liegen gemeinsam in public/.
+  for (const team of ["u14", "mein-team", "u15", "u17"]) {
+    const manifest = JSON.parse(await read(`angular/teams/${team}/manifest.webmanifest`));
+    assert.equal(manifest.display, "standalone");
+    for (const icon of manifest.icons) await read(`angular/public/${icon.src}`);
+    assert.ok(manifest.icons.some((icon) => icon.purpose === "maskable"), `${team}: maskable-Symbol fehlt`);
+  }
+  const index = await read("angular/src/index.html");
+  assert.match(index, /<link rel="manifest" href="manifest.webmanifest">/);
+
+  // ngsw.json/ngsw-worker.js duerfen nicht unter die Jahres-Cache-Regel fallen, sonst sieht niemand ein Update.
+  const config = JSON.parse(await read("firebase.json"));
+  const target = config.hosting.find((entry) => entry.target === "u14");
+  const immutableSources = target.headers.filter((entry) => entry.headers.some((header) => /immutable/.test(header.value))).map((entry) => entry.source);
+  for (const source of immutableSources) {
+    assert.notEqual(source, "**", "Die Sammelregel darf nicht immutable sein");
+    assert.doesNotMatch(source, /ngsw|\.json|webmanifest/, `${source} wuerde den Service Worker einfrieren`);
+  }
+});
+
 test("Spieler loeschen raeumt auch Einladungen und Zugaenge (invites/members) auf", async () => {
   for (const team of teams) {
     const app = await read(`outputs/${team}/app.js`);
@@ -973,4 +1002,14 @@ test("Angular: Build je Live-Team mit derselben Team-ID wie die heutige App (SCR
     assert.ok(!architect.serve.configurations[name], `${name}: ng serve darf nicht auf Live-Daten zeigen`);
   }
   assert.match(await read("package.json"), /npm --prefix angular run build:teams/, "verify baut die Team-Konfigurationen nicht");
+});
+
+test("Angular zeigt das Vereinslogo statt des „TK“-Zeichens (SCRUM-76)", async () => {
+  for (const file of ["angular/src/app/shell/sidebar/sidebar.html", "angular/src/app/pages/login/login.html"]) {
+    const html = await read(file);
+    assert.match(html, /<img class="logo" src="club-logo\.png"/);
+    assert.doesNotMatch(html, />TK</);
+  }
+  const logo = await readFile(new URL("../angular/public/club-logo.png", import.meta.url));
+  assert.equal(logo.subarray(1, 4).toString(), "PNG");
 });

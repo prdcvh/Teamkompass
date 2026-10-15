@@ -10,3 +10,9 @@
     <router-outlet />
   }
 }
+@if (update.ready()) {
+  <div class="update" role="status">
+    <span>Neue Version verfügbar.</span>
+    <button tkButton variant="primary" size="sm" (click)="update.reload()">Neu laden</button>
+  </div>
+}
