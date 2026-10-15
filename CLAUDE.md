@@ -137,7 +137,22 @@ keeps the board current, reports at sprint end).
   comment as required above. If something is off, the sub-agent fixes it
   (via SendMessage, or a new sub-agent given a concrete list of the
   problems). Only after that check passes does the main session merge (per the merge
-  workflow) and set the ticket to `Erledigt`.
+  workflow) and set the ticket to `Erledigt`. Every ticket gets a fresh
+  sub-agent; one is never reused for a second ticket.
+- **Parallel tickets (PO, 2026-10-15).** At most 3 sub-agents at once, each
+  in its own worktree (`isolation: "worktree"`), and only for tickets that
+  clearly don't touch the same code area (e.g. an Angular ticket next to a
+  player-profile fix). Tickets that overlap run one after another. The main
+  session checks and merges one PR at a time; before each merge it brings
+  the latest `main` into that PR and re-runs `npm run verify`.
+- **Night plan first (PO, 2026-10-15).** At the start of every night
+  session, before any ticket work, the main session writes a plan: per
+  ticket a rough token estimate (S ≈ 50k, M ≈ 150k, L ≈ 400k, incl.
+  sub-agent and checking), the order, which tickets run in parallel, and
+  which likely won't fit tonight. It sends the plan to the PO (short
+  PushNotification + the full plan in the chat) and starts work right away
+  — the PO does not confirm it; it is for information only. The final
+  report compares the plan with what actually happened.
 - **Morning reminder.** A scheduled job (07:49 Europe/Berlin, daily) pushes
   the list of tickets in `In Überprüfung` and Draft PRs waiting for the PO.
 - **Sprint rollover is automatic.** As soon as every ticket of the active
