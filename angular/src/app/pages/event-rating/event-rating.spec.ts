@@ -11,8 +11,8 @@ describe('EventRating (Event bewerten)', () => {
   let firebase: FakeFirebase;
   const isMobile = signal(false);
 
-  async function render(options: { mobile?: boolean; eventId?: string; game?: boolean; consent?: string } = {}) {
-    const { mobile = false, eventId = 'e1', game = true, consent } = options;
+  async function render(options: { mobile?: boolean; eventId?: string; game?: boolean; consent?: string; lineup?: boolean; role?: 'trainer' | 'medical' } = {}) {
+    const { mobile = false, eventId = 'e1', game = true, consent, lineup = false, role = 'trainer' } = options;
     isMobile.set(mobile);
     firebase = new FakeFirebase();
     firebase.events.events.set('e1', game
@@ -26,6 +26,9 @@ describe('EventRating (Event bewerten)', () => {
       ['p3', { attendance: 'absent', note: 'Verletzt', autoAbsence: true, playerId: 'p3' }],
     ]));
     firebase.ratings.privateNotes.set('e1', new Map([['p1', { playerId: 'p1', note: 'Vertraulich' }]]));
+    if (lineup) {
+      firebase.lineup.lineup = { assignments: { TW: ['p2'] }, byEvent: { e1: { assignments: { TW: ['p1'], RV: ['p2', 'weg'] }, savedAt: '2026-10-09T10:00:00.000Z' } } };
+    }
     const params = new BehaviorSubject(convertToParamMap({ id: eventId }));
     TestBed.configureTestingModule({
       providers: [
@@ -34,7 +37,7 @@ describe('EventRating (Event bewerten)', () => {
         { provide: ActivatedRoute, useValue: { paramMap: params } },
       ],
     });
-    TestBed.inject(SessionService).role.set('trainer');
+    TestBed.inject(SessionService).role.set(role);
     const fixture = TestBed.createComponent(EventRating);
     await fixture.whenStable();
     await vi.waitFor(() => {
@@ -52,6 +55,38 @@ describe('EventRating (Event bewerten)', () => {
     select.value = value;
     select.dispatchEvent(new Event('change'));
   };
+
+  describe('gespeicherte Aufstellung (SCRUM-122)', () => {
+    it('zeigt die Aufstellung des Spiels nur lesend: Formation, Positionen, Bank', async () => {
+      const fixture = await render({ lineup: true });
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(q(fixture, '.lineup')).not.toBeNull();
+      });
+      expect(text(q(fixture, '.lineup h2'))).toBe('Aufstellung 1'); // nur der Verteidiger RV zählt in die Formation (Torwart nicht)
+      const block = text(q(fixture, '.lineup'));
+      expect(block).toContain('TW 1 Jonas Keller');
+      expect(block).toContain('RV 2 Elias Wagner');
+      expect(block).toContain('Bank: 9 <b>Jan</b> Braun');
+      expect(qa(fixture, '.lineup button, .lineup input, .lineup select')).toHaveLength(0);
+      expect(firebase.calls).not.toContain('saveLineup');
+      expect(firebase.calls).not.toContain('saveEventLineup');
+    });
+
+    it('zeigt nichts, wenn für das Spiel keine Aufstellung gespeichert ist', async () => {
+      expect(q(await render(), '.lineup')).toBeNull();
+    });
+
+    it('zeigt nichts bei Trainings', async () => {
+      expect(q(await render({ lineup: true, game: false }), '.lineup')).toBeNull();
+    });
+
+    it('zeigt Nicht-Trainern nichts und lädt die Aufstellung nicht', async () => {
+      const medical = await render({ lineup: true, role: 'medical' });
+      expect(q(medical, '.lineup')).toBeNull();
+      expect(firebase.calls).not.toContain('watchLineup');
+    });
+  });
 
   describe('Desktop', () => {
     it('zeigt Kopfzeile, Fortschritt und die Matrix mit Gesamtnote je Spieler', async () => {

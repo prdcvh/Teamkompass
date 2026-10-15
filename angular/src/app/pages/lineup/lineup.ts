@@ -1,7 +1,9 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { EventsService } from '../../core/events/events.service';
+import { formatDate } from '../../core/events/event';
 import { LayoutService } from '../../core/shell/layout.service';
 import { type Candidate, eligibleCandidates, formationOptions, assignmentsFromPreview, suggestedLineup } from '../../core/lineup/formation-assignment';
-import { type Assignments, benchOf, formationName, lineupGrade, lineupIsEmpty, moveToZone, onPitchIds, removeFromPitch, swapPlayers, zoneOf } from '../../core/lineup/lineup';
+import { type Assignments, benchOf, formationName, lineupGrade, lineupIsEmpty, moveToZone, nextGame, onPitchIds, previousGameWithLineup, removeFromPitch, swapPlayers, zoneOf } from '../../core/lineup/lineup';
 import { PITCH_ZONES, ZONES, type Zone, outOfPosition, MAX_ON_PITCH, FORMATION_PRESETS } from '../../core/lineup/pitch';
 import { LineupService } from '../../core/lineup/lineup.service';
 import { todayIso } from '../../core/shared/dates';
@@ -31,14 +33,41 @@ export class Lineup implements OnInit {
   protected readonly team = inject(TeamService);
   protected readonly lineup = inject(LineupService);
   protected readonly sync = inject(SyncService);
+  private readonly eventsService = inject(EventsService);
   protected readonly mobile = inject(LayoutService).isMobile;
   private readonly session = inject(SessionService);
   protected readonly isTrainer = computed(() => this.session.role() === 'trainer');
   protected readonly zones = ZONES;
   protected readonly max = MAX_ON_PITCH;
 
-  protected readonly ready = computed(() => this.team.ready() && this.lineup.load() === 'ready');
-  protected readonly failed = computed(() => this.team.error() || this.lineup.error());
+  protected readonly ready = computed(() => this.team.ready() && this.lineup.load() === 'ready' && this.eventsService.load() === 'ready');
+  protected readonly failed = computed(() => this.team.error() || this.lineup.error() || this.eventsService.error());
+
+  /** Alle Spiele, neueste zuerst; die Aufstellung lässt sich für jedes davon ablegen. */
+  protected readonly games = computed(() =>
+    this.eventsService
+      .events()
+      .filter((event) => event.type === 'Spiel')
+      .sort((a, b) => b.date.localeCompare(a.date)),
+  );
+  /** Gewähltes Ziel: undefined = Standard (nächstes Spiel), '' = allgemeine Startelf ohne Spiel, sonst die Event-ID. */
+  private readonly chosen = signal<string | undefined>(undefined);
+  /** Ziel-Spiel; null = allgemeine Startelf (kein Spiel gewählt oder keins ansteht). */
+  protected readonly targetGame = computed(() => {
+    const chosen = this.chosen();
+    if (chosen === undefined) return nextGame(this.games(), todayIso());
+    return this.games().find((event) => event.id === chosen) ?? null;
+  });
+  protected readonly targetValue = computed(() => this.targetGame()?.id ?? '');
+  private readonly storedForTarget = computed(() => {
+    const game = this.targetGame();
+    return game ? (this.lineup.eventLineups()[game.id] ?? null) : null;
+  });
+  protected readonly hasStoredForTarget = computed(() => this.storedForTarget() !== null);
+  /** Letztes Spiel vor dem Ziel mit gespeicherter Aufstellung – Quelle für „Vom letzten Spiel übernehmen“. */
+  protected readonly previousGame = computed(() =>
+    this.targetGame() ? previousGameWithLineup(this.games(), this.lineup.eventLineups(), this.targetGame(), todayIso()) : null,
+  );
 
   /** Alle Spieler mit Durchschnittsnote und aktuellem Status. */
   private readonly entries = computed<Candidate[]>(() => {
@@ -52,9 +81,10 @@ export class Lineup implements OnInit {
   private readonly eligible = computed(() => eligibleCandidates(this.entries()));
   private readonly byId = computed(() => new Map(this.entries().map((entry) => [entry.player.id, entry])));
 
-  /** Gespeicherte Startelf; ist noch nichts gespeichert, zeigt das Board den besten Vorschlag. */
+  /** Gespeicherte Aufstellung des Ziels; ist noch nichts gespeichert, zeigt das Board den besten Vorschlag. */
   protected readonly assignments = computed<Assignments>(() => {
-    const stored = this.lineup.assignments();
+    // Für ein Spiel: dessen gespeicherte Aufstellung; sonst die allgemeine Startelf (wie in der bisherigen App).
+    const stored = this.storedForTarget()?.assignments ?? this.lineup.assignments();
     return lineupIsEmpty(stored) ? suggestedLineup(this.eligible()) : stored;
   });
   protected readonly name = computed(() => formationName(this.assignments()));
@@ -114,7 +144,23 @@ export class Lineup implements OnInit {
     if (this.isTrainer()) {
       this.team.start();
       this.lineup.start();
+      this.eventsService.start();
     }
+  }
+
+  protected formatDate = formatDate;
+
+  protected onTargetSelect(event: Event): void {
+    this.chosen.set((event.target as HTMLSelectElement).value);
+  }
+
+  /** Übernimmt die Aufstellung des letzten Spiels mit Aufstellung und legt sie am Ziel-Spiel ab. */
+  protected copyFromPrevious(): void {
+    const game = this.targetGame();
+    const source = this.previousGame();
+    if (!game || !source || !this.lineup.canEdit()) return;
+    const entry = this.lineup.eventLineups()[source.id];
+    if (entry) this.lineup.saveForEvent(game.id, entry.assignments);
   }
 
   protected openZone(zone: Zone, playerId: string | null): void {
@@ -176,6 +222,10 @@ export class Lineup implements OnInit {
     this.team.retry();
     this.lineup.stop();
     this.lineup.start();
+    if (this.eventsService.load() === 'error') {
+      this.eventsService.stop();
+      this.eventsService.start();
+    }
   }
 
   private place(playerId: string, zone: Zone): void {
@@ -188,6 +238,8 @@ export class Lineup implements OnInit {
   }
 
   private apply(next: Assignments): void {
-    if (this.lineup.save(next)) this.target.set(null);
+    const game = this.targetGame();
+    const saved = game ? this.lineup.saveForEvent(game.id, next) : this.lineup.save(next);
+    if (saved) this.target.set(null);
   }
 }

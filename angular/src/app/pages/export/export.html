@@ -33,6 +33,26 @@
 
       <tk-card>
         <div class="panel">
+          <h2>Sicherung einspielen</h2>
+          <p class="muted">
+            Spielt eine Sicherungsdatei (JSON) aus „Sicherung herunterladen“ dieser oder der bisherigen App wieder ein. Die Datei wird zuerst geprüft, dann siehst du eine Zusammenfassung und bestätigst.
+            Es wird nichts gelöscht: Einträge mit gleicher Kennung werden aktualisiert, neue ergänzt, alles andere bleibt erhalten.
+          </p>
+          <input #backupFile class="file" type="file" accept=".json,application/json" aria-label="Sicherungsdatei wählen" (change)="chooseBackup($event)" />
+          <div>
+            <button tkButton type="button" [disabled]="busy() || importing()" (click)="backupFile.click()">Sicherung einspielen …</button>
+          </div>
+          @if (importError()) {
+            <p class="error" role="alert">{{ importError() }}</p>
+          }
+          @if (importDone()) {
+            <p class="muted" role="status">{{ importDone() }}</p>
+          }
+        </div>
+      </tk-card>
+
+      <tk-card>
+        <div class="panel">
           <h2>Spielerprofil als PDF</h2>
           <p class="muted">Kompakter Bericht mit Kennzahlen, Kompetenzprofil und Bestleistungen. Im Druckdialog „Als PDF speichern“ wählen.</p>
           <label class="field">
@@ -65,5 +85,26 @@
       <button tkButton type="button" (click)="confirming.set(null)">Abbrechen</button>
       <button tkButton type="button" variant="primary" (click)="confirm()">Trotzdem exportieren</button>
     </div>
+  </tk-dialog>
+
+  <tk-dialog class="backup-dialog" [open]="pendingImport() !== null" title="Sicherung einspielen?" (closed)="cancelImport()">
+    @if (pendingImport(); as pending) {
+      <p>Datei „{{ pending.fileName }}“ enthält:</p>
+      <ul class="summary">
+        @for (line of pending.lines; track line) {
+          <li>{{ line }}</li>
+        }
+      </ul>
+      <p>Nichts wird gelöscht: Einträge, die nicht in der Sicherung stehen, bleiben erhalten.</p>
+      @if (pending.overwrites > 0) {
+        <p class="warn">
+          Achtung: Vorhandene Einträge mit gleicher Kennung werden mit dem Stand aus der Sicherung überschrieben. Tipp: vorher „Sicherung herunterladen“, um den aktuellen Stand zu sichern.
+        </p>
+      }
+      <div class="confirm-actions">
+        <button tkButton type="button" (click)="cancelImport()">Abbrechen</button>
+        <button tkButton type="button" variant="primary" (click)="confirmImport()">Sicherung einspielen</button>
+      </div>
+    }
   </tk-dialog>
 </section>

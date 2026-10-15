@@ -44,4 +44,15 @@ export class FakeLineupApi implements Pick<LineupApi, keyof LineupApi> {
     this.lineup = { ...this.lineup, ...data };
     this.emitLineup();
   }
+
+  saveEventLineupError: unknown = null;
+
+  async saveEventLineup(eventId: string, entry: Readonly<Record<string, unknown>>): Promise<void> {
+    this.calls.push('saveEventLineup');
+    if (this.saveEventLineupError) throw this.saveEventLineupError;
+    // Wie setDoc({ byEvent: { [id]: entry } }, { merge: true }): nur dieser Eintrag ändert sich, alles andere bleibt.
+    const byEvent = { ...((this.lineup?.['byEvent'] as Record<string, unknown> | undefined) ?? {}), [eventId]: entry };
+    this.lineup = { ...this.lineup, byEvent };
+    this.emitLineup();
+  }
 }
