@@ -9,7 +9,7 @@ const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 const hash = (value) => createHash("sha256").update(value).digest("hex");
 
 test("alle Team-Instanzen verwenden dieselbe App-Basis", async () => {
-  for (const file of ["app.js", "index.html", "styles.css", "base.css", "mobile.css", "next-level.js"]) {
+  for (const file of ["app.js", "index.html", "styles.css", "base.css", "mobile.css", "next-level.js", "qr-code.js", "service-worker.js"]) {
     const hashes = await Promise.all(teams.map(async (team) => hash(await read(`outputs/${team}/${file}`))));
     assert.equal(new Set(hashes).size, 1, `${file} ist zwischen den Teams divergiert`);
   }
@@ -821,7 +821,7 @@ test("Konten-Passwort wird verdeckt abgefragt und folgt der Richtlinie ab 12 Zei
   for (const team of teams) {
     const app = await read(`outputs/${team}/app.js`);
     const html = await read(`outputs/${team}/index.html`);
-    const create = app.slice(app.indexOf("async function createStaffAccount"), app.indexOf("async function createInviteCodeForPlayer"));
+    const create = app.slice(app.indexOf("async function createStaffAccount"), app.indexOf("function inviteLinkFor"));
     assert.doesNotMatch(create, /prompt\(/, `${team}: Passwort darf nicht per prompt() abgefragt werden`);
     assert.match(create, /askStaffCredentials\(/);
     assert.match(html, /id="staffPassword" type="password" autocomplete="new-password"/);
@@ -879,7 +879,8 @@ test("Abwesenheit: 'Bis' vor 'Von' wird nicht gespeichert; kein vorbelegtes Gebu
     assert.doesNotMatch(app, /\$\("#playerBirthdate"\)\.value = player\?\.birthdate \|\| "2006/);
     assert.match(app, /\$\("#playerBirthdate"\)\.value = player\?\.birthdate \|\| "";/);
     assert.doesNotMatch(app, /ab der Anmeldung eingeben/);
-    assert.match(app, /Anzahl Tage ab heute/);
+    // Seit SCRUM-30 steht die Befristung im Einladungs-Dialog statt in einem prompt().
+    assert.match(await read(`outputs/${team}/index.html`), /Anzahl Tage ab heute/);
   }
 });
 

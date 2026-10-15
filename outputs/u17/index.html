@@ -257,6 +257,16 @@
             <div class="access-manager" id="scoutManagerList"></div>
             <button class="ghost-button" data-action="add-scout" type="button">Scout-Zugang anlegen</button>
           </details>
+          <details class="control-disclosure" id="trainerManagerPanel">
+            <summary>Trainer-Konten verwalten <span id="trainerAccessCount" class="muted"></span></summary>
+            <div class="access-manager" id="trainerManagerList"></div>
+            <button class="ghost-button" data-action="add-trainer" type="button">Trainer-Konto anlegen</button>
+          </details>
+          <details class="control-disclosure" id="inviteManagerPanel">
+            <summary>Offene Einladungen <span id="inviteCount" class="muted"></span></summary>
+            <p class="muted">Noch nicht eingelöste Einladungscodes. Über „Einladen“ in der Spielerliste erzeugst du neue.</p>
+            <div class="access-manager" id="inviteManagerList"></div>
+          </details>
           <div class="table-wrap">
             <table>
               <thead>
@@ -740,6 +750,51 @@
       </form>
     </dialog>
 
+    <dialog id="inviteCreateDialog">
+      <form class="player-form" id="inviteCreateForm" method="dialog" novalidate>
+        <div class="dialog-head">
+          <h2 id="inviteCreateTitle">Einladung erstellen</h2>
+          <button class="icon-button" type="button" id="closeInviteCreateBtn" aria-label="Schließen">×</button>
+        </div>
+        <label>Zugangstyp
+          <select id="inviteCreateRole">
+            <option value="player">Spieler</option>
+            <option value="parent">Eltern</option>
+          </select>
+        </label>
+        <label>Befristung: Anzahl Tage ab heute (leer = unbegrenzt) <input id="inviteCreateDays" type="number" inputmode="numeric" min="1" max="365" step="1" placeholder="z. B. 14" /></label>
+        <p class="muted">Der Code gilt einmalig und wird bei der ersten erfolgreichen Anmeldung ungültig. Danach siehst du ihn und den Link im Dialog und jederzeit unter „Offene Einladungen“.</p>
+        <p class="auth-gate-error" id="inviteCreateError" role="alert"></p>
+        <menu>
+          <button class="ghost-button" type="button" id="cancelInviteCreateBtn">Abbrechen</button>
+          <button class="primary-button" type="submit" id="inviteCreateSubmitBtn">Einladung erstellen</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog id="inviteShareDialog">
+      <div class="player-form invite-share">
+        <div class="dialog-head">
+          <h2>Einladung teilen</h2>
+          <button class="icon-button" type="button" id="closeInviteShareBtn" aria-label="Schließen">×</button>
+        </div>
+        <p class="muted" id="inviteShareInfo"></p>
+        <label>Einladungscode <input id="inviteShareCode" readonly spellcheck="false" autocomplete="off" /></label>
+        <label>Einladungs-Link <input id="inviteShareLink" readonly spellcheck="false" autocomplete="off" /></label>
+        <div class="invite-share-actions">
+          <button class="primary-button" type="button" id="inviteCopyCodeBtn">Code kopieren</button>
+          <button class="ghost-button" type="button" id="inviteCopyLinkBtn">Link kopieren</button>
+          <button class="ghost-button" type="button" id="inviteNativeShareBtn" hidden>Teilen …</button>
+        </div>
+        <p class="muted" id="inviteShareStatus" role="status"></p>
+        <div class="invite-share-qr" id="inviteShareQr"></div>
+        <p class="muted">Der QR-Code enthält den Link: Kamera des Handys draufhalten, dann öffnet sich die Anmeldung mit ausgefülltem Code.</p>
+        <menu>
+          <button class="primary-button" type="button" id="doneInviteShareBtn">Fertig</button>
+        </menu>
+      </div>
+    </dialog>
+
     <dialog id="passwordDialog">
       <form class="player-form" id="passwordForm" method="dialog" novalidate>
         <div class="dialog-head">
@@ -784,6 +839,7 @@
     </dialog>
 
     <script src="./firebase-config.js"></script>
+    <script src="./qr-code.js"></script>
     <script src="./app.js"></script>
     <script src="./next-level.js"></script>
   </body>

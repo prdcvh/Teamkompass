@@ -1834,8 +1834,10 @@ async function createStaffAccount(role) {
     // eigenen, bereits als Trainer erkannten Identitaet - siehe firestore.rules.
     await firestoreModule.setDoc(teamDoc("members", newUid), {
       role,
+      email: trimmedEmail,
       createdAt: firestoreModule.serverTimestamp()
     });
+    renderAccessManager();
     alert(`${role === "medical" ? "Scout-Zugang" : "Trainer-Konto"} für ${trimmedEmail} wurde angelegt.`);
   } catch (error) {
     console.error(error);
@@ -1845,17 +1847,142 @@ async function createStaffAccount(role) {
   }
 }
 
+// Einladungs-Link: ?invite=<Code> fuellt beim Oeffnen das Code-Feld der Anmeldung vor (SCRUM-30).
+function inviteLinkFor(code) {
+  return `${location.origin}${location.pathname}?invite=${encodeURIComponent(code)}`;
+}
+
+// Fuellt das Code-Feld aus ?invite=... vor und entfernt den Code danach aus der Adressleiste
+// (er soll nicht im Verlauf oder in Screenshots der Adresszeile stehenbleiben). Angemeldet wird erst per Knopfdruck.
+function prefillInviteFromUrl() {
+  try {
+    const url = new URL(location.href);
+    const code = (url.searchParams.get("invite") || "").trim();
+    if (!code) return;
+    const field = $("#playerLoginCode");
+    if (field && /^[0-9a-f]{32,64}$/i.test(code)) field.value = code.toLowerCase();
+    url.searchParams.delete("invite");
+    history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Kopiert Text in die Zwischenablage; auf Handys ohne Clipboard-API (oder ohne HTTPS) ueber das markierte Feld.
+async function copyToClipboard(text, fallbackField) {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (error) {
+    console.error(error);
+  }
+  if (!fallbackField) return false;
+  try {
+    fallbackField.focus();
+    fallbackField.select();
+    fallbackField.setSelectionRange(0, text.length);
+    return document.execCommand("copy");
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
+}
+
+// Gueltigkeit eines Zugangs bzw. einer Einladung als Text (Datum oder null = unbegrenzt).
+function accessValidityText(expiresAtDate, now = new Date()) {
+  if (!expiresAtDate) return "Unbegrenzt gueltig";
+  return expiresAtDate < now
+    ? `Abgelaufen seit ${formatDate(localIsoDate(expiresAtDate))}`
+    : `Gueltig bis ${formatDate(localIsoDate(expiresAtDate))}`;
+}
+
+function formatInviteRole(role) {
+  return role === "parent" ? "Eltern" : "Spieler";
+}
+
+// Eingabe von Zugangstyp und Befristung im Dialog statt per prompt() (SCRUM-30).
+function askInviteOptions(playerName) {
+  const dialog = $("#inviteCreateDialog");
+  const form = $("#inviteCreateForm");
+  const error = $("#inviteCreateError");
+  $("#inviteCreateTitle").textContent = `Einladung für ${playerName || "Spieler"}`;
+  form.reset();
+  error.textContent = "";
+  return new Promise((resolve) => {
+    const finish = (value) => {
+      form.removeEventListener("submit", submit);
+      dialog.removeEventListener("close", close);
+      $("#closeInviteCreateBtn").removeEventListener("click", close);
+      $("#cancelInviteCreateBtn").removeEventListener("click", close);
+      if (dialog.open) dialog.close();
+      resolve(value);
+    };
+    const submit = (event) => {
+      event.preventDefault();
+      const role = $("#inviteCreateRole").value === "parent" ? "parent" : "player";
+      const daysText = $("#inviteCreateDays").value.trim();
+      const days = Number(daysText);
+      if (daysText !== "" && (!Number.isInteger(days) || days < 1 || days > 365)) {
+        error.textContent = "Bitte eine ganze Zahl von 1 bis 365 Tagen eingeben oder das Feld leer lassen.";
+        return;
+      }
+      finish({ role, days: daysText === "" ? null : days });
+    };
+    const close = () => finish(null);
+    form.addEventListener("submit", submit);
+    dialog.addEventListener("close", close);
+    $("#closeInviteCreateBtn").addEventListener("click", close);
+    $("#cancelInviteCreateBtn").addEventListener("click", close);
+    dialog.showModal();
+  });
+}
+
+// Zeigt einen Einladungscode im Dialog: Kopieren, Link teilen, QR-Code (SCRUM-30). Ersetzt das fruehere alert().
+function showInviteShare({ code, playerName, role, expiresAtDate }) {
+  const link = inviteLinkFor(code);
+  $("#inviteShareInfo").textContent = `Einmaliger ${formatInviteRole(role)}-Zugang für ${playerName || "Spieler"}. ${accessValidityText(expiresAtDate)}. Der Code wird bei der ersten erfolgreichen Anmeldung ungültig. Behandle ihn bis dahin wie ein Passwort.`;
+  $("#inviteShareCode").value = code;
+  $("#inviteShareLink").value = link;
+  $("#inviteShareStatus").textContent = "";
+  $("#inviteNativeShareBtn").hidden = typeof navigator.share !== "function";
+  const qr = $("#inviteShareQr");
+  try {
+    qr.innerHTML = window.TeamKompassQr.toSvg(link, "QR-Code mit dem Einladungs-Link");
+  } catch (error) {
+    console.error(error);
+    qr.textContent = "Der QR-Code konnte nicht erzeugt werden. Code oder Link funktionieren trotzdem.";
+  }
+  const dialog = $("#inviteShareDialog");
+  if (!dialog.open) dialog.showModal();
+}
+
+async function copyInviteField(fieldSelector, label) {
+  const field = $(fieldSelector);
+  const status = $("#inviteShareStatus");
+  const ok = await copyToClipboard(field.value, field);
+  status.textContent = ok ? `${label} kopiert.` : `Kopieren hat nicht geklappt. Markiere ${label.toLowerCase()} und kopiere es von Hand.`;
+}
+
+async function shareInviteNative() {
+  const code = $("#inviteShareCode").value;
+  try {
+    await navigator.share({ title: "TeamKompass-Einladung", text: "Dein Zugang zu TeamKompass:", url: inviteLinkFor(code) });
+  } catch (error) {
+    if (error?.name !== "AbortError") console.error(error);
+  }
+}
+
 async function createInviteCodeForPlayer(playerId) {
   if (!isCloudTrainer()) return;
-  if (!confirmDespiteRevokedConsent([state.players.find((item) => item.id === playerId)].filter(Boolean), "Das Erzeugen des Zugangs")) return;
-  const accessInput = prompt("Zugangstyp eingeben: Spieler oder Eltern", "Spieler");
-  if (accessInput === null) return;
-  const role = accessInput.trim().toLowerCase().startsWith("eltern") ? "parent" : "player";
-  const daysInput = prompt("Zugang befristen? Anzahl Tage ab heute (ab dem Erzeugen des Codes) eingeben, oder leer lassen fuer unbegrenzten Zugang:", "");
-  if (daysInput === null) return;
-  const days = Number(daysInput.trim());
-  const hasLimit = daysInput.trim() !== "" && Number.isFinite(days) && days > 0;
-  const expiresAt = hasLimit ? firestoreModule.Timestamp.fromDate(new Date(Date.now() + days * 24 * 60 * 60 * 1000)) : null;
+  const player = state.players.find((item) => item.id === playerId);
+  if (!confirmDespiteRevokedConsent([player].filter(Boolean), "Das Erzeugen des Zugangs")) return;
+  const options = await askInviteOptions(player?.name);
+  if (!options) return;
+  const { role, days } = options;
+  const expiresAtDate = days ? new Date(Date.now() + days * 24 * 60 * 60 * 1000) : null;
+  const expiresAt = expiresAtDate ? firestoreModule.Timestamp.fromDate(expiresAtDate) : null;
   const tokenBytes = crypto.getRandomValues(new Uint8Array(24));
   const code = Array.from(tokenBytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
   try {
@@ -1865,9 +1992,7 @@ async function createInviteCodeForPlayer(playerId) {
       expiresAt,
       createdAt: firestoreModule.serverTimestamp()
     });
-    const player = state.players.find((item) => item.id === playerId);
-    const validity = hasLimit ? `gueltig fuer ${days} Tage ab jetzt` : "unbegrenzt gueltig";
-    alert(`Einmaliger ${role === "parent" ? "Eltern" : "Spieler"}-Zugang für ${player?.name || "Spieler"}: ${code}\n\nDer Code wird bei der ersten erfolgreichen Anmeldung ungültig (${validity}). Behandle ihn bis dahin wie ein Passwort.`);
+    showInviteShare({ code, playerName: player?.name, role, expiresAtDate });
     renderAccessManager();
   } catch (error) {
     console.error(error);
@@ -1884,48 +2009,124 @@ function cloudErrorSuffix(error) {
   return code ? ` (Code: ${code})` : "";
 }
 
+// Noch nicht eingeloeste Einladungen (code -> Daten), damit "Teilen" den Code ohne neuen Abruf wieder zeigen kann.
+let openInvites = new Map();
+
 async function renderAccessManager() {
   if (!isCloudTrainer()) return;
   const list = $("#accessManagerList");
   const scoutList = $("#scoutManagerList");
+  const trainerList = $("#trainerManagerList");
+  const inviteList = $("#inviteManagerList");
   if (!list) return;
+  const now = new Date();
+  const setCount = (selector, count) => { const node = $(selector); if (node) node.textContent = `(${count})`; };
   try {
     const snapshot = await firestoreModule.getDocs(teamCollection("members"));
-    const now = new Date();
+    const ownUid = currentUser?.uid || authInstance?.currentUser?.uid;
     const row = (docSnap) => {
       const data = docSnap.data();
       const player = state.players.find((item) => item.id === data.playerId);
       const expiresAtDate = data.expiresAt?.toDate ? data.expiresAt.toDate() : null;
-      let status = "Unbegrenzt gueltig";
-      if (expiresAtDate) {
-        status = expiresAtDate < now
-          ? `Abgelaufen seit ${formatDate(localIsoDate(expiresAtDate))}`
-          : `Gueltig bis ${formatDate(localIsoDate(expiresAtDate))}`;
+      const isSelf = docSnap.id === ownUid;
+      let title;
+      let detail;
+      if (data.role === "trainer") {
+        title = data.email || "Trainer-Konto";
+        const created = data.createdAt?.toDate ? `angelegt am ${formatDate(localIsoDate(data.createdAt.toDate()))}` : "";
+        detail = ["Trainer · Vollzugriff", created, data.email ? "" : `Kennung …${docSnap.id.slice(-6)}`].filter(Boolean).join(" · ");
+      } else if (data.role === "medical") {
+        title = data.email || "Scout-Zugang";
+        detail = `Scout · Read-only · ${accessValidityText(expiresAtDate, now)}`;
+      } else {
+        title = player?.name || data.playerId;
+        detail = `${formatInviteRole(data.role)} · ${accessValidityText(expiresAtDate, now)}`;
       }
+      const action = isSelf
+        ? `<span class="access-self">Das bist du</span>`
+        : `<button class="ghost-button" data-action="revoke-access" data-uid="${escapeHtml(docSnap.id)}" data-role="${escapeHtml(data.role || "")}" type="button">Zugang sperren</button>`;
       return `
         <div class="access-row">
-          <div><strong>${escapeHtml(data.role === "medical" ? "Scout-Zugang" : player?.name || data.playerId)}</strong><span class="muted">${data.role === "parent" ? "Eltern · " : data.role === "medical" ? "Read-only · " : "Spieler · "}${status}</span></div>
-          <button class="ghost-button" data-action="revoke-access" data-uid="${docSnap.id}" type="button">Zugang sperren</button>
+          <div><strong>${escapeHtml(title)}</strong><span class="muted">${escapeHtml(detail)}</span></div>
+          ${action}
         </div>
       `;
     };
-    // Spieler (inkl. Eltern) und Scouts werden getrennt verwaltet (SCRUM-92).
+    // Spieler (inkl. Eltern), Scouts und Trainer werden getrennt verwaltet (SCRUM-92, SCRUM-30).
     const playerDocs = snapshot.docs.filter((docSnap) => ["player", "parent"].includes(docSnap.data().role));
     const scoutDocs = snapshot.docs.filter((docSnap) => docSnap.data().role === "medical");
+    const trainerDocs = snapshot.docs.filter((docSnap) => docSnap.data().role === "trainer");
     list.innerHTML = playerDocs.map(row).join("") || `<p class="muted">Noch keine Spieler-Zugaenge vergeben.</p>`;
     if (scoutList) scoutList.innerHTML = scoutDocs.map(row).join("") || `<p class="muted">Noch kein Scout-Zugang angelegt.</p>`;
-    const playerCount = $("#playerAccessCount");
-    const scoutCount = $("#scoutAccessCount");
-    if (playerCount) playerCount.textContent = `(${playerDocs.length})`;
-    if (scoutCount) scoutCount.textContent = `(${scoutDocs.length})`;
+    if (trainerList) trainerList.innerHTML = trainerDocs.map(row).join("") || `<p class="muted">Keine Trainer-Konten gefunden.</p>`;
+    setCount("#playerAccessCount", playerDocs.length);
+    setCount("#scoutAccessCount", scoutDocs.length);
+    setCount("#trainerAccessCount", trainerDocs.length);
   } catch (error) {
     console.error(error);
   }
+  if (!inviteList) return;
+  try {
+    const inviteSnapshot = await firestoreModule.getDocs(teamCollection("invites"));
+    openInvites = new Map(inviteSnapshot.docs.map((docSnap) => [docSnap.id, docSnap.data()]));
+    const entries = [...openInvites.entries()].sort(([, a], [, b]) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+    inviteList.innerHTML = entries.map(([code, data]) => {
+      const player = state.players.find((item) => item.id === data.playerId);
+      const expiresAtDate = data.expiresAt?.toDate ? data.expiresAt.toDate() : null;
+      return `
+        <div class="access-row">
+          <div><strong>${escapeHtml(player?.name || data.playerId || "Unbekannter Spieler")}</strong><span class="muted">${escapeHtml(`${formatInviteRole(data.role)} · noch nicht eingelöst · ${accessValidityText(expiresAtDate, now)}`)}</span></div>
+          <div class="access-actions">
+            <button class="ghost-button" data-action="share-invite" data-code="${escapeHtml(code)}" type="button">Code / Link / QR</button>
+            <button class="ghost-button" data-action="revoke-invite" data-code="${escapeHtml(code)}" type="button">Widerrufen</button>
+          </div>
+        </div>
+      `;
+    }).join("") || `<p class="muted">Keine offenen Einladungen.</p>`;
+    setCount("#inviteCount", entries.length);
+  } catch (error) {
+    console.error(error);
+    inviteList.innerHTML = `<p class="muted">Offene Einladungen konnten nicht geladen werden.${escapeHtml(cloudErrorSuffix(error))}</p>`;
+  }
 }
 
-async function revokeAccess(uid) {
+function shareOpenInvite(code) {
+  const data = openInvites.get(code);
+  if (!data) return;
+  showInviteShare({
+    code,
+    playerName: state.players.find((item) => item.id === data.playerId)?.name,
+    role: data.role,
+    expiresAtDate: data.expiresAt?.toDate ? data.expiresAt.toDate() : null
+  });
+}
+
+// Widerruft eine noch nicht eingeloeste Einladung: das Code-Dokument wird geloescht, der Code ist sofort wertlos.
+async function revokeInvite(code) {
   if (!isCloudTrainer()) return;
-  if (!confirm("Zugang wirklich sperren? Der Spieler muesste sich danach mit einem neuen Code anmelden.")) return;
+  if (!confirm("Einladung wirklich widerrufen? Der Code und der Link funktionieren danach nicht mehr.")) return;
+  try {
+    await firestoreModule.deleteDoc(teamDoc("invites", code));
+    renderAccessManager();
+  } catch (error) {
+    console.error(error);
+    alert(`Einladung konnte nicht widerrufen werden.${cloudErrorSuffix(error)}`);
+  }
+}
+
+async function revokeAccess(uid, role) {
+  if (!isCloudTrainer()) return;
+  // Das eigene Konto sperren sich Trainer nicht selbst aus (SCRUM-30).
+  if (uid === (currentUser?.uid || authInstance?.currentUser?.uid)) {
+    alert("Das eigene Konto kann hier nicht gesperrt werden.");
+    return;
+  }
+  const question = role === "trainer"
+    ? "Dieses Trainer-Konto wirklich sperren? Es verliert sofort den Vollzugriff und kommt nur mit einem neu angelegten Trainer-Konto wieder hinein."
+    : role === "medical"
+      ? "Scout-Zugang wirklich sperren? Er verliert sofort den Zugriff."
+      : "Zugang wirklich sperren? Der Spieler muesste sich danach mit einem neuen Code anmelden.";
+  if (!confirm(question)) return;
   try {
     await firestoreModule.deleteDoc(teamDoc("members", uid));
     renderAccessManager();
@@ -5210,14 +5411,29 @@ on("#changePasswordBtn", "click", openPasswordDialog);
 on("#passwordForm", "submit", handlePasswordChange);
 on("#closePasswordDialogBtn", "click", () => $("#passwordDialog").close());
 on("#cancelPasswordDialogBtn", "click", () => $("#passwordDialog").close());
-["#accessManagerList", "#scoutManagerList"].forEach((selector) => on(selector, "click", (event) => {
+["#accessManagerList", "#scoutManagerList", "#trainerManagerList"].forEach((selector) => on(selector, "click", (event) => {
   const button = event.target.closest("button[data-action='revoke-access']");
   if (!button) return;
-  revokeAccess(button.dataset.uid);
+  revokeAccess(button.dataset.uid, button.dataset.role);
 }));
+on("#inviteManagerList", "click", (event) => {
+  const button = event.target.closest("button[data-code]");
+  if (!button) return;
+  if (button.dataset.action === "share-invite") shareOpenInvite(button.dataset.code);
+  if (button.dataset.action === "revoke-invite") revokeInvite(button.dataset.code);
+});
 on("#scoutManagerPanel", "click", (event) => {
   if (event.target.closest("button[data-action='add-scout']")) createMedicalAccount();
 });
+on("#trainerManagerPanel", "click", (event) => {
+  if (event.target.closest("button[data-action='add-trainer']")) createTrainerAccount();
+});
+on("#inviteCopyCodeBtn", "click", () => copyInviteField("#inviteShareCode", "Code"));
+on("#inviteCopyLinkBtn", "click", () => copyInviteField("#inviteShareLink", "Link"));
+on("#inviteNativeShareBtn", "click", shareInviteNative);
+on("#closeInviteShareBtn", "click", () => $("#inviteShareDialog").close());
+on("#doneInviteShareBtn", "click", () => $("#inviteShareDialog").close());
+prefillInviteFromUrl();
 
 window.TeamKompass = Object.freeze({
   getState: () => structuredClone(state),
