@@ -28,6 +28,32 @@
     } @else if (!ready()) {
       <p class="muted" role="status">Aufstellung wird geladen …</p>
     } @else {
+      <tk-card>
+        <div class="panel target">
+          <label class="tk-label">
+            Aufstellung für
+            <select class="tk-input" aria-label="Aufstellung für" (change)="onTargetSelect($event)">
+              @for (game of games(); track game.id) {
+                <option [value]="game.id" [selected]="game.id === targetValue()">{{ game.title }} ({{ formatDate(game.date) }})</option>
+              }
+              <option value="" [selected]="targetValue() === ''">Allgemeine Startelf (ohne Spiel)</option>
+            </select>
+          </label>
+          @if (targetGame(); as game) {
+            <p class="meta" role="status">
+              {{ game.title }} am {{ formatDate(game.date) }}@if (!hasStoredForTarget()) { – noch nicht gespeichert; jede Änderung legt die Aufstellung an diesem Spiel ab }
+            </p>
+            @if (previousGame(); as source) {
+              <button tkButton type="button" class="copy" (click)="copyFromPrevious()" [disabled]="!lineup.canEdit()">
+                Aufstellung vom letzten Spiel übernehmen ({{ formatDate(source.date) }})
+              </button>
+            }
+          } @else {
+            <p class="meta">{{ games().length ? 'Kein Spiel gewählt' : 'Kein Spiel angelegt' }} – allgemeine Startelf</p>
+          }
+        </div>
+      </tk-card>
+
       <div class="layout">
         <tk-card>
           <div class="panel">

@@ -82,4 +82,47 @@ describe('LineupService', () => {
     expect(lineup.load()).toBe('idle');
     expect(firebase.lineup.lineupWatchers).toBe(0);
   });
+
+  it('speichert die Aufstellung eines Spiels nur unter byEvent, die allgemeine Startelf und andere Spiele bleiben', async () => {
+    const lineup = await setup();
+    const general = { TW: ['p1'] };
+    const other = { assignments: { ST: ['p2'] }, savedAt: '2026-09-01T10:00:00.000Z' };
+    firebase.lineup.lineup = { assignments: general, byEvent: { e0: other } };
+    firebase.lineup.emitLineup();
+    const next = moveToZone(emptyAssignments(), 'p2', 'ST') as never;
+    expect(lineup.saveForEvent('e1', next, new Date('2026-10-15T08:00:00Z'))).toBe(true);
+    expect(lineup.eventLineups()['e1'].assignments.ST).toEqual(['p2']); // sofort sichtbar
+    await vi.waitFor(() => expect(firebase.calls).toContain('saveEventLineup'));
+    expect(firebase.calls).not.toContain('saveLineup');
+    const doc = firebase.lineup.lineup as { assignments: unknown; byEvent: Record<string, { savedAt: string; assignments: Record<string, string[]> }> };
+    expect(doc.assignments).toEqual(general);
+    expect(doc.byEvent['e0']).toEqual(other);
+    expect(doc.byEvent['e1'].savedAt).toBe('2026-10-15T08:00:00.000Z');
+    expect(Object.keys(doc.byEvent['e1'].assignments)).toHaveLength(14);
+    expect(lineup.assignments().TW).toEqual(['p1']);
+  });
+
+  it('die allgemeine Startelf zu speichern lässt byEvent lokal wie in der Datenbank bestehen', async () => {
+    const lineup = await setup();
+    firebase.lineup.lineup = { byEvent: { e0: { assignments: { TW: ['p1'] }, savedAt: '' } } };
+    firebase.lineup.emitLineup();
+    lineup.save(moveToZone(emptyAssignments(), 'p2', 'ST') as never);
+    expect(lineup.eventLineups()['e0'].assignments.TW).toEqual(['p1']);
+  });
+
+  it('schreibt Spiel-Aufstellungen nur für Trainer und nur mit Spiel', async () => {
+    const other = await setup('medical');
+    expect(other.saveForEvent('e1', emptyAssignments())).toBe(false);
+    TestBed.resetTestingModule();
+    const lineup = await setup();
+    expect(lineup.saveForEvent('', emptyAssignments())).toBe(false);
+    expect(firebase.calls).not.toContain('saveEventLineup');
+  });
+
+  it('blendet Spieler außerhalb des Kaders in Spiel-Aufstellungen aus', async () => {
+    const lineup = await setup();
+    firebase.lineup.lineup = { byEvent: { e1: { assignments: { TW: ['p1', 'weg'] }, savedAt: '' } } };
+    firebase.lineup.emitLineup();
+    expect(lineup.eventLineups()['e1'].assignments.TW).toEqual(['p1']);
+  });
 });

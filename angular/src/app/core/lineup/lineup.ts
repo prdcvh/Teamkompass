@@ -6,6 +6,8 @@
 import { roundGrade } from '../ratings/rating';
 import { MAX_ON_PITCH, PITCH_BANDS, ZONES, type Zone } from './pitch';
 import type { Candidate } from './formation-assignment';
+import type { Player } from '../player/player';
+import type { TeamEvent } from '../events/event';
 
 export type Assignments = Readonly<Record<Zone, readonly string[]>>;
 
@@ -101,4 +103,58 @@ export function lineupGrade(assignments: Assignments, entries: readonly Candidat
   const onPitch = onPitchIds(assignments);
   const grades = entries.filter((entry) => onPitch.has(entry.player.id) && entry.grade !== null).map((entry) => entry.grade as number);
   return grades.length ? roundGrade(grades.reduce((sum, value) => sum + value, 0) / grades.length) : null;
+}
+
+/** Aufstellung eines Spiels (SCRUM-29 der Live-App): `meta/lineup.byEvent[eventId] = { assignments, savedAt }`. */
+export interface EventLineup {
+  readonly assignments: Assignments;
+  /** ISO-Zeitpunkt des Speicherns; leer, wenn das Dokument keinen hat. */
+  readonly savedAt: string;
+}
+
+export type EventLineups = Readonly<Record<string, EventLineup>>;
+
+/**
+ * `byEvent` des Dokuments → Aufstellungen je Spiel (wie normalizeEventLineups der Live-App): Einträge ohne Spieler
+ * entfallen, unbekannte Zonen/Spieler (bei bekanntem Kader) fallen weg.
+ */
+export function normalizeEventLineups(raw: unknown, playerIds?: ReadonlySet<string>): EventLineups {
+  const result: Record<string, EventLineup> = {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return result;
+  for (const [eventId, entry] of Object.entries(raw)) {
+    const assignments = normalizeLineup(entry, playerIds);
+    if (lineupIsEmpty(assignments)) continue;
+    const savedAt = (entry as { savedAt?: unknown } | null)?.savedAt;
+    result[eventId] = { assignments, savedAt: typeof savedAt === 'string' ? savedAt : '' };
+  }
+  return result;
+}
+
+/** Aufstellung eines Spiels → Eintrag in `byEvent` (genau das Format der Live-App). */
+export function docFromEventLineup(assignments: Assignments, savedAt: string): Record<string, unknown> {
+  return { ...docFromLineup(assignments), savedAt };
+}
+
+/** Das nächste anstehende Spiel (heute oder später); null, wenn keins ansteht. */
+export function nextGame(events: readonly TeamEvent[], today: string): TeamEvent | null {
+  return [...events].filter((event) => event.type === 'Spiel' && event.date >= today).sort((a, b) => a.date.localeCompare(b.date))[0] ?? null;
+}
+
+/** Letztes Spiel vor dem Ziel-Spiel (ohne Ziel: vor heute), für das eine Aufstellung gespeichert ist. */
+export function previousGameWithLineup(events: readonly TeamEvent[], lineups: EventLineups, target: TeamEvent | null, today: string): TeamEvent | null {
+  const before = target?.date ?? today;
+  return (
+    [...events]
+      .filter((event) => event.type === 'Spiel' && event.id !== target?.id && event.date < before && lineups[event.id])
+      .sort((a, b) => b.date.localeCompare(a.date))[0] ?? null
+  );
+}
+
+/** Gespeicherte Aufstellung zum Anzeigen (nur lesend): Zeilen je besetzter Zone, Formationsname und Bank. */
+export function lineupSummary(assignments: Assignments, players: readonly Player[]) {
+  const byId = new Map(players.map((player) => [player.id, player]));
+  const rows = ZONES.map((zone) => ({ zone, players: assignments[zone].flatMap((id) => byId.get(id) ?? []) })).filter((row) => row.players.length > 0);
+  const onPitch = onPitchIds(assignments);
+  const bench = [...players].filter((player) => !onPitch.has(player.id)).sort((a, b) => a.number - b.number);
+  return { name: formationName(assignments), rows, bench };
 }

@@ -1,7 +1,7 @@
 import { inviteEntry, memberEntry } from './access/access';
 import { absenceFromDoc, docFromAbsence } from './records/absence';
 import { docFromEvent, eventFromDoc } from './events/event';
-import { docFromLineup, normalizeLineup } from './lineup/lineup';
+import { docFromEventLineup, docFromLineup, normalizeEventLineups, normalizeLineup } from './lineup/lineup';
 import { docFromMeasurement, measurementFromDoc } from './records/measurement';
 import { docFromOpponent, opponentFromDoc } from './opponents/opponent';
 import { docFromPlan, planFromDoc } from './records/plan';
@@ -86,6 +86,16 @@ describe('Datenformat alte App ↔ Angular', () => {
     expect(written['assignments']).toMatchObject({ TW: ['p1'], IV: ['p2', 'p3'], ST: ['p4'] });
     // Angular schreibt nur `assignments` (mit merge, siehe LineupApi); `byEvent` darf nie im Schreibdokument stehen.
     expect(Object.keys(written)).toEqual(['assignments']);
+  });
+
+  it('Aufstellung je Spiel (byEvent): Eintrag der alten App wird gelesen und im selben Format geschrieben', () => {
+    const entry = { assignments: { TW: ['p1'], IV: ['p2', 'p3'], ST: ['p4'] }, savedAt: '2026-10-01T10:00:00.000Z' };
+    const read = normalizeEventLineups({ e1: entry })['e1'];
+    expect(read.assignments.IV).toEqual(['p2', 'p3']);
+    const written = docFromEventLineup(read.assignments, read.savedAt);
+    expect(Object.keys(written).sort()).toEqual(['assignments', 'savedAt']);
+    expect(written['assignments']).toMatchObject(entry.assignments);
+    expect(written['savedAt']).toBe(entry.savedAt);
   });
 
   it('Zugänge: Mitgliedschaften und Einladungen der alten App werden richtig gelesen', () => {
