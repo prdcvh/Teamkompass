@@ -56,8 +56,8 @@ describe('TeamAnalysis (Teamanalyse)', () => {
       'Geburten Q3/Q4': '0/1',
       Positionslücken: '3', // ST, LA, IV je nur ein Spieler
     });
-    expect(root(fixture).querySelector('svg.chart')?.getAttribute('aria-label')).toContain('2 Events mit Note');
-    expect(root(fixture).querySelectorAll('svg.chart circle')).toHaveLength(2);
+    expect(root(fixture).querySelector('svg.chart')?.getAttribute('aria-label')).toContain('Teamnoten nach Event (1 ist die beste Note): ');
+    expect(root(fixture).querySelectorAll('svg.chart .dot')).toHaveLength(2);
     const headings = [...root(fixture).querySelectorAll('h2')].map((h) => h.textContent);
     expect(headings).toEqual(['Teamform', 'Nützliche Kennzahlen', 'Geburtsquartale', 'Positionsabdeckung', 'Trainingsfokus']);
     expect(text(fixture)).toContain('Umschalten: 1 Einheiten');

@@ -33,15 +33,25 @@
         <tk-card>
           <div class="panel">
             <h2>Teamform</h2>
-            <svg class="chart" [attr.viewBox]="'0 0 ' + trend().width + ' ' + trend().height" role="img" [attr.aria-label]="trend().points.length ? 'Teamnoten nach Event: ' + trend().points.length + ' Events mit Note' : 'Noch keine Teamnoten vorhanden'">
+            <svg class="chart" [attr.viewBox]="'0 0 ' + trend().width + ' ' + trend().height" role="img" [attr.aria-label]="trend().points.length ? 'Teamnoten nach Event (1 ist die beste Note): ' + trend().summary : 'Noch keine Teamnoten vorhanden'">
               @for (line of trend().grid; track line.grade) {
                 <line x1="54" [attr.y1]="line.y" [attr.x2]="trend().width - 24" [attr.y2]="line.y" class="grid" />
                 <text x="24" [attr.y]="line.y + 4" class="axis">{{ line.grade }}</text>
               }
               @if (trend().points.length > 0) {
+                @if (trend().area) {
+                  <path [attr.d]="trend().area" class="area" />
+                }
                 <path [attr.d]="trend().path" class="line" />
                 @for (point of trend().points; track $index) {
-                  <circle [attr.cx]="point.x" [attr.cy]="point.y" r="5" class="dot" [class.game]="point.kind === 'Spiel'"><title>{{ point.title }}</title></circle>
+                  @if (point.kind === 'Spiel') {
+                    <rect [attr.x]="point.x - 6" [attr.y]="point.y - 6" width="12" height="12" rx="2" [attr.transform]="'rotate(45 ' + point.x + ' ' + point.y + ')'" class="dot game" [class.last]="$last" tabindex="0" [attr.aria-label]="point.title + ' (Spiel)'"><title>{{ point.title }}</title></rect>
+                  } @else {
+                    <circle [attr.cx]="point.x" [attr.cy]="point.y" r="6" class="dot" [class.last]="$last" tabindex="0" [attr.aria-label]="point.title + ' (Training)'"><title>{{ point.title }}</title></circle>
+                  }
+                  @if ($last || $index === trend().best || trend().points.length <= 8) {
+                    <text [attr.x]="point.x" [attr.y]="point.y - 14" class="value" text-anchor="middle">{{ point.valueLabel }}</text>
+                  }
                   <text [attr.x]="point.x - 14" [attr.y]="trend().height - 12" class="axis small">{{ point.label }}</text>
                 }
               } @else {

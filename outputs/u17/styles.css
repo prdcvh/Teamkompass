@@ -1606,11 +1606,12 @@ canvas {
 
 .analysis-bar span {
   height: 100%;
-  background: var(--green);
+  border-radius: 999px;
+  background: var(--chart-1);
 }
 
 .analysis-bar.availability span {
-  background: var(--green);
+  background: var(--chart-2);
 }
 
 .development-panel {

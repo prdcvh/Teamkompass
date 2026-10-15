@@ -34,7 +34,7 @@ import { ProfileExtras } from './profile-extras';
   imports: [Button, Card, Status, ProfileExtras],
   templateUrl: './profile.html',
   // Reihenfolge = Kaskade (die Handy-Regeln überschreiben Kopf und Auswertung).
-  styleUrls: ['./profile.css', './profile-stats.css', './profile-mobile.css', './profile-risk.css'],
+  styleUrls: ['./profile.css', './profile-stats.css', './profile-mobile.css', './profile-risk.css', '../../ui/chart/chart.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class Profile implements OnInit {

@@ -5,36 +5,6 @@
   gap: var(--tk-space-4);
 }
 
-.chart {
-  width: 100%;
-  height: auto;
-}
-
-.chart .grid {
-  stroke: var(--tk-line);
-}
-
-.chart .axis {
-  fill: var(--tk-muted);
-  font-size: 12px;
-}
-
-.chart .axis.small {
-  font-size: 11px;
-}
-
-.chart .line {
-  fill: none;
-  stroke: var(--tk-red);
-  stroke-width: 4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.chart .dot {
-  fill: var(--tk-red);
-}
-
 .bars {
   display: grid;
   gap: var(--tk-space-3);

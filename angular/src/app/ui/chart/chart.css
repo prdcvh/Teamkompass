@@ -1,0 +1,65 @@
+/* Gemeinsamer Diagramm-Stil (SCRUM-94): ruhige Farben, weiche Flächen, gestrichelte Hilfslinien, Werte per Fokus/Hover.
+   Wird von Profil, Spieleransicht, Teamanalyse und Messwerten eingebunden (Komponenten-CSS ist gekapselt). */
+.chart {
+  width: 100%;
+  height: auto;
+}
+
+.chart .grid {
+  stroke: var(--tk-line);
+  stroke-dasharray: 2 5;
+}
+
+.chart .axis {
+  fill: var(--tk-muted);
+  font-size: 12px;
+}
+
+.chart .axis.small {
+  font-size: 11px;
+}
+
+.chart .area {
+  fill: var(--tk-chart-1);
+  fill-opacity: 0.12;
+  stroke: none;
+}
+
+.chart .line {
+  fill: none;
+  stroke: var(--tk-chart-1);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.chart .dot {
+  fill: var(--tk-surface);
+  stroke: var(--tk-chart-1);
+  stroke-width: 2.5;
+  outline: none;
+  transition: stroke-width 0.12s ease;
+}
+
+.chart .dot.game {
+  stroke: var(--tk-chart-4);
+}
+
+.chart .dot.last {
+  fill: var(--tk-chart-1);
+}
+
+.chart .dot.game.last {
+  fill: var(--tk-chart-4);
+}
+
+.chart .dot:hover,
+.chart .dot:focus-visible {
+  stroke-width: 5;
+}
+
+.chart .value {
+  fill: var(--tk-ink);
+  font-size: 12px;
+  font-weight: 700;
+}

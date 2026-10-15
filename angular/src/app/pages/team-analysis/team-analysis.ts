@@ -30,7 +30,7 @@ function bars(rows: readonly { label: string; value: number }[]): BarRow[] {
   selector: 'app-team-analysis',
   imports: [RouterLink, Button, Card],
   templateUrl: './team-analysis.html',
-  styleUrl: './team-analysis.css',
+  styleUrls: ['./team-analysis.css', '../../ui/chart/chart.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class TeamAnalysis implements OnInit {
