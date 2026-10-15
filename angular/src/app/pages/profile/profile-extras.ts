@@ -31,7 +31,7 @@ interface Deleting {
   selector: 'tk-profile-extras',
   imports: [FormsModule, Button, Card, Dialog, PlanDialog, AbsenceDialog, MeasurementDialog],
   templateUrl: './profile-extras.html',
-  styleUrl: './profile-extras.css',
+  styleUrls: ['./profile-extras.css', '../../ui/chart/chart.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProfileExtras {

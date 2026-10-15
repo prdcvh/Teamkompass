@@ -23,6 +23,7 @@ describe('measurementChart', () => {
     expect(chart.series[1].label).toBe('Gewicht 43 kg');
     expect(chart.labels.map((label) => label.text)).toEqual(['2026-07', '2026-10']);
     expect(chart.series[0].path.startsWith('M ')).toBe(true);
+    expect(chart.summary).toContain('Größe');
   });
 
   it('gleichbleibende Werte ergeben eine waagerechte Linie ohne Division durch null', () => {

@@ -1013,3 +1013,33 @@ test("Angular zeigt das Vereinslogo statt des „TK“-Zeichens (SCRUM-76)", asy
   const logo = await readFile(new URL("../angular/public/club-logo.png", import.meta.url));
   assert.equal(logo.subarray(1, 4).toString(), "PNG");
 });
+
+test("Diagramme: ruhige Farben, Textalternative und Wert-Tooltip in allen Teams (SCRUM-94)", async () => {
+  const app = await read("outputs/team-manager/app.js");
+  const base = await read("outputs/team-manager/base.css");
+  for (const token of ["--chart-1", "--chart-2", "--chart-3", "--chart-4"]) {
+    assert.equal(base.split(`${token}:`).length - 1, 2, `${token} muss hell und dunkel definiert sein`);
+  }
+  assert.match(base, /\.chart-tooltip/);
+  assert.match(app, /function describeChart\(/);
+  assert.match(app, /setAttribute\("role", "img"\)/);
+  // Alle Diagramme melden ihre Textalternative und Messpunkte.
+  for (const fn of ["drawGradeTrendChart", "drawPieChart", "drawBarChart", "renderMeasurementChart"]) {
+    const start = app.indexOf(`function ${fn}(`);
+    const body = app.slice(start, app.indexOf("\n}\n", start));
+    assert.match(body, /describeChart\(/, `${fn} setzt keine Textalternative`);
+  }
+  // Keine festen Rot/Gruen-Reihen mehr in den Diagrammfunktionen.
+  assert.doesNotMatch(app, /palette\.(red|green|blue|amber)/);
+});
+
+test("Diagramm-Beschriftungen: letzte Beschriftung bleibt, ohne mit der vorletzten zu kollidieren (SCRUM-94)", async () => {
+  const app = await read("outputs/team-manager/app.js");
+  const start = app.indexOf("function chartLabelIndices(");
+  const source = app.slice(start, app.indexOf("\n}\n", start) + 3);
+  const chartLabelIndices = new Function(`${source}; return chartLabelIndices;`)();
+  assert.deepEqual([...chartLabelIndices(8, 2)], [0, 2, 4, 7]);
+  assert.deepEqual([...chartLabelIndices(8, 3)], [0, 3, 7]);
+  assert.deepEqual([...chartLabelIndices(3, 1)], [0, 1, 2]);
+  assert.deepEqual([...chartLabelIndices(1, 1)], [0]);
+});

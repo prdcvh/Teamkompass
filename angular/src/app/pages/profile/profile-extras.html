@@ -102,11 +102,21 @@
     </div>
     <tk-card>
       @if (chart().enough) {
-        <svg class="chart" [attr.viewBox]="'0 0 ' + chart().width + ' ' + chart().height" role="img" aria-label="Verlauf von Größe, Gewicht und BMI der letzten 12 Monate">
+        <svg class="chart" [attr.viewBox]="'0 0 ' + chart().width + ' ' + chart().height" role="img" [attr.aria-label]="'Verlauf von Größe, Gewicht und BMI der letzten 12 Monate: ' + chart().summary">
           @for (series of chart().series; track series.key) {
             <path [attr.d]="series.path" class="line" [attr.data-series]="series.key" />
             @for (point of series.points; track $index) {
-              <circle [attr.cx]="point.x" [attr.cy]="point.y" r="4" class="dot" [attr.data-series]="series.key"><title>{{ point.title }}</title></circle>
+              @switch (series.key) {
+                @case ('weight') {
+                  <rect [attr.x]="point.x - 4.5" [attr.y]="point.y - 4.5" width="9" height="9" rx="1.5" class="dot" data-series="weight" tabindex="0" [attr.aria-label]="series.label + ', ' + point.title"><title>{{ point.title }}</title></rect>
+                }
+                @case ('bmi') {
+                  <rect [attr.x]="point.x - 4.5" [attr.y]="point.y - 4.5" width="9" height="9" rx="1.5" [attr.transform]="'rotate(45 ' + point.x + ' ' + point.y + ')'" class="dot" data-series="bmi" tabindex="0" [attr.aria-label]="series.label + ', ' + point.title"><title>{{ point.title }}</title></rect>
+                }
+                @default {
+                  <circle [attr.cx]="point.x" [attr.cy]="point.y" r="5" class="dot" data-series="height" tabindex="0" [attr.aria-label]="series.label + ', ' + point.title"><title>{{ point.title }}</title></circle>
+                }
+              }
             }
           }
           @for (label of chart().labels; track $index) {

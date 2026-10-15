@@ -202,11 +202,28 @@ describe('profile (Auswertungen)', () => {
       expect(chart.points[1].title).toContain('Note 6,0');
     });
 
+    it('liefert Fläche, Beschriftungen, Textalternative und den besten Punkt (SCRUM-94)', () => {
+      const items: EventRating[] = [
+        { event: event('a', '2026-10-01'), rating: rated(3) },
+        { event: event('b', '2026-10-02'), rating: rated(1) },
+        { event: event('c', '2026-10-03'), rating: rated(2) },
+      ];
+      const chart = trendChart(gradedEvents(items));
+      expect(chart.area.endsWith('Z')).toBe(true);
+      expect(chart.points.map((point) => point.valueLabel)).toEqual(['3,0', '1,0', '2,0']);
+      expect(chart.best).toBe(1);
+      expect(chart.summary).toContain('10-02');
+      expect(chart.summary).toContain('Note 1,0');
+    });
+
     it('ein einzelner Punkt steht links, ohne Daten gibt es keinen Pfad', () => {
       const single = trendChart(gradedEvents([{ event: event('a', '2026-10-01'), rating: rated(2) }]));
       expect(single.points).toHaveLength(1);
       expect(single.points[0].x).toBe(54);
       expect(trendChart([]).path).toBe('');
+      expect(trendChart([]).area).toBe('');
+      expect(trendChart([]).best).toBe(-1);
+      expect(single.area).toBe('');
     });
   });
 });

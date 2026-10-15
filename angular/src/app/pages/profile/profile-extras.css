@@ -102,40 +102,28 @@ h2 {
   color: var(--tk-red);
 }
 
-.chart {
-  width: 100%;
-  height: auto;
+.chart .line[data-series='height'] {
+  stroke: var(--tk-chart-1);
 }
 
-.chart .line {
-  fill: none;
-  stroke-width: 3;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+.chart .line[data-series='weight'] {
+  stroke: var(--tk-chart-2);
 }
 
-.chart [data-series='height'] {
-  stroke: var(--tk-red);
-  fill: var(--tk-red);
+.chart .line[data-series='bmi'] {
+  stroke: var(--tk-chart-3);
 }
 
-.chart [data-series='weight'] {
-  stroke: var(--tk-blue, #2563eb);
-  fill: var(--tk-blue, #2563eb);
+.chart .dot[data-series='height'] {
+  stroke: var(--tk-chart-1);
 }
 
-.chart [data-series='bmi'] {
-  stroke: var(--tk-green);
-  fill: var(--tk-green);
+.chart .dot[data-series='weight'] {
+  stroke: var(--tk-chart-2);
 }
 
-.chart .line[data-series] {
-  fill: none;
-}
-
-.chart .axis {
-  fill: var(--tk-muted);
-  font-size: 11px;
+.chart .dot[data-series='bmi'] {
+  stroke: var(--tk-chart-3);
 }
 
 .legend {
@@ -161,17 +149,19 @@ h2 {
   background: currentColor;
 }
 
-.legend [data-series='height'] .swatch,
 .legend li[data-series='height'] .swatch {
-  background: var(--tk-red);
+  background: var(--tk-chart-1);
 }
 
 .legend li[data-series='weight'] .swatch {
-  background: var(--tk-blue, #2563eb);
+  border-radius: 2px;
+  background: var(--tk-chart-2);
 }
 
 .legend li[data-series='bmi'] .swatch {
-  background: var(--tk-green);
+  border-radius: 2px;
+  background: var(--tk-chart-3);
+  transform: rotate(45deg) scale(0.9);
 }
 
 .error {

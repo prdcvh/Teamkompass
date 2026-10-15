@@ -1,4 +1,5 @@
 /** Verlaufsdiagramm der Messwerte (Größe, Gewicht, BMI). */
+import { smoothPath } from '../chart-path';
 import { type Measurement, calculateBmi, sortedMeasurements } from './measurement';
 
 export interface MeasurementSeries {
@@ -13,6 +14,8 @@ export interface MeasurementChart {
   readonly height: number;
   readonly series: readonly MeasurementSeries[];
   readonly labels: readonly { x: number; text: string }[];
+  /** Textalternative: alle Messwerte in einem Satz. */
+  readonly summary: string;
   /** Mindestens zwei Messungen der letzten 12 Monate mit Größe UND Gewicht sind nötig. */
   readonly enough: boolean;
 }
@@ -44,9 +47,9 @@ export function measurementChart(measurements: readonly Measurement[], today: st
       y: M_HEIGHT - M_BOTTOM - ((value - min) / range) * (M_HEIGHT - M_BOTTOM - M_TOP),
       title: `${entries[index].date}: ${round(value)}${unit}`,
     }));
-    return { key, label, points, path: points.map((point, index) => `${index ? 'L' : 'M'} ${point.x} ${point.y}`).join(' ') };
+    return { key, label, points, path: smoothPath(points) };
   };
-  if (entries.length < 2) return { width: M_WIDTH, height: M_HEIGHT, series: [], labels: [], enough: false };
+  if (entries.length < 2) return { width: M_WIDTH, height: M_HEIGHT, series: [], labels: [], summary: '', enough: false };
   const last = entries[entries.length - 1];
   const bmi = entries.map((item) => calculateBmi(item.height, item.weight) ?? 0);
   return {
@@ -59,5 +62,6 @@ export function measurementChart(measurements: readonly Measurement[], today: st
       build('bmi', `BMI ${round(bmi[bmi.length - 1])}`, bmi, ''),
     ],
     labels: entries.map((item, index) => ({ x: x(index), text: item.date.slice(0, 7) })),
+    summary: entries.map((item, index) => `${item.date}: Größe ${round(item.height)} cm, Gewicht ${round(item.weight)} kg, BMI ${round(bmi[index])}`).join('; '),
   };
 }

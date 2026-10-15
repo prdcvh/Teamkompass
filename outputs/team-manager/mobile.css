@@ -1141,7 +1141,7 @@ details.opponent-details-toggle {
   display: block;
   height: 100%;
   border-radius: 999px;
-  background: var(--green);
+  background: var(--chart-1);
 }
 
 /* ---- 07 Kader ----------------------------------------------------------- */
@@ -1852,7 +1852,7 @@ canvas {
 
 .analysis-bar-row strong { font-size: 0.86rem; font-weight: 700; }
 .analysis-bar-row span   { color: var(--muted); font-size: 0.82rem; font-weight: 800; font-variant-numeric: tabular-nums; }
-.analysis-bar.availability > span { background: var(--blue); }
+.analysis-bar.availability > span { background: var(--chart-2); }
 
 .development-item {
   display: grid;

@@ -31,6 +31,12 @@
   --tk-soft-neutral: #e9e7ec;
   --tk-on-red: #ffffff;
 
+  /* Diagrammfarben (SCRUM-94): ruhig, gleiche Werte wie --chart-* der Live-Apps */
+  --tk-chart-1: #3f6c99;
+  --tk-chart-2: #2c8579;
+  --tk-chart-3: #b9812a;
+  --tk-chart-4: #b5505f;
+
   /* Form */
   --tk-radius-sm: 8px;
   --tk-radius-md: 10px;
@@ -89,6 +95,10 @@
   --tk-soft-neutral: #262931;
   --tk-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 26px rgba(0, 0, 0, 0.34);
   --tk-focus-ring: 0 0 0 3px rgba(240, 68, 98, 0.24);
+  --tk-chart-1: #86b4dd;
+  --tk-chart-2: #5cc2b1;
+  --tk-chart-3: #e3b25c;
+  --tk-chart-4: #ec8fa0;
   color-scheme: dark;
 }
 
@@ -116,6 +126,10 @@
     --tk-soft-neutral: #262931;
     --tk-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 26px rgba(0, 0, 0, 0.34);
     --tk-focus-ring: 0 0 0 3px rgba(240, 68, 98, 0.24);
+    --tk-chart-1: #86b4dd;
+    --tk-chart-2: #5cc2b1;
+    --tk-chart-3: #e3b25c;
+    --tk-chart-4: #ec8fa0;
     color-scheme: dark;
   }
 }

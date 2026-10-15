@@ -5,6 +5,7 @@
  * kleiner ist besser. Wichtig für die Kernzahlen (siehe CLAUDE.md „wrong core numbers“): Anwesenheits- und
  * Einsatzquote zählen nur Events, die nicht in der Zukunft liegen und deren Anwesenheit schon gesetzt ist (SCRUM-20).
  */
+import { areaPath, smoothPath } from '../chart-path';
 import { type TeamEvent } from '../events/event';
 import { GRADE_FIELDS, GRADE_LABELS, type GradeField, type Rating, calculatedGrade, gradeLabel, roundGrade } from '../ratings/rating';
 
@@ -169,7 +170,7 @@ export const CHART_WIDTH = 760;
 export const CHART_HEIGHT = 260;
 const CHART_LEFT = 54;
 const CHART_RIGHT = 24;
-const CHART_TOP = 30;
+const CHART_TOP = 46;
 const CHART_BOTTOM = 38;
 
 export interface ChartPoint {
@@ -178,6 +179,8 @@ export interface ChartPoint {
   readonly grade: number;
   readonly label: string;
   readonly title: string;
+  /** Note als Text („2,3“) für die Beschriftung am Punkt. */
+  readonly valueLabel: string;
 }
 
 export interface TrendChart {
@@ -186,6 +189,12 @@ export interface TrendChart {
   readonly grid: readonly { y: number; grade: number }[];
   readonly points: readonly ChartPoint[];
   readonly path: string;
+  /** Fläche unter der Kurve (leer bei weniger als zwei Punkten). */
+  readonly area: string;
+  /** Textalternative: alle Werte in einem Satz. */
+  readonly summary: string;
+  /** Index des besten Wertes (kleinste Note), -1 ohne Punkte. */
+  readonly best: number;
 }
 
 /** Ein Punkt eines Notendiagramms. */
@@ -200,6 +209,7 @@ export interface PlotPoint {
 export interface PlottedPoint extends PlotPoint {
   readonly x: number;
   readonly y: number;
+  readonly valueLabel: string;
 }
 
 export interface PlotChart {
@@ -208,6 +218,9 @@ export interface PlotChart {
   readonly grid: readonly { y: number; grade: number }[];
   readonly points: readonly PlottedPoint[];
   readonly path: string;
+  readonly area: string;
+  readonly summary: string;
+  readonly best: number;
 }
 
 /** Notendiagramm: Note 1 oben, Note 6 unten, Punkte gleichmäßig von links nach rechts. */
@@ -219,13 +232,18 @@ export function plotChart(input: readonly PlotPoint[]): PlotChart {
     ...entry,
     x: CHART_LEFT + (index * plotWidth) / Math.max(input.length - 1, 1),
     y: y(entry.grade),
+    valueLabel: gradeLabel(entry.grade),
   }));
+  const best = points.length ? points.reduce((index, point, at) => (point.grade < points[index].grade ? at : index), 0) : -1;
   return {
     width: CHART_WIDTH,
     height: CHART_HEIGHT,
     grid: [1, 2, 3, 4, 5, 6].map((grade) => ({ y: y(grade), grade })),
     points,
-    path: points.map((point, index) => `${index ? 'L' : 'M'} ${point.x} ${point.y}`).join(' '),
+    path: smoothPath(points),
+    area: areaPath(points, CHART_HEIGHT - CHART_BOTTOM),
+    summary: points.map((point) => `${point.label}${point.kind ? ` ${point.kind}` : ''} Note ${gradeLabel(point.grade)}`).join(', '),
+    best,
   };
 }
 

@@ -352,6 +352,212 @@ function chartFonts(compact) {
     : { title: "700 18px system-ui", label: "12px system-ui", value: "700 13px system-ui", legend: "13px system-ui", empty: "14px system-ui" };
 }
 
+// Ruhige, einheitliche Diagrammfarben (--chart-* in base.css, hell und dunkel). Neben der Farbe
+// unterscheiden Markerformen und Beschriftungen die Reihen (SCRUM-94).
+function chartPalette() {
+  return {
+    surface: cssVar("--field") || "#ffffff",
+    panel: cssVar("--panel") || "#ffffff",
+    ink: cssVar("--ink") || "#241d1f",
+    muted: cssVar("--muted") || "#70686b",
+    line: cssVar("--line") || "#e4dcde",
+    soft: cssVar("--soft-neutral") || "#e9e7ec",
+    series: [
+      cssVar("--chart-1") || "#3f6c99",
+      cssVar("--chart-2") || "#2c8579",
+      cssVar("--chart-3") || "#b9812a",
+      cssVar("--chart-4") || "#b5505f"
+    ]
+  };
+}
+
+function chartRoundRect(ctx, x, y, w, h, radius) {
+  const r = Math.max(0, Math.min(radius, w / 2, h / 2));
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+// Zeichnet einen Marker der Form circle/square/diamond/triangle um (x, y).
+function chartMarker(ctx, shape, x, y, r) {
+  ctx.beginPath();
+  if (shape === "square") {
+    chartRoundRect(ctx, x - r, y - r, r * 2, r * 2, r * 0.3);
+  } else if (shape === "diamond") {
+    ctx.moveTo(x, y - r * 1.25);
+    ctx.lineTo(x + r * 1.25, y);
+    ctx.lineTo(x, y + r * 1.25);
+    ctx.lineTo(x - r * 1.25, y);
+    ctx.closePath();
+  } else if (shape === "triangle") {
+    ctx.moveTo(x, y - r * 1.2);
+    ctx.lineTo(x + r * 1.2, y + r * 0.9);
+    ctx.lineTo(x - r * 1.2, y + r * 0.9);
+    ctx.closePath();
+  } else {
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+  }
+}
+
+// Gleichmaessige, ueberschwingungsfreie Kurve durch die Punkte (monotone kubische Interpolation).
+function chartSmoothPath(ctx, points) {
+  ctx.moveTo(points[0].x, points[0].y);
+  if (points.length < 3) {
+    points.slice(1).forEach((point) => ctx.lineTo(point.x, point.y));
+    return;
+  }
+  const count = points.length;
+  const widths = [];
+  const slopes = [];
+  for (let i = 0; i < count - 1; i += 1) {
+    widths[i] = points[i + 1].x - points[i].x || 1;
+    slopes[i] = (points[i + 1].y - points[i].y) / widths[i];
+  }
+  const tangents = [slopes[0]];
+  for (let i = 1; i < count - 1; i += 1) tangents[i] = slopes[i - 1] * slopes[i] <= 0 ? 0 : (slopes[i - 1] + slopes[i]) / 2;
+  tangents[count - 1] = slopes[count - 2];
+  for (let i = 0; i < count - 1; i += 1) {
+    if (slopes[i] === 0) {
+      tangents[i] = 0;
+      tangents[i + 1] = 0;
+      continue;
+    }
+    const a = tangents[i] / slopes[i];
+    const b = tangents[i + 1] / slopes[i];
+    const sum = a * a + b * b;
+    if (sum > 9) {
+      const scale = 3 / Math.sqrt(sum);
+      tangents[i] = scale * a * slopes[i];
+      tangents[i + 1] = scale * b * slopes[i];
+    }
+  }
+  for (let i = 0; i < count - 1; i += 1) {
+    const w = widths[i] / 3;
+    ctx.bezierCurveTo(points[i].x + w, points[i].y + tangents[i] * w, points[i + 1].x - w, points[i + 1].y - tangents[i + 1] * w, points[i + 1].x, points[i + 1].y);
+  }
+}
+
+// ---- Hover-/Fokus-Werte der Diagramme (Maus, Touch, Pfeiltasten) ----
+// Jedes Diagramm meldet seine Messpunkte als { ax, ay, test(x, y), text }; der Tooltip zeigt den Wert
+// des getroffenen Punkts. Die vollstaendige Wertliste steht zusaetzlich als aria-label am Canvas.
+const chartHitState = new WeakMap();
+let chartTooltipEl = null;
+
+function chartTooltipElement() {
+  if (!chartTooltipEl) {
+    chartTooltipEl = document.createElement("div");
+    chartTooltipEl.className = "chart-tooltip";
+    chartTooltipEl.setAttribute("aria-hidden", "true");
+    chartTooltipEl.hidden = true;
+    document.body.append(chartTooltipEl);
+  }
+  return chartTooltipEl;
+}
+
+function hideChartTooltip() {
+  if (chartTooltipEl) chartTooltipEl.hidden = true;
+}
+
+function showChartTooltip(canvas, hit) {
+  const tip = chartTooltipElement();
+  tip.textContent = hit.text;
+  tip.hidden = false;
+  const box = canvas.getBoundingClientRect();
+  const tipBox = tip.getBoundingClientRect();
+  const left = Math.min(Math.max(box.left + hit.ax - tipBox.width / 2, 8), window.innerWidth - tipBox.width - 8);
+  const above = box.top + hit.ay - tipBox.height - 12;
+  tip.style.left = `${Math.round(left)}px`;
+  tip.style.top = `${Math.round(above < 8 ? box.top + hit.ay + 16 : above)}px`;
+}
+
+function chartHitAt(canvas, event) {
+  const state = chartHitState.get(canvas);
+  if (!state?.hits.length) return -1;
+  const box = canvas.getBoundingClientRect();
+  const x = event.clientX - box.left;
+  const y = event.clientY - box.top;
+  let best = -1;
+  let bestDistance = Infinity;
+  state.hits.forEach((hit, index) => {
+    if (!hit.test(x, y)) return;
+    const distance = Math.hypot(hit.ax - x, hit.ay - y);
+    if (distance < bestDistance) {
+      best = index;
+      bestDistance = distance;
+    }
+  });
+  return best;
+}
+
+function bindChartHits(canvas) {
+  const showIndex = (index) => {
+    const state = chartHitState.get(canvas);
+    if (!state || index < 0 || index >= state.hits.length) {
+      hideChartTooltip();
+      return;
+    }
+    state.active = index;
+    showChartTooltip(canvas, state.hits[index]);
+  };
+  const onPointer = (event) => showIndex(chartHitAt(canvas, event));
+  canvas.addEventListener("pointermove", onPointer);
+  canvas.addEventListener("pointerdown", onPointer);
+  canvas.addEventListener("pointerleave", hideChartTooltip);
+  canvas.addEventListener("blur", hideChartTooltip);
+  canvas.addEventListener("focus", () => {
+    if (canvas.matches(":focus-visible")) showIndex(0);
+  });
+  canvas.addEventListener("keydown", (event) => {
+    const state = chartHitState.get(canvas);
+    if (!state?.hits.length) return;
+    const last = state.hits.length - 1;
+    const keys = { ArrowRight: Math.min(state.active + 1, last), ArrowDown: Math.min(state.active + 1, last), ArrowLeft: Math.max(state.active - 1, 0), ArrowUp: Math.max(state.active - 1, 0), Home: 0, End: last };
+    if (event.key === "Escape") {
+      hideChartTooltip();
+      return;
+    }
+    if (!(event.key in keys)) return;
+    event.preventDefault();
+    showIndex(keys[event.key]);
+  });
+  window.addEventListener("scroll", hideChartTooltip, { passive: true });
+}
+
+// Setzt Textalternative und Messpunkte eines Diagramms. Ohne Punkte (leeres Diagramm) ist es nicht fokussierbar.
+function describeChart(canvas, label, hits = []) {
+  canvas.setAttribute("role", "img");
+  canvas.setAttribute("aria-label", label);
+  const existing = chartHitState.get(canvas);
+  const state = existing || { hits: [], active: -1 };
+  state.hits = hits;
+  state.active = -1;
+  chartHitState.set(canvas, state);
+  if (!existing) bindChartHits(canvas);
+  if (hits.length) canvas.tabIndex = 0;
+  else canvas.removeAttribute("tabindex");
+  hideChartTooltip();
+}
+
+function chartSummary(title, items) {
+  const text = items.join(", ");
+  return `${title}: ${text.length > 700 ? `${text.slice(0, 700)} …` : text}`;
+}
+
+// Welche Rubrikenbeschriftungen (Datum) angezeigt werden: jede step-te plus immer die letzte,
+// ohne dass die vorletzte mit der letzten zusammenstoesst.
+function chartLabelIndices(count, step) {
+  const indices = [];
+  for (let i = 0; i < count; i += step) indices.push(i);
+  const last = count - 1;
+  while (indices.length && last - indices[indices.length - 1] < step && indices[indices.length - 1] !== last) indices.pop();
+  if (indices[indices.length - 1] !== last) indices.push(last);
+  return new Set(indices);
+}
+
 // Schreibt einen Hinweis mittig in die leere Zeichenflaeche und bricht ihn um.
 function drawChartPlaceholder(chart, text) {
   const { ctx, width, height, palette, compact } = chart;
@@ -376,12 +582,36 @@ function drawChartPlaceholder(chart, text) {
   ctx.textAlign = "left";
 }
 
-// Gemeinsamer Notenverlauf fuer Spieler- und Teamform (Schulnoten 1 bis 6).
-function drawGradeTrendChart(canvas, title, entries, emptyText) {
+// Kleine Legende: Marker + Text, bricht bei Platzmangel um. Gibt die naechste freie y-Position zurueck.
+function drawChartLegend(chart, items, x, y) {
+  const { ctx, width, palette, compact } = chart;
+  ctx.font = chartFonts(compact).legend;
+  let cursorX = x;
+  let cursorY = y;
+  items.forEach((item) => {
+    const labelWidth = ctx.measureText(item.label).width;
+    if (cursorX > x && cursorX + 22 + labelWidth > width - 12) {
+      cursorX = x;
+      cursorY += 18;
+    }
+    ctx.fillStyle = item.color;
+    chartMarker(ctx, item.shape || "circle", cursorX + 5, cursorY - 4, 4.5);
+    ctx.fill();
+    ctx.fillStyle = palette.ink;
+    ctx.fillText(item.label, cursorX + 15, cursorY);
+    cursorX += 15 + labelWidth + 18;
+  });
+  return cursorY;
+}
+
+// Gemeinsamer Notenverlauf fuer Spieler- und Teamform (Schulnoten 1 bis 6, 1 = oben = beste Note).
+// entries: { label, grade, color?, shape?, kind?, detail? }; options.legend: Marker-Legende.
+function drawGradeTrendChart(canvas, title, entries, emptyText, options = {}) {
   if (!canvas) return;
-  const chart = setupChartCanvas(canvas, (width) => (width < 520 ? Math.round(width * 0.78) : Math.round(width / 2.7)));
+  const chart = setupChartCanvas(canvas, (width) => (width < 520 ? Math.round(width * 0.8) : Math.round(width / 2.6)));
   const { ctx, width, height, palette, compact } = chart;
   const font = chartFonts(compact);
+  const lineColor = palette.series[0];
 
   ctx.fillStyle = palette.ink;
   ctx.font = font.title;
@@ -389,71 +619,118 @@ function drawGradeTrendChart(canvas, title, entries, emptyText) {
 
   if (!entries.length) {
     drawChartPlaceholder(chart, emptyText);
+    describeChart(canvas, `${title}: ${emptyText}`);
     return;
   }
 
-  const left = compact ? 22 : 34;
-  const right = width - (compact ? 10 : 20);
-  const top = compact ? 32 : 46;
-  const bottom = height - (compact ? 24 : 30);
-
+  let headBottom = compact ? 18 : 24;
+  if (options.legend?.length) headBottom = drawChartLegend(chart, options.legend, 12, headBottom + (compact ? 16 : 20));
+  ctx.fillStyle = palette.muted;
   ctx.font = font.label;
+  ctx.textAlign = "right";
+  ctx.fillText("1 = beste Note", width - 12, compact ? 18 : 24);
+  ctx.textAlign = "left";
+
+  const left = compact ? 24 : 36;
+  const right = width - (compact ? 14 : 24);
+  const top = headBottom + (compact ? 26 : 32);
+  const bottom = height - (compact ? 24 : 30);
+  const yFor = (grade) => top + ((Number(grade) - 1) * (bottom - top)) / 5;
+
+  // Heller Bereich fuer die Noten 1 bis 3 (gut), dezente gestrichelte Hilfslinien.
+  ctx.fillStyle = `${lineColor}14`;
+  chartRoundRect(ctx, left, yFor(1), right - left, yFor(3) - yFor(1), 6);
+  ctx.fill();
+  ctx.font = font.label;
+  ctx.setLineDash([2, 5]);
+  ctx.lineWidth = 1;
   for (let grade = 1; grade <= 6; grade += 1) {
-    const y = top + ((grade - 1) * (bottom - top)) / 5;
     ctx.strokeStyle = palette.line;
-    ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(left, y);
-    ctx.lineTo(right, y);
+    ctx.moveTo(left, yFor(grade));
+    ctx.lineTo(right, yFor(grade));
     ctx.stroke();
     ctx.fillStyle = palette.muted;
     ctx.textAlign = "right";
-    ctx.fillText(String(grade), left - 6, y + 3.5);
+    ctx.fillText(String(grade), left - 8, yFor(grade) + 3.5);
   }
+  ctx.setLineDash([]);
   ctx.textAlign = "left";
 
   const span = Math.max(entries.length - 1, 1);
   const points = entries.map((entry, index) => ({
     x: entries.length === 1 ? (left + right) / 2 : left + (index * (right - left)) / span,
-    y: top + ((Number(entry.grade) - 1) * (bottom - top)) / 5,
+    y: yFor(entry.grade),
     entry
   }));
 
-  ctx.strokeStyle = palette.red;
-  ctx.lineWidth = compact ? 2.5 : 4;
-  ctx.beginPath();
-  points.forEach((point, index) => (index ? ctx.lineTo(point.x, point.y) : ctx.moveTo(point.x, point.y)));
-  ctx.stroke();
-
-  // Nur so viele Datumsangaben zeigen, wie nebeneinander lesbar bleiben.
-  const labelStep = Math.max(1, Math.ceil(points.length / Math.max(1, Math.floor((right - left) / (compact ? 42 : 64)))));
-  points.forEach((point, index) => {
-    ctx.fillStyle = point.entry.color || palette.green;
+  if (points.length > 1) {
+    const fill = ctx.createLinearGradient(0, top, 0, bottom);
+    fill.addColorStop(0, `${lineColor}30`);
+    fill.addColorStop(1, `${lineColor}00`);
     ctx.beginPath();
-    ctx.arc(point.x, point.y, compact ? 4.5 : 7, 0, Math.PI * 2);
+    chartSmoothPath(ctx, points);
+    ctx.lineTo(points[points.length - 1].x, bottom);
+    ctx.lineTo(points[0].x, bottom);
+    ctx.closePath();
+    ctx.fillStyle = fill;
     ctx.fill();
-    if (index % labelStep && index !== points.length - 1) return;
+
+    ctx.strokeStyle = lineColor;
+    ctx.lineWidth = compact ? 2.5 : 3;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    chartSmoothPath(ctx, points);
+    ctx.stroke();
+  }
+
+  // Wertbeschriftung: bei wenigen Punkten alle, sonst nur den letzten und den besten.
+  const showAllValues = points.length <= (compact ? 5 : 9);
+  const bestIndex = points.reduce((best, point, index) => (point.entry.grade < points[best].entry.grade ? index : best), 0);
+  const labelStep = Math.max(1, Math.ceil(points.length / Math.max(1, Math.floor((right - left) / (compact ? 42 : 64)))));
+  const labelled = chartLabelIndices(points.length, labelStep);
+  const markerRadius = compact ? 4.5 : 6;
+  points.forEach((point, index) => {
+    const isLast = index === points.length - 1;
+    const color = point.entry.color || lineColor;
+    if (isLast) {
+      ctx.fillStyle = `${color}33`;
+      chartMarker(ctx, point.entry.shape, point.x, point.y, markerRadius + 5);
+      ctx.fill();
+    }
+    ctx.fillStyle = isLast ? color : palette.surface;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2.5;
+    chartMarker(ctx, point.entry.shape, point.x, point.y, markerRadius);
+    ctx.fill();
+    ctx.stroke();
+    if (showAllValues || isLast || index === bestIndex) {
+      ctx.fillStyle = palette.ink;
+      ctx.font = font.value;
+      ctx.textAlign = "center";
+      ctx.fillText(gradeLabel(Number(point.entry.grade)), Math.min(Math.max(point.x, left + 10), right - 10), point.y - markerRadius - 7);
+      ctx.textAlign = "left";
+    }
+    if (!labelled.has(index)) return;
     ctx.fillStyle = palette.muted;
     ctx.font = font.label;
     ctx.textAlign = "center";
     ctx.fillText(point.entry.label, Math.min(Math.max(point.x, left + 12), right - 12), bottom + (compact ? 15 : 19));
     ctx.textAlign = "left";
   });
-}
 
-function chartPalette() {
-  return {
-    surface: cssVar("--field") || "#fbfcfb",
-    panel: cssVar("--panel") || "#ffffff",
-    ink: cssVar("--ink") || "#241d1f",
-    muted: cssVar("--muted") || "#70686b",
-    line: cssVar("--line") || "#e4dcde",
-    red: cssVar("--red") || "#d8072e",
-    green: cssVar("--green") || "#08714f",
-    blue: cssVar("--blue") || "#1f4f72",
-    amber: cssVar("--amber") || "#c9862f",
-    soft: cssVar("--soft-panel") || "#f3e8eb"
-  };
+  const hitRadius = compact ? 18 : 22;
+  describeChart(
+    canvas,
+    chartSummary(`${title} (Schulnote, 1 ist die beste)`, entries.map((entry) => `${entry.label} ${entry.kind ? `${entry.kind} ` : ""}Note ${gradeLabel(Number(entry.grade))}`)),
+    points.map((point) => ({
+      ax: point.x,
+      ay: point.y,
+      test: (x, y) => Math.hypot(point.x - x, point.y - y) <= hitRadius || (Math.abs(point.x - x) <= (right - left) / span / 2 && y >= top - 8 && y <= bottom + 8),
+      text: `${point.entry.detail || point.entry.label}${point.entry.kind ? ` · ${point.entry.kind}` : ""}: Note ${gradeLabel(Number(point.entry.grade))}`
+    }))
+  );
 }
 
 // Rollen-Modus: Ohne Anmeldung darf weder der lokale Zwischenspeicher noch die
@@ -3928,50 +4205,51 @@ function renderMeasurementChart(player) {
   const entries = (player ? playerMeasurements(player.id) : [])
     .filter((item) => item.height && item.weight && new Date(`${item.date}T00:00:00`) >= oneYearAgo);
 
-  const chart = setupChartCanvas(canvas, (width) => (width < 520 ? Math.round(width * 0.82) : Math.round(width / 2.7)));
+  const chart = setupChartCanvas(canvas, (width) => (width < 520 ? Math.round(width * 0.86) : Math.round(width / 2.6)));
   const { ctx, width, height, palette, compact } = chart;
   const font = chartFonts(compact);
+  const title = player ? `${player.name} · Größe, Gewicht, BMI` : "Größe, Gewicht, BMI";
 
   ctx.fillStyle = palette.ink;
   ctx.font = font.title;
-  ctx.fillText(player ? `${player.name} · Größe, Gewicht, BMI` : "Größe, Gewicht, BMI", 12, compact ? 18 : 24);
+  ctx.fillText(title, 12, compact ? 18 : 24);
 
   if (entries.length < 2) {
-    drawChartPlaceholder(chart, "Noch nicht genug Messwerte der letzten 12 Monate für einen Verlauf (mindestens 2 nötig).");
+    const text = "Noch nicht genug Messwerte der letzten 12 Monate für einen Verlauf (mindestens 2 nötig).";
+    drawChartPlaceholder(chart, text);
+    describeChart(canvas, `${title}: ${text}`);
     return;
   }
 
   const last = entries[entries.length - 1];
   const lastBmi = calculateBmi(last.height, last.weight);
   const series = [
-    { label: `Größe ${last.height} cm`, color: palette.red, values: entries.map((item) => Number(item.height)) },
-    { label: `Gewicht ${last.weight} kg`, color: palette.blue, values: entries.map((item) => Number(item.weight)) },
-    { label: `BMI ${gradeLabel(lastBmi ? roundGrade(lastBmi) : null)}`, color: palette.green, values: entries.map((item) => calculateBmi(item.height, item.weight)) }
+    { label: `Größe ${last.height} cm`, short: "Größe", unit: "cm", color: palette.series[0], shape: "circle", values: entries.map((item) => Number(item.height)) },
+    { label: `Gewicht ${last.weight} kg`, short: "Gewicht", unit: "kg", color: palette.series[1], shape: "square", values: entries.map((item) => Number(item.weight)) },
+    { label: `BMI ${gradeLabel(lastBmi ? roundGrade(lastBmi) : null)}`, short: "BMI", unit: "", color: palette.series[2], shape: "diamond", values: entries.map((item) => calculateBmi(item.height, item.weight)) }
   ];
 
-  // Legende: schmal zweizeilig ueber dem Verlauf, breit einzeilig.
-  const legendRows = compact ? 2 : 1;
-  const legendTop = compact ? 34 : 44;
-  ctx.font = font.legend;
-  series.forEach((item, index) => {
-    const column = compact ? index % 2 : index;
-    const row = compact ? Math.floor(index / 2) : 0;
-    const x = 14 + column * ((width - 24) / (compact ? 2 : 3));
-    const y = legendTop + row * 17;
-    ctx.fillStyle = item.color;
-    ctx.beginPath();
-    ctx.arc(x + 4, y - 4, 4.5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = palette.ink;
-    ctx.fillText(item.label, x + 14, y, (width - 24) / (compact ? 2 : 3) - 20);
-  });
-
-  const left = 14;
-  const right = width - 14;
-  const top = legendTop + legendRows * 17 + 8;
-  const bottom = height - (compact ? 24 : 28);
+  const legendBaseline = drawChartLegend(chart, series, 12, compact ? 38 : 48);
+  const left = 18;
+  const right = width - 18;
+  const top = legendBaseline + 18;
+  const bottom = height - (compact ? 24 : 30);
   const span = Math.max(entries.length - 1, 1);
 
+  // Dezente Hilfslinien; jede Reihe nutzt ihre eigene Skala (Hoehe, Gewicht und BMI liegen weit auseinander).
+  ctx.strokeStyle = palette.line;
+  ctx.lineWidth = 1;
+  ctx.setLineDash([2, 5]);
+  for (let step = 0; step <= 3; step += 1) {
+    const y = top + (step * (bottom - top)) / 3;
+    ctx.beginPath();
+    ctx.moveTo(left, y);
+    ctx.lineTo(right, y);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  const hits = entries.map((entry, index) => ({ x: left + (index * (right - left)) / span, entry, index }));
   series.forEach((item) => {
     const min = Math.min(...item.values);
     const max = Math.max(...item.values);
@@ -3981,15 +4259,19 @@ function renderMeasurementChart(player) {
       y: bottom - ((item.values[index] - min) / range) * (bottom - top)
     }));
     ctx.strokeStyle = item.color;
-    ctx.lineWidth = compact ? 2 : 3;
+    ctx.lineWidth = compact ? 2.25 : 3;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
     ctx.beginPath();
-    points.forEach((point, index) => (index ? ctx.lineTo(point.x, point.y) : ctx.moveTo(point.x, point.y)));
+    chartSmoothPath(ctx, points);
     ctx.stroke();
     points.forEach((point) => {
-      ctx.fillStyle = item.color;
-      ctx.beginPath();
-      ctx.arc(point.x, point.y, compact ? 3.5 : 5, 0, Math.PI * 2);
+      ctx.fillStyle = palette.surface;
+      ctx.strokeStyle = item.color;
+      ctx.lineWidth = 2.25;
+      chartMarker(ctx, item.shape, point.x, point.y, compact ? 3.5 : 4.5);
       ctx.fill();
+      ctx.stroke();
     });
   });
 
@@ -3997,12 +4279,25 @@ function renderMeasurementChart(player) {
   ctx.font = font.label;
   ctx.fillStyle = palette.muted;
   ctx.textAlign = "center";
+  const labelled = chartLabelIndices(entries.length, labelStep);
   entries.forEach((entry, index) => {
-    if (index % labelStep && index !== entries.length - 1) return;
+    if (!labelled.has(index)) return;
     const x = left + (index * (right - left)) / span;
     ctx.fillText(entry.date.slice(0, 7), Math.min(Math.max(x, left + 16), right - 16), bottom + (compact ? 15 : 19));
   });
   ctx.textAlign = "left";
+
+  const describe = (index) => `${entries[index].date}: Größe ${entries[index].height} cm, Gewicht ${entries[index].weight} kg, BMI ${gradeLabel(series[2].values[index] ? roundGrade(series[2].values[index]) : null)}`;
+  describeChart(
+    canvas,
+    chartSummary(`${title} (letzte 12 Monate)`, entries.map((_, index) => describe(index))),
+    hits.map(({ x, index }) => ({
+      ax: x,
+      ay: top,
+      test: (px) => Math.abs(px - x) <= Math.max((right - left) / span / 2, 12),
+      text: describe(index)
+    }))
+  );
 }
 
 // Einwilligung (SCRUM-51): "widerrufen" warnt deutlich, blockiert aber nichts. "Noch offen" und
@@ -4065,7 +4360,7 @@ function renderProfileChart(player, ratings) {
   drawGradeTrendChart(
     $("#trendChart"),
     player ? `${player.name} · Notenentwicklung` : "Notenentwicklung",
-    ratings.map((item) => ({ label: item.event.date.slice(5), grade: Number(item.rating.grade) })),
+    ratings.map((item) => ({ label: item.event.date.slice(5), detail: `${item.event.title} (${item.event.date})`, grade: Number(item.rating.grade), kind: item.event.type })),
     "Noch keine benoteten Events vorhanden."
   );
 }
@@ -4346,26 +4641,36 @@ function renderTeamAnalysis() {
 
 function drawTeamTrendChart() {
   const palette = chartPalette();
+  const gameColor = palette.series[3];
+  const trainingColor = palette.series[1];
   const entries = [...state.events]
     .sort((a, b) => new Date(a.date) - new Date(b.date))
     .map((event) => ({ event, grade: teamAverageGradeForEvent(event) }))
     .filter((item) => item.grade)
     .map((item) => ({
       label: item.event.date.slice(5),
+      detail: `${item.event.title} (${item.event.date})`,
       grade: Number(item.grade),
-      color: item.event.type === "Spiel" ? palette.red : palette.green
+      kind: item.event.type === "Spiel" ? "Spiel" : "Training",
+      color: item.event.type === "Spiel" ? gameColor : trainingColor,
+      shape: item.event.type === "Spiel" ? "diamond" : "circle"
     }));
-  drawGradeTrendChart($("#teamTrendChart"), "Teamnoten nach Event", entries, "Noch keine Teamnoten vorhanden.");
+  drawGradeTrendChart($("#teamTrendChart"), "Teamnoten nach Event", entries, "Noch keine Teamnoten vorhanden.", {
+    legend: [
+      { label: "Spiel", color: gameColor, shape: "diamond" },
+      { label: "Training", color: trainingColor, shape: "circle" }
+    ]
+  });
 }
 
 function drawBirthQuarterChart() {
   const counts = birthQuarterCounts();
-  drawBarChart($("#birthQuarterChart"), Object.entries(counts).map(([label, value]) => ({ label, value })), "Geborene Spieler je Quartal", chartPalette().red);
+  drawBarChart($("#birthQuarterChart"), Object.entries(counts).map(([label, value]) => ({ label, value })), "Geborene Spieler je Quartal", chartPalette().series[0]);
 }
 
 function drawPositionCoverageChart() {
   const rows = positionCoverage().slice(0, 10).map(([label, value]) => ({ label, value }));
-  drawBarChart($("#positionCoverageChart"), rows, "Positionsabdeckung", chartPalette().green);
+  drawBarChart($("#positionCoverageChart"), rows, "Positionsabdeckung", chartPalette().series[1]);
 }
 
 function trainingFocusCounts() {
@@ -4394,7 +4699,8 @@ function drawPieChart(canvas, rows, title) {
     (width < 520 ? 56 + 2 * 82 + rows.length * 34 : 60 + 2 * 96 + 20));
   const { ctx, width, height, palette, compact } = chart;
   const font = chartFonts(compact);
-  const colors = [palette.red, palette.green, palette.amber];
+  const colors = palette.series;
+  const shapes = ["circle", "square", "diamond", "triangle"];
   const total = rows.reduce((sum, row) => sum + row.value, 0);
 
   ctx.fillStyle = palette.ink;
@@ -4403,25 +4709,41 @@ function drawPieChart(canvas, rows, title) {
 
   if (!total) {
     drawChartPlaceholder(chart, "Noch keine Trainings angelegt.");
+    describeChart(canvas, `${title}: Noch keine Trainings angelegt.`);
     return;
   }
 
-  // Schmal: Kreis oben, Legende darunter. Breit: Kreis links, Legende rechts.
+  // Schmal: Ring oben, Legende darunter. Breit: Ring links, Legende rechts.
   const radius = compact ? Math.min(width * 0.26, 82) : 96;
   const centerX = compact ? width / 2 : 20 + radius;
   const centerY = compact ? 40 + radius : height / 2 + 12;
+  const thickness = Math.round(radius * 0.38);
+  const slices = [];
 
+  const visible = rows.filter((row) => row.value > 0);
   let startAngle = -Math.PI / 2;
   rows.forEach((row, index) => {
+    if (!row.value) return;
     const slice = (row.value / total) * Math.PI * 2;
+    const gap = visible.length > 1 ? 0.035 : 0;
     ctx.beginPath();
-    ctx.moveTo(centerX, centerY);
-    ctx.arc(centerX, centerY, radius, startAngle, startAngle + slice);
-    ctx.closePath();
-    ctx.fillStyle = colors[index % colors.length];
-    ctx.fill();
+    ctx.arc(centerX, centerY, radius - thickness / 2, startAngle + gap, startAngle + slice - gap);
+    ctx.strokeStyle = colors[index % colors.length];
+    ctx.lineWidth = thickness;
+    ctx.lineCap = "butt";
+    ctx.stroke();
+    slices.push({ row, index, from: startAngle, to: startAngle + slice });
     startAngle += slice;
   });
+
+  ctx.fillStyle = palette.ink;
+  ctx.font = compact ? "700 22px system-ui" : "700 28px system-ui";
+  ctx.textAlign = "center";
+  ctx.fillText(String(total), centerX, centerY + (compact ? 4 : 5));
+  ctx.fillStyle = palette.muted;
+  ctx.font = font.label;
+  ctx.fillText("Trainings", centerX, centerY + (compact ? 18 : 22));
+  ctx.textAlign = "left";
 
   const legendX = compact ? 14 : centerX + radius + 28;
   const legendTop = compact ? centerY + radius + 26 : centerY - ((rows.length - 1) * 46) / 2;
@@ -4431,7 +4753,8 @@ function drawPieChart(canvas, rows, title) {
     const y = legendTop + index * legendStep;
     const percentage = Math.round((row.value / total) * 100);
     ctx.fillStyle = colors[index % colors.length];
-    ctx.fillRect(legendX, y - 12, 13, 13);
+    chartMarker(ctx, shapes[index % shapes.length], legendX + 6, y - 6, 5.5);
+    ctx.fill();
     ctx.fillStyle = palette.ink;
     ctx.font = font.value;
     ctx.fillText(row.label, legendX + 21, y, width - legendX - 30);
@@ -4439,14 +4762,34 @@ function drawPieChart(canvas, rows, title) {
     ctx.font = font.legend;
     ctx.fillText(`${row.value} Einheiten · ${percentage}%`, legendX + 21, y + 15, width - legendX - 30);
   });
+
+  describeChart(
+    canvas,
+    chartSummary(title, rows.map((row) => `${row.label} ${row.value} Einheiten (${Math.round((row.value / total) * 100)}%)`)),
+    slices.map(({ row, from, to }) => {
+      const middle = (from + to) / 2;
+      return {
+        ax: centerX + Math.cos(middle) * (radius - thickness / 2),
+        ay: centerY + Math.sin(middle) * (radius - thickness / 2),
+        test: (x, y) => {
+          const distance = Math.hypot(x - centerX, y - centerY);
+          if (distance < radius - thickness - 4 || distance > radius + 6) return false;
+          let angle = Math.atan2(y - centerY, x - centerX);
+          if (angle < -Math.PI / 2) angle += Math.PI * 2;
+          return angle >= from && angle <= to;
+        },
+        text: `${row.label}: ${row.value} Einheiten (${Math.round((row.value / total) * 100)}%)`
+      };
+    })
+  );
 }
 
 function drawBarChart(canvas, rows, title, color) {
   if (!canvas) return;
-  const barHeight = 22;
-  const barGap = 9;
-  const headHeight = 40;
-  const chart = setupChartCanvas(canvas, () => headHeight + Math.max(rows.length, 1) * (barHeight + barGap) + 10);
+  const barHeight = 20;
+  const barGap = 11;
+  const headHeight = 42;
+  const chart = setupChartCanvas(canvas, () => headHeight + Math.max(rows.length, 1) * (barHeight + barGap) + 8);
   const { ctx, width, palette, compact } = chart;
   const font = chartFonts(compact);
 
@@ -4456,19 +4799,21 @@ function drawBarChart(canvas, rows, title, color) {
 
   if (!rows.length) {
     drawChartPlaceholder(chart, "Noch keine Daten vorhanden.");
+    describeChart(canvas, `${title}: Noch keine Daten vorhanden.`);
     return;
   }
 
   // Beschriftungsspalte an den laengsten Eintrag anpassen, aber gedeckelt.
   ctx.font = font.label;
   const labelWidth = Math.min(
-    Math.max(...rows.map((row) => ctx.measureText(row.label).width)) + 10,
+    Math.max(...rows.map((row) => ctx.measureText(row.label).width)) + 12,
     Math.round(width * 0.34)
   );
-  const valueWidth = 34;
+  const valueWidth = 30;
   const trackLeft = 12 + labelWidth;
   const trackRight = width - 12 - valueWidth;
   const max = Math.max(...rows.map((row) => row.value), 1);
+  const hits = [];
 
   rows.forEach((row, index) => {
     const y = headHeight + index * (barHeight + barGap);
@@ -4478,16 +4823,28 @@ function drawBarChart(canvas, rows, title, color) {
     ctx.fillText(row.label, 12, y + barHeight / 2 + 3.5, labelWidth - 10);
 
     ctx.fillStyle = palette.soft;
-    ctx.fillRect(trackLeft, y, Math.max(trackRight - trackLeft, 1), barHeight);
-    ctx.fillStyle = color;
-    ctx.fillRect(trackLeft, y, Math.max((row.value / max) * (trackRight - trackLeft), row.value ? 3 : 0), barHeight);
+    chartRoundRect(ctx, trackLeft, y, Math.max(trackRight - trackLeft, 1), barHeight, barHeight / 2);
+    ctx.fill();
+    if (row.value) {
+      const barWidth = Math.max((row.value / max) * (trackRight - trackLeft), barHeight);
+      ctx.fillStyle = color;
+      chartRoundRect(ctx, trackLeft, y, barWidth, barHeight, barHeight / 2);
+      ctx.fill();
+    }
 
     ctx.fillStyle = palette.ink;
     ctx.font = font.value;
     ctx.textAlign = "right";
     ctx.fillText(String(row.value), width - 12, y + barHeight / 2 + 4);
+    hits.push({
+      ax: trackLeft + Math.max((row.value / max) * (trackRight - trackLeft), barHeight) / 2,
+      ay: y,
+      test: (px, py) => py >= y - barGap / 2 && py <= y + barHeight + barGap / 2,
+      text: `${row.label}: ${row.value}`
+    });
   });
   ctx.textAlign = "left";
+  describeChart(canvas, chartSummary(title, rows.map((row) => `${row.label} ${row.value}`)), hits);
 }
 
 function exportData() {

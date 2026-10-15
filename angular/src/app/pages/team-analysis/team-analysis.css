@@ -90,40 +90,6 @@ h2 {
   padding: var(--tk-space-4);
 }
 
-.chart {
-  width: 100%;
-  height: auto;
-}
-
-.chart .grid {
-  stroke: var(--tk-line);
-}
-
-.chart .axis {
-  fill: var(--tk-muted);
-  font-size: 12px;
-}
-
-.chart .axis.small {
-  font-size: 11px;
-}
-
-.chart .line {
-  fill: none;
-  stroke: var(--tk-muted);
-  stroke-width: 3;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.chart .dot {
-  fill: var(--tk-green);
-}
-
-.chart .dot.game {
-  fill: var(--tk-red);
-}
-
 .legend {
   display: flex;
   gap: var(--tk-space-3);
@@ -140,11 +106,13 @@ h2 {
 }
 
 .key.game {
-  background: var(--tk-red);
+  border-radius: 2px;
+  background: var(--tk-chart-4);
+  transform: rotate(45deg) scale(0.9);
 }
 
 .key.training {
-  background: var(--tk-green);
+  background: var(--tk-chart-1);
 }
 
 .insights {

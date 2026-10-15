@@ -26,6 +26,11 @@
   --soft-danger: #f9dddd;
   --soft-neutral: #e9e7ec;
   --focus-ring: 0 0 0 3px rgba(216, 7, 46, 0.18);
+  /* Diagrammfarben (SCRUM-94): ruhig, als 6-stelliges Hex, weil das Canvas-Zeichnen Transparenz anhaengt. */
+  --chart-1: #3f6c99;
+  --chart-2: #2c8579;
+  --chart-3: #b9812a;
+  --chart-4: #b5505f;
   --sidebar-bg: #171314;
   --topbar-bg: rgba(247, 247, 245, 0.72);
   --topbar-blur: blur(20px) saturate(180%);
@@ -60,6 +65,10 @@
   --soft-danger: #3a1b1d;
   --soft-neutral: #262931;
   --focus-ring: 0 0 0 3px rgba(240, 68, 98, 0.24);
+  --chart-1: #86b4dd;
+  --chart-2: #5cc2b1;
+  --chart-3: #e3b25c;
+  --chart-4: #ec8fa0;
   --topbar-bg: rgba(17, 22, 21, 0.66);
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 26px rgba(0, 0, 0, 0.34);
   --shadow-hero: 0 1px 2px rgba(0, 0, 0, 0.5), 0 26px 60px rgba(0, 0, 0, 0.5);
@@ -178,3 +187,27 @@ body.role-trainer-cloud #scoutManagerPanel {
 .auth-gate.is-loading hr,
 .auth-gate.is-failed .auth-gate-form,
 .auth-gate.is-failed hr { display: none; }
+
+/* Diagramme: Fokus per Tastatur und Wert-Tooltip (SCRUM-94) */
+canvas[role="img"]:focus-visible {
+  outline: 2px solid var(--chart-1);
+  outline-offset: 2px;
+}
+
+.chart-tooltip {
+  position: fixed;
+  z-index: 80;
+  max-width: min(280px, calc(100vw - 16px));
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: var(--shadow-card);
+  font: 600 0.8rem/1.3 system-ui, sans-serif;
+  pointer-events: none;
+}
+
+.chart-tooltip[hidden] {
+  display: none;
+}

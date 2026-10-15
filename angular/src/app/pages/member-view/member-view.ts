@@ -31,7 +31,7 @@ import { ProfileExtras } from '../profile/profile-extras';
   selector: 'app-member-view',
   imports: [RouterLink, Button, Card, Status, ProfileExtras],
   templateUrl: './member-view.html',
-  styleUrls: ['../profile/profile.css', './member-view.css'],
+  styleUrls: ['../profile/profile.css', './member-view.css', '../../ui/chart/chart.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MemberView implements OnInit {
