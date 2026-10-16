@@ -29,6 +29,7 @@ export const WIDTHS = [360, 390, 768, 1024, 1280, 1440, 1920];
 export const ROUTES = [
   '/start', '/kader', '/events', '/events/e1', '/events/e2', '/events/e3', '/profile', '/profile/p1', '/teamanalyse',
   '/gegneranalyse', '/aufstellung', '/suche', '/zugaenge', '/trainer-konto', '/medizin-zugang', '/export', '/einstellungen', '/styleguide',
+  '/anmelden?as=none', '/ansicht?as=player', '/ansicht?as=medical',
 ];
 
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json' };
@@ -50,13 +51,23 @@ function measure() {
   const problems = [];
   if (document.documentElement.scrollWidth > width) problems.push(`Seite scrollt seitlich (${document.documentElement.scrollWidth} > ${width})`);
   const describe = (el) => `${el.tagName.toLowerCase()}${el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).join('.') : ''}`;
+  // Zierde, die ein Elternelement innerhalb des Fensters abschneidet (z. B. Hintergrundgrafik), erzeugt kein Scrollen.
+  const clipped = (el) => {
+    for (let parent = el.parentElement; parent && parent !== document.body; parent = parent.parentElement) {
+      const overflow = getComputedStyle(parent).overflowX;
+      if (overflow === 'visible') continue;
+      const box = parent.getBoundingClientRect();
+      if (box.left >= -0.5 && box.right <= width + 0.5) return true;
+    }
+    return false;
+  };
   for (const el of document.querySelectorAll('body *')) {
     const style = getComputedStyle(el);
     if (style.display === 'none' || style.visibility === 'hidden' || style.position === 'fixed' && el.closest('[aria-hidden="true"], [inert]')) continue;
     const rect = el.getBoundingClientRect();
     if (rect.width === 0 && rect.height === 0) continue;
     if (el.closest('.tk-sr-only, [hidden]')) continue;
-    if (rect.right > width + 0.5 || rect.left < -0.5) problems.push(`${describe(el)} ragt über den Rand (${Math.round(rect.left)}–${Math.round(rect.right)} von ${width})`);
+    if ((rect.right > width + 0.5 || rect.left < -0.5) && !clipped(el)) problems.push(`${describe(el)} ragt über den Rand (${Math.round(rect.left)}–${Math.round(rect.right)} von ${width})`);
     if ((style.overflowX === 'auto' || style.overflowX === 'scroll') && el.scrollWidth > el.clientWidth + 1) problems.push(`${describe(el)} scrollt seitlich (${el.scrollWidth} > ${el.clientWidth})`);
   }
   return problems.slice(0, 8);
@@ -80,10 +91,10 @@ test('Keine Seite scrollt seitlich (alle Breiten, alle Seiten)', { skip: playwri
       const page = await context.newPage();
       for (const route of routes) {
         await page.goto(base + route);
-        await page.waitForSelector('main', { timeout: 15_000 });
+        await page.waitForSelector('main, form, h1', { timeout: 15_000 });
         await page.waitForTimeout(400);
         const problems = await page.evaluate(measure);
-        if (shots) await page.screenshot({ path: join(shots, `${route.replace(/\//g, '_')}-${width}.png`), fullPage: true });
+        if (shots) await page.screenshot({ path: join(shots, `${route.replace(/[/?=]/g, '_')}-${width}.png`), fullPage: true });
         if (problems.length) failures.push(`${width}px ${route}: ${problems.join('; ')}`);
       }
       await context.close();

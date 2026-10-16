@@ -17,6 +17,8 @@ const names = [
 function seed(): FakeFirebase {
   const fake = new FakeFirebase();
   fake.access.members.set('e2e-uid', { role: 'trainer', playerId: null });
+  fake.access.members.set('e2e-player', { role: 'player', playerId: 'p1' });
+  fake.access.members.set('e2e-medical', { role: 'medical', playerId: null });
   names.forEach((name, i) => {
     fake.players.players.set(`p${i + 1}`, {
       name, positions: [['TW', 'IV', 'ZM', 'ST', 'LA'][i % 5]], number: i + 1, birthdate: '2012-05-05',
@@ -52,7 +54,14 @@ bootstrapApplication(App, {
     // Meldet nach dem Start der Anmeldeprüfung einen angemeldeten Trainer.
     provideAppInitializer(() => {
       inject(AuthApi);
-      setTimeout(() => fake.auth.emit({ uid: 'e2e-uid', isAnonymous: false, email: 'trainer@example.org' }), 0);
+      // ?as=player | medical | none wählt eine andere Rolle bzw. „nicht angemeldet“ (Anmeldeseite).
+      const as = new URLSearchParams(location.search).get('as');
+      const user =
+        as === 'none' ? null
+        : as === 'player' ? { uid: 'e2e-player', isAnonymous: true, email: null }
+        : as === 'medical' ? { uid: 'e2e-medical', isAnonymous: false, email: 'scout@example.org' }
+        : { uid: 'e2e-uid', isAnonymous: false, email: 'trainer@example.org' };
+      setTimeout(() => fake.auth.emit(user), 0);
     }),
   ],
 }).catch((err) => console.error(err));
