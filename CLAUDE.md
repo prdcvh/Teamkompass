@@ -106,6 +106,11 @@ keeps the board current, reports at sprint end).
   token) may be blocked by the sandbox, then send the images in the chat
   (`SendUserFile`) and say so. Never put credentials into files, tickets or
   commits.
+- **Design changes: Figma prototype first (PO, 2026-10-16).** For a visible
+  design/layout change, Claude may — and for larger ones should — first build a
+  prototype in Figma (Figma connector) and send the PO a screenshot of it
+  (ticket comment and/or chat). It is for information and as a template; the
+  PO does not need to approve it before the build continues.
 - **Definition of Done:** acceptance criteria met; change applied to every
   app copy (see "Repo layout"); `npm run verify` green, with a test for the
   fix where the logic is testable; PR merged per the merge workflow below;
