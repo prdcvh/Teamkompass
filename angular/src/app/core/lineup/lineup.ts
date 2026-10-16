@@ -4,7 +4,7 @@
  * (wie outputs/team-manager/app.js: movePlayerToZone, swapPlayers). Noten sind Schulnoten: kleiner ist besser.
  */
 import { roundGrade } from '../ratings/rating';
-import { MAX_ON_PITCH, PITCH_BANDS, ZONES, type Zone } from './pitch';
+import { MAX_ON_PITCH, PITCH_BANDS, PITCH_ZONES, ZONES, type Zone } from './pitch';
 import type { Candidate } from './formation-assignment';
 import type { Player } from '../player/player';
 import type { TeamEvent } from '../events/event';
@@ -157,4 +157,34 @@ export function lineupSummary(assignments: Assignments, players: readonly Player
   const onPitch = onPitchIds(assignments);
   const bench = [...players].filter((player) => !onPitch.has(player.id)).sort((a, b) => a.number - b.number);
   return { name: formationName(assignments), rows, bench };
+}
+
+/** Ein Spieler als Punkt auf dem Mini-Spielfeld des Start-Dashboards (Prozent, Tor unten wie im Taktikboard). */
+export interface PitchMarker {
+  readonly id: string;
+  readonly name: string;
+  readonly number: number;
+  readonly zone: Zone;
+  readonly x: number;
+  readonly y: number;
+}
+
+/**
+ * Punkte der Startelf: Mehrere Spieler einer Zone werden gleichmäßig über deren Breite verteilt
+ * (z. B. zwei Innenverteidiger links und rechts der Mitte). Unbekannte Spieler fallen weg.
+ */
+export function pitchMarkers(assignments: Assignments, players: readonly Player[]): PitchMarker[] {
+  const byId = new Map(players.map((player) => [player.id, player]));
+  return ZONES.flatMap((zone) => {
+    const { x, y, width } = PITCH_ZONES[zone];
+    const placed = assignments[zone].flatMap((id) => byId.get(id) ?? []);
+    return placed.map((player, index) => ({
+      id: player.id,
+      name: player.name,
+      number: player.number,
+      zone,
+      x: Math.round((x - width / 2 + (width * (index + 0.5)) / placed.length) * 10) / 10,
+      y,
+    }));
+  });
 }

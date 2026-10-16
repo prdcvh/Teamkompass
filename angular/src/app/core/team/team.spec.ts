@@ -3,7 +3,7 @@ import type { Player } from '../player/player';
 import { type EventRating } from '../profile/profile';
 import { BLANK_RATING, type Rating } from '../ratings/rating';
 import type { Absence } from '../records/absence';
-import { type PlayerData, dashboardFigures, itemsFor, leaders, matchResult, nextUpcomingEvent, teamRecord } from './team';
+import { type PlayerData, countdownLabel, dashboardFigures, formTrend, itemsFor, leaders, matchResult, nextUpcomingEvent, teamRecord, upcomingEvents } from './team';
 
 describe('team (Dashboard-Auswertungen)', () => {
   const TODAY = '2026-10-10';
@@ -50,6 +50,36 @@ describe('team (Dashboard-Auswertungen)', () => {
     });
   });
 
+  describe('Nächste Events', () => {
+    it('liefert die nächsten Events ab heute in zeitlicher Reihenfolge, begrenzt', () => {
+      const events = [
+        event('a', '2026-10-09'),
+        event('b', '2026-10-20'),
+        event('c', TODAY, { startTime: '18:00' }),
+        event('d', TODAY, { startTime: '09:30' }),
+        event('e', '2026-10-15'),
+      ];
+      expect(upcomingEvents(events, TODAY, 3).map((e) => e.id)).toEqual(['d', 'c', 'e']);
+      expect(upcomingEvents([event('a', '2026-10-09'), event('x', '')], TODAY, 3)).toEqual([]);
+    });
+
+    it('beschriftet den Abstand in Tagen', () => {
+      expect(countdownLabel(TODAY, TODAY)).toBe('Heute');
+      expect(countdownLabel('2026-10-11', TODAY)).toBe('Morgen');
+      expect(countdownLabel('2026-11-01', TODAY)).toBe('in 22 Tagen');
+    });
+  });
+
+  describe('Formtrend', () => {
+    it('vergleicht die letzte Note mit dem Schnitt davor (kleiner ist besser)', () => {
+      expect(formTrend([])).toBeNull();
+      expect(formTrend([2])).toBeNull();
+      expect(formTrend([3, 3, 2])).toBe('besser');
+      expect(formTrend([2, 2, 3])).toBe('schlechter');
+      expect(formTrend([2, 2.4, 2.1])).toBe('gleich');
+    });
+  });
+
   describe('Bestenliste', () => {
     const e1 = event('e1', '2026-10-01');
     const e2 = event('e2', '2026-10-02');
@@ -63,6 +93,8 @@ describe('team (Dashboard-Auswertungen)', () => {
         data(player('d'), itemsOf([2, 2])),
       ], 2);
       expect(list.map((entry) => [entry.player.id, entry.grade, entry.events])).toEqual([['b', 1.5, 2], ['d', 2, 2]]);
+      expect(list[0].recent).toEqual([1, 2]);
+      expect(list[0].trend).toBe('schlechter');
     });
 
     it('zählt Events als Teilnahmen (Anwesend/Teilweise)', () => {
