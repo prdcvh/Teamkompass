@@ -115,7 +115,7 @@
             <tbody>
               @for (event of visible(); track event.id) {
                 <tr>
-                  <td>{{ formatDate(event.date) }}</td>
+                  <td class="date">{{ formatDate(event.date) }}</td>
                   <td><strong>{{ event.title }}</strong></td>
                   <td><span class="badge" [attr.data-type]="event.type">{{ event.type }}</span></td>
                   <td>{{ detail(event) || '–' }}<div class="weather"><tk-weather [event]="event" /></div></td>

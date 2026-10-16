@@ -70,6 +70,12 @@ function measure() {
     if ((rect.right > width + 0.5 || rect.left < -0.5) && !clipped(el)) problems.push(`${describe(el)} ragt über den Rand (${Math.round(rect.left)}–${Math.round(rect.right)} von ${width})`);
     if ((style.overflowX === 'auto' || style.overflowX === 'scroll') && el.scrollWidth > el.clientWidth + 1) problems.push(`${describe(el)} scrollt seitlich (${el.scrollWidth} > ${el.clientWidth})`);
   }
+  // Datum und Typ-Schild in Tabellen dürfen nicht umbrechen, sonst steht dort „18.10.202 / 6“ (SCRUM-152).
+  for (const cell of document.querySelectorAll('td.date, td .badge')) {
+    const range = document.createRange();
+    range.selectNodeContents(cell);
+    if (range.getClientRects().length > 1) problems.push(`„${cell.textContent.trim()}“ bricht um`);
+  }
   return problems.slice(0, 8);
 }
 
