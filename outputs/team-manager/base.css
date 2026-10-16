@@ -259,3 +259,8 @@ canvas[role="img"]:focus-visible {
 .chart-tooltip[hidden] {
   display: none;
 }
+
+/* SCRUM-131: Suche ohne Treffer blendet das Eventdetail aus; Hinweis fuer Details ausserhalb des Filters */
+#eventsView.events-filter-empty .event-editor { display: none; }
+.event-outside-note { margin: 0 0 8px; padding: 8px 12px; border-radius: 10px; background: rgba(216, 7, 46, 0.08); }
+.event-outside-note[hidden] { display: none; }

@@ -3667,7 +3667,13 @@ function renderEvents() {
   const upcoming = events.filter((event) => event.date >= today).sort((a, b) => new Date(a.date) - new Date(b.date));
   const past = events.filter((event) => event.date < today).sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  $("#eventList").innerHTML = eventCardsHtml(upcoming) || (events.length ? `<p class="muted">Keine anstehenden Events.</p>` : `<p class="muted">Noch keine Events angelegt.</p>`);
+  // SCRUM-131: leerer Datenbestand und Suche ohne Treffer sind zwei verschiedene Faelle.
+  const filterEmpty = state.events.length > 0 && !events.length;
+  $("#eventList").innerHTML = eventCardsHtml(upcoming) || (
+    !state.events.length ? `<p class="muted">Noch keine Events angelegt.</p>`
+      : filterEmpty ? `<p class="muted">Keine Events für diese Suche gefunden.</p><button class="ghost-button" type="button" data-reset-event-filter>Filter zurücksetzen</button>`
+      : `<p class="muted">Keine anstehenden Events.</p>`
+  );
 
   const pastToggle = $("#pastEventsToggle");
   if (past.length) {
@@ -3682,6 +3688,13 @@ function renderEvents() {
     pastToggle.open = false;
     $("#pastEventsList").innerHTML = "";
   }
+
+  // Details eines Events, das der Filter ausblendet, nicht still weiter zeigen.
+  const shown = selectedEvent();
+  const outsideFilter = Boolean(shown) && !filterEmpty && !events.some((item) => item.id === shown.id);
+  $("#eventsView")?.classList.toggle("events-filter-empty", filterEmpty);
+  const outsideNote = $("#eventOutsideFilterNote");
+  if (outsideNote) outsideNote.hidden = !outsideFilter;
 
   renderRatingTable();
 }
@@ -5678,7 +5691,15 @@ on("#playerTable", "click", handleSquadActionClick);
 on("#playerCardsMobile", "click", handleSquadActionClick);
 on("#addPlayerFabMobile", "click", () => openPlayerDialog());
 
+function resetEventFilter() {
+  eventFilter = { query: "", type: "all" };
+  if ($("#eventSearch")) $("#eventSearch").value = "";
+  if ($("#eventTypeFilter")) $("#eventTypeFilter").value = "all";
+  renderEvents();
+}
+
 function handleEventListClick(event) {
+  if (event.target.closest("[data-reset-event-filter]")) { resetEventFilter(); return; }
   const card = event.target.closest("[data-event-id]");
   if (!card) return;
   state.selectedEventId = card.dataset.eventId;
