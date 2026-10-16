@@ -7,6 +7,7 @@ import { OpponentsApi } from '../firebase/opponents.api';
 import { PlayerRecordsApi } from '../firebase/player-records.api';
 import { PlayersApi } from '../firebase/players.api';
 import { RatingsApi } from '../firebase/ratings.api';
+import { TeamSettingsApi } from '../firebase/team-settings.api';
 import { FakeAccessApi } from './fake-access.api';
 import { FakeAuthApi } from './fake-auth.api';
 import { FakeEventsApi } from './fake-events.api';
@@ -15,6 +16,7 @@ import { FakeOpponentsApi } from './fake-opponents.api';
 import { FakePlayerRecordsApi } from './fake-player-records.api';
 import { FakePlayersApi } from './fake-players.api';
 import { FakeRatingsApi } from './fake-ratings.api';
+import { FakeTeamSettingsApi } from './fake-team-settings.api';
 
 /**
  * Alle Firebase-Attrappen eines Tests an einer Stelle (je Zugriffsklasse unter `firebase/` eine).
@@ -30,6 +32,7 @@ export class FakeFirebase {
   readonly opponents = new FakeOpponentsApi(this.calls);
   readonly ratings = new FakeRatingsApi(this.calls);
   readonly records = new FakePlayerRecordsApi(this.calls);
+  readonly settings = new FakeTeamSettingsApi(this.calls);
 }
 
 /** Stellt die Attrappe für alle Firebase-Zugriffsklassen bereit. */
@@ -43,5 +46,6 @@ export function provideFakeFirebase(fake: FakeFirebase): Provider[] {
     { provide: OpponentsApi, useValue: fake.opponents },
     { provide: RatingsApi, useValue: fake.ratings },
     { provide: PlayerRecordsApi, useValue: fake.records },
+    { provide: TeamSettingsApi, useValue: fake.settings },
   ];
 }

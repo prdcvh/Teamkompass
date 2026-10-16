@@ -75,6 +75,50 @@
       </div>
     </div>
 
+    <div class="place" aria-live="polite">
+      @if (draft().locationCoords; as coords) {
+        <p class="place-chosen">Ort gewählt: <strong>{{ coords.name }}</strong> – Koordinaten gespeichert, das Wetter kann angezeigt werden.</p>
+      } @else {
+        <p class="hint">Ohne Auswahl bleibt der Ort nur ein Text (kein Wetter).</p>
+      }
+      <div class="place-actions">
+        <button tkButton type="button" variant="neutral" class="search-place" [disabled]="!canSearch()" (click)="searchPlaces()">
+          {{ searchState() === 'searching' ? 'Suche läuft …' : 'Ort suchen' }}
+        </button>
+        @if (draft().locationCoords) {
+          <button tkButton type="button" variant="neutral" class="remove-coords" (click)="removeCoords()">Auswahl entfernen</button>
+        }
+        @if (canSaveDefault()) {
+          <button tkButton type="button" variant="neutral" class="save-default" (click)="saveAsDefault()">Als Standardort des Teams merken</button>
+        }
+        @if (defaultLocation()) {
+          <button tkButton type="button" variant="neutral" class="clear-default" (click)="clearDefault()">Standardort löschen</button>
+        }
+      </div>
+      @if (defaultLocation(); as fallback) {
+        <p class="hint">Standardort des Teams: {{ fallback.coords ? fallback.coords.name : fallback.text }}</p>
+      }
+      @if (searchError()) {
+        <p class="error search-error" role="alert">{{ searchError() }}</p>
+      }
+      @if (searchState() === 'done' && !searchError()) {
+        @if (places().length === 0) {
+          <p class="hint no-places">Kein Treffer. Der Ort bleibt als Text gespeichert; versuche es mit einem anderen Suchbegriff (z. B. dem Ortsnamen).</p>
+        } @else {
+          <ul class="places" aria-label="Treffer der Ortssuche">
+            @for (place of places(); track $index) {
+              <li>
+                <button type="button" class="place-option" (click)="choosePlace(place)">
+                  <span>{{ place.name }}</span>
+                  <span class="muted">{{ [place.region, place.country].filter(part => part !== '').join(', ') }} · {{ place.lat.toFixed(3) }}, {{ place.lon.toFixed(3) }}</span>
+                </button>
+              </li>
+            }
+          </ul>
+        }
+      }
+    </div>
+
     <div class="grid">
       <div class="field">
         <label class="tk-label">
