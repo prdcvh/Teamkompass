@@ -1,5 +1,18 @@
 import { type LocationCoords, MAX_TEXT_LENGTH, isLocationCoords } from '../events/event';
 
+/**
+ * Standardort des Teams für das Wetter (SCRUM-153): gilt für jedes Event ohne über „Ort suchen“ gewählten Ort,
+ * z. B. Trainings mit „Kunstrasen - heim“. Laut PO immer Königstein im Taunus.
+ */
+export const TEAM_HOME_LOCATION: LocationCoords = { lat: 50.17943, lon: 8.47132, name: 'Königstein im Taunus, Hessen' };
+/** Kurzname für die Anzeige am Wetter. */
+export const TEAM_HOME_SHORT_NAME = 'Königstein';
+
+/** Ort fürs Wetter: der gewählte Ort des Events, sonst der Standardort des Teams. */
+export function weatherLocation(coords: LocationCoords | null): LocationCoords {
+  return coords ?? TEAM_HOME_LOCATION;
+}
+
 /** Standardort (Heimplatz) des Teams: Ortstext wie im Event und – falls gewählt – Koordinaten. */
 export interface DefaultLocation {
   readonly text: string;

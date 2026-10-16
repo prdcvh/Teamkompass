@@ -17,7 +17,7 @@ import {
 } from '../../core/events/event';
 import { EventsService } from '../../core/events/events.service';
 import { type GeocodedPlace, GeocodingService, GEOCODING_MIN_QUERY, coordsFromPlace, geocodingMessage, placeLabel } from '../../core/geocoding/geocoding.service';
-import { TeamSettingsService } from '../../core/team-settings/team-settings.service';
+import { TEAM_HOME_LOCATION } from '../../core/team-settings/team-settings';
 import { todayIso } from '../../core/shared/dates';
 import { Button } from '../../ui/button/button';
 import { Dialog } from '../../ui/dialog/dialog';
@@ -33,7 +33,6 @@ import { Dialog } from '../../ui/dialog/dialog';
 export class EventDialog {
   private readonly events = inject(EventsService);
   private readonly geocoding = inject(GeocodingService);
-  private readonly settings = inject(TeamSettingsService);
 
   readonly open = input(false);
   /** Zu bearbeitendes Event; leer = neues Event anlegen. */
@@ -55,39 +54,23 @@ export class EventDialog {
   protected readonly places = signal<readonly GeocodedPlace[]>([]);
   protected readonly searchState = signal<'idle' | 'searching' | 'done'>('idle');
   protected readonly searchError = signal('');
-  protected readonly defaultLocation = this.settings.defaultLocation;
+  /** Ohne gewählten Ort zeigt das Wetter den Standardort des Teams (SCRUM-153). */
+  protected readonly homeName = TEAM_HOME_LOCATION.name;
   protected readonly canSearch = computed(() => this.draft().location.trim().length >= GEOCODING_MIN_QUERY && this.searchState() !== 'searching');
-  protected readonly canSaveDefault = computed(() => this.draft().location.trim() !== '' || this.draft().locationCoords !== null);
   protected readonly label = placeLabel;
   private searchRun = 0;
 
   constructor() {
-    // Beim Öffnen frisch befüllen: bearbeiten = Werte des Events, anlegen = Standardwerte mit heutigem Datum
-    // und – falls festgelegt – dem Standardort des Teams.
+    // Beim Öffnen frisch befüllen: bearbeiten = Werte des Events, anlegen = Standardwerte mit heutigem Datum.
     effect(() => {
       if (!this.open()) return;
       const event = this.event();
       untracked(() => {
-        this.settings.start();
-        this.draft.set(event ? draftFromEvent(event) : this.withDefaultLocation(emptyDraft(todayIso())));
+        this.draft.set(event ? draftFromEvent(event) : emptyDraft(todayIso()));
         this.errors.set({});
         this.resetSearch();
       });
     });
-    // Der Standardort kann erst nach dem Öffnen eintreffen: nur einsetzen, solange noch kein Ort eingegeben wurde.
-    effect(() => {
-      const fallback = this.defaultLocation();
-      if (!this.open() || this.event() !== null || fallback === null) return;
-      untracked(() => {
-        const draft = this.draft();
-        if (draft.location === '' && draft.locationCoords === null) this.draft.set(this.withDefaultLocation(draft));
-      });
-    });
-  }
-
-  private withDefaultLocation(draft: EventDraft): EventDraft {
-    const fallback = this.defaultLocation();
-    return fallback ? { ...draft, location: fallback.text, locationCoords: fallback.coords } : draft;
   }
 
   private resetSearch(): void {
@@ -120,15 +103,6 @@ export class EventDialog {
 
   protected removeCoords(): void {
     this.patch({ locationCoords: null });
-  }
-
-  protected saveAsDefault(): void {
-    const draft = this.draft();
-    this.settings.saveDefaultLocation({ text: draft.location.trim().slice(0, MAX_TEXT_LENGTH), coords: draft.locationCoords });
-  }
-
-  protected clearDefault(): void {
-    this.settings.saveDefaultLocation(null);
   }
 
   protected patch(change: Partial<EventDraft>): void {
