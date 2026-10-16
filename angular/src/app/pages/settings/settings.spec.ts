@@ -21,11 +21,22 @@ describe('Settings (Einstellungen & Datenschutz)', () => {
   }
   const root = (fixture: { nativeElement: unknown }) => fixture.nativeElement as HTMLElement;
 
-  it('rendert die Bereiche Darstellung, Lokale Daten und Aktivitätsverlauf', async () => {
+  it('rendert die Bereiche Darstellung, Lokale Daten, Aktivitätsverlauf und Wettervorhersage', async () => {
     const fixture = await render();
     const headings = [...root(fixture).querySelectorAll('.page > tk-card h2')].map((h) => h.textContent);
-    expect(headings).toEqual(['Darstellung', 'Lokale Daten', 'Aktivitätsverlauf']);
+    expect(headings).toEqual(['Darstellung', 'Lokale Daten', 'Aktivitätsverlauf', 'Wettervorhersage']);
     expect(root(fixture).textContent).toContain('Noch keine lokalen Aktivitäten protokolliert.');
+  });
+
+  it('erklärt den Datenschutz der Wettervorhersage (Open-Meteo)', async () => {
+    const text = root(await render()).textContent ?? '';
+    expect(text).toContain('Wettervorhersage');
+    expect(text).toContain('open-meteo.com');
+    expect(text).toContain('IP-Adresse');
+    expect(text).toContain('Koordinaten');
+    expect(text).toContain('90 Tage');
+    expect(text).toContain('keine Spieler- oder Teamdaten');
+    expect(text).toContain('CC BY 4.0');
   });
 
   it('schaltet den Darkmode um', async () => {
