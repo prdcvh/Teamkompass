@@ -81,7 +81,6 @@
                   <span class="what">
                     <strong>{{ event.title }}</strong>
                     <small>{{ formatDate(event.date) }}@if (detail(event); as info) { · {{ info }}}</small>
-                    <tk-weather [event]="event" />
                   </span>
                   @if (resultText(event); as result) {
                     <span class="result">{{ result }}</span>
@@ -90,6 +89,8 @@
                 @if (events.canWrite()) {
                   <button tkButton size="sm" type="button" (click)="openEdit(event)" [attr.aria-label]="'Event bearbeiten: ' + event.title">Bearbeiten</button>
                 }
+                <!-- Eigene Zeile über die volle Kartenbreite, nicht gequetscht neben „Bearbeiten“ (SCRUM-155). -->
+                <tk-weather class="card-weather" [event]="event" />
               </li>
             }
           </ul>

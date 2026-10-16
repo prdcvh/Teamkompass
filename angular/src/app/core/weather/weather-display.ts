@@ -29,9 +29,14 @@ export function weatherDescription(code: number | null): string {
 }
 
 /** Sichtbarer Kurztext, z. B. „14 °C · 60 % Regen“. */
-export function weatherSummary(s: WeatherSnapshot): string {
+/** Teile der Kurzanzeige, z. B. [„14 °C“, „60 % Regen“]; jeder Teil bleibt beim Umbruch zusammen (SCRUM-155). */
+export function weatherParts(s: WeatherSnapshot): string[] {
   const temp = `${Math.round(s.temperature)} °C`;
-  return s.precipitationProbability === null ? temp : `${temp} · ${Math.round(s.precipitationProbability)} % Regen`;
+  return s.precipitationProbability === null ? [temp] : [temp, `${Math.round(s.precipitationProbability)} % Regen`];
+}
+
+export function weatherSummary(s: WeatherSnapshot): string {
+  return weatherParts(s).join(' · ');
 }
 
 /** Ausführlicher Text für Screenreader. */

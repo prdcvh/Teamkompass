@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { Component } from '@angular/core';
 import { type TeamEvent } from '../../core/events/event';
-import { weatherDescription, weatherKind, weatherSpokenText, weatherSummary } from '../../core/weather/weather-display';
+import { weatherDescription, weatherKind, weatherParts, weatherSpokenText, weatherSummary } from '../../core/weather/weather-display';
 import { WeatherProvider } from '../../core/weather/weather-provider';
 import { WeatherService } from '../../core/weather/weather.service';
 import { Weather } from './weather';
@@ -178,5 +178,10 @@ describe('Wetteranzeige-Texte', () => {
   it('lässt fehlende Regenwahrscheinlichkeit weg', () => {
     expect(weatherSummary(snap)).toBe('14 °C');
     expect(weatherSpokenText(snap)).toBe('Wetter: Klar, 14 Grad Celsius');
+  });
+
+  it('teilt die Anzeige in Teile, die beim Umbruch zusammenbleiben (SCRUM-155)', () => {
+    expect(weatherParts({ ...snap, precipitationProbability: 79.6 })).toEqual(['14 °C', '80 % Regen']);
+    expect(weatherSummary({ ...snap, precipitationProbability: 79.6 })).toBe('14 °C · 80 % Regen');
   });
 });

@@ -146,14 +146,16 @@ td.date {
 
 .row {
   display: grid;
-  grid-template-columns: 1fr auto;
+  /* minmax(0, …): die Karte darf schmaler als ihr längstes Wort werden, statt unter „Bearbeiten“ zu laufen (SCRUM-155). */
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--tk-space-2);
   align-items: center;
 }
 
 .event-card {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-width: 0;
   gap: var(--tk-space-3);
   align-items: center;
   width: 100%;
@@ -167,14 +169,48 @@ td.date {
   cursor: pointer;
 }
 
+.card-weather {
+  grid-column: 1 / -1;
+  padding: 0 var(--tk-space-1) var(--tk-space-3);
+  margin-top: calc(-1 * var(--tk-space-2));
+}
+
 .what {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 2px;
   min-width: 0;
 }
 
+/* Schmale Handys: Typ-Schild über den Titel, damit der Titel die Breite neben „Bearbeiten“ bekommt (SCRUM-155). */
+@media (max-width: 479px) {
+  .event-card {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: var(--tk-space-1);
+  }
+
+  .event-card .badge {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: start;
+  }
+
+  .event-card .what {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .event-card .result {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+}
+
 .what strong {
   font-size: var(--tk-text-lg);
+  /* Lange Titel („Abschlusstraining …“) trennen statt unter den Knopf zu laufen (SCRUM-155). */
+  overflow-wrap: break-word;
+  hyphens: auto;
 }
 
 .what small {
