@@ -5,7 +5,7 @@
  * Pausen sind erlaubt; ein Tag zählt als Pause, sobald ihn irgendeine Pause enthält.
  */
 import { MAX_TITLE_LENGTH } from '../events/event';
-import { formatDate, isIsoDate } from '../shared/dates';
+import { addDays, formatDate, isIsoDate } from '../shared/dates';
 
 export interface PlanningBreak {
   readonly id: string;
@@ -90,8 +90,8 @@ export function breakFromDoc(id: string, data: unknown): PlanningBreak | null {
   return { id, name: label === '' ? 'Pause' : label, startDate, endDate };
 }
 
-/** Alle brauchbaren Pausen aus dem Dokument, sortiert nach Beginn. */
-export function breaksFromPlanningDoc(doc: Readonly<Record<string, unknown>> | null): PlanningBreak[] {
+/** Alle brauchbaren Pausen aus dem Dokument `meta/breaks`, sortiert nach Beginn. */
+export function breaksFromDoc(doc: Readonly<Record<string, unknown>> | null): PlanningBreak[] {
   const map = doc?.['breaks'];
   if (typeof map !== 'object' || map === null || Array.isArray(map)) return [];
   return Object.entries(map)
@@ -103,4 +103,25 @@ export function breaksFromPlanningDoc(doc: Readonly<Record<string, unknown>> | n
 /** Zeitraum als Text, z. B. „12.10.2026 bis 25.10.2026“. */
 export function breakPeriodText(entry: Pick<PlanningBreak, 'startDate' | 'endDate'>): string {
   return `${formatDate(entry.startDate)} bis ${formatDate(entry.endDate)}`;
+}
+
+/** So viele Tage vor Beginn einer Pause wird schon auf sie hingewiesen. */
+export const BREAK_NOTICE_DAYS = 14;
+
+const dayMonth = (iso: string) => formatDate(iso).slice(0, 6);
+
+/**
+ * Einzeiliger Hinweis auf die laufende oder die nächste Pause (SCRUM-150), sonst null.
+ * - Läuft eine Pause (Von bis Bis, beide Tage eingeschlossen): „Winterpause bis 10.01.“ Laufen mehrere, gilt die mit dem
+ *   spätesten Ende.
+ * - Beginnt eine Pause in höchstens {@link BREAK_NOTICE_DAYS} Tagen: „Ab 27.10. Herbstferien (bis 07.11.)“. Es zählt die
+ *   früheste.
+ * Es kommt nur Name und Zeitraum vor.
+ */
+export function breakNotice(breaks: readonly Pick<PlanningBreak, 'name' | 'startDate' | 'endDate'>[], today: string): string | null {
+  const running = breaks.filter((entry) => inRange(today, breakRange(entry))).sort((a, b) => b.endDate.localeCompare(a.endDate) || a.name.localeCompare(b.name))[0];
+  if (running) return `${running.name} bis ${dayMonth(running.endDate)}`;
+  const limit = addDays(today, BREAK_NOTICE_DAYS);
+  const next = breaks.filter((entry) => entry.startDate > today && entry.startDate <= limit).sort((a, b) => a.startDate.localeCompare(b.startDate) || a.name.localeCompare(b.name))[0];
+  return next ? `Ab ${dayMonth(next.startDate)} ${next.name} (bis ${dayMonth(next.endDate)})` : null;
 }

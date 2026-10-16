@@ -3,7 +3,11 @@ import { environment } from '../../../environments/environment';
 import { FirebaseConnection } from './firebase-connection';
 import type { SnapshotMeta } from './types';
 
-/** Planung (`meta/planning`, ein einzelnes Dokument, nur Trainer). Serien liegen als Map unter `series.{id}`, Pausen unter `breaks.{id}`. */
+/**
+ * Planung: Serien liegen als Map unter `series.{id}` im Dokument `meta/planning` (nur Trainer). Pausen (SCRUM-148/150) liegen
+ * bewusst getrennt als Map unter `breaks.{id}` im Dokument `meta/breaks`: dieses darf jedes Teammitglied lesen (für den
+ * Pausen-Hinweis), die Serien in `meta/planning` bleiben Trainern vorbehalten. Schreiben darf nur der Trainer.
+ */
 @Injectable({ providedIn: 'root' })
 export class PlanningApi {
   private readonly connection = inject(FirebaseConnection);
@@ -44,16 +48,32 @@ export class PlanningApi {
     await setDoc(doc(db, 'teams', environment.teamId, 'meta', 'planning'), { skipped: { [seriesId]: { [date]: true } } }, { merge: true });
   }
 
-  /** Legt die Pause an oder ersetzt sie (SCRUM-148); Serien und andere Pausen bleiben unberührt. */
+  /** Beobachtet das Pausen-Dokument `meta/breaks` (lesbar für alle Teammitglieder). */
+  async watchBreaks(
+    onData: (data: Readonly<Record<string, unknown>> | null, meta: SnapshotMeta) => void,
+    onError: (error: unknown) => void,
+  ): Promise<() => void> {
+    const { db } = await this.connection.get();
+    const { doc, onSnapshot } = await import('firebase/firestore');
+    return onSnapshot(
+      doc(db, 'teams', environment.teamId, 'meta', 'breaks'),
+      { includeMetadataChanges: true },
+      (snapshot) =>
+        onData(snapshot.exists() ? snapshot.data() : null, { fromCache: snapshot.metadata.fromCache, hasPendingWrites: snapshot.metadata.hasPendingWrites }),
+      onError,
+    );
+  }
+
+  /** Legt die Pause an oder ersetzt sie (SCRUM-148); andere Pausen bleiben unberührt. */
   async saveBreak(id: string, data: Readonly<Record<string, unknown>>): Promise<void> {
     const { db } = await this.connection.get();
     const { doc, setDoc } = await import('firebase/firestore');
-    await setDoc(doc(db, 'teams', environment.teamId, 'meta', 'planning'), { breaks: { [id]: data } }, { merge: true });
+    await setDoc(doc(db, 'teams', environment.teamId, 'meta', 'breaks'), { breaks: { [id]: data } }, { merge: true });
   }
 
   async deleteBreak(id: string): Promise<void> {
     const { db } = await this.connection.get();
     const { doc, setDoc, deleteField } = await import('firebase/firestore');
-    await setDoc(doc(db, 'teams', environment.teamId, 'meta', 'planning'), { breaks: { [id]: deleteField() } }, { merge: true });
+    await setDoc(doc(db, 'teams', environment.teamId, 'meta', 'breaks'), { breaks: { [id]: deleteField() } }, { merge: true });
   }
 }

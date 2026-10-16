@@ -18,6 +18,8 @@
     }
   </header>
 
+  <tk-break-notice />
+
   <p class="sync" role="status" [attr.data-state]="sync.state()">
     {{ sync.label() }}
     @if (sync.detail()) {

@@ -5,7 +5,7 @@ import {
   type PlanningBreak,
   breakFromDoc,
   breakFromDraft,
-  breaksFromPlanningDoc,
+  breaksFromDoc,
   docFromBreak,
   draftFromBreak,
   emptyBreakDraft,
@@ -64,10 +64,10 @@ describe('Pausen: Prüfungen', () => {
         b3: { startDate: '2026-12-01', endDate: '2026-12-02' },
       },
     };
-    expect(breaksFromPlanningDoc(doc).map((item) => item.id)).toEqual(['b1', 'b3', 'b2']);
-    expect(breaksFromPlanningDoc(doc)[1].name).toBe('Pause');
-    expect(breaksFromPlanningDoc(null)).toEqual([]);
-    expect(breaksFromPlanningDoc({ breaks: [1] })).toEqual([]);
+    expect(breaksFromDoc(doc).map((item) => item.id)).toEqual(['b1', 'b3', 'b2']);
+    expect(breaksFromDoc(doc)[1].name).toBe('Pause');
+    expect(breaksFromDoc(null)).toEqual([]);
+    expect(breaksFromDoc({ breaks: [1] })).toEqual([]);
   });
 
   it('erkennt Tage in einer Pause (beide Grenzen gehören dazu, Überlappung erlaubt)', () => {

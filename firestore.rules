@@ -209,6 +209,14 @@ service cloud.firestore {
         allow read, write: if isTrainer();
       }
 
+      // Pausen (Ferien, Winterpause; SCRUM-148/150) - bewusst ein eigenes Dokument neben meta/planning: jedes
+      // Teammitglied darf es lesen (Hinweis "Winterpause bis 10.01." fuer Spieler), enthaelt aber nur Name und
+      // Zeitraum. Die Serien in meta/planning bleiben Trainern vorbehalten. Schreiben darf nur der Trainer.
+      match /meta/breaks {
+        allow read: if isTeamMember();
+        allow write: if isTrainer();
+      }
+
       match /meta/operations {
         allow read, write: if isTrainer();
       }

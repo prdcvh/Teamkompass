@@ -257,4 +257,19 @@ describe('Events (Events-Seite)', () => {
       expect(qa(fixture, '.row button')).toHaveLength(0);
     });
   });
+
+  it('zeigt über der Liste einen Hinweis auf die laufende Pause (SCRUM-150)', async () => {
+    const fixture = await render();
+    expect(q(fixture, '[data-testid="break-notice"]')).toBeNull();
+    const now = new Date();
+    const iso = (offset: number) => {
+      const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    };
+    firebase.planning.breaksDoc = { breaks: { b1: { name: 'Winterpause', startDate: iso(-1), endDate: iso(3) } } };
+    firebase.planning.emitBreaks();
+    await flush(fixture);
+    const end = iso(3);
+    expect(text(q(fixture, '[data-testid="break-notice"]'))).toBe(`Winterpause bis ${end.slice(8, 10)}.${end.slice(5, 7)}.`);
+  });
 });
