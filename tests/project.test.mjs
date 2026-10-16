@@ -1075,3 +1075,15 @@ test("Diagramm-Beschriftungen: letzte Beschriftung bleibt, ohne mit der vorletzt
   assert.deepEqual([...chartLabelIndices(3, 1)], [0, 1, 2]);
   assert.deepEqual([...chartLabelIndices(1, 1)], [0]);
 });
+
+test("Belastungsanzeige im Profil trennt 7-Tage-Wert und Wochenschnitt (SCRUM-135)", async () => {
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    assert.match(app, /avgLoad: roundGrade\(chronicWeeklyAvg\)/, `${team}: Wochenschnitt fehlt im Risiko-Ergebnis`);
+    assert.match(app, /Belastung letzte 7 Tage \$\{risk\.load\} · Ø \$\{risk\.avgLoad\}\/Woche über 4 Wochen/, `${team}: Beschriftung passt nicht`);
+    assert.equal(app.includes("Ø Belastung ${risk.load}/Woche"), false, `${team}: irreführende Beschriftung noch vorhanden`);
+  }
+  const html = await read("angular/src/app/pages/profile/profile.html");
+  assert.match(html, /Belastung letzte 7 Tage \{\{ numberLabel\(r\.load\) \}\} · Ø \{\{ numberLabel\(r\.avgLoad\) \}\}\/Woche über 4 Wochen/);
+  assert.equal(html.includes("Ø Belastung {{ numberLabel(r.load) }}"), false);
+});

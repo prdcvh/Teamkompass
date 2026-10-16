@@ -2709,6 +2709,7 @@ function computePlayerInjuryRisk(playerId) {
     tier: riskTier.tier,
     action: riskTier.action,
     load: roundGrade(acuteLoad),
+    avgLoad: roundGrade(chronicWeeklyAvg),
     recentEvents: attended.filter((item) => daysBetween(item.date, today) <= 28).length,
     reason: topFactors.join(" · ") || "Keine auffälligen Belastungsfaktoren"
   };
@@ -4576,7 +4577,7 @@ function renderProfileHeader(player, ratings) {
           <strong>${risk.level} · ${risk.percentage}%</strong>
         </div>
         <div class="risk-meter"><span class="${risk.tier}" style="width:${risk.percentage}%"></span></div>
-        <small>${escapeHtml(risk.reason)} · Ø Belastung ${risk.load}/Woche (${risk.recentEvents} Events/4 Wochen)</small>
+        <small>${escapeHtml(risk.reason)} · Belastung letzte 7 Tage ${risk.load} · Ø ${risk.avgLoad}/Woche über 4 Wochen (${risk.recentEvents} Events/4 Wochen)</small>
         <small>${escapeHtml(risk.action)}</small>
       </div>
     </div>

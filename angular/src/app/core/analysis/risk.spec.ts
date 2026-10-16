@@ -84,6 +84,17 @@ describe('risk (Belastungsindikator, Parität zur bisherigen App)', () => {
     expect(risk(player(), newestFirst([entry('2026-10-10', 'Training', 2, 'present', 3), ...base])).recentEvents).toBe(3);
   });
 
+  it('liefert neben der Belastung der letzten 7 Tage den echten Wochenschnitt der 4 Wochen (SCRUM-135)', () => {
+    // 5 Trainings à Intensität 2: 4 davon in den letzten 7 Tagen (8), alle 5 in 28 Tagen (10 / 4 = 2,5 pro Woche).
+    const result = risk(player(), newestFirst([
+      entry('2026-10-09', 'Training', 2, 'present', 5), entry('2026-10-07', 'Training', 2, 'present', 5), entry('2026-10-05', 'Training', 2, 'present', 2),
+      entry('2026-10-03', 'Training', 2, 'present', 2), entry('2026-10-01', 'Training', 2, 'present', 1),
+    ]));
+    expect(result.load).toBe(8);
+    expect(result.avgLoad).toBe(2.5);
+    expect(result.avgLoad).not.toBe(result.load);
+  });
+
   it('ohne Daten unauffällig mit Hinweistext', () => {
     const result = risk(player(), []);
     expect(result).toMatchObject({ percentage: 0, tier: 'unauffaellig', level: 'Unauffällig', load: 0, recentEvents: 0, reason: 'Keine auffälligen Belastungsfaktoren' });

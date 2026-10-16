@@ -32,6 +32,8 @@ export interface InjuryRisk {
   readonly action: string;
   /** Akute Belastung der letzten 7 Tage. */
   readonly load: number;
+  /** Wochenschnitt der Belastung über die letzten 4 Wochen (Summe der 28 Tage / 4). */
+  readonly avgLoad: number;
   /** Einsätze der letzten 4 Wochen. */
   readonly recentEvents: number;
   readonly reason: string;
@@ -152,6 +154,7 @@ export function injuryRisk(
     tier: tier.tier,
     action: tier.action,
     load: roundGrade(acuteLoad),
+    avgLoad: roundGrade(chronicWeeklyAvg),
     recentEvents: attended.filter((item) => daysBetween(item.date, today) <= 28).length,
     reason: topFactors.join(' · ') || 'Keine auffälligen Belastungsfaktoren',
   };
