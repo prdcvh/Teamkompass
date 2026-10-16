@@ -3,7 +3,7 @@ import { RouterLink } from '@angular/router';
 import { environment } from '../../../environments/environment';
 import { formatDate, resultText } from '../../core/events/event';
 import { LayoutService } from '../../core/shell/layout.service';
-import { formationName, lineupIsEmpty, onPitchCount } from '../../core/lineup/lineup';
+import { formationName, lineupIsEmpty, onPitchCount, pitchMarkers } from '../../core/lineup/lineup';
 import { PITCH_BANDS } from '../../core/lineup/pitch';
 import { LineupService } from '../../core/lineup/lineup.service';
 import { todayIso } from '../../core/shared/dates';
@@ -11,13 +11,26 @@ import { numberLabel } from '../../core/profile/profile';
 import { SessionService } from '../../core/auth/session.service';
 import { SquadService } from '../../core/player/squad.service';
 import { SyncService } from '../../core/shell/sync.service';
-import { dashboardFigures, leaders } from '../../core/team/team';
+import { smoothPath } from '../../core/chart-path';
+import { type TeamEvent } from '../../core/events/event';
+import { gradeLabel } from '../../core/ratings/rating';
+import { FORM_LENGTH, type FormTrend, countdownLabel, dashboardFigures, leaders, upcomingEvents } from '../../core/team/team';
 import { TeamService } from '../../core/team/team.service';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 
 /** Beschriftung der Bänder von vorn nach hinten (Reihenfolge von PITCH_BANDS umgekehrt). */
 const BAND_LABELS: readonly string[] = ['Angriff', 'Offensiv', 'Mittelfeld', 'Defensiv', 'Abwehr'];
+
+const MONTHS = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+const WEEKDAYS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+
+/** Größe der Mini-Formkurve (SVG-Einheiten); Note 1 oben, Note 6 unten. */
+const SPARK_WIDTH = 96;
+const SPARK_HEIGHT = 28;
+const SPARK_PAD = 4;
+
+const TREND_TEXT: Record<Exclude<FormTrend, null>, string> = { besser: 'Form steigt', schlechter: 'Form fällt', gleich: 'Form stabil' };
 
 /** Start-Dashboard: Kennzahlen des Teams, nächstes Event und Bestenliste (nur für Trainer mit Daten). */
 @Component({
@@ -39,7 +52,35 @@ export class Home implements OnInit {
   protected readonly teamId = environment.teamId;
 
   protected readonly figures = computed(() => dashboardFigures(this.team.data(), this.team.events(), todayIso()));
-  protected readonly board = computed(() => leaders(this.team.data(), this.mobile() ? 5 : 6));
+  protected readonly board = computed(() =>
+    leaders(this.team.data(), this.mobile() ? 5 : 6).map((entry) => ({
+      ...entry,
+      spark: this.spark(entry.recent),
+      trendText: entry.trend ? TREND_TEXT[entry.trend] : '',
+      tone: entry.grade <= 2 ? 'good' : entry.grade <= 3 ? 'ok' : 'weak',
+      initials: entry.player.name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase(),
+    })),
+  );
+  protected readonly formLength = FORM_LENGTH;
+
+  /** Die nächsten drei Events: das erste groß, die anderen als kurze Liste. */
+  protected readonly upcoming = computed(() => {
+    const today = todayIso();
+    return upcomingEvents(this.team.events(), today, 3).map((event) => ({ event, ...this.dateParts(event), countdown: countdownLabel(event.date, today) }));
+  });
+
+  /** Spieler als Punkte auf dem Mini-Spielfeld; am Desktop liegt das Feld quer (eigenes Tor links). */
+  protected readonly markers = computed(() => {
+    const horizontal = !this.mobile();
+    return pitchMarkers(this.lineup.assignments(), this.squad.players()).map((marker) => ({
+      ...marker,
+      label: marker.name.split(/\s+/)[0] ?? '',
+      keeper: marker.zone === 'TW',
+      left: horizontal ? 100 - marker.y : marker.x,
+      // Am Handy rückt der Torwart etwas nach oben, damit sein Name nicht über den Feldrand ragt.
+      top: horizontal ? marker.x : Math.min(marker.y, 87),
+    }));
+  });
   protected readonly cards = computed(() => {
     const figures = this.figures();
     const { record } = figures;
@@ -66,6 +107,22 @@ export class Home implements OnInit {
     if (keeper.length) rows.push({ label: 'Tor', names: keeper });
     return { empty: lineupIsEmpty(assignments), formation: formationName(assignments), count: onPitchCount(assignments), rows };
   });
+
+  private spark(grades: readonly number[]) {
+    const inner = SPARK_HEIGHT - SPARK_PAD * 2;
+    const step = grades.length > 1 ? (SPARK_WIDTH - SPARK_PAD * 2) / (grades.length - 1) : 0;
+    const points = grades.map((grade, index) => ({
+      x: grades.length > 1 ? SPARK_PAD + index * step : SPARK_WIDTH / 2,
+      y: SPARK_PAD + ((Math.min(Math.max(grade, 1), 6) - 1) / 5) * inner,
+    }));
+    return { width: SPARK_WIDTH, height: SPARK_HEIGHT, path: smoothPath(points), last: points[points.length - 1] ?? null, label: grades.map(gradeLabel).join(', ') };
+  }
+
+  private dateParts(event: TeamEvent) {
+    const [year, month, day] = event.date.split('-').map(Number);
+    const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+    return { day: String(day), month: MONTHS[month - 1] ?? '', weekday: WEEKDAYS[weekday] ?? '' };
+  }
 
   protected formatDate = formatDate;
   protected resultText = resultText;

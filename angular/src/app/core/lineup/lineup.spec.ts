@@ -1,5 +1,5 @@
 import { type Candidate, assignmentsFromPreview, eligibleCandidates, formationPreview } from './formation-assignment';
-import { benchOf, docFromEventLineup, docFromLineup, lineupSummary, nextGame, normalizeEventLineups, previousGameWithLineup, emptyAssignments, formationName, lineupGrade, lineupIsEmpty, moveToZone, normalizeLineup, onPitchCount, removeFromPitch, swapPlayers, zoneOf } from './lineup';
+import { benchOf, docFromEventLineup, docFromLineup, lineupSummary, nextGame, pitchMarkers, normalizeEventLineups, previousGameWithLineup, emptyAssignments, formationName, lineupGrade, lineupIsEmpty, moveToZone, normalizeLineup, onPitchCount, removeFromPitch, swapPlayers, zoneOf } from './lineup';
 import { FORMATION_PRESETS, ZONES, presetName } from './pitch';
 import type { Player } from '../player/player';
 import { eventFromDoc } from '../events/event';
@@ -151,5 +151,17 @@ describe('Aufstellung je Spiel (SCRUM-122, Format der Live-App SCRUM-29)', () =>
     expect(summary.name).toBe('1');
     expect(summary.rows.map((row) => `${row.zone}:${row.players.map((p) => p.id)}`)).toEqual(['TW:a', 'ST:b']);
     expect(summary.bench.map((p) => p.id)).toEqual(['c']);
+  });
+});
+
+describe('Mini-Spielfeld (Start-Dashboard)', () => {
+  it('verteilt mehrere Spieler einer Zone über deren Breite und lässt Unbekannte weg', () => {
+    const players = [player('a', 1, ['TW']), player('b', 4, ['IV']), player('c', 5, ['IV'])];
+    const assignments = { ...emptyAssignments(), TW: ['a'], IV: ['b', 'c', 'zz'] };
+    expect(pitchMarkers(assignments, players).map((m) => [m.id, m.zone, m.x, m.y])).toEqual([
+      ['a', 'TW', 50, 92],
+      ['b', 'IV', 36.5, 70],
+      ['c', 'IV', 63.5, 70],
+    ]);
   });
 });
