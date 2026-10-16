@@ -31,10 +31,14 @@ build step, no bundler, no test suite.
   Already generic per `teamId`, so a new team never needs rule changes.
 - `angular/`: the in-progress Angular rewrite (see Jira epic SCRUM-40). Own
   `package.json`, built separately; `npm run verify` also lints, builds and
-  tests it. It is **not** one of the copies above and is not deployed until
-  its hosting target (`u14`, site `teamkompass-u14`) exists. Its test team
-  is `teamId: U14`, data copied from `mein-team` — never write to
-  `mein-team` from there.
+  tests it. It is **not** one of the copies above (feature requests against
+  "the app" don't automatically include it, and vice versa). It **is
+  deployed**: every merge to `main` builds it and publishes it to hosting
+  target `u14` → https://teamkompass-u14.web.app/ (last step of
+  `.github/workflows/firebase-hosting-merge.yml`, see `FIREBASE_SETUP.md`
+  §8). So an Angular change is live there right after merge — say so, don't
+  call it "not deployed". Its test team is `teamId: U14`, data copied from
+  `mein-team` — never write to `mein-team` from there.
 
 **A feature request against "the app" almost always means every copy**
 (root + every `outputs/*` team folder), not just root — root being out of
