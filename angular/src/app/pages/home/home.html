@@ -134,7 +134,7 @@
                 </span>
                 <span class="go" aria-hidden="true">›</span>
               </a>
-              <tk-weather [event]="first.event" [showSource]="true" />
+              <tk-weather [event]="first.event" [showSource]="true" [showClothing]="true" />
               @if (upcoming().length > 1) {
                 <ul class="later">
                   @for (item of upcoming().slice(1); track item.event.id) {

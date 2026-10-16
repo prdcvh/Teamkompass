@@ -31,9 +31,10 @@ function makeEvent(patch: Partial<TeamEvent> = {}): TeamEvent {
   };
 }
 
-@Component({ imports: [Weather], template: '<tk-weather [event]="event" [showSource]="true" />' })
+@Component({ imports: [Weather], template: '<tk-weather [event]="event" [showSource]="true" [showClothing]="clothing" />' })
 class Host {
   event = makeEvent();
+  clothing = false;
 }
 
 class FakeProvider extends WeatherProvider {
@@ -136,6 +137,22 @@ describe('tk-weather', () => {
     const f = await render(makeEvent({ date: '2026-10-16', startTime: '09:00' }));
     await settle(f);
     expect(host(f).dataset['state']).toBe('hidden');
+  });
+
+  it('zeigt die Kleidungsempfehlung nur auf Wunsch, mit Alternativtext, Text und Hinweis', async () => {
+    const f = await render(makeEvent());
+    f.componentInstance.clothing = true;
+    await settle(f);
+    const el = host(f);
+    expect(el.querySelector('tk-clothing svg')?.getAttribute('aria-label')).toBe('Kleidungsempfehlung: lange Hose, Pulli, Regenjacke');
+    expect(el.querySelector('tk-clothing .text')?.textContent).toBe('Am 17.10.: lange Hose, Pulli und Regenjacke');
+    expect(el.querySelector('tk-clothing .hint')?.textContent).toContain('Trainer entscheidet');
+  });
+
+  it('zeigt ohne Wunsch keine Kleidungsempfehlung', async () => {
+    const f = await render(makeEvent());
+    await settle(f);
+    expect(host(f).querySelector('tk-clothing')).toBeNull();
   });
 });
 
