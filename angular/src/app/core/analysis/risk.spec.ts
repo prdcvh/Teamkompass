@@ -74,6 +74,16 @@ describe('risk (Belastungsindikator, Parität zur bisherigen App)', () => {
     });
   }
 
+  it('zählt Termine nach heute nicht, Termine von heute schon (SCRUM-136)', () => {
+    const base = [entry('2026-10-08', 'Training', 2, 'present', 3), entry('2026-10-01', 'Training', 2, 'present', 3)];
+    const future = [entry('2026-10-12', 'Spiel', 3, 'present', 3, 90), entry('2026-10-11', 'Training', 3, 'present', 3)];
+    const without = risk(player(), newestFirst(base));
+    const withFuture = risk(player(), newestFirst([...future, ...base]));
+    expect(withFuture).toEqual(without);
+    // Heute zählt weiter mit.
+    expect(risk(player(), newestFirst([entry('2026-10-10', 'Training', 2, 'present', 3), ...base])).recentEvents).toBe(3);
+  });
+
   it('liefert neben der Belastung der letzten 7 Tage den echten Wochenschnitt der 4 Wochen (SCRUM-135)', () => {
     // 5 Trainings à Intensität 2: 4 davon in den letzten 7 Tagen (8), alle 5 in 28 Tagen (10 / 4 = 2,5 pro Woche).
     const result = risk(player(), newestFirst([
