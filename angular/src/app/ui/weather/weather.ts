@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, input, si
 import { type TeamEvent, eventStart } from '../../core/events/event';
 import { TEAM_HOME_SHORT_NAME, weatherLocation } from '../../core/team-settings/team-settings';
 import { type WeatherSnapshot, WEATHER_ATTRIBUTION, berlinNow, withinHorizon } from '../../core/weather/weather';
-import { weatherKind, weatherSpokenText, weatherSummary } from '../../core/weather/weather-display';
+import { weatherKind, weatherParts, weatherSpokenText } from '../../core/weather/weather-display';
 import { WeatherService } from '../../core/weather/weather.service';
 import { Clothing } from '../clothing/clothing';
 import { Icon, type IconName } from '../icon/icon';
@@ -22,7 +22,8 @@ type State =
     @switch (state().kind) {
       @case ('ok') {
         <span class="line" role="img" [attr.aria-label]="spoken()"
-          ><tk-icon [name]="icon()" /><span aria-hidden="true">{{ summary() }}</span
+          ><tk-icon [name]="icon()" /><span aria-hidden="true"
+            >@for (part of parts(); track $index) {@if ($index > 0) { · }<span class="part">{{ part }}</span>}</span
           >@if (usesHome()) {<span class="home" aria-hidden="true">· {{ homeName }}</span>}</span
         >
       }
@@ -100,9 +101,9 @@ export class Weather {
     const [, m, d] = date.split('-');
     return `Am ${Number(d)}.${Number(m)}.`;
   });
-  protected readonly summary = computed(() => {
+  protected readonly parts = computed(() => {
     const s = this.snapshot();
-    return s ? weatherSummary(s) : '';
+    return s ? weatherParts(s) : [];
   });
   protected readonly spoken = computed(() => {
     const s = this.snapshot();

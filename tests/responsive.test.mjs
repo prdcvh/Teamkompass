@@ -70,11 +70,23 @@ function measure() {
     if ((rect.right > width + 0.5 || rect.left < -0.5) && !clipped(el)) problems.push(`${describe(el)} ragt über den Rand (${Math.round(rect.left)}–${Math.round(rect.right)} von ${width})`);
     if ((style.overflowX === 'auto' || style.overflowX === 'scroll') && el.scrollWidth > el.clientWidth + 1) problems.push(`${describe(el)} scrollt seitlich (${el.scrollWidth} > ${el.clientWidth})`);
   }
-  // Datum und Typ-Schild in Tabellen dürfen nicht umbrechen, sonst steht dort „18.10.202 / 6“ (SCRUM-152).
-  for (const cell of document.querySelectorAll('td.date, td .badge')) {
+  // Datum, Typ-Schild und Wetterteile („80 % Regen“) dürfen nicht umbrechen, sonst steht dort „18.10.202 / 6“ (SCRUM-152, SCRUM-155).
+  for (const cell of document.querySelectorAll('td.date, td .badge, tk-weather .part, tk-weather .home')) {
     const range = document.createRange();
     range.selectNodeContents(cell);
     if (range.getClientRects().length > 1) problems.push(`„${cell.textContent.trim()}“ bricht um`);
+  }
+  // Eventkarten: Titel und Text dürfen nicht unter den „Bearbeiten“-Knopf laufen (SCRUM-155).
+  for (const row of document.querySelectorAll('.cards .row')) {
+    const button = row.querySelector(':scope > button');
+    const what = row.querySelector('.what');
+    if (!button || !what) continue;
+    const textRight = Math.max(...[...what.querySelectorAll('strong, small')].map((el) => {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      return Math.max(...[...range.getClientRects()].map((r) => r.right));
+    }));
+    if (textRight > button.getBoundingClientRect().left + 0.5) problems.push(`Eventkarte „${what.querySelector('strong')?.textContent?.trim()}“ läuft unter „Bearbeiten“`);
   }
   // Touch-Geräte: Felder unter 16 px lassen das iPhone beim Antippen hineinzoomen, danach scrollt die Seite seitlich (SCRUM-154).
   if (matchMedia('(pointer: coarse)').matches) {
