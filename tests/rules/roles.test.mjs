@@ -45,6 +45,7 @@ beforeEach(async () => {
     await setDoc(doc(db, t("events/e1")), { title: "Training" });
     await setDoc(doc(db, t("opponents/o1")), { name: "Gegner" });
     await setDoc(doc(db, t("meta/lineup")), { assignments: {} });
+    await setDoc(doc(db, t("meta/settings")), { defaultLocation: { text: "Heimplatz", coords: null } });
     await setDoc(doc(db, t("invites/code1")), { role: "player", playerId: "p1", expiresAt: null });
   });
 });
@@ -54,7 +55,7 @@ const canRead = (uid, path) => assertSucceeds(getDoc(doc(as(uid), t(path))));
 const cannotRead = (uid, path) => assertFails(getDoc(doc(as(uid), t(path))));
 
 test("Trainer liest und schreibt alles Wesentliche", async () => {
-  for (const path of ["players/p1", "players/p2", "events/e1", "events/e1/ratings/p2", "events/e1/privateNotes/p1", "opponents/o1", "meta/lineup", "players/p1/absences/a1", "players/p1/measurements/m1", "players/p1/developmentPlans/f1"]) await canRead("coach", path);
+  for (const path of ["players/p1", "players/p2", "events/e1", "events/e1/ratings/p2", "events/e1/privateNotes/p1", "opponents/o1", "meta/lineup", "meta/settings", "players/p1/absences/a1", "players/p1/measurements/m1", "players/p1/developmentPlans/f1"]) await canRead("coach", path);
   const db = as("coach");
   await assertSucceeds(setDoc(doc(db, t("players/p3")), { name: "neu" }));
   await assertSucceeds(setDoc(doc(db, t("events/e2")), { title: "neu" }));
@@ -66,14 +67,14 @@ test("Trainer liest und schreibt alles Wesentliche", async () => {
 
 test("Ohne Anmeldung und als Nicht-Mitglied geht nichts", async () => {
   for (const uid of [null, "fremd"]) {
-    for (const path of ["players/p1", "events/e1", "events/e1/ratings/p1", "opponents/o1", "meta/lineup"]) await cannotRead(uid, path);
+    for (const path of ["players/p1", "events/e1", "events/e1/ratings/p1", "opponents/o1", "meta/lineup", "meta/settings"]) await cannotRead(uid, path);
     await assertFails(setDoc(doc(as(uid), t("players/p9")), { name: "x" }));
   }
 });
 
 test("Medizin: Spieler, Abwesenheiten und Messwerte lesbar; keine Noten, Notizen, Pläne, Gegner, Aufstellung; nichts schreibbar", async () => {
   for (const path of ["players/p1", "players/p2", "players/p1/absences/a1", "players/p2/measurements/m1", "events/e1"]) await canRead("medic", path);
-  for (const path of ["events/e1/ratings/p1", "events/e1/privateNotes/p1", "players/p1/developmentPlans/f1", "opponents/o1", "meta/lineup"]) await cannotRead("medic", path);
+  for (const path of ["events/e1/ratings/p1", "events/e1/privateNotes/p1", "players/p1/developmentPlans/f1", "opponents/o1", "meta/lineup", "meta/settings"]) await cannotRead("medic", path);
   await assertFails(setDoc(doc(as("medic"), t("players/p1/absences/a2")), { playerId: "p1", label: "x" }));
   await assertFails(setDoc(doc(as("medic"), t("players/p9")), { name: "x" }));
 });
@@ -81,7 +82,7 @@ test("Medizin: Spieler, Abwesenheiten und Messwerte lesbar; keine Noten, Notizen
 test("Spieler und Eltern: nur das eigene Profil samt Noten, Plänen, Abwesenheiten, Messwerten; nie fremde Daten oder interne Notizen", async () => {
   for (const uid of ["pl1", "parent1"]) {
     for (const path of ["players/p1", "events/e1/ratings/p1", "players/p1/developmentPlans/f1", "players/p1/absences/a1", "players/p1/measurements/m1", "events/e1"]) await canRead(uid, path);
-    for (const path of ["players/p2", "events/e1/ratings/p2", "players/p2/developmentPlans/f1", "players/p2/absences/a1", "events/e1/privateNotes/p1", "opponents/o1", "meta/lineup"]) await cannotRead(uid, path);
+    for (const path of ["players/p2", "events/e1/ratings/p2", "players/p2/developmentPlans/f1", "players/p2/absences/a1", "events/e1/privateNotes/p1", "opponents/o1", "meta/lineup", "meta/settings"]) await cannotRead(uid, path);
     await assertFails(getDocs(collection(as(uid), t("members"))));
     await assertFails(getDocs(collection(as(uid), t("invites"))));
     await assertFails(getDocs(collection(as(uid), t("players"))));
@@ -117,6 +118,7 @@ test("Spieler, Eltern und Medizin können keine Bewertungen, Spieler, Events ode
     await assertFails(setDoc(doc(db, t("events/e9")), { title: "x" }));
     await assertFails(setDoc(doc(db, t("opponents/o9")), { name: "x" }));
     await assertFails(setDoc(doc(db, t("meta/lineup")), { assignments: {} }));
+    await assertFails(setDoc(doc(db, t("meta/settings")), { defaultLocation: null }));
   }
 });
 
