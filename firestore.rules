@@ -204,6 +204,11 @@ service cloud.firestore {
         allow read, write: if isTrainer();
       }
 
+      // Planung (Trainingsserien, SCRUM-145) - nur Trainer.
+      match /meta/planning {
+        allow read, write: if isTrainer();
+      }
+
       match /meta/operations {
         allow read, write: if isTrainer();
       }

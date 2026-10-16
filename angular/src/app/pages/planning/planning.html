@@ -1,0 +1,65 @@
+<section class="page">
+  <header class="head">
+    <div>
+      <p class="tk-eyebrow">Mannschaft</p>
+      <h1>Planung</h1>
+      <p class="muted">Feste Trainingstage als Serie mit Enddatum. Die Termine entstehen in einem späteren Schritt.</p>
+    </div>
+    @if (planning.load() === 'ready') {
+      <button tkButton variant="primary" type="button" (click)="openNew()">+ Serie anlegen</button>
+    }
+  </header>
+
+  <p class="sync" role="status" [attr.data-state]="sync.state()">
+    {{ sync.label() }}
+    @if (sync.detail()) {
+      <span> – {{ sync.detail() }}</span>
+    }
+  </p>
+
+  @if (planning.load() === 'error') {
+    <div class="notice" role="alert">
+      <p>Die Planung konnte nicht geladen werden. Bitte Verbindung prüfen.</p>
+      <button tkButton type="button" (click)="planning.retry()">Erneut versuchen</button>
+    </div>
+  } @else if (planning.load() !== 'ready') {
+    <p class="muted" role="status">Planung wird geladen …</p>
+  } @else {
+    <h2>Trainingsserien</h2>
+    @if (planning.series().length === 0) {
+      <tk-card>
+        <div class="empty">
+          <p>Noch keine Serie angelegt.</p>
+          <button tkButton variant="primary" type="button" (click)="openNew()">+ Serie anlegen</button>
+        </div>
+      </tk-card>
+    } @else {
+      <tk-card>
+        <ul class="list">
+          @for (series of planning.series(); track series.id) {
+            <li class="row">
+              <div class="what">
+                <strong>{{ weekday(series.weekday) }}, {{ series.startTime }} Uhr · {{ title(series) }}</strong>
+                <small>{{ series.durationMinutes }} Min.{{ series.location ? ' · ' + series.location : '' }} · {{ series.trainingFocus }} · {{ intensity(series) }}</small>
+                <small>{{ formatDate(series.startDate) }} bis {{ formatDate(series.endDate) }}</small>
+              </div>
+              <button tkButton size="sm" type="button" (click)="openEdit(series)" [attr.aria-label]="'Serie bearbeiten: ' + weekday(series.weekday) + ' ' + series.startTime">Bearbeiten</button>
+            </li>
+          }
+        </ul>
+      </tk-card>
+    }
+  }
+</section>
+
+<tk-series-dialog [open]="dialogOpen()" [series]="editing()" (closed)="closeDialog()" (deleteRequested)="askDelete($event)" />
+
+<tk-dialog [open]="deleting() !== null" title="Serie löschen?" (closed)="deleting.set(null)">
+  <p>
+    Die Serie „{{ deleting() ? weekday(deleting()!.weekday) + ', ' + deleting()!.startTime + ' Uhr' : '' }}“ wird gelöscht. Bereits angelegte Events bleiben unberührt.
+  </p>
+  <div class="confirm-actions">
+    <button tkButton type="button" (click)="deleting.set(null)">Abbrechen</button>
+    <button tkButton type="button" variant="primary" (click)="confirmDelete()">Endgültig löschen</button>
+  </div>
+</tk-dialog>

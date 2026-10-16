@@ -32,6 +32,7 @@ export const routes: Routes = [
           { path: 'kader', loadComponent: () => import('./pages/squad/squad').then((m) => m.Squad) },
           { path: 'events', loadComponent: () => import('./pages/events/events').then((m) => m.Events) },
           { path: 'events/:id', loadComponent: () => import('./pages/event-rating/event-rating').then((m) => m.EventRating) },
+          { path: 'planung', loadComponent: () => import('./pages/planning/planning').then((m) => m.Planning) },
           { path: 'profile', loadComponent: () => import('./pages/profile/profile').then((m) => m.Profile) },
           { path: 'profile/:id', loadComponent: () => import('./pages/profile/profile').then((m) => m.Profile) },
           { path: 'teamanalyse', loadComponent: () => import('./pages/team-analysis/team-analysis').then((m) => m.TeamAnalysis) },

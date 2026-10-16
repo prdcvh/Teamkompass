@@ -42,7 +42,7 @@ describe('Shell (in der App)', () => {
     expect(root.querySelector('tk-tab-bar')).toBeNull();
     const labels = [...root.querySelectorAll('tk-sidebar ul.main a')].map((a) => a.textContent?.trim());
     expect(labels).toEqual([
-      'Dashboard', 'Kader', 'Events', 'Spielerprofile', 'Teamanalyse', 'Gegneranalyse', 'Aufstellung',
+      'Dashboard', 'Kader', 'Events', 'Planung', 'Spielerprofile', 'Teamanalyse', 'Gegneranalyse', 'Aufstellung',
     ]);
   });
 
