@@ -15,6 +15,7 @@ import {
   sortEvents,
   validateDraft,
 } from './event';
+import { endOfWeek, sectionEvents } from './event-sections';
 
 describe('event (Logik)', () => {
   const draft = (overrides: Partial<EventDraft> = {}): EventDraft => ({ ...emptyDraft('2026-10-06'), title: 'Training Dienstag', ...overrides });
@@ -191,6 +192,82 @@ describe('event (Logik)', () => {
         ['September 2026', 1],
       ]);
       expect(monthLabel('')).toBe('Ohne Datum');
+    });
+  });
+
+  describe('Bereiche und Sortierung (SCRUM-140/141)', () => {
+    const ids = (events: readonly { id: string }[]) => events.map((e) => e.id);
+
+    it('endOfWeek: Sonntag der Mo-So-Woche, auch über den Jahreswechsel', () => {
+      expect(endOfWeek('2026-10-05')).toBe('2026-10-11'); // Montag
+      expect(endOfWeek('2026-10-07')).toBe('2026-10-11'); // Mittwoch
+      expect(endOfWeek('2026-10-11')).toBe('2026-10-11'); // Sonntag
+      expect(endOfWeek('2026-12-31')).toBe('2027-01-03'); // Donnerstag
+      expect(endOfWeek('2024-12-30')).toBe('2025-01-05');
+    });
+
+    const list = [
+      event({ id: 'past1', date: '2026-10-04', title: 'Vor Montag' }),
+      event({ id: 'past2', date: '2026-09-20' }),
+      event({ id: 'today', date: '2026-10-07', startTime: '18:00' }),
+      event({ id: 'yesterday', date: '2026-10-06' }),
+      event({ id: 'sun', date: '2026-10-11' }),
+      event({ id: 'mon', date: '2026-10-12' }),
+      event({ id: 'far', date: '2027-02-01' }),
+    ];
+
+    it('heute zählt zu Diese Woche, frühere Tage der Woche sind vergangen, Sonntag/Montag-Grenze', () => {
+      const sections = sectionEvents(list, 'chronological', '2026-10-07');
+      expect(ids(sections.past)).toEqual(['yesterday', 'past1', 'past2']);
+      expect(ids(sections.week)).toEqual(['today', 'sun']);
+      expect(ids(sections.later)).toEqual(['mon', 'far']);
+    });
+
+    it('Montag früh: die ganze Woche liegt noch vor uns, der Sonntag davor ist vergangen', () => {
+      const sections = sectionEvents(list, 'chronological', '2026-10-05');
+      expect(ids(sections.past)).toEqual(['past1', 'past2']);
+      expect(ids(sections.week)).toEqual(['yesterday', 'today', 'sun']);
+    });
+
+    it('Sonntag: nur dieser Tag ist Diese Woche, der Montag danach Später', () => {
+      const sections = sectionEvents(list, 'chronological', '2026-10-11');
+      expect(ids(sections.week)).toEqual(['sun']);
+      expect(ids(sections.later)).toEqual(['mon', 'far']);
+    });
+
+    it('Jahreswechsel: Woche reicht über den 1. Januar', () => {
+      const events = [event({ id: 'a', date: '2026-12-31' }), event({ id: 'b', date: '2027-01-03' }), event({ id: 'c', date: '2027-01-04' }), event({ id: 'd', date: '2026-12-30' })];
+      const sections = sectionEvents(events, 'chronological', '2026-12-31');
+      expect(ids(sections.past)).toEqual(['d']);
+      expect(ids(sections.week)).toEqual(['a', 'b']);
+      expect(ids(sections.later)).toEqual(['c']);
+    });
+
+    it('ohne gültiges Datum gilt ein Event als vergangen', () => {
+      expect(ids(sectionEvents([event({ id: 'x', date: '' })], 'chronological', '2026-10-07').past)).toEqual(['x']);
+    });
+
+    it('Chronologisch: Vergangene jüngste zuerst, Woche/Später nächstes zuerst; am selben Tag Startzeit, ohne Startzeit zuletzt', () => {
+      const events = [
+        event({ id: 'late', date: '2026-10-08', startTime: '19:00' }),
+        event({ id: 'none', date: '2026-10-08', startTime: null }),
+        event({ id: 'early', date: '2026-10-08', startTime: '09:30' }),
+        event({ id: 'next', date: '2026-10-07' }),
+      ];
+      expect(ids(sectionEvents(events, 'chronological', '2026-10-07').week)).toEqual(['next', 'early', 'late', 'none']);
+      expect(ids(sortEvents(events, 'chronological'))).toEqual(['next', 'early', 'late', 'none']);
+      expect(ids(sectionEvents([event({ id: 'p1', date: '2026-10-01' }), event({ id: 'p2', date: '2026-10-03' })], 'chronological', '2026-10-07').past)).toEqual(['p2', 'p1']);
+    });
+
+    it('Neueste zuerst und Älteste zuerst wirken innerhalb jedes Bereichs', () => {
+      const newest = sectionEvents(list, 'date-desc', '2026-10-07');
+      expect(ids(newest.past)).toEqual(['yesterday', 'past1', 'past2']);
+      expect(ids(newest.week)).toEqual(['sun', 'today']);
+      expect(ids(newest.later)).toEqual(['far', 'mon']);
+      const oldest = sectionEvents(list, 'date-asc', '2026-10-07');
+      expect(ids(oldest.past)).toEqual(['past2', 'past1', 'yesterday']);
+      expect(ids(oldest.week)).toEqual(['today', 'sun']);
+      expect(ids(oldest.later)).toEqual(['mon', 'far']);
     });
   });
 });
