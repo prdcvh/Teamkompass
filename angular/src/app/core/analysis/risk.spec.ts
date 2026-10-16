@@ -74,6 +74,16 @@ describe('risk (Belastungsindikator, Parität zur bisherigen App)', () => {
     });
   }
 
+  it('zählt Termine nach heute nicht, Termine von heute schon (SCRUM-136)', () => {
+    const base = [entry('2026-10-08', 'Training', 2, 'present', 3), entry('2026-10-01', 'Training', 2, 'present', 3)];
+    const future = [entry('2026-10-12', 'Spiel', 3, 'present', 3, 90), entry('2026-10-11', 'Training', 3, 'present', 3)];
+    const without = risk(player(), newestFirst(base));
+    const withFuture = risk(player(), newestFirst([...future, ...base]));
+    expect(withFuture).toEqual(without);
+    // Heute zählt weiter mit.
+    expect(risk(player(), newestFirst([entry('2026-10-10', 'Training', 2, 'present', 3), ...base])).recentEvents).toBe(3);
+  });
+
   it('ohne Daten unauffällig mit Hinweistext', () => {
     const result = risk(player(), []);
     expect(result).toMatchObject({ percentage: 0, tier: 'unauffaellig', level: 'Unauffällig', load: 0, recentEvents: 0, reason: 'Keine auffälligen Belastungsfaktoren' });

@@ -2618,7 +2618,10 @@ function computePlayerInjuryRisk(playerId) {
         ? Math.max(0.15, Math.min(1, Number(rating.minutes) / matchDuration))
         : rating.attendance === "limited" ? 0.6 : 1;
       return { date: new Date(`${event.date}T00:00:00`), sessionLoad: Number(event.intensity || 2) * exposure };
-    });
+    })
+    // Termine nach heute zaehlen noch nicht (SCRUM-136): sonst ergibt daysBetween negative Werte,
+    // die den 7-/28-Tage-Filtern genuegen und den "Erholung"-Faktor verfaelschen.
+    .filter((item) => item.date <= today);
 
   // Akute (7 Tage) vs. chronische (28 Tage / 4 Wochen) Belastung - ACWR-Sweetspot ca. 0.8-1.3,
   // alles darueber ist eine Belastungsspitze mit deutlich erhoehtem Verletzungsrisiko.
