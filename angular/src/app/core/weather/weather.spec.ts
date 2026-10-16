@@ -94,6 +94,10 @@ describe('openMeteoUrl', () => {
     expect(url.searchParams.get('start_date')).toBe('2026-10-16');
     expect(url.searchParams.get('hourly')).toContain('precipitation_probability');
   });
+
+  it('geht am Service Worker vorbei, damit eine ältere CSP des Workers nicht blockiert (SCRUM-151)', () => {
+    expect(new URL(openMeteoUrl({ lat: 50.18, lon: 8.46 }, '2026-10-16')).searchParams.get('ngsw-bypass')).toBe('true');
+  });
 });
 
 describe('WeatherService', () => {

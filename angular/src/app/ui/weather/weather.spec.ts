@@ -40,9 +40,11 @@ class Host {
 class FakeProvider extends WeatherProvider {
   mode: 'ok' | 'fail' | 'pending' = 'ok';
   calls = 0;
+  lastCoords: unknown = null;
   resolve: (v: unknown) => void = () => undefined;
-  async fetchDay(_c: unknown, date: string): Promise<unknown> {
+  async fetchDay(coords: unknown, date: string): Promise<unknown> {
     this.calls++;
+    this.lastCoords = coords;
     if (this.mode === 'fail') throw new Error('offline');
     if (this.mode === 'pending') return new Promise((r) => (this.resolve = () => r(dayResponse(date))));
     return dayResponse(date);
@@ -103,12 +105,21 @@ describe('tk-weather', () => {
     expect(host(f).textContent).toContain('Wetter nicht verfügbar');
   });
 
-  it('zeigt „Kein Ort“ ohne Koordinaten und ruft nichts ab', async () => {
-    const f = await render(makeEvent({ locationCoords: null }));
+  it('nimmt ohne gewählten Ort den Standardort Königstein und sagt das dazu (SCRUM-153)', async () => {
+    const f = await render(makeEvent({ location: 'Kunstrasen - heim', locationCoords: null }));
     await settle(f);
-    expect(host(f).dataset['state']).toBe('no-place');
-    expect(host(f).textContent).toContain('Kein Ort für Wetter');
-    expect(provider.calls).toBe(0);
+    expect(host(f).dataset['state']).toBe('ok');
+    // Der Dienst rundet auf 2 Stellen (Cache pro Gebiet).
+    expect(provider.lastCoords).toMatchObject({ lat: 50.18, lon: 8.47 });
+    expect(host(f).textContent).toContain('Königstein');
+    expect(host(f).querySelector('.line')!.getAttribute('aria-label')).toContain('Standardort Königstein');
+  });
+
+  it('nimmt einen gewählten Ort und zeigt dann keinen Standardort-Hinweis', async () => {
+    const f = await render(makeEvent({ locationCoords: { lat: 50.2, lon: 8.6, name: 'Bad Homburg' } }));
+    await settle(f);
+    expect(provider.lastCoords).toMatchObject({ lat: 50.2, lon: 8.6 });
+    expect(host(f).querySelector('.home')).toBeNull();
   });
 
   it('weist auf die fehlende Startzeit hin und ruft nichts ab', async () => {

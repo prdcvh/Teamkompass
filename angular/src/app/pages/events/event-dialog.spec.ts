@@ -7,7 +7,7 @@ import { EventDialog } from './event-dialog';
 
 const KOENIGSTEIN = { name: 'Königstein im Taunus', region: 'Hessen', country: 'Deutschland', lat: 50.1806, lon: 8.4597 };
 
-describe('EventDialog: Ortssuche und Standardort (SCRUM-97)', () => {
+describe('EventDialog: Ortssuche (SCRUM-97) und Standardort Königstein (SCRUM-153)', () => {
   let firebase: FakeFirebase;
   let searches: { query: string; language: string | undefined }[];
   let answer: () => Promise<GeocodingResult>;
@@ -145,49 +145,16 @@ describe('EventDialog: Ortssuche und Standardort (SCRUM-97)', () => {
     expect(q<HTMLButtonElement>(fixture, '.search-place')!.disabled).toBe(true);
   });
 
-  it('speichert den Standardort des Teams und füllt neue Events damit vor', async () => {
-    const fixture = await render();
-    await search(fixture, 'Heimplatz');
-    q<HTMLButtonElement>(fixture, '.place-option')!.click();
-    await flush(fixture);
-    q<HTMLButtonElement>(fixture, '.save-default')!.click();
-    await flush(fixture);
-    expect(firebase.settings.settings).toMatchObject({
-      defaultLocation: { text: 'Heimplatz', coords: { lat: 50.1806, lon: 8.4597 } },
-    });
-
-    // Neuer Dialog (neues Event): Ort und Koordinaten sind vorbelegt.
-    TestBed.resetTestingModule();
-    const stored = firebase.settings.settings;
-    const next = await render({ defaults: stored });
-    await vi.waitFor(() => {
-      next.detectChanges();
-      expect(q<HTMLInputElement>(next, 'input[name="location"]')!.value).toBe('Heimplatz');
-    });
-    expect(text(q(next, '.place-chosen'))).toContain('Königstein im Taunus');
-    type(q<HTMLInputElement>(next, 'input[name="title"]')!, 'Vorbelegt');
-    submit(next);
-    await vi.waitFor(() => expect(savedEvent('Vorbelegt')).toMatchObject({ location: 'Heimplatz', locationCoords: { lat: 50.1806 } }));
-  });
-
-  it('befüllt beim Bearbeiten eines bestehenden Events nichts mit dem Standardort', async () => {
+  it('fragt nicht nach einem Standardort und nennt Königstein als Ort fürs Wetter (SCRUM-153)', async () => {
     const fixture = await render({ defaults: { defaultLocation: { text: 'Heimplatz', coords: null } } });
-    fixture.componentRef.setInput('open', false);
-    fixture.componentRef.setInput('event', {
-      id: 'e1', type: 'Training', title: 'Alt', date: '2026-10-05', intensity: 2, location: '', trainingFocus: '', opponent: '',
-      goalsFor: null, goalsAgainst: null, matchDuration: null, startTime: null, durationMinutes: null, locationCoords: null, notes: '',
-    });
     await flush(fixture);
-    fixture.componentRef.setInput('open', true);
-    await flush(fixture);
+    expect(q(fixture, '.save-default')).toBeNull();
+    expect(q(fixture, '.clear-default')).toBeNull();
+    // Neues Event bleibt ohne Ort; das Wetter nimmt dann den Standardort.
     expect(q<HTMLInputElement>(fixture, 'input[name="location"]')!.value).toBe('');
-  });
-
-  it('löscht den Standardort wieder', async () => {
-    const fixture = await render({ defaults: { defaultLocation: { text: 'Heimplatz', coords: null } } });
-    await flush(fixture);
-    q<HTMLButtonElement>(fixture, '.clear-default')!.click();
-    await flush(fixture);
-    expect(firebase.settings.settings).toMatchObject({ defaultLocation: null });
+    expect(text(q(fixture, '.home-hint'))).toContain('Königstein im Taunus');
+    type(q<HTMLInputElement>(fixture, 'input[name="title"]')!, 'Ohne Ort');
+    submit(fixture);
+    await vi.waitFor(() => expect(savedEvent('Ohne Ort')).toMatchObject({ location: '', locationCoords: null }));
   });
 });

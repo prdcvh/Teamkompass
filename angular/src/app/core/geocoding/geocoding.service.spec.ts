@@ -35,7 +35,7 @@ describe('GeocodingService (Open-Meteo, gemocktes fetch)', () => {
     });
     const url = new URL(fetchMock.mock.calls[0][0] as string);
     expect(url.origin).toBe('https://geocoding-api.open-meteo.com');
-    expect([...url.searchParams.keys()].sort()).toEqual(['count', 'format', 'language', 'name']);
+    expect([...url.searchParams.keys()].sort()).toEqual(['count', 'format', 'language', 'name', 'ngsw-bypass']);
     expect(url.searchParams.get('name')).toBe('Königstein');
     expect(url.searchParams.get('language')).toBe('de');
     expect(url.searchParams.get('count')).toBe(String(GEOCODING_MAX_RESULTS));
@@ -81,6 +81,10 @@ describe('GeocodingService (Open-Meteo, gemocktes fetch)', () => {
 describe('Geocoding-Hilfen', () => {
   it('baut die URL mit kodiertem Ortstext', () => {
     expect(openMeteoGeocodingUrl('Bad Homburg & Co', 'de')).toContain('name=Bad+Homburg+%26+Co');
+  });
+
+  it('geht am Service Worker vorbei, damit eine ältere CSP des Workers nicht blockiert (SCRUM-151)', () => {
+    expect(new URL(openMeteoGeocodingUrl('Königstein', 'de')).searchParams.get('ngsw-bypass')).toBe('true');
   });
 
   it('bildet Anzeigename und Event-Ort ohne doppelte Teile', () => {

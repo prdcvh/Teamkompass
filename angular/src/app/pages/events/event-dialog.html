@@ -79,7 +79,7 @@
       @if (draft().locationCoords; as coords) {
         <p class="place-chosen">Ort gewählt: <strong>{{ coords.name }}</strong> – Koordinaten gespeichert, das Wetter kann angezeigt werden.</p>
       } @else {
-        <p class="hint">Ohne Auswahl bleibt der Ort nur ein Text (kein Wetter).</p>
+        <p class="hint home-hint">Ohne gewählten Ort zeigt das Wetter den Standardort {{ homeName }}. Für Auswärtsorte „Ort suchen“ nutzen.</p>
       }
       <div class="place-actions">
         <button tkButton type="button" variant="neutral" class="search-place" [disabled]="!canSearch()" (click)="searchPlaces()">
@@ -88,16 +88,7 @@
         @if (draft().locationCoords) {
           <button tkButton type="button" variant="neutral" class="remove-coords" (click)="removeCoords()">Auswahl entfernen</button>
         }
-        @if (canSaveDefault()) {
-          <button tkButton type="button" variant="neutral" class="save-default" (click)="saveAsDefault()">Als Standardort des Teams merken</button>
-        }
-        @if (defaultLocation()) {
-          <button tkButton type="button" variant="neutral" class="clear-default" (click)="clearDefault()">Standardort löschen</button>
-        }
       </div>
-      @if (defaultLocation(); as fallback) {
-        <p class="hint">Standardort des Teams: {{ fallback.coords ? fallback.coords.name : fallback.text }}</p>
-      }
       @if (searchError()) {
         <p class="error search-error" role="alert">{{ searchError() }}</p>
       }

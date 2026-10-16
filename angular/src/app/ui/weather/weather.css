@@ -24,6 +24,11 @@
   color: var(--tk-blue);
 }
 
+.home {
+  color: var(--tk-muted);
+  font-weight: 400;
+}
+
 .line.muted {
   color: var(--tk-muted);
   font-weight: 400;
