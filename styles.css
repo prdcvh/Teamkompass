@@ -1453,3 +1453,8 @@ menu {
 .risk-compare strong {
   font-size: 1.3rem;
 }
+
+.risk-compare > div {
+  display: grid;
+  gap: 2px;
+}
