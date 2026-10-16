@@ -3,6 +3,7 @@ import { type TeamEvent, eventStart } from '../../core/events/event';
 import { type WeatherSnapshot, WEATHER_ATTRIBUTION, berlinNow, withinHorizon } from '../../core/weather/weather';
 import { weatherKind, weatherSpokenText, weatherSummary } from '../../core/weather/weather-display';
 import { WeatherService } from '../../core/weather/weather.service';
+import { Clothing } from '../clothing/clothing';
 import { Icon, type IconName } from '../icon/icon';
 
 type State =
@@ -15,7 +16,7 @@ type State =
  */
 @Component({
   selector: 'tk-weather',
-  imports: [Icon],
+  imports: [Icon, Clothing],
   template: `
     @switch (state().kind) {
       @case ('ok') {
@@ -36,6 +37,9 @@ type State =
         <span class="line muted">Keine Startzeit für Wetter</span>
       }
     }
+    @if (showClothing() && snapshot(); as snap) {
+      <tk-clothing [snapshot]="snap" [dayLabel]="dayLabel()" />
+    }
     @if (showSource() && state().kind === 'ok') {
       <a class="source" [href]="source.url" target="_blank" rel="noopener noreferrer">{{ source.text }}</a>
     }
@@ -48,6 +52,9 @@ export class Weather {
   readonly event = input.required<TeamEvent>();
   /** Zeigt den Open-Meteo-Hinweis direkt am Wetter (sonst muss ihn die Seite einmal anzeigen). */
   readonly showSource = input(false);
+
+  /** Zeigt zusätzlich die Kleidungsempfehlung (SCRUM-99), sobald das Wetter da ist. */
+  readonly showClothing = input(false);
 
   private readonly service = inject(WeatherService);
   protected readonly source = WEATHER_ATTRIBUTION;
@@ -81,9 +88,15 @@ export class Weather {
     return r.value === 'error' ? { kind: 'unavailable' } : { kind: 'ok', snapshot: r.value };
   });
 
-  private readonly snapshot = computed(() => {
+  protected readonly snapshot = computed(() => {
     const s = this.state();
     return s.kind === 'ok' ? s.snapshot : null;
+  });
+  protected readonly dayLabel = computed(() => {
+    const date = this.event().date;
+    if (date === berlinNow(this.service.now()).date) return 'Heute';
+    const [, m, d] = date.split('-');
+    return `Am ${Number(d)}.${Number(m)}.`;
   });
   protected readonly summary = computed(() => {
     const s = this.snapshot();

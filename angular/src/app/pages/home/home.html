@@ -61,7 +61,7 @@
               <p class="muted">
                 {{ next.type }} · {{ formatDate(next.date) }}@if (next.opponent) { · vs. {{ next.opponent }}}@if (next.location) { · {{ next.location }}}
               </p>
-              <tk-weather [event]="next" [showSource]="true" />
+              <tk-weather [event]="next" [showSource]="true" [showClothing]="true" />
               <a tkButton variant="primary" [routerLink]="['/events', next.id]">Zur Bewertung</a>
             } @else {
               <p class="muted">Kein kommendes Event geplant.</p>

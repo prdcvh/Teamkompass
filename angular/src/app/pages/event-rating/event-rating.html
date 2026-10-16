@@ -7,7 +7,7 @@
         <p class="meta">
           {{ ev.type }} · {{ formatDate(ev.date) }}@if (resultText(ev); as result) { · Ergebnis {{ result }}} · Intensität {{ intensity() }}@if (ev.location) { · {{ ev.location }}}@if (isGame()) { · {{ ratings.matchDuration() }} Min.}
         </p>
-        <tk-weather [event]="ev" [showSource]="true" />
+        <tk-weather [event]="ev" [showSource]="true" [showClothing]="true" />
       } @else {
         <h1>Event bewerten</h1>
       }

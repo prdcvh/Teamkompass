@@ -1,0 +1,89 @@
+:host {
+  display: block;
+  margin-top: 8px;
+}
+
+.box {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 12px;
+  background: var(--tk-surface-2);
+  border: 1px solid var(--tk-line);
+  border-radius: var(--tk-radius-md);
+  color: var(--tk-ink);
+}
+
+.figure {
+  width: 96px;
+  height: auto;
+  flex: none;
+  stroke: var(--tk-ink);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+.skin {
+  fill: var(--tk-surface);
+}
+
+.top {
+  fill: var(--tk-blue);
+}
+
+.top.thick {
+  fill: var(--tk-blue);
+  stroke-width: 3;
+}
+
+.shorts,
+.pants {
+  fill: var(--tk-ink);
+}
+
+.hat {
+  fill: var(--tk-red);
+}
+
+.jacket {
+  fill: var(--tk-amber);
+  fill-opacity: 0.55;
+}
+
+.drop {
+  fill: var(--tk-blue);
+  stroke: none;
+}
+
+.info {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 180px;
+}
+
+.text {
+  margin: 0;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--tk-muted);
+}
+
+.copy {
+  justify-self: start;
+  min-height: var(--tk-touch);
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--tk-ink);
+  background: var(--tk-surface);
+  border: 1px solid var(--tk-line);
+  border-radius: var(--tk-radius-md);
+  cursor: pointer;
+}

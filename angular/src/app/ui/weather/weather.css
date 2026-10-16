@@ -34,3 +34,7 @@
   font-size: 11px;
   text-decoration: underline;
 }
+
+tk-clothing {
+  flex: 1 1 100%;
+}
