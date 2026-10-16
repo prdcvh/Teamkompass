@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { INTENSITIES } from '../../core/events/event';
+import { type PlanningBreak, breakPeriodText } from '../../core/planning/breaks';
 import { type TrainingSeries, seriesTitle, weekdayLabel } from '../../core/planning/planning';
 import { EventsService } from '../../core/events/events.service';
 import { PlanningService } from '../../core/planning/planning.service';
@@ -9,12 +10,13 @@ import { TeamSettingsService } from '../../core/team-settings/team-settings.serv
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 import { Dialog } from '../../ui/dialog/dialog';
+import { BreakDialog } from './break-dialog';
 import { SeriesDialog } from './series-dialog';
 
 /** Planung (nur Trainer): Trainingsserien verwalten. Beim Speichern entstehen die Trainings als Events. */
 @Component({
   selector: 'app-planning',
-  imports: [Button, Card, Dialog, SeriesDialog],
+  imports: [BreakDialog, Button, Card, Dialog, SeriesDialog],
   templateUrl: './planning.html',
   styleUrl: './planning.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -29,6 +31,11 @@ export class Planning implements OnInit {
   protected readonly editing = signal<TrainingSeries | null>(null);
   protected readonly deleting = signal<TrainingSeries | null>(null);
 
+  protected readonly breakDialogOpen = signal(false);
+  protected readonly editingBreak = signal<PlanningBreak | null>(null);
+  protected readonly deletingBreak = signal<PlanningBreak | null>(null);
+
+  protected readonly period = breakPeriodText;
   protected readonly title = seriesTitle;
   protected readonly weekday = weekdayLabel;
   protected readonly formatDate = formatDate;
@@ -74,5 +81,32 @@ export class Planning implements OnInit {
     const series = this.deleting();
     if (series) this.planning.deleteSeries(series.id);
     this.deleting.set(null);
+  }
+
+  protected openNewBreak(): void {
+    this.editingBreak.set(null);
+    this.breakDialogOpen.set(true);
+  }
+
+  protected openEditBreak(entry: PlanningBreak): void {
+    this.editingBreak.set(entry);
+    this.breakDialogOpen.set(true);
+  }
+
+  protected askDeleteBreak(entry: PlanningBreak): void {
+    this.breakDialogOpen.set(false);
+    this.deletingBreak.set(entry);
+    void this.planning.loadBreakProtection(null, entry);
+  }
+
+  /** Was beim Löschen der Pause mit den Serien-Trainings passiert; null, solange geprüft wird. */
+  protected deleteBreakPreview(entry: PlanningBreak | null): string | null {
+    return entry ? this.planning.deleteBreakPreview(entry.id) : null;
+  }
+
+  protected confirmDeleteBreak(): void {
+    const entry = this.deletingBreak();
+    if (entry) this.planning.deleteBreak(entry.id);
+    this.deletingBreak.set(null);
   }
 }

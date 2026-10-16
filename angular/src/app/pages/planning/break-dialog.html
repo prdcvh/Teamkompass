@@ -1,0 +1,71 @@
+<tk-dialog [open]="open()" [title]="heading()" (closed)="closed.emit()">
+  <form (submit)="submit($event)" novalidate>
+    <div class="field">
+      <label class="tk-label">
+        Name
+        <input
+          class="tk-input"
+          name="name"
+          autocomplete="off"
+          placeholder="z. B. Herbstferien"
+          [attr.maxlength]="maxName"
+          [value]="draft().name"
+          [attr.aria-invalid]="errors().name ? 'true' : null"
+          [attr.aria-describedby]="errors().name ? 'err-name' : null"
+          (input)="patch({ name: value($event) })"
+        />
+      </label>
+      @if (errors().name) {
+        <span class="error" id="err-name" role="alert">{{ errors().name }}</span>
+      }
+    </div>
+    <div class="grid">
+      <div class="field">
+        <label class="tk-label">
+          Von
+          <input
+            class="tk-input"
+            name="startDate"
+            type="date"
+            [value]="draft().startDate"
+            [attr.aria-invalid]="errors().startDate ? 'true' : null"
+            [attr.aria-describedby]="errors().startDate ? 'err-break-from' : null"
+            (input)="patch({ startDate: value($event) })"
+          />
+        </label>
+        @if (errors().startDate) {
+          <span class="error" id="err-break-from" role="alert">{{ errors().startDate }}</span>
+        }
+      </div>
+      <div class="field">
+        <label class="tk-label">
+          Bis
+          <input
+            class="tk-input"
+            name="endDate"
+            type="date"
+            [value]="draft().endDate"
+            [attr.aria-invalid]="errors().endDate ? 'true' : null"
+            [attr.aria-describedby]="errors().endDate ? 'err-break-to' : null"
+            (input)="patch({ endDate: value($event) })"
+          />
+        </label>
+        @if (errors().endDate) {
+          <span class="error" id="err-break-to" role="alert">{{ errors().endDate }}</span>
+        }
+      </div>
+    </div>
+    <p class="hint">Beide Tage zählen zur Pause. Überlappende Pausen sind erlaubt. Einzelne Events (z. B. ein Spiel) bleiben immer bestehen.</p>
+    @if (preview(); as text) {
+      <p class="preview" role="status" data-testid="break-preview">{{ text }}</p>
+    }
+
+    <menu>
+      @if (editing()) {
+        <button tkButton type="button" variant="neutral" class="delete" (click)="askDelete()">Pause löschen</button>
+      }
+      <button tkButton type="button" variant="neutral" (click)="closed.emit()">Abbrechen</button>
+      <button tkButton type="submit" variant="primary">Speichern</button>
+    </menu>
+  </form>
+</tk-dialog>
