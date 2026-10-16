@@ -4,6 +4,7 @@
 
 .page {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--tk-space-4);
   max-width: 1400px;
   padding: var(--tk-space-5);
@@ -11,6 +12,7 @@
 
 h1 {
   margin: 0;
+  overflow-wrap: anywhere;
   font-size: var(--tk-text-title);
 }
 
@@ -55,16 +57,29 @@ h1 {
   color: var(--tk-muted);
 }
 
+.meta {
+  overflow-wrap: anywhere;
+}
+
+/* Fortschritt und Ansicht stehen nebeneinander und rutschen untereinander, wenn der Platz fehlt. */
 .toolbar {
-  display: grid;
-  grid-template-columns: 1fr minmax(160px, 220px);
-  gap: var(--tk-space-4);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tk-space-3) var(--tk-space-4);
   align-items: center;
 }
 
 .progress {
   display: grid;
+  flex: 1 1 240px;
   gap: 6px;
+  min-width: 0;
+}
+
+.view {
+  flex: 1 1 180px;
+  max-width: 260px;
+  min-width: 0;
 }
 
 .progress-label {
@@ -95,47 +110,60 @@ h1 {
   overflow: auto;
 }
 
+/* Die Matrix passt in die Breite (kein seitliches Scrollen): feste Spaltenanteile, Texte und Auswahlfelder schrumpfen bzw. brechen um. */
 table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.col-player { width: 16%; }
+.col-attendance { width: 14%; }
+.col-total { width: 7%; }
+.col-grade { width: 7%; }
+.col-count { width: 5.5%; }
+.col-note { width: 17%; }
+
+table.game .col-player { width: 14%; }
+table.game .col-grade { width: 6.6%; }
+table.game .col-note { width: 11.3%; }
+
+.matrix {
+  padding: var(--tk-space-2);
 }
 
 th {
-  padding: var(--tk-space-3);
+  padding: var(--tk-space-2) 4px;
   color: var(--tk-muted);
   background: var(--tk-surface-2);
   position: sticky;
   top: 0;
   z-index: 3;
-  font-size: var(--tk-text-xs);
+  font-size: 10px;
   font-weight: 600;
-  letter-spacing: var(--tk-track-eyebrow);
+  letter-spacing: 0;
+  line-height: 1.25;
   text-align: left;
-  text-transform: uppercase;
+  overflow-wrap: break-word;
 }
 
 td {
-  padding: var(--tk-space-2) var(--tk-space-3);
+  padding: var(--tk-space-2) 4px;
+  background: var(--tk-surface);
   border-top: 1px solid var(--tk-line);
   font-size: var(--tk-text-sm);
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  vertical-align: middle;
 }
 
-/* Spieler-Spalte bleibt beim seitlichen Scrollen links stehen (deckend, damit nichts durchscheint). */
-th:first-child,
-td:first-child {
-  position: sticky;
-  left: 0;
-  z-index: 2;
-  box-shadow: 1px 0 0 var(--tk-line);
+td .tk-input {
+  min-width: 0;
+  padding: 8px 4px;
+  text-overflow: ellipsis;
 }
 
-th:first-child {
-  z-index: 4;
-}
-
-td {
-  background: var(--tk-surface);
+td .number {
+  margin-right: 2px;
 }
 
 /* Dezente Zeilenfarbe nach Anwesenheit bei diesem Event; Text im Auswahlfeld bleibt der eigentliche Hinweis. */
@@ -159,12 +187,9 @@ tr[data-tone='grey'] td,
   background: var(--tk-soft-neutral);
 }
 
-.grade-select {
-  min-width: 64px;
-}
-
+.grade-select,
 .small {
-  width: 72px;
+  min-width: 0;
 }
 
 .number {
@@ -276,8 +301,9 @@ tr[data-tone='grey'] td,
     padding: var(--tk-space-4) var(--tk-space-4) 140px;
   }
 
-  .toolbar {
-    grid-template-columns: 1fr;
+  .view {
+    flex-basis: 100%;
+    max-width: none;
   }
 
   .tk-input {

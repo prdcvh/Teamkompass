@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { LayoutService } from '../../core/shell/layout.service';
+import { LayoutService, injectNarrowViewport } from '../../core/shell/layout.service';
 import { ageFromBirthdate, formatDate } from '../../core/shared/dates';
 import { CONSENT_LABELS, PLAYER_STATUSES, type Player, STANDARD_POSITIONS, positionText } from '../../core/player/player';
 import { SORT_OPTIONS, type SortKey, filterPlayers, groupByLine, sortPlayers, statusCounts } from '../../core/player/squad-list';
@@ -25,6 +25,9 @@ export class Squad implements OnInit {
   protected readonly squad = inject(SquadService);
   protected readonly sync = inject(SyncService);
   protected readonly mobile = inject(LayoutService).isMobile;
+  private readonly narrow = injectNarrowViewport();
+  /** Kartenliste statt Tabelle: auf dem Handy und überall, wo die Tabelle nicht neben das Seitenmenü passt (SCRUM-134). */
+  protected readonly cards = computed(() => this.mobile() || this.narrow());
 
   protected readonly positionOptions = STANDARD_POSITIONS;
   protected readonly statusOptions = PLAYER_STATUSES;

@@ -96,7 +96,7 @@
           }
         </div>
       </tk-card>
-    } @else if (mobile()) {
+    } @else if (cards()) {
       @for (group of groups(); track group.title) {
         <h2 class="group">{{ group.title }} · {{ group.players.length }}</h2>
         <tk-card>

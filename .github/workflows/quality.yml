@@ -17,4 +17,7 @@ jobs:
         with:
           node-version: 22
       - run: npm ci --prefix angular
+      # Browser für den Test „kein seitliches Scrollen“ (tests/responsive.test.mjs, SCRUM-134); ohne ihn würde der Test übersprungen.
+      - run: npm install --no-save --no-package-lock --prefix angular playwright@1.56.1
+      - run: npx --prefix angular playwright install --with-deps chromium
       - run: npm run verify

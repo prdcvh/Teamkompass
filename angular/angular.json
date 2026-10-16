@@ -61,6 +61,17 @@
               "extractLicenses": false,
               "sourceMap": true
             },
+            "e2e": {
+              "outputPath": "dist/e2e",
+              "optimization": false,
+              "extractLicenses": false,
+              "fileReplacements": [
+                {
+                  "replace": "src/main.ts",
+                  "with": "src/e2e/main.e2e.ts"
+                }
+              ]
+            },
             "mein-team": {
               "outputPath": "dist/team-mein-team",
               "assets": [

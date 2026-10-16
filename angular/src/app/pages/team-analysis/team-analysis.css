@@ -81,7 +81,15 @@ h2 {
 
 [data-variant='mobile'] .columns,
 [data-variant='mobile'] .columns.three {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* Mit Seitenmenü reicht die Breite unter 1100 px nicht für zwei bzw. drei Spalten (SCRUM-134). */
+@media (max-width: 1099px) {
+  .columns,
+  .columns.three {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .panel {

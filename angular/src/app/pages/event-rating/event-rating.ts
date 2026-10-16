@@ -6,7 +6,7 @@ import { INTENSITIES, formatDate, resultText } from '../../core/events/event';
 import { EventsService } from '../../core/events/events.service';
 import { LineupService } from '../../core/lineup/lineup.service';
 import { lineupSummary } from '../../core/lineup/lineup';
-import { LayoutService } from '../../core/shell/layout.service';
+import { LayoutService, injectNarrowViewport } from '../../core/shell/layout.service';
 import { type Player, consentRevokedMessage, isConsentRevoked } from '../../core/player/player';
 import {
   ATTENDANCES,
@@ -14,6 +14,7 @@ import {
   type Attendance,
   type AttendanceTone,
   GRADE_FIELDS,
+  type GradeField,
   GRADE_LABELS,
   MAX_GOALS_OR_ASSISTS,
   MAX_NOTE_LENGTH,
@@ -34,6 +35,14 @@ import { Card } from '../../ui/card/card';
 
 const GRADE_OPTIONS = [1, 2, 3, 4, 5, 6] as const;
 
+/** Spaltenköpfe der Matrix: lange Wörter mit weichen Trennstellen, damit sie in schmalen Spalten umbrechen statt abgeschnitten zu werden. */
+const GRADE_HEADERS: Readonly<Record<GradeField, string>> = {
+  ...GRADE_LABELS,
+  technique: 'Fehler\u00ADquote',
+  tactics: 'Entschei\u00ADdungs\u00ADfindung',
+  comprehension: 'Lern\u00ADfähig\u00ADkeit',
+};
+
 /**
  * Event bewerten (Figma: Bewertungsmatrix Desktop, Stepper Handy): je Spieler Anwesenheit, vier Teilnoten
  * (daraus die Gesamtnote), bei Spielen Minuten/Tore/Vorlagen, sichtbares Feedback und interne Notiz.
@@ -52,7 +61,10 @@ export class EventRating implements OnInit {
   protected readonly eventsService = inject(EventsService);
   protected readonly sync = inject(SyncService);
   private readonly lineupService = inject(LineupService);
-  protected readonly mobile = inject(LayoutService).isMobile;
+  private readonly layoutMobile = inject(LayoutService).isMobile;
+  private readonly narrow = injectNarrowViewport();
+  /** Einzelkarten-Ansicht (Handy und alles unter TABLE_MIN_WIDTH); sonst die Matrix mit allen Spalten. */
+  protected readonly mobile = computed(() => this.layoutMobile() || this.narrow());
 
   protected readonly attendances = ATTENDANCES;
   protected readonly attendanceLabels = ATTENDANCE_LABELS;
@@ -60,6 +72,7 @@ export class EventRating implements OnInit {
   protected readonly gradeLabels = GRADE_LABELS;
   protected readonly gradeOptions = GRADE_OPTIONS;
   protected readonly views = RATING_VIEWS;
+  protected readonly gradeHeaders = GRADE_HEADERS;
   protected readonly limits = { note: MAX_NOTE_LENGTH, goals: MAX_GOALS_OR_ASSISTS };
 
   private readonly eventId = toSignal(this.route.paramMap.pipe(map((params) => params.get('id') ?? '')), { initialValue: '' });
