@@ -118,7 +118,7 @@
                   <td>{{ formatDate(event.date) }}</td>
                   <td><strong>{{ event.title }}</strong></td>
                   <td><span class="badge" [attr.data-type]="event.type">{{ event.type }}</span></td>
-                  <td>{{ detail(event) || '–' }} <tk-weather [event]="event" /></td>
+                  <td>{{ detail(event) || '–' }}<div class="weather"><tk-weather [event]="event" /></div></td>
                   <td>{{ intensityLabel(event) }}</td>
                   <td>{{ resultText(event) || '–' }}</td>
                   @if (events.canWrite()) {
