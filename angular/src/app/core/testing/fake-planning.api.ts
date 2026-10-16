@@ -8,6 +8,7 @@ export class FakePlanningApi implements Pick<PlanningApi, keyof PlanningApi> {
   doc: Record<string, unknown> | null = null;
   watchError: unknown = null;
   saveError: unknown = null;
+  skipError: unknown = null;
   watchers = 0;
   errorListener: ((error: unknown) => void) | null = null;
   private listener: ((data: Readonly<Record<string, unknown>> | null, meta: SnapshotMeta) => void) | null = null;
@@ -48,7 +49,20 @@ export class FakePlanningApi implements Pick<PlanningApi, keyof PlanningApi> {
     if (this.saveError) throw this.saveError;
     const rest = { ...this.series };
     delete rest[id];
-    this.doc = { ...this.doc, series: rest };
+    const skipped = { ...this.skipped };
+    delete skipped[id];
+    this.doc = { ...this.doc, series: rest, skipped };
+    this.emit();
+  }
+
+  get skipped(): Record<string, Record<string, boolean>> {
+    return (this.doc?.['skipped'] as Record<string, Record<string, boolean>> | undefined) ?? {};
+  }
+
+  async markSkipped(seriesId: string, date: string): Promise<void> {
+    this.calls.push(`markSkipped:${seriesId}:${date}`);
+    if (this.skipError) throw this.skipError;
+    this.doc = { ...this.doc, skipped: { ...this.skipped, [seriesId]: { ...this.skipped[seriesId], [date]: true } } };
     this.emit();
   }
 }

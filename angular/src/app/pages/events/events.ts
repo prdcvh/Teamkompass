@@ -14,6 +14,7 @@ import {
   resultText,
   sortEvents,
 } from '../../core/events/event';
+import { isSeriesEvent } from '../../core/planning/series-events';
 import { EventsService } from '../../core/events/events.service';
 import { SyncService } from '../../core/shell/sync.service';
 import { Button } from '../../ui/button/button';
@@ -73,6 +74,10 @@ export class Events implements OnInit {
   }
 
   /** „vs. Gegner · Ort“ bzw. nur der Ort. */
+  protected fromSeries(event: TeamEvent): boolean {
+    return isSeriesEvent(event.id);
+  }
+
   protected detail(event: TeamEvent): string {
     return [event.opponent ? `vs. ${event.opponent}` : '', event.location].filter(Boolean).join(' · ');
   }

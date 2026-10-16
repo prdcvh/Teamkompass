@@ -3,7 +3,7 @@
     <div>
       <p class="tk-eyebrow">Mannschaft</p>
       <h1>Planung</h1>
-      <p class="muted">Feste Trainingstage als Serie mit Enddatum. Die Termine entstehen in einem späteren Schritt.</p>
+      <p class="muted">Feste Trainingstage als Serie mit Enddatum. Beim Speichern entstehen die Trainings in der Eventliste.</p>
     </div>
     @if (planning.load() === 'ready') {
       <button tkButton variant="primary" type="button" (click)="openNew()">+ Serie anlegen</button>
@@ -16,6 +16,10 @@
       <span> – {{ sync.detail() }}</span>
     }
   </p>
+
+  @if (planning.run().state !== 'idle') {
+    <p class="run" role="status" [attr.data-state]="planning.run().state">{{ planning.run().text }}</p>
+  }
 
   @if (planning.load() === 'error') {
     <div class="notice" role="alert">
@@ -56,7 +60,7 @@
 
 <tk-dialog [open]="deleting() !== null" title="Serie löschen?" (closed)="deleting.set(null)">
   <p>
-    Die Serie „{{ deleting() ? weekday(deleting()!.weekday) + ', ' + deleting()!.startTime + ' Uhr' : '' }}“ wird gelöscht. Bereits angelegte Events bleiben unberührt.
+    Die Serie „{{ deleting() ? weekday(deleting()!.weekday) + ', ' + deleting()!.startTime + ' Uhr' : '' }}“ wird gelöscht. Bereits angelegte Trainings bleiben bestehen.
   </p>
   <div class="confirm-actions">
     <button tkButton type="button" (click)="deleting.set(null)">Abbrechen</button>

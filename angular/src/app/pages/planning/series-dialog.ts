@@ -40,6 +40,9 @@ export class SeriesDialog {
   protected readonly editing = computed(() => this.series() !== null);
   protected readonly heading = computed(() => (this.editing() ? 'Serie bearbeiten' : 'Serie anlegen'));
 
+  /** Was beim Speichern passiert, z. B. „34 Trainings werden angelegt“. */
+  protected readonly preview = computed(() => this.planning.preview(this.draft()));
+
   protected readonly places = signal<readonly GeocodedPlace[]>([]);
   protected readonly searchState = signal<'idle' | 'searching' | 'done'>('idle');
   protected readonly searchError = signal('');

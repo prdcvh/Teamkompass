@@ -37,6 +37,18 @@ export class EventsApi {
     await setDoc(doc(db, 'teams', environment.teamId, 'events', id), data, { merge: true });
   }
 
+  /**
+   * Legt mehrere Events in einem Schreibvorgang an (ein Block, höchstens 500). Wie {@link saveEvent} mit merge;
+   * gedacht für Events mit festen IDs, die zwei Trainer gleichzeitig mit demselben Inhalt schreiben dürfen.
+   */
+  async saveEventsBatch(entries: readonly { readonly id: string; readonly data: Readonly<Record<string, unknown>> }[]): Promise<void> {
+    const { db } = await this.connection.get();
+    const { doc, writeBatch } = await import('firebase/firestore');
+    const batch = writeBatch(db);
+    for (const entry of entries) batch.set(doc(db, 'teams', environment.teamId, 'events', entry.id), entry.data, { merge: true });
+    await batch.commit();
+  }
+
   /** Löscht das Event samt Bewertungen und internen Notizen (in Blöcken, Limit 500 je Schreibvorgang). */
   async deleteEvent(id: string): Promise<void> {
     const { db } = await this.connection.get();

@@ -46,6 +46,25 @@ describe('Planung (Seite)', () => {
     expect(row).toContain(formatDate(end));
   });
 
+  it('zeigt vor dem Speichern die Vorschau und legt danach die Trainings an', async () => {
+    const fixture = await render();
+    (root(fixture).querySelector('.head button') as HTMLButtonElement).click();
+    await fixture.whenStable();
+    expect(root(fixture).querySelector('[data-testid="series-preview"]')).toBeNull();
+    // Heute plus 8 Wochen, gleicher Wochentag wie heute: genau 9 Termine (heute eingeschlossen).
+    const today = todayIso();
+    type(field(fixture, 'startTime'), '17:30');
+    type(field(fixture, 'endDate'), new Date(Date.parse(`${today}T00:00:00Z`) + 56 * 86_400_000).toISOString().slice(0, 10));
+    await fixture.whenStable();
+    expect(root(fixture).querySelector('[data-testid="series-preview"]')?.textContent).toContain('9 Trainings werden angelegt.');
+
+    (root(fixture).querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit', { cancelable: true }));
+    await fixture.whenStable();
+    await vi.waitFor(() => expect(firebase.events.events.size).toBe(9));
+    await fixture.whenStable();
+    expect(root(fixture).querySelector('.run')?.textContent).toContain('9 Trainings wurden angelegt.');
+  });
+
   it('zeigt Prüfmeldungen und speichert dann nichts', async () => {
     const fixture = await render();
     (root(fixture).querySelector('.head button') as HTMLButtonElement).click();
