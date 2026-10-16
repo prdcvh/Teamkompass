@@ -121,6 +121,103 @@ describe('Planung (Seite)', () => {
   });
 });
 
+describe('Planung: Pausen (Seite, SCRUM-148)', () => {
+  let firebase: FakeFirebase;
+  const day = (offset: number) => new Date(Date.parse(`${todayIso()}T00:00:00Z`) + offset * 86_400_000).toISOString().slice(0, 10);
+
+  async function render() {
+    firebase = new FakeFirebase();
+    await TestBed.configureTestingModule({ imports: [Planning], providers: [...provideFakeFirebase(firebase)] }).compileComponents();
+    TestBed.inject(SessionService).role.set('trainer');
+    const fixture = TestBed.createComponent(Planning);
+    await fixture.whenStable();
+    return fixture;
+  }
+  const root = (fixture: { nativeElement: unknown }) => fixture.nativeElement as HTMLElement;
+  const field = (fixture: { nativeElement: unknown }, name: string) => root(fixture).querySelector(`tk-break-dialog [name="${name}"]`) as HTMLInputElement;
+  function type(input: HTMLInputElement, value: string) {
+    input.value = value;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  const addBreakButton = (fixture: { nativeElement: unknown }) => [...root(fixture).querySelectorAll('.section-head button')].find((b) => b.textContent?.includes('Pause anlegen')) as HTMLButtonElement;
+
+  it('zeigt einen leeren Pausen-Teil, prüft die Eingaben und legt eine Pause an', async () => {
+    const fixture = await render();
+    expect(root(fixture).textContent).toContain('Noch keine Pause eingetragen.');
+    addBreakButton(fixture).click();
+    await fixture.whenStable();
+    const form = root(fixture).querySelector('tk-break-dialog form') as HTMLFormElement;
+    form.dispatchEvent(new Event('submit', { cancelable: true }));
+    await fixture.whenStable();
+    const messages = [...root(fixture).querySelectorAll('tk-break-dialog .error')].map((el) => el.textContent);
+    expect(messages.some((text) => text?.includes('Namen'))).toBe(true);
+    expect(messages.some((text) => text?.includes('Bis'))).toBe(true);
+    expect(firebase.calls).not.toContain('saveBreak');
+
+    type(field(fixture, 'name'), 'Herbstferien');
+    type(field(fixture, 'endDate'), day(-1));
+    form.dispatchEvent(new Event('submit', { cancelable: true }));
+    await fixture.whenStable();
+    expect([...root(fixture).querySelectorAll('tk-break-dialog .error')].some((el) => el.textContent?.includes('nicht vor dem Von-Datum'))).toBe(true);
+
+    type(field(fixture, 'endDate'), day(13));
+    form.dispatchEvent(new Event('submit', { cancelable: true }));
+    await fixture.whenStable();
+    await vi.waitFor(() => expect(Object.keys(firebase.planning.breaks)).toHaveLength(1));
+    await fixture.whenStable();
+    const row = root(fixture).querySelector('[data-testid="break-list"] .what')?.textContent ?? '';
+    expect(row).toContain('Herbstferien');
+    expect(row).toContain(formatDate(day(13)));
+  });
+
+  it('nennt in der Vorschau die wegfallenden Trainings und entfernt sie beim Speichern', async () => {
+    const fixture = await render();
+    const dates = [day(7), day(14), day(21)];
+    firebase.planning.doc = {
+      series: { s1: { weekday: isoWeekday(day(7)), startTime: '17:30', durationMinutes: 90, location: '', locationCoords: null, title: '', trainingFocus: 'Umschalten', intensity: 2, startDate: day(-30), endDate: day(21) } },
+    };
+    for (const date of dates) firebase.events.events.set(`serie-s1-${date}`, { type: 'Training', title: 'Training', date, intensity: 2, location: '', trainingFocus: 'Umschalten', startTime: '17:30', durationMinutes: 90, locationCoords: null });
+    firebase.events.events.set('spiel', { type: 'Spiel', title: 'Testspiel', date: dates[1], opponent: 'SG' });
+    firebase.events.emitEvents();
+    firebase.planning.emit();
+    await fixture.whenStable();
+    addBreakButton(fixture).click();
+    await fixture.whenStable();
+    type(field(fixture, 'name'), 'Herbstferien');
+    type(field(fixture, 'startDate'), day(10));
+    type(field(fixture, 'endDate'), day(30));
+    await vi.waitFor(() => {
+      expect(root(fixture).querySelector('[data-testid="break-preview"]')?.textContent).toBe('In der Pause „Herbstferien“: 2 Trainings fallen weg.');
+    });
+    (root(fixture).querySelector('tk-break-dialog form') as HTMLFormElement).dispatchEvent(new Event('submit', { cancelable: true }));
+    await vi.waitFor(() => expect([...firebase.events.events.keys()].sort()).toEqual([`serie-s1-${dates[0]}`, 'spiel']));
+    await fixture.whenStable();
+    expect(root(fixture).querySelector('.run')?.textContent).toContain('2 Trainings sind weggefallen.');
+  });
+
+  it('löscht eine Pause nach Rückfrage, und die Trainings entstehen wieder', async () => {
+    const fixture = await render();
+    const date = day(7);
+    firebase.planning.doc = {
+      series: { s1: { weekday: isoWeekday(date), startTime: '17:30', durationMinutes: 90, location: '', locationCoords: null, title: '', trainingFocus: 'Umschalten', intensity: 2, startDate: day(-30), endDate: day(14) } },
+      breaks: { b1: { name: 'Sommerpause', startDate: day(1), endDate: day(10) } },
+    };
+    firebase.planning.emit();
+    await fixture.whenStable();
+    (root(fixture).querySelector('[data-testid="break-list"] button') as HTMLButtonElement).click();
+    await fixture.whenStable();
+    (root(fixture).querySelector('tk-break-dialog .delete') as HTMLButtonElement).click();
+    await fixture.whenStable();
+    expect(firebase.calls).not.toContain('deleteBreak');
+    await vi.waitFor(() => expect(root(fixture).querySelector('[data-testid="delete-break-preview"]')?.textContent).toBe('Pause „Sommerpause“ wird gelöscht: 1 Training entsteht wieder.'));
+    const confirm = [...root(fixture).querySelectorAll('.confirm-actions button')].filter((b) => b.textContent?.includes('Endgültig')).at(-1) as HTMLButtonElement; // der Pausen-Dialog steht nach dem Serien-Dialog
+    confirm.click();
+    await vi.waitFor(() => expect(firebase.calls).toContain('deleteBreak'));
+    expect(firebase.planning.breaks).toEqual({});
+    await vi.waitFor(() => expect(firebase.events.events.has(`serie-s1-${date}`)).toBe(true));
+  });
+});
+
 describe('Planung: Zugang nur für Trainer', () => {
   it('liegt in der Navigation (Sidebar und Mehr-Blatt) und hinter dem Trainer-Wächter', () => {
     expect(SIDEBAR_ITEMS.map((item) => item.path)).toContain('/planung');

@@ -3,6 +3,7 @@ import { INTENSITIES } from '../../core/events/event';
 import { type PlanningBreak, breakPeriodText } from '../../core/planning/breaks';
 import { type TrainingSeries, seriesTitle, weekdayLabel } from '../../core/planning/planning';
 import { EventsService } from '../../core/events/events.service';
+import { BreaksService } from '../../core/planning/breaks.service';
 import { PlanningService } from '../../core/planning/planning.service';
 import { formatDate } from '../../core/shared/dates';
 import { SyncService } from '../../core/shell/sync.service';
@@ -23,6 +24,7 @@ import { SeriesDialog } from './series-dialog';
 })
 export class Planning implements OnInit {
   protected readonly planning = inject(PlanningService);
+  private readonly breaksService = inject(BreaksService);
   protected readonly sync = inject(SyncService);
   private readonly events = inject(EventsService);
   private readonly settings = inject(TeamSettingsService);
@@ -96,17 +98,17 @@ export class Planning implements OnInit {
   protected askDeleteBreak(entry: PlanningBreak): void {
     this.breakDialogOpen.set(false);
     this.deletingBreak.set(entry);
-    void this.planning.loadBreakProtection(null, entry);
+    void this.breaksService.loadBreakProtection(null, entry);
   }
 
   /** Was beim Löschen der Pause mit den Serien-Trainings passiert; null, solange geprüft wird. */
   protected deleteBreakPreview(entry: PlanningBreak | null): string | null {
-    return entry ? this.planning.deleteBreakPreview(entry.id) : null;
+    return entry ? this.breaksService.deleteBreakPreview(entry.id) : null;
   }
 
   protected confirmDeleteBreak(): void {
     const entry = this.deletingBreak();
-    if (entry) this.planning.deleteBreak(entry.id);
+    if (entry) this.breaksService.deleteBreak(entry.id);
     this.deletingBreak.set(null);
   }
 }

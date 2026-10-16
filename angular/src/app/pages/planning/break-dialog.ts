@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { MAX_TITLE_LENGTH } from '../../core/events/event';
 import { type BreakDraft, type BreakErrors, type PlanningBreak, draftFromBreak, emptyBreakDraft } from '../../core/planning/breaks';
-import { PlanningService } from '../../core/planning/planning.service';
+import { BreaksService } from '../../core/planning/breaks.service';
 import { todayIso } from '../../core/shared/dates';
 import { Button } from '../../ui/button/button';
 import { Dialog } from '../../ui/dialog/dialog';
@@ -15,7 +15,7 @@ import { Dialog } from '../../ui/dialog/dialog';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class BreakDialog {
-  private readonly planning = inject(PlanningService);
+  private readonly breaks = inject(BreaksService);
 
   readonly open = input(false);
   /** Zu bearbeitende Pause; leer = neue Pause. */
@@ -29,7 +29,7 @@ export class BreakDialog {
   protected readonly editing = computed(() => this.entry() !== null);
   protected readonly heading = computed(() => (this.editing() ? 'Pause bearbeiten' : 'Pause anlegen'));
   /** Was beim Speichern passiert, z. B. „In der Pause „Herbstferien“: 4 Trainings fallen weg.“ */
-  protected readonly preview = computed(() => this.planning.previewBreak(this.draft()));
+  protected readonly preview = computed(() => this.breaks.previewBreak(this.draft()));
 
   constructor() {
     effect(() => {
@@ -38,14 +38,14 @@ export class BreakDialog {
       untracked(() => {
         this.draft.set(entry ? draftFromBreak(entry) : emptyBreakDraft(todayIso()));
         this.errors.set({});
-        this.planning.breakProtection.set(null);
+        this.breaks.breakProtection.set(null);
       });
     });
     // Sobald der Zeitraum gültig ist, nachsehen, welche Termine darin schon bewertet sind (für die Vorschau).
     effect(() => {
       if (!this.open()) return;
       const draft = this.draft();
-      untracked(() => void this.planning.loadBreakProtection(draft));
+      untracked(() => void this.breaks.loadBreakProtection(draft));
     });
   }
 
@@ -59,7 +59,7 @@ export class BreakDialog {
 
   protected submit(event: Event): void {
     event.preventDefault();
-    const errors = this.planning.saveBreak(this.draft());
+    const errors = this.breaks.saveBreak(this.draft());
     this.errors.set(errors);
     if (Object.keys(errors).length === 0) this.closed.emit();
   }

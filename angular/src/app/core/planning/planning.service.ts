@@ -7,8 +7,7 @@ import { EventsApi } from '../firebase/events.api';
 import { PlanningApi } from '../firebase/planning.api';
 import { todayIso } from '../shared/dates';
 import { SyncService } from '../shell/sync.service';
-import { type BreakChangePlan, breakCandidates, breakChangeText, breakScope, breakSummary, planBreakChange } from './break-change';
-import { type BreakDraft, type BreakErrors, type PlanningBreak, breakFromDraft, breaksFromPlanningDoc, docFromBreak, validateBreakDraft } from './breaks';
+import { type PlanningBreak, breaksFromPlanningDoc } from './breaks';
 import { type SeriesDraft, type SeriesErrors, type TrainingSeries, docFromSeries, seriesFromDraft, seriesFromPlanningDoc, validateSeriesDraft } from './planning';
 import { SERIES_EVENT_BATCH_SIZE, type SeriesChangePlan, changeCandidates, changeText, eventFromSeries, planSeriesChange, planText, skippedFromPlanningDoc } from './series-events';
 
@@ -20,14 +19,6 @@ export interface SeriesRun {
   readonly text: string;
 }
 const IDLE_RUN: SeriesRun = { state: 'idle', text: '' };
-
-/** Welche künftigen Termine im Zeitraum einer Pause schon Bewertungen/Notizen haben (für die Vorschau der Pause). */
-export interface BreakProtection {
-  /** Zeiträume, für die nachgesehen wurde. */
-  readonly key: string;
-  readonly state: 'loading' | 'ready' | 'error';
-  readonly rated: ReadonlySet<string>;
-}
 
 /** Welche künftigen Termine einer Serie schon Bewertungen/Notizen haben (vor dem Ändern oder Löschen nachgesehen). */
 export interface SeriesProtection {
@@ -50,14 +41,13 @@ export class PlanningService {
   private readonly events = inject(EventsService);
   private readonly eventsApi = inject(EventsApi);
 
-  private readonly stored = signal<Readonly<Record<string, unknown>> | null>(null);
+  /** Stand des Planungsdokuments (für {@link BreaksService}). */
+  readonly stored = signal<Readonly<Record<string, unknown>> | null>(null);
   readonly load = signal<PlanningLoad>('idle');
   readonly canWrite = computed(() => this.session.role() === 'trainer');
   readonly series = computed<readonly TrainingSeries[]>(() => seriesFromPlanningDoc(this.stored()));
   /** Pausen (SCRUM-148): an ihren Tagen entstehen keine Serien-Trainings. */
   readonly breaks = computed<readonly PlanningBreak[]>(() => breaksFromPlanningDoc(this.stored()));
-  /** Stand der Prüfung auf bewertete Termine für die Vorschau im Pausen-Formular. */
-  readonly breakProtection = signal<BreakProtection | null>(null);
   /** Meldung zum letzten Anlegen der Serien-Trainings. */
   readonly run = signal<SeriesRun>(IDLE_RUN);
   /** Stand der Prüfung auf bewertete Termine für die Vorschau im Formular (beim Speichern wird neu geprüft). */
@@ -66,7 +56,6 @@ export class PlanningService {
   private unsubscribe: (() => void) | null = null;
   private generation = 0;
   private protectionRun = 0;
-  private breakRun = 0;
 
   constructor() {
     effect(() => {
@@ -114,8 +103,6 @@ export class PlanningService {
     this.run.set(IDLE_RUN);
     this.protection.set(null);
     this.protectionRun += 1;
-    this.breakProtection.set(null);
-    this.breakRun += 1;
   }
 
   /**
@@ -221,43 +208,26 @@ export class PlanningService {
    * sonst die Fehlermeldung (die Blöcke davor bleiben bestehen).
    */
   private async execute(series: TrainingSeries | null, plan: SeriesChangePlan, retryHint: string): Promise<string | null> {
-    const creates = series
-      ? plan.create.map((date) => {
-          const event = eventFromSeries(series, date);
-          return { id: event.id, data: docFromEvent(event) };
-        })
-      : [];
+    const creates = series ? plan.create.map((date) => eventFromSeries(series, date)).map((event) => ({ id: event.id, data: docFromEvent(event) })) : [];
     return this.writeChunks(creates, plan.update.map((entry) => ({ id: entry.id, data: entry.changes })), plan.remove, retryHint);
   }
 
   /** Schreibt Anlegen, Anpassen und Entfernen in Blöcken. Rückgabe: null = geschafft, sonst die Fehlermeldung. */
-  private async writeChunks(
+  async writeChunks(
     creates: readonly { readonly id: string; readonly data: Readonly<Record<string, unknown>> }[],
     updates: readonly { readonly id: string; readonly data: Readonly<Record<string, unknown>> }[],
     removes: readonly string[],
     retryHint: string,
   ): Promise<string | null> {
-    const steps: (() => Promise<void>)[] = [];
     const chunks = <T>(items: readonly T[]) => Array.from({ length: Math.ceil(items.length / SERIES_EVENT_BATCH_SIZE) }, (_, index) => items.slice(index * SERIES_EVENT_BATCH_SIZE, (index + 1) * SERIES_EVENT_BATCH_SIZE));
-    const sizes: number[] = [];
-    for (const chunk of chunks(creates)) {
-      sizes.push(chunk.length);
-      steps.push(() => this.eventsApi.saveEventsBatch(chunk));
-    }
-    for (const chunk of chunks(updates)) {
-      sizes.push(chunk.length);
-      steps.push(() => this.eventsApi.saveEventsBatch(chunk));
-    }
-    for (const chunk of chunks(removes)) {
-      sizes.push(chunk.length);
-      steps.push(() => this.eventsApi.deleteEventsBatch(chunk));
-    }
-    const total = sizes.reduce((sum, size) => sum + size, 0);
+    const save = (items: typeof creates) => chunks(items).map((chunk) => ({ size: chunk.length, run: () => this.eventsApi.saveEventsBatch(chunk) }));
+    const steps = [...save(creates), ...save(updates), ...chunks(removes).map((chunk) => ({ size: chunk.length, run: () => this.eventsApi.deleteEventsBatch(chunk) }))];
+    const total = steps.reduce((sum, step) => sum + step.size, 0);
     let done = 0;
     try {
-      for (const [index, step] of steps.entries()) {
-        await step();
-        done += sizes[index];
+      for (const step of steps) {
+        await step.run();
+        done += step.size;
       }
     } catch (error) {
       console.error(error);
@@ -306,165 +276,8 @@ export class PlanningService {
     this.run.set({ state: 'done', text: `Die Serie wurde gelöscht. ${this.summary({ ...plan, create: [] }).replace('Es gab keine neuen Trainings anzulegen.', 'Es gab keine künftigen Termine zu entfernen.')}` });
   }
 
-  // --- Pausen (SCRUM-148) ---
-
-  /** Die Pausen nach einer Änderung: die geänderte Pause ersetzt oder entfernt, alle anderen unverändert. */
-  private breaksAfter(before: PlanningBreak | null, after: PlanningBreak | null): readonly PlanningBreak[] {
-    const id = (after ?? before)?.id;
-    return [...this.breaks().filter((entry) => entry.id !== id), ...(after ? [after] : [])];
-  }
-
-  /** Alter und neuer Stand der Pause zu einem Entwurf; null, solange der Entwurf ungültig ist. */
-  private breakStates(draft: BreakDraft): { readonly before: PlanningBreak | null; readonly after: PlanningBreak } | null {
-    if (Object.keys(validateBreakDraft(draft)).length > 0) return null;
-    const before = draft.id === null ? null : (this.breaks().find((entry) => entry.id === draft.id) ?? null);
-    return { before, after: breakFromDraft(draft, draft.id ?? 'neu') };
-  }
-
-  private breakKey(before: PlanningBreak | null, after: PlanningBreak | null): string {
-    return breakScope(before, after)
-      .map((range) => `${range.from}/${range.to}`)
-      .join('|');
-  }
-
-  /**
-   * Schaut nach, welche Serien-Trainings im Zeitraum der Pause schon Bewertungen oder Notizen haben (für die Vorschau).
-   * Ändert sich der Zeitraum nicht, wird nicht noch einmal gefragt; beim Speichern wird ohnehin neu geprüft.
-   */
-  async loadBreakProtection(draft: BreakDraft | null, removing: PlanningBreak | null = null): Promise<void> {
-    const states = draft ? this.breakStates(draft) : removing ? { before: removing, after: null } : null;
-    if (!states) return;
-    const key = this.breakKey(states.before, states.after);
-    const current = this.breakProtection();
-    if (current && current.key === key && current.state !== 'error') return;
-    const run = ++this.breakRun;
-    this.breakProtection.set({ key, state: 'loading', rated: new Set() });
-    const events = await this.events.whenLoaded();
-    if (run !== this.breakRun) return;
-    if (this.events.load() !== 'ready') {
-      this.breakProtection.set({ key, state: 'error', rated: new Set() });
-      return;
-    }
-    try {
-      const ids = breakCandidates(this.series(), todayIso(), events, breakScope(states.before, states.after));
-      const rated = await this.eventsApi.findEventsWithRecords(ids);
-      if (run === this.breakRun) this.breakProtection.set({ key, state: 'ready', rated });
-    } catch (error) {
-      console.error(error);
-      if (run === this.breakRun) this.breakProtection.set({ key, state: 'error', rated: new Set() });
-    }
-  }
-
-  /** Vorschau für das Pausen-Formular, z. B. „In der Pause „Herbstferien“: 4 Trainings fallen weg.“ Null, solange ungültig. */
-  previewBreak(draft: BreakDraft): string | null {
-    const states = this.breakStates(draft);
-    if (!states || this.events.load() !== 'ready') return null;
-    return this.breakPreviewText(`In der Pause „${states.after.name}“`, states.before, states.after);
-  }
-
-  /** Vorschau für die Rückfrage beim Löschen einer Pause. */
-  deleteBreakPreview(id: string): string | null {
-    const before = this.breaks().find((entry) => entry.id === id);
-    if (!before || this.events.load() !== 'ready') return null;
-    return this.breakPreviewText(`Pause „${before.name}“ wird gelöscht`, before, null);
-  }
-
-  private breakPreviewText(lead: string, before: PlanningBreak | null, after: PlanningBreak | null): string {
-    const events = this.events.events();
-    const scope = breakScope(before, after);
-    const hasCandidates = breakCandidates(this.series(), todayIso(), events, scope).length > 0;
-    const protection = this.breakProtection();
-    if (hasCandidates) {
-      if (protection === null || protection.key !== this.breakKey(before, after) || protection.state === 'loading') return 'Es wird geprüft, welche Termine schon bewertet sind …';
-      if (protection.state === 'error') return 'Es konnte nicht geprüft werden, welche Termine schon bewertet sind. Beim Speichern wird es erneut versucht; klappt auch das nicht, bleiben die Termine unverändert.';
-    }
-    const rated = hasCandidates && protection ? protection.rated : new Set<string>();
-    const plan = planBreakChange(this.series(), todayIso(), events, rated, skippedFromPlanningDoc(this.stored()), this.breaksAfter(before, after), scope);
-    return breakChangeText(lead, plan);
-  }
-
-  /**
-   * Prüft und speichert eine Pause (neu oder geändert) und bringt danach die Serien-Trainings in Ordnung: neu oder
-   * verlängert entfernt sie unbewertete, nicht von Hand geänderte Serien-Trainings in der Pause; gekürzt lässt sie wieder
-   * entstehen. Gibt die Fehler der Prüfung zurück; leer = gespeichert.
-   */
-  saveBreak(draft: BreakDraft): BreakErrors {
-    if (!this.canWrite() || this.load() !== 'ready') return { startDate: 'Die Planung ist noch nicht geladen. Bitte kurz warten und erneut speichern.' };
-    const errors = validateBreakDraft(draft);
-    if (Object.keys(errors).length > 0) return errors;
-    const before = draft.id === null ? null : (this.breaks().find((entry) => entry.id === draft.id) ?? null);
-    const after = breakFromDraft(draft, draft.id ?? `b${crypto.randomUUID().replaceAll('-', '').slice(0, 16)}`);
-    void this.applyBreak(before, after, this.write(this.api.saveBreak(after.id, docFromBreak(after)), 'Die Pause konnte nicht gespeichert werden.'));
-    return {};
-  }
-
-  /** Löscht die Pause: erst entstehen die Serien-Trainings wieder, dann wird die Pause entfernt (bei Fehler bleibt sie bestehen). */
-  deleteBreak(id: string): boolean {
-    const before = this.breaks().find((entry) => entry.id === id);
-    if (!before || !this.canWrite() || this.load() !== 'ready') return false;
-    void this.removeBreak(before);
-    return true;
-  }
-
-  private async applyBreak(before: PlanningBreak | null, after: PlanningBreak, written: Promise<boolean>): Promise<void> {
-    this.run.set({ state: 'running', text: 'Termine werden aktualisiert …' });
-    if (!(await written)) {
-      this.run.set({ state: 'error', text: 'Die Pause wurde nicht gespeichert, deshalb wurden keine Termine geändert.' });
-      return;
-    }
-    const plan = await this.prepareBreakPlan(before, after, 'Die Pause ist gespeichert, aber ', 'Bitte die Pause später erneut speichern.');
-    if (!plan) return;
-    const failure = await this.executeBreak(plan, 'Bitte die Pause erneut speichern, dann wird der Rest erledigt.');
-    this.run.set(failure ? { state: 'error', text: failure } : { state: 'done', text: breakSummary(plan) });
-  }
-
-  private async removeBreak(before: PlanningBreak): Promise<void> {
-    this.run.set({ state: 'running', text: 'Pause wird gelöscht …' });
-    const plan = await this.prepareBreakPlan(before, null, 'Die Pause wurde nicht gelöscht, denn ', 'Bitte später erneut löschen.');
-    if (!plan) return;
-    const failure = await this.executeBreak(plan, 'Die Pause besteht noch; bitte erneut löschen, dann wird der Rest erledigt.');
-    if (failure) {
-      this.run.set({ state: 'error', text: failure });
-      return;
-    }
-    if (!(await this.write(this.api.deleteBreak(before.id), 'Die Pause konnte nicht gelöscht werden.'))) {
-      this.run.set({ state: 'error', text: 'Die Serien-Trainings wurden wieder angelegt, aber die Pause konnte nicht gelöscht werden. Bitte erneut löschen.' });
-      return;
-    }
-    this.run.set({ state: 'done', text: `Die Pause „${before.name}“ wurde gelöscht. ${breakSummary(plan)}` });
-  }
-
-  /** Liest Events und Bewertungsstand frisch und plant die Folgen der Pause. Bei Fehler: Meldung, Rückgabe null, nichts geändert. */
-  private async prepareBreakPlan(before: PlanningBreak | null, after: PlanningBreak | null, prefix: string, suffix: string): Promise<BreakChangePlan | null> {
-    const events = await this.events.whenLoaded();
-    if (this.events.load() !== 'ready') {
-      this.run.set({ state: 'error', text: `${prefix}die vorhandenen Events konnten nicht geladen werden. Es wurden keine Termine geändert. ${suffix}` });
-      return null;
-    }
-    const scope = breakScope(before, after);
-    let rated: ReadonlySet<string>;
-    try {
-      rated = await this.eventsApi.findEventsWithRecords(breakCandidates(this.series(), todayIso(), events, scope));
-    } catch (error) {
-      console.error(error);
-      this.run.set({ state: 'error', text: `${prefix}es konnte nicht geprüft werden, welche Termine schon bewertet sind. Deshalb wurde nichts geändert. ${authErrorMessage(errorCode(error))} ${suffix}` });
-      return null;
-    }
-    return planBreakChange(this.series(), todayIso(), events, rated, skippedFromPlanningDoc(this.stored()), this.breaksAfter(before, after), scope);
-  }
-
-  private executeBreak(plan: BreakChangePlan, retryHint: string): Promise<string | null> {
-    const creates = plan.create.flatMap((entry) =>
-      entry.dates.map((date) => {
-        const event = eventFromSeries(entry.series, date);
-        return { id: event.id, data: docFromEvent(event) };
-      }),
-    );
-    return this.writeChunks(creates, [], plan.remove, retryHint);
-  }
-
   /** Löst das Schreiben aus; das Ergebnis sagt, ob es geklappt hat (Fehler sind bereits gemeldet). */
-  private write(pending: Promise<void>, failure: string): Promise<boolean> {
+  write(pending: Promise<void>, failure: string): Promise<boolean> {
     if (!this.sync.isFailed()) this.sync.state.set('syncing');
     return pending
       .then(() => {
