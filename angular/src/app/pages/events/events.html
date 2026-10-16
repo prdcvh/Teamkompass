@@ -86,9 +86,7 @@
                     <span class="result">{{ result }}</span>
                   }
                 </a>
-                @if (events.canWrite()) {
-                  <button tkButton size="sm" type="button" (click)="openEdit(event)" [attr.aria-label]="'Event bearbeiten: ' + event.title">Bearbeiten</button>
-                }
+                <button tkButton size="sm" type="button" (click)="openView(event)" [attr.aria-label]="'Event anschauen: ' + event.title">Anschauen</button>
                 <!-- Eigene Zeile über die volle Kartenbreite, nicht gequetscht neben „Bearbeiten“ (SCRUM-155). -->
                 <tk-weather class="card-weather" [event]="event" />
               </li>
@@ -108,9 +106,7 @@
                 <th scope="col">Ort / Gegner</th>
                 <th scope="col">Intensität</th>
                 <th scope="col">Ergebnis</th>
-                @if (events.canWrite()) {
-                  <th scope="col"><span class="tk-sr-only">Aktionen</span></th>
-                }
+                <th scope="col"><span class="tk-sr-only">Aktionen</span></th>
               </tr>
             </thead>
             <tbody>
@@ -122,15 +118,17 @@
                   <td>{{ detail(event) || '–' }}<div class="weather"><tk-weather [event]="event" /></div></td>
                   <td>{{ intensityLabel(event) }}</td>
                   <td>{{ resultText(event) || '–' }}</td>
-                  @if (events.canWrite()) {
-                    <td>
-                      <div class="actions">
+                  <td>
+                    <div class="actions">
+                      @if (events.canWrite()) {
                         <a tkButton size="sm" variant="primary" [routerLink]="['/events', event.id]" [attr.aria-label]="'Bewerten: ' + event.title">Bewerten</a>
-                        <button tkButton size="sm" type="button" (click)="openEdit(event)" [attr.aria-label]="'Bearbeiten: ' + event.title">Bearbeiten</button>
+                      }
+                      <button tkButton size="sm" type="button" (click)="openView(event)" [attr.aria-label]="'Anschauen: ' + event.title">Anschauen</button>
+                      @if (events.canWrite()) {
                         <button tkButton size="sm" type="button" class="danger" (click)="askDelete(event)" [attr.aria-label]="'Löschen: ' + event.title">Löschen</button>
-                      </div>
-                    </td>
-                  }
+                      }
+                    </div>
+                  </td>
                 </tr>
               }
             </tbody>
@@ -146,9 +144,9 @@
   }
 </section>
 
-@if (events.canWrite()) {
-  <tk-event-dialog [open]="dialogOpen()" [event]="editing()" (closed)="closeDialog()" (deleteRequested)="askDelete($event)" />
+<tk-event-dialog [open]="dialogOpen()" [event]="editing()" [canEdit]="events.canWrite()" (closed)="closeDialog()" (deleteRequested)="askDelete($event)" />
 
+@if (events.canWrite()) {
   <tk-dialog [open]="deleting() !== null" title="Event löschen?" (closed)="cancelDelete()">
     <p>
       „{{ deleting()?.title }}“ wird mit allen Bewertungen und internen Notizen gelöscht. Das lässt sich nicht rückgängig machen.
