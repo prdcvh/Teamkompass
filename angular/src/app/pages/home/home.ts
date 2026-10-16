@@ -15,6 +15,7 @@ import { dashboardFigures, leaders } from '../../core/team/team';
 import { TeamService } from '../../core/team/team.service';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
+import { Weather } from '../../ui/weather/weather';
 
 /** Beschriftung der Bänder von vorn nach hinten (Reihenfolge von PITCH_BANDS umgekehrt). */
 const BAND_LABELS: readonly string[] = ['Angriff', 'Offensiv', 'Mittelfeld', 'Defensiv', 'Abwehr'];
@@ -22,7 +23,7 @@ const BAND_LABELS: readonly string[] = ['Angriff', 'Offensiv', 'Mittelfeld', 'De
 /** Start-Dashboard: Kennzahlen des Teams, nächstes Event und Bestenliste (nur für Trainer mit Daten). */
 @Component({
   selector: 'app-home',
-  imports: [RouterLink, Button, Card],
+  imports: [RouterLink, Button, Card, Weather],
   templateUrl: './home.html',
   styleUrl: './home.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

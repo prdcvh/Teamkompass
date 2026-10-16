@@ -7,6 +7,8 @@ import { OpponentsApi } from '../firebase/opponents.api';
 import { PlayerRecordsApi } from '../firebase/player-records.api';
 import { PlayersApi } from '../firebase/players.api';
 import { RatingsApi } from '../firebase/ratings.api';
+import { WeatherProvider } from '../weather/weather-provider';
+import { OfflineWeatherProvider } from './fake-weather.provider';
 import { FakeAccessApi } from './fake-access.api';
 import { FakeAuthApi } from './fake-auth.api';
 import { FakeEventsApi } from './fake-events.api';
@@ -43,5 +45,7 @@ export function provideFakeFirebase(fake: FakeFirebase): Provider[] {
     { provide: OpponentsApi, useValue: fake.opponents },
     { provide: RatingsApi, useValue: fake.ratings },
     { provide: PlayerRecordsApi, useValue: fake.records },
+    // Seiten zeigen Wetter; Tests sollen nie ins Netz (SCRUM-98).
+    { provide: WeatherProvider, useClass: OfflineWeatherProvider },
   ];
 }

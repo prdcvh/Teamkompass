@@ -81,6 +81,7 @@
                   <span class="what">
                     <strong>{{ event.title }}</strong>
                     <small>{{ formatDate(event.date) }}@if (detail(event); as info) { · {{ info }}}</small>
+                    <tk-weather [event]="event" />
                   </span>
                   @if (resultText(event); as result) {
                     <span class="result">{{ result }}</span>
@@ -117,7 +118,7 @@
                   <td>{{ formatDate(event.date) }}</td>
                   <td><strong>{{ event.title }}</strong></td>
                   <td><span class="badge" [attr.data-type]="event.type">{{ event.type }}</span></td>
-                  <td>{{ detail(event) || '–' }}</td>
+                  <td>{{ detail(event) || '–' }} <tk-weather [event]="event" /></td>
                   <td>{{ intensityLabel(event) }}</td>
                   <td>{{ resultText(event) || '–' }}</td>
                   @if (events.canWrite()) {
@@ -136,6 +137,7 @@
         </div>
       </tk-card>
     }
+    <p class="muted"><a [href]="source.url" target="_blank" rel="noopener noreferrer">{{ source.text }}</a></p>
   }
 
   @if (events.canEdit() && mobile()) {
