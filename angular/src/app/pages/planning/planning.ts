@@ -8,12 +8,13 @@ import { TeamSettingsService } from '../../core/team-settings/team-settings.serv
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 import { Dialog } from '../../ui/dialog/dialog';
+import { SchoolHolidaysHint } from './school-holidays-hint';
 import { SeriesDialog } from './series-dialog';
 
 /** Planung (nur Trainer): Trainingsserien verwalten. Die Termine selbst entstehen erst in einem späteren Schritt (SCRUM-146). */
 @Component({
   selector: 'app-planning',
-  imports: [Button, Card, Dialog, SeriesDialog],
+  imports: [Button, Card, Dialog, SchoolHolidaysHint, SeriesDialog],
   templateUrl: './planning.html',
   styleUrl: './planning.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
