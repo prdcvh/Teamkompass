@@ -2618,7 +2618,10 @@ function computePlayerInjuryRisk(playerId) {
         ? Math.max(0.15, Math.min(1, Number(rating.minutes) / matchDuration))
         : rating.attendance === "limited" ? 0.6 : 1;
       return { date: new Date(`${event.date}T00:00:00`), sessionLoad: Number(event.intensity || 2) * exposure };
-    });
+    })
+    // Termine nach heute zaehlen noch nicht (SCRUM-136): sonst ergibt daysBetween negative Werte,
+    // die den 7-/28-Tage-Filtern genuegen und den "Erholung"-Faktor verfaelschen.
+    .filter((item) => item.date <= today);
 
   // Akute (7 Tage) vs. chronische (28 Tage / 4 Wochen) Belastung - ACWR-Sweetspot ca. 0.8-1.3,
   // alles darueber ist eine Belastungsspitze mit deutlich erhoehtem Verletzungsrisiko.
@@ -2706,6 +2709,7 @@ function computePlayerInjuryRisk(playerId) {
     tier: riskTier.tier,
     action: riskTier.action,
     load: roundGrade(acuteLoad),
+    avgLoad: roundGrade(chronicWeeklyAvg),
     recentEvents: attended.filter((item) => daysBetween(item.date, today) <= 28).length,
     reason: topFactors.join(" · ") || "Keine auffälligen Belastungsfaktoren"
   };
@@ -4573,7 +4577,7 @@ function renderProfileHeader(player, ratings) {
           <strong>${risk.level} · ${risk.percentage}%</strong>
         </div>
         <div class="risk-meter"><span class="${risk.tier}" style="width:${risk.percentage}%"></span></div>
-        <small>${escapeHtml(risk.reason)} · Ø Belastung ${risk.load}/Woche (${risk.recentEvents} Events/4 Wochen)</small>
+        <small>${escapeHtml(risk.reason)} · Belastung letzte 7 Tage ${risk.load} · Ø ${risk.avgLoad}/Woche über 4 Wochen (${risk.recentEvents} Events/4 Wochen)</small>
         <small>${escapeHtml(risk.action)}</small>
       </div>
     </div>

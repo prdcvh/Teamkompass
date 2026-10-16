@@ -32,6 +32,8 @@ export interface InjuryRisk {
   readonly action: string;
   /** Akute Belastung der letzten 7 Tage. */
   readonly load: number;
+  /** Wochenschnitt der Belastung über die letzten 4 Wochen (Summe der 28 Tage / 4). */
+  readonly avgLoad: number;
   /** Einsätze der letzten 4 Wochen. */
   readonly recentEvents: number;
   readonly reason: string;
@@ -70,7 +72,10 @@ export function injuryRisk(
           ? Math.max(0.15, Math.min(1, rating!.minutes / matchDuration))
           : rating!.attendance === 'limited' ? 0.6 : 1;
       return { date: localMidnight(event.date), sessionLoad: (event.intensity || 2) * exposure };
-    });
+    })
+    // Termine nach heute zählen noch nicht (SCRUM-136): sonst ergibt daysBetween negative Werte, die den 7-/28-Tage-
+    // Filtern genügen und den Faktor „Keine Erholung“ verfälschen.
+    .filter((item) => item.date <= today);
 
   // Akute (7 Tage) vs. chronische (28 Tage / 4 Wochen) Belastung – ACWR-Sweetspot ca. 0,8–1,3, alles darüber ist
   // eine Belastungsspitze mit deutlich erhöhtem Verletzungsrisiko.
@@ -149,6 +154,7 @@ export function injuryRisk(
     tier: tier.tier,
     action: tier.action,
     load: roundGrade(acuteLoad),
+    avgLoad: roundGrade(chronicWeeklyAvg),
     recentEvents: attended.filter((item) => daysBetween(item.date, today) <= 28).length,
     reason: topFactors.join(' · ') || 'Keine auffälligen Belastungsfaktoren',
   };
