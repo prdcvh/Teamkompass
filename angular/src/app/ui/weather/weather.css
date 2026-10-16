@@ -1,0 +1,36 @@
+:host {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--tk-ink);
+}
+
+:host([hidden]) {
+  display: none;
+}
+
+.line {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.line tk-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--tk-blue);
+}
+
+.line.muted {
+  color: var(--tk-muted);
+  font-weight: 400;
+}
+
+.source {
+  color: var(--tk-muted);
+  font-size: 11px;
+  text-decoration: underline;
+}

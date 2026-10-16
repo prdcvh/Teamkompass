@@ -21,6 +21,11 @@ const ICONS = {
   'chevron-right': ['M9 6l6 6-6 6'],
   close: ['M6 6l12 12', 'M18 6L6 18'],
   plus: ['M12 5v14', 'M5 12h14'],
+  'weather-sun': ['M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8z', 'M12 2v2', 'M12 20v2', 'M2 12h2', 'M20 12h2', 'M5 5l1.4 1.4', 'M17.6 17.6L19 19', 'M19 5l-1.4 1.4', 'M6.4 17.6L5 19'],
+  'weather-cloud': ['M7 18h10a4 4 0 0 0 .5-8A5.5 5.5 0 0 0 7 8.5 4.8 4.8 0 0 0 7 18z'],
+  'weather-rain': ['M7 15h10a4 4 0 0 0 .5-8A5.5 5.5 0 0 0 7 5.5 4.8 4.8 0 0 0 7 15z', 'M8 18l-1 3', 'M12 18l-1 3', 'M16 18l-1 3'],
+  'weather-snow': ['M7 15h10a4 4 0 0 0 .5-8A5.5 5.5 0 0 0 7 5.5 4.8 4.8 0 0 0 7 15z', 'M8 19h.01', 'M12 20h.01', 'M16 19h.01'],
+  'weather-storm': ['M7 14h10a4 4 0 0 0 .5-8A5.5 5.5 0 0 0 7 4.5 4.8 4.8 0 0 0 7 14z', 'M12 14l-2 4h4l-2 4'],
 } as const satisfies Record<string, readonly string[]>;
 
 export type IconName = keyof typeof ICONS;
