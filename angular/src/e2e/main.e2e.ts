@@ -60,6 +60,12 @@ function seed(): FakeFirebase {
   fake.records.playerRecords.set('p1/developmentPlans', new Map([['dp1', { focus: 'Orientierung und Blickverhalten vor der Ballannahme', goal: 'Blick', status: 'In Arbeit', createdAt: '2026-09-01', selfReflection: '' }]]));
   fake.records.playerRecords.set('p1/absences', new Map([['ab1', { kind: 'absence', label: 'Schule', from: '2026-09-01', to: '2026-09-02' }]]));
   fake.records.playerRecords.set('p1/measurements', new Map([['me1', { date: '2026-07-01', height: '150', weight: '40' }], ['me2', { date: '2026-09-01', height: '152', weight: '41' }]]));
+  fake.planning.doc = {
+    series: {
+      s1: { weekday: 2, startTime: '17:30', durationMinutes: 90, location: 'Kunstrasen - heim', locationCoords: null, title: '', trainingFocus: 'Eigener Ballbesitz', intensity: 2, startDate: '2026-10-20', endDate: '2027-03-30' },
+      s2: { weekday: 4, startTime: '18:00', durationMinutes: 75, location: 'Sporthalle am Hang mit sehr langem Namen', locationCoords: null, title: 'Torwart- und Athletiktraining im Wechsel', trainingFocus: 'Umschalten', intensity: 3, startDate: '2026-10-22', endDate: '2027-03-25' },
+    },
+  };
   return fake;
 }
 
