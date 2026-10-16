@@ -97,7 +97,7 @@
         <p class="position" aria-live="polite">{{ currentIndex() + 1 }} / {{ players().length }}</p>
 
         <tk-card>
-          <article class="rating-card" [attr.data-attendance]="attendanceOf(player)">
+          <article class="rating-card" [attr.data-tone]="tone(player)">
             <header class="card-head">
               <span class="number">{{ player.number }}</span>
               <div>
@@ -178,7 +178,7 @@
             </thead>
             <tbody>
               @for (player of players(); track player.id) {
-                <tr [attr.data-attendance]="attendanceOf(player)">
+                <tr [attr.data-tone]="tone(player)">
                   <td>
                     <span class="number">{{ player.number }}</span> <strong>{{ player.name }}</strong>
                     @if (revoked(player)) {

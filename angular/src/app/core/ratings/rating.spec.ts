@@ -2,6 +2,7 @@ import {
   BLANK_RATING,
   type Rating,
   applyChange,
+  attendanceTone,
   calculatedGrade,
   docFromRating,
   gradeLabel,
@@ -13,6 +14,14 @@ import {
 } from './rating';
 
 describe('rating (Logik)', () => {
+  it('ordnet jeder Anwesenheit eine Zeilenfarbe zu (offen = keine)', () => {
+    expect(attendanceTone('present')).toBe('green');
+    expect(attendanceTone('limited')).toBe('amber');
+    expect(attendanceTone('absent')).toBe('red');
+    expect(attendanceTone('excluded')).toBe('grey');
+    expect(attendanceTone('open')).toBe('none');
+  });
+
   const full = (overrides: Partial<Rating> = {}): Rating => ({ ...BLANK_RATING, attendance: 'present', effort: 2, technique: 2, tactics: 2, comprehension: 2, ...overrides });
 
   describe('Gesamtnote (Kernzahl)', () => {

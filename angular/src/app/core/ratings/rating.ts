@@ -16,6 +16,24 @@ export const ATTENDANCE_LABELS: Readonly<Record<Attendance, string>> = {
   excluded: 'Nicht im Kader',
 };
 
+export type AttendanceTone = 'none' | 'green' | 'amber' | 'red' | 'grey';
+
+/** Dezente Zeilenfarbe je Anwesenheit bei diesem Event (offen = keine Farbe). */
+export function attendanceTone(attendance: Attendance): AttendanceTone {
+  switch (attendance) {
+    case 'present':
+      return 'green';
+    case 'limited':
+      return 'amber';
+    case 'absent':
+      return 'red';
+    case 'excluded':
+      return 'grey';
+    default:
+      return 'none';
+  }
+}
+
 /** Die vier Teilnoten in der Reihenfolge der Bewertungsmatrix. */
 export const GRADE_FIELDS = ['effort', 'technique', 'tactics', 'comprehension'] as const;
 export type GradeField = (typeof GRADE_FIELDS)[number];
