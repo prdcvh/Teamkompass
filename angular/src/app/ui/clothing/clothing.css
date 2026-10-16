@@ -48,7 +48,9 @@
 
 .jacket {
   fill: var(--tk-amber);
-  fill-opacity: 0.55;
+  fill-opacity: 0.25;
+  stroke: var(--tk-amber);
+  stroke-width: 2.5;
 }
 
 .drop {
