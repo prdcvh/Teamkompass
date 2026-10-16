@@ -9,6 +9,7 @@ import {
   MAX_SCORE,
   MAX_TEXT_LENGTH,
   MAX_TITLE_LENGTH,
+  MAX_TRAINING_DURATION,
   type TeamEvent,
   TRAINING_FOCUSES,
   draftFromEvent,
@@ -39,7 +40,7 @@ export class EventDialog {
   protected readonly types = EVENT_TYPES;
   protected readonly intensities = INTENSITIES;
   protected readonly focuses = TRAINING_FOCUSES;
-  protected readonly limits = { title: MAX_TITLE_LENGTH, text: MAX_TEXT_LENGTH, notes: MAX_NOTES_LENGTH, score: MAX_SCORE, duration: MAX_MATCH_DURATION };
+  protected readonly limits = { title: MAX_TITLE_LENGTH, text: MAX_TEXT_LENGTH, notes: MAX_NOTES_LENGTH, score: MAX_SCORE, duration: MAX_MATCH_DURATION, trainingDuration: MAX_TRAINING_DURATION };
 
   protected readonly draft = signal<EventDraft>(emptyDraft(todayIso()));
   protected readonly errors = signal<EventErrors>({});

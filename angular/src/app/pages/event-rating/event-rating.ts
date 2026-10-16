@@ -12,6 +12,7 @@ import {
   ATTENDANCES,
   ATTENDANCE_LABELS,
   type Attendance,
+  type AttendanceTone,
   GRADE_FIELDS,
   GRADE_LABELS,
   MAX_GOALS_OR_ASSISTS,
@@ -19,6 +20,7 @@ import {
   RATING_VIEWS,
   type RatingField,
   type RatingView,
+  attendanceTone,
   calculatedGrade,
   gradeLabel,
   matchesView,
@@ -124,6 +126,10 @@ export class EventRating implements OnInit {
 
   protected attendanceOf(player: Player): Attendance {
     return this.ratings.ratingFor(player.id).attendance;
+  }
+
+  protected tone(player: Player): AttendanceTone {
+    return attendanceTone(this.attendanceOf(player));
   }
 
   protected valueOf(event: Event): string {

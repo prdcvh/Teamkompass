@@ -33,6 +33,9 @@ const event = (id: string, extra: Partial<TeamEvent> = {}): TeamEvent => ({
   goalsFor: null,
   goalsAgainst: null,
   matchDuration: null,
+  startTime: null,
+  durationMinutes: null,
+  locationCoords: null,
   notes: '',
   ...extra,
 });

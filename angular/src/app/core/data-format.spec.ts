@@ -30,11 +30,22 @@ describe('Datenformat alte App ↔ Angular', () => {
       id: 'e1', type: 'Training', title: 'Dienstag', date: '2026-10-13', intensity: 3, location: 'Platz 2',
       trainingFocus: 'Passspiel', opponent: '', goalsFor: '', goalsAgainst: '', matchDuration: '', notes: 'Hinweis',
     };
-    expect(docFromEvent(eventFromDoc('e1', training))).toEqual(training);
+    // Neue Felder (SCRUM-95) sind für ältere Dokumente leer; die bestehenden Felder bleiben unverändert.
+    const empty = { startTime: '', durationMinutes: '', locationCoords: null };
+    expect(docFromEvent(eventFromDoc('e1', training))).toEqual({ ...training, ...empty });
     const match = { ...training, id: 'e2', type: 'Spiel', trainingFocus: '', opponent: 'SV Nord', goalsFor: 3, goalsAgainst: 1, matchDuration: 70 };
-    expect(docFromEvent(eventFromDoc('e2', match))).toEqual(match);
+    expect(docFromEvent(eventFromDoc('e2', match))).toEqual({ ...match, ...empty });
     const open = { ...match, goalsFor: '', goalsAgainst: '' };
-    expect(docFromEvent(eventFromDoc('e2', open))).toEqual(open);
+    expect(docFromEvent(eventFromDoc('e2', open))).toEqual({ ...open, ...empty });
+  });
+
+  it('Event mit Startzeit, Dauer und Koordinaten bleibt unverändert erhalten', () => {
+    const doc = {
+      id: 'e3', type: 'Training', title: 'Mittwoch', date: '2026-10-14', intensity: 2, location: 'Platz 1', trainingFocus: 'Umschalten',
+      opponent: '', goalsFor: '', goalsAgainst: '', matchDuration: '', notes: '',
+      startTime: '17:30', durationMinutes: 90, locationCoords: { lat: 50.18, lon: 8.47, name: 'Königstein' },
+    };
+    expect(docFromEvent(eventFromDoc('e3', doc))).toEqual(doc);
   });
 
   it('Bewertung (inkl. Abwesenheits-Automatik und Teilnoten)', () => {

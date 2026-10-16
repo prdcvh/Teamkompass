@@ -2,6 +2,8 @@ import {
   type EventDraft,
   type TeamEvent,
   docFromEvent,
+  eventEnd,
+  eventStart,
   draftFromEvent,
   emptyDraft,
   eventFromDoc,
@@ -77,6 +79,92 @@ describe('event (Logik)', () => {
       const game = event({ type: 'Spiel', goalsFor: 1, goalsAgainst: 1, matchDuration: 80, opponent: 'SV Nord' });
       expect(draftFromEvent(game)).toMatchObject({ id: 'e1', type: 'Spiel', goalsFor: '1', goalsAgainst: '1', matchDuration: '80', opponent: 'SV Nord' });
       expect(draftFromEvent(event()).goalsFor).toBe('');
+    });
+  });
+
+  describe('Startzeit, Dauer und Ortskoordinaten (SCRUM-95)', () => {
+    const coords = { lat: 50.1833, lon: 8.4667, name: 'Königstein im Taunus' };
+
+    it('prüft Uhrzeit HH:MM', () => {
+      expect(validateDraft(draft({ startTime: '' }))).toEqual({});
+      expect(validateDraft(draft({ startTime: '18:30' }))).toEqual({});
+      expect(validateDraft(draft({ startTime: '00:00' }))).toEqual({});
+      for (const bad of ['24:00', '9:30', '18:60', 'abc', '18:3']) {
+        expect(validateDraft(draft({ startTime: bad })).startTime).toBeTruthy();
+      }
+    });
+
+    it('prüft die Trainingsdauer (1–300) nur bei Training', () => {
+      expect(validateDraft(draft({ durationMinutes: '' }))).toEqual({});
+      expect(validateDraft(draft({ durationMinutes: '1' }))).toEqual({});
+      expect(validateDraft(draft({ durationMinutes: '300' }))).toEqual({});
+      for (const bad of ['0', '301', '-5', '1.5', 'abc']) {
+        expect(validateDraft(draft({ durationMinutes: bad })).durationMinutes).toBeTruthy();
+      }
+      expect(validateDraft(draft({ type: 'Spiel', durationMinutes: '999' })).durationMinutes).toBeUndefined();
+    });
+
+    it('prüft den Bereich der Koordinaten', () => {
+      expect(validateDraft(draft({ locationCoords: coords }))).toEqual({});
+      expect(validateDraft(draft({ locationCoords: { ...coords, lat: 91 } })).locationCoords).toBeTruthy();
+      expect(validateDraft(draft({ locationCoords: { ...coords, lon: -181 } })).locationCoords).toBeTruthy();
+      expect(validateDraft(draft({ locationCoords: { ...coords, lat: Number.NaN } })).locationCoords).toBeTruthy();
+    });
+
+    it('Entwurf → Event → Dokument → Event bewahrt die Werte', () => {
+      const training = eventFromDraft(draft({ startTime: '18:00', durationMinutes: '90', locationCoords: coords }), 'e1');
+      expect(training).toMatchObject({ startTime: '18:00', durationMinutes: 90, locationCoords: coords });
+      const doc = docFromEvent(training);
+      expect(doc).toMatchObject({ startTime: '18:00', durationMinutes: 90, locationCoords: coords });
+      expect(eventFromDoc('e1', doc)).toEqual(training);
+      expect(draftFromEvent(training)).toMatchObject({ startTime: '18:00', durationMinutes: '90', locationCoords: coords });
+    });
+
+    it('Spiel nutzt matchDuration, keine Trainingsdauer', () => {
+      const game = eventFromDraft(draft({ type: 'Spiel', startTime: '10:30', durationMinutes: '90', matchDuration: '70' }), 'e2');
+      expect(game).toMatchObject({ startTime: '10:30', durationMinutes: null, matchDuration: 70 });
+    });
+
+    it('ältere Dokumente liefern null-Werte ohne Fehler und werden mit Leerwerten geschrieben', () => {
+      const old = eventFromDoc('x', { type: 'Training', title: 'Alt', date: '2026-10-01' });
+      expect(old).toMatchObject({ startTime: null, durationMinutes: null, locationCoords: null });
+      expect(docFromEvent(old)).toMatchObject({ startTime: '', durationMinutes: '', locationCoords: null });
+    });
+
+    it('ignoriert ungültige gespeicherte Werte', () => {
+      const parsed = eventFromDoc('x', { startTime: '25:99', durationMinutes: 999, locationCoords: { lat: 200, lon: 1, name: 'x' } });
+      expect(parsed).toMatchObject({ startTime: null, durationMinutes: null, locationCoords: null });
+      expect(eventFromDoc('y', { startTime: 5, durationMinutes: 'abc', locationCoords: 'Platz' })).toMatchObject({ startTime: null, durationMinutes: null, locationCoords: null });
+    });
+
+    describe('eventEnd', () => {
+      it('Training: Start + Dauer (Sommerzeit, UTC+2)', () => {
+        const e = event({ date: '2026-10-06', startTime: '18:00', durationMinutes: 90 });
+        expect(eventStart(e)?.toISOString()).toBe('2026-10-06T16:00:00.000Z');
+        expect(eventEnd(e)?.toISOString()).toBe('2026-10-06T17:30:00.000Z');
+      });
+
+      it('Winterzeit (UTC+1)', () => {
+        expect(eventEnd(event({ date: '2026-12-01', startTime: '18:00', durationMinutes: 60 }))?.toISOString()).toBe('2026-12-01T18:00:00.000Z');
+      });
+
+      it('Tage der Zeitumstellung', () => {
+        expect(eventStart(event({ date: '2026-10-25', startTime: '10:00', durationMinutes: 60 }))?.toISOString()).toBe('2026-10-25T09:00:00.000Z');
+        expect(eventStart(event({ date: '2026-03-29', startTime: '10:00', durationMinutes: 60 }))?.toISOString()).toBe('2026-03-29T08:00:00.000Z');
+      });
+
+      it('Spiel: Start + matchDuration', () => {
+        const e = event({ type: 'Spiel', date: '2026-10-10', startTime: '11:00', matchDuration: 70, durationMinutes: null });
+        expect(eventEnd(e)?.toISOString()).toBe('2026-10-10T10:10:00.000Z');
+      });
+
+      it('null, wenn Zeit oder Dauer fehlen', () => {
+        expect(eventEnd(event({ startTime: null, durationMinutes: 90 }))).toBeNull();
+        expect(eventEnd(event({ startTime: '18:00', durationMinutes: null }))).toBeNull();
+        expect(eventEnd(event({ type: 'Spiel', startTime: '18:00', matchDuration: null }))).toBeNull();
+        expect(eventEnd(event({ date: '', startTime: '18:00', durationMinutes: 90 }))).toBeNull();
+        expect(eventEnd(event({ startTime: 'x', durationMinutes: 90 }))).toBeNull();
+      });
     });
   });
 
