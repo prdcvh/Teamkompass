@@ -80,6 +80,19 @@
     </div>
   </tk-card>
 
+  <tk-card>
+    <div class="panel" id="datenschutz-wetter">
+      <h2>Wettervorhersage</h2>
+      <p>Bei Terminen mit Ort zeigt die App eine Wettervorhersage. Dafür fragt dein Gerät den Dienst Open-Meteo (open-meteo.com) ab.</p>
+      <ul class="privacy">
+        <li>Übertragen werden der Ort des Termins (als Koordinaten) und die IP-Adresse deines Geräts.</li>
+        <li>Open-Meteo speichert Server-Logs 90 Tage lang.</li>
+        <li>Es werden keine Spieler- oder Teamdaten übertragen.</li>
+      </ul>
+      <p class="muted">Quelle der Wetterdaten: <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo</a> (CC BY 4.0).</p>
+    </div>
+  </tk-card>
+
   <tk-dialog [open]="confirmClear()" title="Lokalen Zwischenspeicher löschen?" (closed)="confirmClear.set(false)">
     <p>Gespeicherte Teamdaten auf diesem Gerät werden gelöscht. Cloud-Daten bleiben erhalten.</p>
     <div class="confirm-actions">
