@@ -69,7 +69,7 @@
           }
         </div>
       </tk-card>
-    } @else if (mobile()) {
+    } @else if (cards()) {
       @for (month of months(); track month.label) {
         <h2 class="group">{{ month.label }} · {{ month.events.length }}</h2>
         <tk-card>

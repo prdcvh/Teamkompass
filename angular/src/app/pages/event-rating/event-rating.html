@@ -157,24 +157,24 @@
         </tk-card>
       }
     } @else {
-      <tk-card>
+      <tk-card class="matrix">
         <div class="table-wrap">
-          <table>
+          <table [class.game]="isGame()">
             <thead>
               <tr>
-                <th scope="col">Spieler</th>
-                <th scope="col">Anwesenheit</th>
-                <th scope="col">Gesamtnote</th>
+                <th scope="col" class="col-player">Spieler</th>
+                <th scope="col" class="col-attendance">Anwesenheit</th>
+                <th scope="col" class="col-total">Gesamt&shy;note</th>
                 @for (field of gradeFields; track field) {
-                  <th scope="col">{{ gradeLabels[field] }}</th>
+                  <th scope="col" class="col-grade" [attr.title]="gradeLabels[field]">{{ gradeHeaders[field] }}</th>
                 }
                 @if (isGame()) {
-                  <th scope="col">Min.</th>
-                  <th scope="col">Tore</th>
-                  <th scope="col">Vorlagen</th>
+                  <th scope="col" class="col-count">Min.</th>
+                  <th scope="col" class="col-count">Tore</th>
+                  <th scope="col" class="col-count">Vor&shy;lagen</th>
                 }
-                <th scope="col" title="Diese Notiz sehen Spieler und Eltern in ihrem Profil">Feedback an Spieler (sichtbar)</th>
-                <th scope="col" title="Nur für Trainer sichtbar, Spieler und Eltern bekommen sie nie zu sehen">Interne Notiz (nur Trainer)</th>
+                <th scope="col" class="col-note" title="Diese Notiz sehen Spieler und Eltern in ihrem Profil">Feedback an Spieler (sichtbar)</th>
+                <th scope="col" class="col-note" title="Nur für Trainer sichtbar, Spieler und Eltern bekommen sie nie zu sehen">Interne Notiz (nur Trainer)</th>
               </tr>
             </thead>
             <tbody>

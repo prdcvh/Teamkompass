@@ -57,7 +57,14 @@ h2 {
 }
 
 [data-variant='mobile'] .layout {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* Mit Seitenmenü reicht die Breite unter 1100 px nicht für zwei Spalten (SCRUM-134). */
+@media (max-width: 1099px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .side {

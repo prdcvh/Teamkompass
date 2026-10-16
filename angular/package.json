@@ -8,6 +8,7 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "lint": "ng lint",
+    "build:e2e": "ng build -c e2e",
     "build:teams": "ng build -c production,mein-team && ng build -c production,u15 && ng build -c production,u17"
   },
   "private": true,

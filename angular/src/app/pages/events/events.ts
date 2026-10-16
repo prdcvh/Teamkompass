@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { LayoutService } from '../../core/shell/layout.service';
+import { LayoutService, injectNarrowViewport } from '../../core/shell/layout.service';
 import {
   EVENT_SORT_OPTIONS,
   EVENT_TYPES,
@@ -36,6 +36,9 @@ export class Events implements OnInit {
   protected readonly events = inject(EventsService);
   protected readonly sync = inject(SyncService);
   protected readonly mobile = inject(LayoutService).isMobile;
+  private readonly narrow = injectNarrowViewport();
+  /** Kartenliste statt Tabelle: auf dem Handy und überall, wo die Tabelle nicht neben das Seitenmenü passt (SCRUM-134). */
+  protected readonly cards = computed(() => this.mobile() || this.narrow());
   protected readonly source = WEATHER_ATTRIBUTION;
 
   protected readonly typeOptions = EVENT_TYPES;

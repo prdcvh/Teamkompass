@@ -85,7 +85,7 @@ h1 {
 
 .filters {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr auto;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: var(--tk-space-3);
   align-items: center;
 }
@@ -114,6 +114,7 @@ td {
   padding: var(--tk-space-3);
   border-top: 1px solid var(--tk-line);
   font-size: var(--tk-text-sm);
+  overflow-wrap: anywhere;
 }
 
 .actions {

@@ -75,12 +75,19 @@ h2 {
 
 .columns {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: var(--tk-space-4);
 }
 
 [data-variant='mobile'] .columns {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* Mit Seitenmenü reicht die Breite unter 1100 px nicht für zwei Spalten (SCRUM-134). */
+@media (max-width: 1099px) {
+  .columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .panel {

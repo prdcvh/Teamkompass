@@ -75,3 +75,20 @@ textarea {
     min-height: var(--tk-touch);
   }
 }
+
+/*
+ * Seitenraster aller Seiten (SCRUM-134): Die Spalte darf schmaler als ihr Inhalt werden. Ohne `minmax(0, 1fr)`
+ * wächst sie auf die Breite des längsten Inhalts (z. B. einer Tabelle) und schiebt die ganze Seite über den Rand.
+ */
+.page {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* Kopfzeilen mit Titel und Aktion brechen um, statt die Seite zu verbreitern. */
+.page > .head {
+  flex-wrap: wrap;
+}
+
+.page h1 {
+  overflow-wrap: anywhere;
+}
