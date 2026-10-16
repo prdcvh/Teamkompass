@@ -125,3 +125,13 @@ h2 {
   background: var(--tk-soft-red);
   font-weight: 600;
 }
+
+.preview {
+  margin: 0 0 var(--tk-space-3);
+  padding: var(--tk-space-3);
+  color: var(--tk-ink);
+  background: var(--tk-field);
+  border-radius: var(--tk-radius-md, 8px);
+  font-size: var(--tk-text-sm);
+  font-weight: 600;
+}

@@ -10,6 +10,12 @@ export class FakeEventsApi implements Pick<EventsApi, keyof EventsApi> {
   watchEventsError: unknown = null;
   saveEventError: unknown = null;
   deleteEventError: unknown = null;
+  findRecordsError: unknown = null;
+  /** 1-basiert: der n-te Aufruf von deleteEventsBatch schlägt fehl. */
+  failDeleteBatchNumber: number | null = null;
+  private deleteBatchCalls = 0;
+  /** Ob ein Event Bewertungen/Notizen hat; FakeFirebase verdrahtet das mit der Bewertungs-Attrappe. */
+  hasRecords: (id: string) => boolean = () => false;
   /** 1-basiert: der n-te Aufruf von saveEventsBatch schlägt fehl. */
   failBatchNumber: number | null = null;
   private batchCalls = 0;
@@ -58,6 +64,20 @@ export class FakeEventsApi implements Pick<EventsApi, keyof EventsApi> {
     this.calls.push(`saveEventsBatch:${entries.length}`);
     if (this.failBatchNumber === this.batchCalls) throw { code: 'unavailable' };
     for (const entry of entries) this.events.set(entry.id, { ...this.events.get(entry.id), ...entry.data });
+    this.emitEvents();
+  }
+
+  async findEventsWithRecords(ids: readonly string[]): Promise<ReadonlySet<string>> {
+    this.calls.push(`findEventsWithRecords:${ids.length}`);
+    if (this.findRecordsError) throw this.findRecordsError;
+    return new Set(ids.filter((id) => this.hasRecords(id)));
+  }
+
+  async deleteEventsBatch(ids: readonly string[]): Promise<void> {
+    this.deleteBatchCalls += 1;
+    this.calls.push(`deleteEventsBatch:${ids.length}`);
+    if (this.failDeleteBatchNumber === this.deleteBatchCalls) throw { code: 'unavailable' };
+    for (const id of ids) this.events.delete(id);
     this.emitEvents();
   }
 

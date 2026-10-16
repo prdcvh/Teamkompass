@@ -111,8 +111,10 @@ export class EventsService {
     const event = eventFromDraft(draft, id);
     const previous = this.events().find((entry) => entry.id === id);
     if (!this.sync.isFailed()) this.sync.state.set('syncing');
+    // Serien-Training (SCRUM-147): Wird es einzeln geändert, merken wir das; die Serie überschreibt es dann nie mehr.
+    const edited = previous !== undefined && parseSeriesEventId(id) !== null && JSON.stringify(docFromEvent(previous)) !== JSON.stringify(docFromEvent(event));
     void this.eventsApi
-      .saveEvent(id, docFromEvent(event))
+      .saveEvent(id, edited ? { ...docFromEvent(event), seriesEdited: true } : docFromEvent(event))
       .then(() => this.sync.clearError())
       // Neues Event oder neues Datum: Spieler mit Abwesenheit im Zeitraum automatisch auf „Fehlt“ setzen (SCRUM-80).
       .then(() => (!previous || previous.date !== event.date ? this.absences.reconcileEvent(event, this.squad.players()) : 0))

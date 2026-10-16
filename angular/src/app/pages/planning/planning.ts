@@ -62,6 +62,12 @@ export class Planning implements OnInit {
   protected askDelete(series: TrainingSeries): void {
     this.dialogOpen.set(false);
     this.deleting.set(series);
+    void this.planning.loadProtection(series.id);
+  }
+
+  /** Was beim Löschen mit den künftigen Terminen passiert; null, solange geprüft wird. */
+  protected deletePreview(series: TrainingSeries | null): string | null {
+    return series ? this.planning.deletePreview(series.id) : null;
   }
 
   protected confirmDelete(): void {
