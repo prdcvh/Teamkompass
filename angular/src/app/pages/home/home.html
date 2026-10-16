@@ -31,7 +31,12 @@
 
       <tk-card>
         <div class="panel">
-          <h2>Aufstellung</h2>
+          <div class="panel-head">
+            <h2>Aufstellung</h2>
+            @if (lineup.load() === 'ready' && !lineupSummary().empty) {
+              <a class="more" routerLink="/aufstellung">Bearbeiten</a>
+            }
+          </div>
           @if (lineup.load() === 'error') {
             <p class="muted" role="status">Die Aufstellung konnte nicht geladen werden.</p>
           } @else if (lineup.load() !== 'ready') {
@@ -40,14 +45,50 @@
             <p class="muted">Noch keine Aufstellung gespeichert.</p>
             <a tkButton variant="primary" routerLink="/aufstellung">Aufstellung anlegen</a>
           } @else {
-            <a class="lineup-link" routerLink="/aufstellung" [attr.aria-label]="'Aufstellung öffnen, Formation ' + lineupSummary().formation">
-              <span class="lineup-head"><strong>{{ lineupSummary().formation }}</strong><span class="muted">{{ lineupSummary().count }} von 11 Spielern</span></span>
-              <ul class="lineup-rows">
-                @for (row of lineupSummary().rows; track row.label) {
-                  <li><span class="zone">{{ row.label }}</span><span>{{ row.names.join(' · ') }}</span></li>
-                }
-              </ul>
-            </a>
+            <div class="lineup">
+              <a class="lineup-link" routerLink="/aufstellung" [attr.aria-label]="'Aufstellung öffnen, Formation ' + lineupSummary().formation">
+                <div class="pitch" [class.horizontal]="!mobile()" aria-hidden="true">
+                  @if (mobile()) {
+                    <svg class="marks" viewBox="0 0 100 133" preserveAspectRatio="none">
+                      <rect x="3" y="3" width="94" height="127" rx="1" />
+                      <line x1="3" y1="66.5" x2="97" y2="66.5" />
+                      <circle cx="50" cy="66.5" r="11" />
+                      <circle class="spot" cx="50" cy="66.5" r="0.9" />
+                      <rect x="23" y="3" width="54" height="22" />
+                      <rect x="37" y="3" width="26" height="8" />
+                      <rect x="23" y="108" width="54" height="22" />
+                      <rect x="37" y="122" width="26" height="8" />
+                    </svg>
+                  } @else {
+                    <svg class="marks" viewBox="0 0 160 100" preserveAspectRatio="none">
+                      <rect x="3" y="3" width="154" height="94" rx="1" />
+                      <line x1="80" y1="3" x2="80" y2="97" />
+                      <circle cx="80" cy="50" r="11" />
+                      <circle class="spot" cx="80" cy="50" r="0.9" />
+                      <rect x="3" y="23" width="22" height="54" />
+                      <rect x="3" y="37" width="8" height="26" />
+                      <rect x="135" y="23" width="22" height="54" />
+                      <rect x="149" y="37" width="8" height="26" />
+                    </svg>
+                  }
+                  @for (marker of markers(); track marker.id) {
+                    <span class="marker" [class.keeper]="marker.keeper" [style.left.%]="marker.left" [style.top.%]="marker.top">
+                      <span class="shirt">{{ marker.number }}</span>
+                      <span class="name">{{ marker.label }}</span>
+                    </span>
+                  }
+                </div>
+              </a>
+              <div class="lineup-side">
+                <p class="formation">{{ lineupSummary().formation }}</p>
+                <p class="muted">{{ lineupSummary().count }} von 11 Spielern auf dem Platz</p>
+                <ul class="lineup-rows">
+                  @for (row of lineupSummary().rows; track row.label) {
+                    <li><span class="zone">{{ row.label }}</span><span>{{ row.names.join(' · ') }}</span></li>
+                  }
+                </ul>
+              </div>
+            </div>
           }
         </div>
       </tk-card>
@@ -55,33 +96,94 @@
       <div class="columns">
         <tk-card>
           <div class="panel">
-            <h2>Nächstes Event</h2>
-            @if (figures().next; as next) {
-              <p class="next-title">{{ next.title }}</p>
-              <p class="muted">
-                {{ next.type }} · {{ formatDate(next.date) }}@if (next.opponent) { · vs. {{ next.opponent }}}@if (next.location) { · {{ next.location }}}
-              </p>
-              <tk-weather [event]="next" [showSource]="true" [showClothing]="true" />
-              <a tkButton variant="primary" [routerLink]="['/events', next.id]">Zur Bewertung</a>
+            <div class="panel-head">
+              <h2>Nächste Events</h2>
+              <a class="more" routerLink="/events">Alle Events</a>
+            </div>
+            @if (upcoming().length === 0) {
+              <div class="empty">
+                <span class="empty-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="3" /><path d="M3.5 10h17M8 3v4M16 3v4" /></svg>
+                </span>
+                <p class="muted">Kein kommendes Event geplant.</p>
+                <a tkButton variant="primary" routerLink="/events">Event anlegen</a>
+              </div>
             } @else {
-              <p class="muted">Kein kommendes Event geplant.</p>
-              <a tkButton variant="primary" routerLink="/events">Event anlegen</a>
+              @let first = upcoming()[0];
+              <a class="next" [routerLink]="['/events', first.event.id]" [attr.data-type]="first.event.type">
+                <span class="date-tile" aria-hidden="true">
+                  <small>{{ first.weekday }}</small>
+                  <strong>{{ first.day }}</strong>
+                  <small>{{ first.month }}</small>
+                </span>
+                <span class="next-body">
+                  <span class="tags">
+                    <span class="tag type">{{ first.event.type }}</span>
+                    <span class="tag when">{{ first.countdown }}</span>
+                  </span>
+                  <span class="next-title">{{ first.event.title }}</span>
+                  <span class="next-meta">
+                    <span>{{ formatDate(first.event.date) }}@if (first.event.startTime) { · {{ first.event.startTime }} Uhr}</span>
+                    @if (first.event.opponent) {
+                      <span>vs. {{ first.event.opponent }}</span>
+                    }
+                    @if (first.event.location) {
+                      <span>{{ first.event.location }}</span>
+                    }
+                  </span>
+                </span>
+                <span class="go" aria-hidden="true">›</span>
+              </a>
+              <tk-weather [event]="first.event" [showSource]="true" [showClothing]="true" />
+              @if (upcoming().length > 1) {
+                <ul class="later">
+                  @for (item of upcoming().slice(1); track item.event.id) {
+                    <li>
+                      <a [routerLink]="['/events', item.event.id]" [attr.data-type]="item.event.type">
+                        <span class="later-date">{{ item.weekday }} {{ item.day }}. {{ item.month }}</span>
+                        <span class="later-title">{{ item.event.title }}@if (item.event.opponent) { <span class="muted"> · vs. {{ item.event.opponent }}</span>}</span>
+                        <span class="tag type">{{ item.event.type }}</span>
+                      </a>
+                    </li>
+                  }
+                </ul>
+              }
             }
           </div>
         </tk-card>
 
         <tk-card>
           <div class="panel">
-            <h2>Formkurve · Bestenliste</h2>
+            <div class="panel-head">
+              <h2>Formkurve</h2>
+              <span class="muted">Bestenliste · letzte {{ formLength }} Noten</span>
+            </div>
             @if (board().length === 0) {
               <p class="muted">Noch keine benoteten Events.</p>
             } @else {
               <ol class="board">
-                @for (entry of board(); track entry.player.id) {
-                  <li>
-                    <a class="player-link" [routerLink]="['/profile', entry.player.id]">{{ entry.player.name }}</a>
-                    <span class="muted">{{ entry.events }} Einsätze</span>
-                    <strong>Ø {{ numberLabel(entry.grade) }}</strong>
+                @for (entry of board(); track entry.player.id; let i = $index) {
+                  <li [class.top]="i === 0">
+                    <span class="rank">{{ i + 1 }}</span>
+                    <span class="avatar" aria-hidden="true">{{ entry.initials }}</span>
+                    <span class="who">
+                      <a class="player-link" [routerLink]="['/profile', entry.player.id]">{{ entry.player.name }}</a>
+                      <span class="muted">{{ entry.events }} {{ entry.events === 1 ? 'Einsatz' : 'Einsätze' }}</span>
+                    </span>
+                    <svg class="spark" [attr.viewBox]="'0 0 ' + entry.spark.width + ' ' + entry.spark.height" role="img" [attr.aria-label]="'Letzte Noten: ' + entry.spark.label">
+                      <line class="base" x1="0" [attr.y1]="entry.spark.height / 2" [attr.x2]="entry.spark.width" [attr.y2]="entry.spark.height / 2" />
+                      <path [attr.d]="entry.spark.path" />
+                      @if (entry.spark.last; as last) {
+                        <circle [attr.cx]="last.x" [attr.cy]="last.y" r="3" />
+                      }
+                    </svg>
+                    <span class="trend" [attr.data-trend]="entry.trend" [attr.title]="entry.trendText">
+                      @if (entry.trend) {
+                        <span aria-hidden="true">{{ entry.trend === 'besser' ? '↗' : entry.trend === 'schlechter' ? '↘' : '→' }}</span>
+                        <span class="tk-sr-only">{{ entry.trendText }}</span>
+                      }
+                    </span>
+                    <strong class="grade" [attr.data-tone]="entry.tone">Ø {{ numberLabel(entry.grade) }}</strong>
                   </li>
                 }
               </ol>

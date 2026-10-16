@@ -548,6 +548,37 @@ function loadFunctions(source, names, context) {
   return new Function(...Object.keys(context), `${code}\nreturn { ${names.join(", ")} };`)(...Object.values(context));
 }
 
+test("Belastung: Termine nach heute zählen nicht, Termine von heute schon (SCRUM-136)", async () => {
+  const iso = (offsetDays) => {
+    const d = new Date();
+    d.setDate(d.getDate() + offsetDays);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+  const tiers = [{ min: 0, tier: "unauffaellig", level: "Unauffällig", action: "" }];
+  const training = (id, offset) => ({ id, type: "Training", date: iso(offset), intensity: 2, ratings: { p: { attendance: "present", effort: "" } } });
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    const run = (events) => {
+      const state = { players: [{ id: "p" }], events, absences: {}, measurements: {} };
+      const sortedEvents = () => [...state.events].sort((a, b) => new Date(b.date) - new Date(a.date));
+      const { computePlayerInjuryRisk } = loadFunctions(app, ["computePlayerInjuryRisk", "daysBetween", "roundGrade"], {
+        state, sortedEvents, playerMeasurements: () => [], isInjuryAbsence: () => false, activeAbsenceOn: () => null, INJURY_RISK_TIERS: tiers,
+      });
+      return computePlayerInjuryRisk("p");
+    };
+    const past = [training("a", -5), training("b", -12)];
+    const base = run(past);
+    // Zukünftige Termine ändern nichts: weder Last noch "Keine Erholung".
+    const withFuture = run([...past, training("f1", 1), training("f2", 3), training("f3", 10)]);
+    assert.deepEqual(withFuture, base, `${team}: zukünftige Termine verändern die Belastung`);
+    assert.equal(base.recentEvents, 2);
+    // Ein Termin heute zählt weiter mit.
+    assert.equal(run([...past, training("t", 0)]).recentEvents, 3, `${team}: Termin von heute fehlt`);
+    // "Keine Erholung seit letztem Einsatz" darf nicht aus zwei Zukunftsterminen entstehen.
+    assert.equal(run([training("f1", 1), training("f2", 2)]).reason, "Keine auffälligen Belastungsfaktoren", `${team}: Erholungsfaktor aus Zukunftsterminen`);
+  }
+});
+
 test("Anwesenheits- und Einsatzquote zählen keine zukünftigen oder ungesetzten Events", async () => {
   for (const team of teams) {
     const source = await read(`outputs/${team}/app.js`);
@@ -1045,4 +1076,16 @@ test("Diagramm-Beschriftungen: letzte Beschriftung bleibt, ohne mit der vorletzt
   assert.deepEqual([...chartLabelIndices(8, 3)], [0, 3, 7]);
   assert.deepEqual([...chartLabelIndices(3, 1)], [0, 1, 2]);
   assert.deepEqual([...chartLabelIndices(1, 1)], [0]);
+});
+
+test("Belastungsanzeige im Profil trennt 7-Tage-Wert und Wochenschnitt (SCRUM-135)", async () => {
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    assert.match(app, /avgLoad: roundGrade\(chronicWeeklyAvg\)/, `${team}: Wochenschnitt fehlt im Risiko-Ergebnis`);
+    assert.match(app, /Belastung letzte 7 Tage \$\{risk\.load\} · Ø \$\{risk\.avgLoad\}\/Woche über 4 Wochen/, `${team}: Beschriftung passt nicht`);
+    assert.equal(app.includes("Ø Belastung ${risk.load}/Woche"), false, `${team}: irreführende Beschriftung noch vorhanden`);
+  }
+  const html = await read("angular/src/app/pages/profile/profile.html");
+  assert.match(html, /Belastung letzte 7 Tage \{\{ numberLabel\(r\.load\) \}\} · Ø \{\{ numberLabel\(r\.avgLoad\) \}\}\/Woche über 4 Wochen/);
+  assert.equal(html.includes("Ø Belastung {{ numberLabel(r.load) }}"), false);
 });

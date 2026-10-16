@@ -52,6 +52,11 @@ describe('Home (Start-Dashboard)', () => {
     expect(text(fixture)).toContain('Ø 2');
     expect(text(fixture)).toContain('vs. SV Nord');
     expect(text(fixture)).toContain('Kunstrasen');
+    expect(text(fixture)).toContain('in 4 Tagen');
+    expect(text(fixture)).toContain('1 Einsatz');
+    expect(text(fixture)).not.toContain('1 Einsätze');
+    expect(root(fixture).querySelector('.next')?.getAttribute('href')).toBe('/events/e2');
+    expect(root(fixture).querySelector('.board .spark')?.getAttribute('aria-label')).toBe('Letzte Noten: 2,0');
   });
 
   it('gibt Namen und Titel nie als HTML aus', async () => {
@@ -79,9 +84,12 @@ describe('Home (Start-Dashboard)', () => {
     const link = root(fixture).querySelector<HTMLAnchorElement>('.lineup-link')!;
     expect(link.getAttribute('href')).toBe('/aufstellung');
     expect(link.getAttribute('aria-label')).toBe('Aufstellung öffnen, Formation 1-1');
-    const rows = [...link.querySelectorAll('.lineup-rows li')].map((li) => li.textContent?.replace(/\s+/g, ' ').trim());
-    expect(rows).toEqual(['AngriffAli Adler', 'Abwehr<b>Ben</b>']);
+    const markers = [...link.querySelectorAll('.marker')].map((el) => el.textContent?.replace(/\s+/g, ' ').trim());
+    expect(markers).toEqual(['4<b>Ben</b>', '9Ali']);
     expect(link.querySelector('b')).toBeNull();
+    const rows = [...root(fixture).querySelectorAll('.lineup-rows li')].map((li) => li.textContent?.replace(/\s+/g, ' ').trim());
+    expect(rows).toEqual(['AngriffAli Adler', 'Abwehr<b>Ben</b>']);
+    expect(text(fixture)).toContain('1-1');
   });
 
   it('weist ohne gespeicherte Aufstellung auf die Aufstellung hin', async () => {
