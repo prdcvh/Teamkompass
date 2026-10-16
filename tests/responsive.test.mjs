@@ -27,7 +27,7 @@ function loadPlaywright() {
 
 export const WIDTHS = [360, 390, 768, 1024, 1280, 1440, 1920];
 export const ROUTES = [
-  '/start', '/kader', '/events', '/events/e1', '/events/e2', '/events/e3', '/profile', '/profile/p1', '/teamanalyse',
+  '/start', '/kader', '/events', '/events/e1', '/events/e2', '/events/e3', '/events/e4', '/profile', '/profile/p1', '/teamanalyse',
   '/gegneranalyse', '/aufstellung', '/suche', '/zugaenge', '/trainer-konto', '/medizin-zugang', '/export', '/einstellungen', '/styleguide',
   '/anmelden?as=none', '/ansicht?as=player', '/ansicht?as=medical',
 ];
@@ -75,6 +75,13 @@ function measure() {
     const range = document.createRange();
     range.selectNodeContents(cell);
     if (range.getClientRects().length > 1) problems.push(`„${cell.textContent.trim()}“ bricht um`);
+  }
+  // Touch-Geräte: Felder unter 16 px lassen das iPhone beim Antippen hineinzoomen, danach scrollt die Seite seitlich (SCRUM-154).
+  if (matchMedia('(pointer: coarse)').matches) {
+    for (const field of document.querySelectorAll('input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea')) {
+      const size = parseFloat(getComputedStyle(field).fontSize);
+      if (size < 16 && field.getBoundingClientRect().width > 0) problems.push(`${describe(field)} hat ${size}px Schrift (iPhone zoomt beim Antippen)`);
+    }
   }
   return problems.slice(0, 8);
 }
