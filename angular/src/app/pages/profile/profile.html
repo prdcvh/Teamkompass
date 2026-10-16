@@ -60,7 +60,7 @@
               <strong>{{ r.level }} · {{ r.percentage }}%</strong>
             </div>
             <div class="risk-meter" role="img" [attr.aria-label]="'Belastungsindikator ' + r.percentage + ' Prozent, ' + r.level"><span [style.width.%]="r.percentage"></span></div>
-            <small>{{ r.reason }} · Ø Belastung {{ numberLabel(r.load) }}/Woche ({{ r.recentEvents }} Einsätze/4 Wochen)</small>
+            <small>{{ r.reason }} · Belastung letzte 7 Tage {{ numberLabel(r.load) }} · Ø {{ numberLabel(r.avgLoad) }}/Woche über 4 Wochen ({{ r.recentEvents }} Einsätze/4 Wochen)</small>
             <small>{{ r.action }}</small>
           </div>
         }

@@ -20,12 +20,14 @@ import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 import { Dialog } from '../../ui/dialog/dialog';
 import { Icon } from '../../ui/icon/icon';
+import { Weather } from '../../ui/weather/weather';
+import { WEATHER_ATTRIBUTION } from '../../core/weather/weather';
 import { EventDialog } from './event-dialog';
 
 /** Events (Training/Spiel): Liste mit Suche und Typfilter, anlegen, nachträglich bearbeiten und löschen. */
 @Component({
   selector: 'app-events',
-  imports: [RouterLink, Button, Card, Dialog, Icon, EventDialog],
+  imports: [RouterLink, Button, Card, Dialog, Icon, EventDialog, Weather],
   templateUrl: './events.html',
   styleUrl: './events.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -37,6 +39,7 @@ export class Events implements OnInit {
   private readonly narrow = injectNarrowViewport();
   /** Kartenliste statt Tabelle: auf dem Handy und überall, wo die Tabelle nicht neben das Seitenmenü passt (SCRUM-134). */
   protected readonly cards = computed(() => this.mobile() || this.narrow());
+  protected readonly source = WEATHER_ATTRIBUTION;
 
   protected readonly typeOptions = EVENT_TYPES;
   protected readonly sortOptions = EVENT_SORT_OPTIONS;

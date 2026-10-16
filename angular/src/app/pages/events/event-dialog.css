@@ -21,6 +21,55 @@ textarea {
   resize: vertical;
 }
 
+.place {
+  display: grid;
+  gap: var(--tk-space-2);
+}
+
+.place p {
+  margin: 0;
+}
+
+.hint,
+.muted {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+.place-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tk-space-2);
+}
+
+.places {
+  display: grid;
+  gap: var(--tk-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.place-option {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  min-height: var(--tk-touch);
+  padding: var(--tk-space-2) var(--tk-space-3);
+  border: 1px solid var(--tk-line);
+  border-radius: var(--tk-radius-md);
+  background: var(--tk-surface);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.place-option:focus-visible {
+  outline: none;
+  box-shadow: var(--tk-focus-ring);
+}
+
 .error {
   color: var(--tk-red);
   font-size: var(--tk-text-sm);

@@ -225,3 +225,8 @@ td {
     min-height: var(--tk-touch);
   }
 }
+
+/* Wetter (SCRUM-98): Quellenlink in der Textfarbe. */
+p.muted a {
+  color: inherit;
+}

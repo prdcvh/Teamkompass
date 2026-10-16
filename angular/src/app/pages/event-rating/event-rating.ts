@@ -32,6 +32,7 @@ import { SquadService } from '../../core/player/squad.service';
 import { SyncService } from '../../core/shell/sync.service';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
+import { Weather } from '../../ui/weather/weather';
 
 const GRADE_OPTIONS = [1, 2, 3, 4, 5, 6] as const;
 
@@ -49,7 +50,7 @@ const GRADE_HEADERS: Readonly<Record<GradeField, string>> = {
  */
 @Component({
   selector: 'app-event-rating',
-  imports: [RouterLink, Button, Card],
+  imports: [RouterLink, Button, Card, Weather],
   templateUrl: './event-rating.html',
   styleUrl: './event-rating.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

@@ -199,6 +199,11 @@ service cloud.firestore {
         allow read, write: if isTrainer();
       }
 
+      // Teameinstellungen (Standardort/Heimplatz fuer neue Events), SCRUM-97 - nur Trainer.
+      match /meta/settings {
+        allow read, write: if isTrainer();
+      }
+
       match /meta/operations {
         allow read, write: if isTrainer();
       }

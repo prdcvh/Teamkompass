@@ -59,10 +59,49 @@ export function nextUpcomingEvent(events: readonly TeamEvent[], today: string): 
   return events.filter((event) => event.date && event.date >= today).sort((a, b) => a.date.localeCompare(b.date))[0] ?? null;
 }
 
+/** Die nächsten Events ab heute (heute zählt mit), zeitlich sortiert. */
+export function upcomingEvents(events: readonly TeamEvent[], today: string, limit: number): TeamEvent[] {
+  return events
+    .filter((event) => event.date && event.date >= today)
+    .sort((a, b) => a.date.localeCompare(b.date) || (a.startTime ?? '').localeCompare(b.startTime ?? ''))
+    .slice(0, limit);
+}
+
+/** Ganze Kalendertage von `today` bis `date` (beides ISO-Datum); negativ für Vergangenes. */
+export function daysUntil(date: string, today: string): number {
+  return Math.round((Date.parse(`${date}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
+}
+
+/** „Heute“, „Morgen“ oder „in N Tagen“. */
+export function countdownLabel(date: string, today: string): string {
+  const days = daysUntil(date, today);
+  return days <= 0 ? 'Heute' : days === 1 ? 'Morgen' : `in ${days} Tagen`;
+}
+
 export interface Leader {
   readonly player: Player;
   readonly grade: number;
   readonly events: number;
+  /** Die letzten Noten (höchstens FORM_LENGTH, älteste zuerst) für die Formkurve. */
+  readonly recent: readonly number[];
+  readonly trend: FormTrend;
+}
+
+/** Wie viele der letzten Noten die Formkurve auf dem Start-Dashboard zeigt. */
+export const FORM_LENGTH = 6;
+
+/** Formtrend: letzte Note gegenüber dem Schnitt der Noten davor (Schulnoten: kleiner ist besser). */
+export type FormTrend = 'besser' | 'schlechter' | 'gleich' | null;
+
+/** Ab dieser Abweichung (Notenstufen) gilt die letzte Note als besser/schlechter. */
+const TREND_THRESHOLD = 0.25;
+
+export function formTrend(grades: readonly number[]): FormTrend {
+  if (grades.length < 2) return null;
+  const last = grades[grades.length - 1];
+  const before = grades.slice(0, -1);
+  const delta = last - before.reduce((sum, grade) => sum + grade, 0) / before.length;
+  return delta <= -TREND_THRESHOLD ? 'besser' : delta >= TREND_THRESHOLD ? 'schlechter' : 'gleich';
 }
 
 export interface PlayerData {
@@ -75,7 +114,11 @@ export interface PlayerData {
 /** Bestenliste: Spieler mit Notenschnitt, beste Note zuerst. */
 export function leaders(data: readonly PlayerData[], limit: number): Leader[] {
   return data
-    .map(({ player, items }) => ({ player, grade: averageGrade(gradedEvents(items)), events: attendanceCount(items) }))
+    .map(({ player, items }) => {
+      const graded = gradedEvents(items);
+      const recent: readonly number[] = graded.slice(-FORM_LENGTH).map((entry) => entry.grade);
+      return { player, grade: averageGrade(graded), events: attendanceCount(items), recent, trend: formTrend(recent) };
+    })
     .filter((entry): entry is Leader => entry.grade !== null)
     .sort((a, b) => a.grade - b.grade)
     .slice(0, limit);
