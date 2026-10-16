@@ -82,6 +82,12 @@ td {
   overflow-wrap: anywhere;
 }
 
+/* Das Datum steht immer in einer Zeile, sonst liest man „18.10.202 / 6“ (SCRUM-152). */
+td.date {
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
 .actions {
   display: flex;
   gap: var(--tk-space-2);
@@ -96,6 +102,9 @@ td {
   border-radius: var(--tk-radius-pill);
   font-size: var(--tk-text-xs);
   font-weight: 600;
+  /* „Training“ nicht in Silben zerlegen (SCRUM-152). */
+  white-space: nowrap;
+  overflow-wrap: normal;
 }
 
 .badge[data-type='Spiel'] {
