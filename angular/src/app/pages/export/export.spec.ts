@@ -114,6 +114,17 @@ describe('Export (Daten exportieren)', () => {
     expect(printed[0]).not.toContain('<b>Ben</b>');
   });
 
+  it('markiert den gewählten Spieler in der Auswahl und deaktiviert Bericht ohne Spieler nicht fälschlich', async () => {
+    const fixture = await render();
+    const select = root(fixture).querySelector('select') as HTMLSelectElement;
+    expect(select.value).toBe('p1');
+    select.value = 'p2';
+    select.dispatchEvent(new Event('change'));
+    await settle(fixture);
+    expect(select.value).toBe('p2');
+    expect(byText(fixture, 'Bericht erstellen')!.disabled).toBe(false);
+  });
+
   it('warnt auch beim PDF nur für den gewählten Spieler', async () => {
     const fixture = await render('trainer', 'revoked');
     byText(fixture, 'Bericht erstellen')!.click(); // erster Spieler: Einwilligung ok
