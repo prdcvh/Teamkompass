@@ -27,7 +27,7 @@ function loadPlaywright() {
 
 export const WIDTHS = [360, 390, 768, 1024, 1280, 1440, 1920];
 export const ROUTES = [
-  '/start', '/kader', '/events', '/events/e1', '/events/e2', '/events/e3', '/profile', '/profile/p1', '/teamanalyse',
+  '/start', '/kader', '/events', '/events/e1', '/events/e2', '/events/e3', '/events/e4', '/profile', '/profile/p1', '/teamanalyse',
   '/gegneranalyse', '/aufstellung', '/suche', '/zugaenge', '/trainer-konto', '/medizin-zugang', '/export', '/einstellungen', '/styleguide',
   '/anmelden?as=none', '/ansicht?as=player', '/ansicht?as=medical',
 ];
