@@ -22,6 +22,7 @@ import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 import { Dialog } from '../../ui/dialog/dialog';
 import { Icon } from '../../ui/icon/icon';
+import { BreakNotice } from '../../ui/break-notice/break-notice';
 import { WeatherService } from '../../core/weather/weather.service';
 import { Weather } from '../../ui/weather/weather';
 import { WEATHER_ATTRIBUTION, berlinNow } from '../../core/weather/weather';
@@ -30,7 +31,7 @@ import { EventDialog } from './event-dialog';
 /** Events (Training/Spiel): Liste mit Suche und Typfilter, anlegen, nachträglich bearbeiten und löschen. */
 @Component({
   selector: 'app-events',
-  imports: [NgTemplateOutlet, RouterLink, Button, Card, Dialog, Icon, EventDialog, Weather],
+  imports: [NgTemplateOutlet, RouterLink, Button, Card, Dialog, Icon, EventDialog, Weather, BreakNotice],
   templateUrl: './events.html',
   styleUrl: './events.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

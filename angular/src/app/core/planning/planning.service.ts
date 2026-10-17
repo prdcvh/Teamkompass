@@ -1,4 +1,4 @@
-import { Injectable, computed, effect, inject, signal } from '@angular/core';
+import { Injectable, type Signal, computed, effect, inject, signal } from '@angular/core';
 import { authErrorMessage, errorCode } from '../auth/auth-errors';
 import { SessionService } from '../auth/session.service';
 import { docFromEvent } from '../events/event';
@@ -7,7 +7,8 @@ import { EventsApi } from '../firebase/events.api';
 import { PlanningApi } from '../firebase/planning.api';
 import { todayIso } from '../shared/dates';
 import { SyncService } from '../shell/sync.service';
-import { type PlanningBreak, breaksFromPlanningDoc } from './breaks';
+import { type PlanningBreak } from './breaks';
+import { BreaksStore } from './breaks-store';
 import { type SeriesDraft, type SeriesErrors, type TrainingSeries, docFromSeries, seriesFromDraft, seriesFromPlanningDoc, validateSeriesDraft } from './planning';
 import { SERIES_EVENT_BATCH_SIZE, type SeriesChangePlan, changeCandidates, changeText, eventFromSeries, planSeriesChange, planText, skippedFromPlanningDoc } from './series-events';
 
@@ -40,14 +41,24 @@ export class PlanningService {
   private readonly sync = inject(SyncService);
   private readonly events = inject(EventsService);
   private readonly eventsApi = inject(EventsApi);
+  private readonly breaksStore = inject(BreaksStore);
 
   /** Stand des Planungsdokuments (für {@link BreaksService}). */
   readonly stored = signal<Readonly<Record<string, unknown>> | null>(null);
-  readonly load = signal<PlanningLoad>('idle');
+  /** Stand des Lesens von `meta/planning` (die Serien). */
+  private readonly planningLoad = signal<PlanningLoad>('idle');
+  /** „Bereit“ erst, wenn Serien und Pausen (`meta/breaks`) gelesen sind: sonst entstünden Serien-Trainings in Pausen. */
+  readonly load = computed<PlanningLoad>(() => {
+    const own = this.planningLoad();
+    const breaks = this.breaksStore.load();
+    if (own === 'idle') return 'idle';
+    if (own === 'error' || breaks === 'error') return 'error';
+    return own === 'ready' && breaks === 'ready' ? 'ready' : 'loading';
+  });
   readonly canWrite = computed(() => this.session.role() === 'trainer');
   readonly series = computed<readonly TrainingSeries[]>(() => seriesFromPlanningDoc(this.stored()));
   /** Pausen (SCRUM-148): an ihren Tagen entstehen keine Serien-Trainings. */
-  readonly breaks = computed<readonly PlanningBreak[]>(() => breaksFromPlanningDoc(this.stored()));
+  readonly breaks: Signal<readonly PlanningBreak[]> = this.breaksStore.breaks;
   /** Meldung zum letzten Anlegen der Serien-Trainings. */
   readonly run = signal<SeriesRun>(IDLE_RUN);
   /** Stand der Prüfung auf bewertete Termine für die Vorschau im Formular (beim Speichern wird neu geprüft). */
@@ -64,15 +75,16 @@ export class PlanningService {
   }
 
   start(): void {
-    if (this.unsubscribe || this.load() === 'loading' || !this.canWrite()) return;
+    if (this.unsubscribe || this.planningLoad() === 'loading' || !this.canWrite()) return;
     const generation = ++this.generation;
-    this.load.set('loading');
+    this.planningLoad.set('loading');
+    this.breaksStore.start();
     this.api
       .watchPlanning(
         (data, meta) => {
           if (generation !== this.generation) return;
           this.stored.set(data);
-          this.load.set('ready');
+          this.planningLoad.set('ready');
           this.sync.applySnapshot(meta);
         },
         (error) => {
@@ -80,7 +92,7 @@ export class PlanningService {
         },
       )
       .then((unsubscribe) => {
-        if (generation !== this.generation || this.load() === 'error') unsubscribe();
+        if (generation !== this.generation || this.planningLoad() === 'error') unsubscribe();
         else this.unsubscribe = unsubscribe;
       })
       .catch((error) => {
@@ -91,6 +103,7 @@ export class PlanningService {
   /** Nach einem Ladefehler erneut versuchen. */
   retry(): void {
     this.stop();
+    this.breaksStore.retry();
     this.start();
   }
 
@@ -99,7 +112,7 @@ export class PlanningService {
     this.unsubscribe?.();
     this.unsubscribe = null;
     this.stored.set(null);
-    this.load.set('idle');
+    this.planningLoad.set('idle');
     this.run.set(IDLE_RUN);
     this.protection.set(null);
     this.protectionRun += 1;
@@ -295,6 +308,6 @@ export class PlanningService {
     console.error(error);
     this.unsubscribe?.();
     this.unsubscribe = null;
-    this.load.set('error');
+    this.planningLoad.set('error');
   }
 }

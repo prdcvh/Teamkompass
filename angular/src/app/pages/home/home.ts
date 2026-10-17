@@ -18,6 +18,7 @@ import { FORM_LENGTH, type FormTrend, countdownLabel, dashboardFigures, leaders,
 import { TeamService } from '../../core/team/team.service';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
+import { BreakNotice } from '../../ui/break-notice/break-notice';
 import { InstallHint } from '../../ui/install-hint/install-hint';
 import { Weather } from '../../ui/weather/weather';
 
@@ -37,7 +38,7 @@ const TREND_TEXT: Record<Exclude<FormTrend, null>, string> = { besser: 'Form ste
 /** Start-Dashboard: Kennzahlen des Teams, nächstes Event und Bestenliste (nur für Trainer mit Daten). */
 @Component({
   selector: 'app-home',
-  imports: [RouterLink, Button, Card, InstallHint, Weather],
+  imports: [RouterLink, Button, Card, InstallHint, Weather, BreakNotice],
   templateUrl: './home.html',
   styleUrl: './home.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

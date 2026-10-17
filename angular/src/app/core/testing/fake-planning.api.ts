@@ -1,7 +1,7 @@
 import type { SnapshotMeta } from '../firebase/types';
 import type { PlanningApi } from '../firebase/planning.api';
 
-/** Ersatz für {@link PlanningApi} in Tests (ein Dokument meta/planning mit `series`-Map). */
+/** Ersatz für {@link PlanningApi} in Tests (Dokument meta/planning mit `series`-Map, Dokument meta/breaks mit `breaks`-Map). */
 export class FakePlanningApi implements Pick<PlanningApi, keyof PlanningApi> {
   constructor(readonly calls: string[] = []) {}
 
@@ -66,15 +66,42 @@ export class FakePlanningApi implements Pick<PlanningApi, keyof PlanningApi> {
     this.emit();
   }
 
+  /** Dokument `meta/breaks` (Pausen, für alle Teammitglieder lesbar). */
+  breaksDoc: Record<string, unknown> | null = null;
+  breaksWatchError: unknown = null;
+  breaksWatchers = 0;
+  breaksErrorListener: ((error: unknown) => void) | null = null;
+  private breaksListener: ((data: Readonly<Record<string, unknown>> | null, meta: SnapshotMeta) => void) | null = null;
+
+  async watchBreaks(
+    onData: (data: Readonly<Record<string, unknown>> | null, meta: SnapshotMeta) => void,
+    onError: (error: unknown) => void,
+  ): Promise<() => void> {
+    this.calls.push('watchBreaks');
+    if (this.breaksWatchError) throw this.breaksWatchError;
+    this.breaksWatchers += 1;
+    this.breaksListener = onData;
+    this.breaksErrorListener = onError;
+    this.emitBreaks();
+    return () => {
+      this.breaksWatchers -= 1;
+      this.breaksListener = null;
+    };
+  }
+
+  emitBreaks(meta: SnapshotMeta = { fromCache: false, hasPendingWrites: false }): void {
+    this.breaksListener?.(this.breaksDoc, meta);
+  }
+
   get breaks(): Record<string, unknown> {
-    return (this.doc?.['breaks'] as Record<string, unknown> | undefined) ?? {};
+    return (this.breaksDoc?.['breaks'] as Record<string, unknown> | undefined) ?? {};
   }
 
   async saveBreak(id: string, data: Readonly<Record<string, unknown>>): Promise<void> {
     this.calls.push('saveBreak');
     if (this.saveError) throw this.saveError;
-    this.doc = { ...this.doc, breaks: { ...this.breaks, [id]: data } };
-    this.emit();
+    this.breaksDoc = { ...this.breaksDoc, breaks: { ...this.breaks, [id]: data } };
+    this.emitBreaks();
   }
 
   async deleteBreak(id: string): Promise<void> {
@@ -82,7 +109,7 @@ export class FakePlanningApi implements Pick<PlanningApi, keyof PlanningApi> {
     if (this.saveError) throw this.saveError;
     const rest = { ...this.breaks };
     delete rest[id];
-    this.doc = { ...this.doc, breaks: rest };
-    this.emit();
+    this.breaksDoc = { ...this.breaksDoc, breaks: rest };
+    this.emitBreaks();
   }
 }

@@ -200,9 +200,10 @@ describe('Planung: Pausen (Seite, SCRUM-148)', () => {
     const date = day(7);
     firebase.planning.doc = {
       series: { s1: { weekday: isoWeekday(date), startTime: '17:30', durationMinutes: 90, location: '', locationCoords: null, title: '', trainingFocus: 'Umschalten', intensity: 2, startDate: day(-30), endDate: day(14) } },
-      breaks: { b1: { name: 'Sommerpause', startDate: day(1), endDate: day(10) } },
     };
+    firebase.planning.breaksDoc = { breaks: { b1: { name: 'Sommerpause', startDate: day(1), endDate: day(10) } } };
     firebase.planning.emit();
+    firebase.planning.emitBreaks();
     await fixture.whenStable();
     (root(fixture).querySelector('[data-testid="break-list"] button') as HTMLButtonElement).click();
     await fixture.whenStable();
