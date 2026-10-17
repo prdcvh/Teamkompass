@@ -57,10 +57,22 @@ describe('AbsencesService (SCRUM-18)', () => {
     await vi.waitFor(() => expect(firebase.ratings.ratings.get('e3')?.get('p1')).toMatchObject({ attendance: 'absent', note: 'Verletzung · Zerrung (Ende offen)' }));
   });
 
-  it('gleicht nicht ab, solange Bewertungen noch laden (keine Überschreibung)', async () => {
+  it('gleicht auch ab, solange die Bewertungen des Profils noch laden (SCRUM-164), ohne Bewertetes zu überschreiben', async () => {
     const { absences, profile } = await setup();
+    profile.stop(); // Profil lädt (noch) nicht: früher brach der Abgleich hier stillschweigend ab
+    expect(profile.loading() || profile.playerId() !== 'p1').toBe(true);
+    expect(absences.saveAbsence(absenceDraft({ reason: 'Verletzung', detail: 'Bänderriss', from: '2026-10-01', to: '' }))).toEqual({});
+    await vi.waitFor(() => expect(firebase.ratings.ratings.get('e1')?.get('p1')).toMatchObject({ attendance: 'absent', autoAbsence: true, note: 'Verletzung · Bänderriss (Ende offen)' }));
+    await vi.waitFor(() => expect(firebase.ratings.ratings.get('e3')?.get('p1')).toMatchObject({ attendance: 'absent', autoAbsence: true }));
+    expect(firebase.ratings.ratings.get('e2')?.get('p1')).toMatchObject({ attendance: 'present', effort: 2 }); // von Hand bewertet (SCRUM-18)
+    expect(firebase.calls).toContain('readRatingDoc:e2:p1'); // liest die Bewertung vorher, statt blind zu schreiben
+  });
+
+  it('gelöscht, während das Profil noch lädt: setzt automatisch gesetzte Einträge trotzdem zurück', async () => {
+    const { absences, profile } = await setup();
+    firebase.ratings.ratings.set('e1', new Map([['p1', { attendance: 'absent', autoAbsence: true, note: 'Urlaub (bis 10.10.2026)', playerId: 'p1' }]]));
     profile.stop();
-    expect(absences.reconcileAbsences('p1', [{ id: 'x', kind: 'absence', label: 'Urlaub', detail: '', from: '2026-10-01', to: '2026-10-30' }])).toBe(0);
-    expect(firebase.calls.some((call) => call.startsWith('saveRating'))).toBe(false);
+    expect(await absences.reconcileAbsences('p1', [])).toBe(1);
+    expect(firebase.ratings.ratings.get('e1')?.get('p1')).toMatchObject({ attendance: 'open', autoAbsence: false, note: '' });
   });
 });

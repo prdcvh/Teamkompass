@@ -20,9 +20,12 @@ describe('Datenformat alte App ↔ Angular', () => {
   it('Spieler', () => {
     const live = {
       id: 'p1', name: 'Ali Adler', positions: ['ZM', 'DM'], number: 8, birthdate: '2012-03-12', status: 'Verletzt',
-      injuryUntil: '2026-11-01', consentStatus: 'granted', consentDate: '2026-09-01',
+      injuryUntil: '2026-11-01', injuredSince: '2026-10-01', consentStatus: 'granted', consentDate: '2026-09-01',
     };
     expect(docFromPlayer(playerFromDoc('p1', live))).toEqual(live);
+    // Ältere Dokumente ohne „verletzt seit“ (SCRUM-164): bleiben lesbar, das Feld wird leer ergänzt.
+    const { injuredSince: _, ...legacy } = live;
+    expect(docFromPlayer(playerFromDoc('p1', legacy))).toEqual({ ...legacy, injuredSince: '' });
   });
 
   it('Event: Training und Spiel samt Leerwerten', () => {

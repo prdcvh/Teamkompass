@@ -14,7 +14,7 @@ describe('team (Dashboard-Auswertungen)', () => {
   });
   const game = (id: string, date: string, goalsFor: number | null, goalsAgainst: number | null) => event(id, date, { type: 'Spiel', goalsFor, goalsAgainst, matchDuration: 90 });
   const player = (id: string, overrides: Partial<Player> = {}): Player => ({
-    id, name: `Spieler ${id}`, positions: ['ST'], number: 9, birthdate: '2012-01-01', status: 'Fit', injuryUntil: '', consentStatus: 'granted', consentDate: '', ...overrides,
+    id, name: `Spieler ${id}`, positions: ['ST'], number: 9, birthdate: '2012-01-01', status: 'Fit', injuryUntil: '', injuredSince: '', consentStatus: 'granted', consentDate: '', ...overrides,
   });
   const rated = (grade: number, attendance: Rating['attendance'] = 'present'): Rating => ({ ...BLANK_RATING, attendance, effort: grade, technique: grade, tactics: grade, comprehension: grade });
   const data = (p: Player, items: EventRating[], absences: Absence[] = []): PlayerData => ({ player: p, items, absences, measurements: [] });

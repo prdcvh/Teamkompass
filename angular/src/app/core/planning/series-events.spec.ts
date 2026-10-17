@@ -117,6 +117,26 @@ describe('PlanningService: Serien-Trainings anlegen', () => {
     expect(eventFromDoc(id, data)).toMatchObject({ type: 'Training', title: 'Training', date: '2026-10-20', startTime: '17:30', durationMinutes: 90, exertion: 5, intensity: 2 });
   });
 
+  it('belegt neu angelegte Serien-Trainings bei Abwesenheit oder Verletzung mit „Fehlt“ vor, mit wenigen Lesezugriffen (SCRUM-159/164)', async () => {
+    const planning = await setup();
+    firebase.players.players.set('p1', { name: 'Ali', positions: ['ST'], number: 9, birthdate: '2012-05-05', status: 'Fit' });
+    firebase.players.players.set('p2', { name: 'Ben', positions: ['IV'], number: 4, birthdate: '2012-06-06', status: 'Verletzt', injuryUntil: '', injuredSince: '2027-03-30' });
+    firebase.players.players.set('p3', { name: 'Cem', positions: ['TW'], number: 1, birthdate: '2012-07-07', status: 'Fit' });
+    firebase.records.playerRecords.set('p1/absences', new Map([['a1', { kind: 'absence', label: 'Urlaub', detail: '', from: '2026-10-26', to: '2026-11-05' }]]));
+    planning.saveSeries(base);
+    await done(planning);
+    expect(planning.run().state).toBe('done');
+    const absent = (playerId: string) =>
+      [...firebase.ratings.ratings].filter(([, byPlayer]) => byPlayer.get(playerId)?.['attendance'] === 'absent').map(([eventId]) => eventId.slice(-10)).sort();
+    expect(absent('p1')).toEqual(['2026-10-27', '2026-11-03']);
+    expect(absent('p2')).toEqual(['2027-03-30', '2027-04-06', '2027-04-13']);
+    expect(absent('p3')).toEqual([]);
+    expect(firebase.ratings.ratings.get([...firebase.events.events.keys()].find((id) => id.endsWith('2026-10-27'))!)?.get('p1')).toMatchObject({ autoAbsence: true, note: 'Urlaub (bis 05.11.2026)' });
+    // Abwesenheiten je Spieler einmal, Bewertungen nur für die fehlenden Spieler (nicht 26 × 3).
+    expect(firebase.calls.filter((call) => call.startsWith('readPlayerRecords:')).sort()).toEqual(['readPlayerRecords:p1:absences', 'readPlayerRecords:p2:absences', 'readPlayerRecords:p3:absences']);
+    expect(firebase.calls.filter((call) => call.startsWith('readRatingDoc:'))).toHaveLength(5);
+  });
+
   it('legt beim zweiten Speichern nichts doppelt an', async () => {
     const planning = await setup();
     planning.saveSeries(base);
