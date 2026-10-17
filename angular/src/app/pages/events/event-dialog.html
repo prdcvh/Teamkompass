@@ -1,4 +1,27 @@
 <tk-dialog [open]="open()" [title]="title()" (closed)="closed.emit()">
+  @if (viewing() && canEdit()) {
+    <button tkDialogAction type="button" class="edit-pen" aria-label="Event bearbeiten" (click)="startEdit()">
+      <tk-icon name="edit" />
+    </button>
+  }
+  @if (viewing()) {
+    <div class="details">
+      <dl>
+        @for (row of facts(); track row.label) {
+          <div class="fact">
+            <dt>{{ row.label }}</dt>
+            <dd>{{ row.value }}</dd>
+          </div>
+        }
+        @if (shown()?.notes?.trim()) {
+          <div class="fact">
+            <dt>Notizen</dt>
+            <dd class="notes">{{ shown()?.notes }}</dd>
+          </div>
+        }
+      </dl>
+    </div>
+  } @else {
   <form (submit)="submit($event)" novalidate>
     <div class="field">
       <label class="tk-label">
@@ -272,8 +295,9 @@
       @if (editing()) {
         <button tkButton type="button" variant="neutral" class="delete" (click)="askDelete()">Event löschen</button>
       }
-      <button tkButton type="button" variant="neutral" (click)="closed.emit()">Abbrechen</button>
+      <button tkButton type="button" variant="neutral" (click)="cancel()">Abbrechen</button>
       <button tkButton type="submit" variant="primary">Speichern</button>
     </menu>
   </form>
+  }
 </tk-dialog>

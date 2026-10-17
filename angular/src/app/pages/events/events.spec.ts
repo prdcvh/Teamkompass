@@ -17,7 +17,7 @@ describe('Events (Events-Seite)', () => {
   async function render(role: 'trainer' | 'medical' = 'trainer', mobile = false) {
     isMobile.set(mobile);
     firebase = new FakeFirebase();
-    firebase.events.events.set('e1', { type: 'Training', title: 'Training Montag', date: '2026-10-05', intensity: 2, location: 'Kunstrasen' });
+    firebase.events.events.set('e1', { type: 'Training', title: 'Training Montag', date: '2026-10-05', intensity: 2, location: 'Kunstrasen', notes: 'Erste Zeile\n<b>zweite</b> Zeile' });
     firebase.events.events.set('e2', { type: 'Spiel', title: 'Heimspiel', date: '2026-10-10', opponent: 'SV Nord', goalsFor: 3, goalsAgainst: 1, intensity: 3 });
     firebase.events.events.set('e3', { type: 'Training', title: 'Training September', date: '2026-09-28' });
     TestBed.configureTestingModule({
@@ -168,9 +168,11 @@ describe('Events (Events-Seite)', () => {
 
     it('bearbeitet ein Event nachträglich (Titel, Datum, Ort, Notiz)', async () => {
       const fixture = await render();
-      qa<HTMLButtonElement>(fixture, 'tbody tr button').find((button) => text(button) === 'Bearbeiten' && button.getAttribute('aria-label') === 'Bearbeiten: Training Montag')!.click();
+      qa<HTMLButtonElement>(fixture, 'tbody tr button').find((button) => text(button) === 'Anschauen' && button.getAttribute('aria-label') === 'Anschauen: Training Montag')!.click();
       await flush(fixture);
       const dialog = q<HTMLElement>(fixture, 'tk-event-dialog')!;
+      dialog.querySelector<HTMLButtonElement>('.edit-pen')!.click();
+      await flush(fixture);
       expect(text(dialog.querySelector('h2'))).toBe('Event bearbeiten');
       expect(dialog.querySelector<HTMLInputElement>('input[name="title"]')!.value).toBe('Training Montag');
       type(dialog.querySelector<HTMLInputElement>('input[name="title"]')!, 'Training Dienstag');
@@ -297,8 +299,8 @@ describe('Events (Events-Seite)', () => {
       openAll(fixture);
       expect(qa(fixture, 'tbody tr')).toHaveLength(3);
       expect(q(fixture, '.head button')).toBeNull();
-      expect(qa(fixture, 'tbody tr button')).toHaveLength(0);
-      expect(q(fixture, 'tk-event-dialog')).toBeNull();
+      expect(qa(fixture, 'tbody tr button').map(text)).toEqual(['Anschauen', 'Anschauen', 'Anschauen']);
+      expect(qa(fixture, 'tbody tr a')).toHaveLength(0);
     });
   });
 
@@ -312,13 +314,14 @@ describe('Events (Events-Seite)', () => {
       expect(qa<HTMLAnchorElement>(fixture, 'a.event-card')[1].getAttribute('href')).toBe('/events/e1');
       qa<HTMLButtonElement>(fixture, '.row button')[0].click();
       await flush(fixture);
-      expect(text(q(fixture, 'tk-event-dialog h2'))).toBe('Event bearbeiten');
+      expect(text(q(fixture, 'tk-event-dialog h2'))).toBe('Event ansehen');
+      expect(q(fixture, 'tk-event-dialog .edit-pen')).not.toBeNull();
     });
 
     it('zeigt für Medizin weder Anlegen noch Bearbeiten', async () => {
       const fixture = await render('medical', true);
       expect(q(fixture, '.fab')).toBeNull();
-      expect(qa(fixture, '.row button')).toHaveLength(0);
+      expect(qa(fixture, '.row button').map(text)).toEqual(['Anschauen', 'Anschauen']); // nur „Diese Woche“ ist offen
     });
   });
 });

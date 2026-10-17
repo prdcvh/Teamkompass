@@ -97,8 +97,8 @@ export class Events implements OnInit {
     this.dialogOpen.set(true);
   }
 
-  protected openEdit(event: TeamEvent): void {
-    if (!this.events.canWrite()) return;
+  /** „Anschauen“: öffnet die Leseansicht; das Bearbeiten schaltet der Stift im Dialog frei (nur Trainer). */
+  protected openView(event: TeamEvent): void {
     this.editing.set(event);
     this.dialogOpen.set(true);
   }
