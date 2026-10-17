@@ -4,6 +4,7 @@ import {
   type EventDraft,
   type EventErrors,
   EXERTIONS,
+  exertionLabel,
   MAX_MATCH_DURATION,
   MAX_NOTES_LENGTH,
   MAX_SCORE,
@@ -79,7 +80,7 @@ export class EventDialog {
       { label: 'Ort', value: event.location },
       { label: 'Gegner', value: event.type === 'Spiel' ? event.opponent : '' },
       { label: 'Ergebnis', value: resultText(event) },
-      { label: 'Intensität', value: INTENSITIES.find((entry) => entry.value === event.intensity)?.label ?? '' },
+      { label: 'Anstrengung', value: exertionLabel(event.exertion) },
       { label: 'Trainingsschwerpunkt', value: event.type === 'Training' ? event.trainingFocus : '' },
     ];
     return rows.filter((row) => row.value.trim() !== '');
