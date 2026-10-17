@@ -38,6 +38,10 @@ export class FakeFirebase {
   readonly records = new FakePlayerRecordsApi(this.calls);
   readonly settings = new FakeTeamSettingsApi(this.calls);
   readonly planning = new FakePlanningApi(this.calls);
+
+  constructor() {
+    this.events.hasRecords = (id) => (this.ratings.ratings.get(id)?.size ?? 0) > 0 || (this.ratings.privateNotes.get(id)?.size ?? 0) > 0;
+  }
 }
 
 /** Stellt die Attrappe für alle Firebase-Zugriffsklassen bereit. */

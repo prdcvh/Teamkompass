@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { SessionService } from '../auth/session.service';
-import { eventFromDoc, eventStart } from '../events/event';
+import { type TeamEvent, draftFromEvent, eventFromDoc, eventStart } from '../events/event';
 import { EventsService } from '../events/events.service';
 import { SyncService } from '../shell/sync.service';
 import { FakeFirebase, provideFakeFirebase } from '../testing/fake-firebase';
@@ -124,6 +124,7 @@ describe('PlanningService: Serien-Trainings anlegen', () => {
     const count = firebase.events.events.size;
     expect(count).toBe(26);
     const [saved] = planning.series();
+    await planning.loadProtection(saved.id);
     expect(planning.preview({ ...base, id: saved.id })?.text).toContain('Es werden keine neuen Trainings angelegt. (26 Termine gibt es schon');
     planning.saveSeries({ ...base, id: saved.id });
     await vi.waitFor(() => expect(planning.run().text).toBe('Es gab keine neuen Trainings anzulegen.'));
@@ -137,10 +138,12 @@ describe('PlanningService: Serien-Trainings anlegen', () => {
     await done(planning);
     const [saved] = planning.series();
     const id = seriesEventId(saved.id, '2026-10-27');
-    firebase.events.events.set(id, { ...firebase.events.events.get(id), notes: 'Platz gesperrt', startTime: '18:30' });
-    firebase.events.emitEvents();
+    const events = TestBed.inject(EventsService);
+    const moved = events.events().find((event) => event.id === id);
+    expect(events.save({ ...draftFromEvent(moved as TeamEvent), notes: 'Platz gesperrt', startTime: '18:30' })).toEqual({});
+    await vi.waitFor(() => expect(firebase.events.events.get(id)).toMatchObject({ seriesEdited: true }));
     planning.saveSeries({ ...base, id: saved.id, endDate: '2027-04-20' });
-    await vi.waitFor(() => expect(planning.run().text).toBe('1 Training wurde angelegt.'));
+    await vi.waitFor(() => expect(planning.run().text).toBe('1 Training wurde angelegt. 1 Termin blieb unverändert, weil er bewertet oder von Hand geändert wurde.'));
     expect(firebase.events.events.get(id)).toMatchObject({ notes: 'Platz gesperrt', startTime: '18:30' });
   });
 
@@ -153,6 +156,7 @@ describe('PlanningService: Serien-Trainings anlegen', () => {
     expect(await TestBed.inject(EventsService).remove(id)).toBe(true);
     expect(firebase.planning.skipped[saved.id]).toEqual({ '2026-11-03': true });
     expect(firebase.events.events.has(id)).toBe(false);
+    await planning.loadProtection(saved.id);
     expect(planning.preview({ ...base, id: saved.id })?.text).toContain('1 von Hand gelöschter Termin entsteht nicht neu');
     planning.saveSeries({ ...base, id: saved.id });
     await vi.waitFor(() => expect(planning.run().text).toBe('Es gab keine neuen Trainings anzulegen.'));
@@ -172,7 +176,8 @@ describe('PlanningService: Serien-Trainings anlegen', () => {
     planning.deleteSeries(saved.id);
     await vi.waitFor(() => expect(planning.series()).toHaveLength(0));
     expect(firebase.planning.skipped).toEqual({});
-    expect(firebase.events.events.size).toBe(25); // angelegte Trainings bleiben bestehen
+    // Die künftigen, unbewerteten Trainings verschwinden mit der Serie (SCRUM-147).
+    expect(firebase.events.events.size).toBe(0);
   });
 
   it('bricht das Löschen ab, wenn der Merker nicht gesetzt werden kann', async () => {
@@ -214,7 +219,7 @@ describe('PlanningService: Serien-Trainings anlegen', () => {
     planning.saveSeries(long);
     await done(planning);
     expect(planning.run().state).toBe('error');
-    expect(planning.run().text).toContain('Es wurden nur 50 von 78 Trainings angelegt');
+    expect(planning.run().text).toContain('Es wurden nur 50 von 78 Terminänderungen übernommen');
     expect(TestBed.inject(SyncService).state()).toBe('error');
     expect(firebase.events.events.size).toBe(50);
 

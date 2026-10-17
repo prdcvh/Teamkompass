@@ -62,8 +62,9 @@
 
 <tk-dialog [open]="deleting() !== null" title="Serie löschen?" (closed)="deleting.set(null)">
   <p>
-    Die Serie „{{ deleting() ? weekday(deleting()!.weekday) + ', ' + deleting()!.startTime + ' Uhr' : '' }}“ wird gelöscht. Bereits angelegte Trainings bleiben bestehen.
+    Die Serie „{{ deleting() ? weekday(deleting()!.weekday) + ', ' + deleting()!.startTime + ' Uhr' : '' }}“ wird gelöscht. Vergangene Termine bleiben immer bestehen.
   </p>
+  <p class="preview" role="status" data-testid="delete-preview">{{ deletePreview(deleting()) ?? 'Es wird geprüft, welche Termine schon bewertet sind …' }}</p>
   <div class="confirm-actions">
     <button tkButton type="button" (click)="deleting.set(null)">Abbrechen</button>
     <button tkButton type="button" variant="primary" (click)="confirmDelete()">Endgültig löschen</button>

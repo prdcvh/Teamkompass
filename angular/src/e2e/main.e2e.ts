@@ -46,6 +46,11 @@ function seed(): FakeFirebase {
   fake.events.events.set('e3', { type: 'Training', title: 'Training', date: '2026-11-20', intensity: 2 });
   // Ohne gewählten Ort: Wetter für den Standardort Königstein (SCRUM-153).
   fake.events.events.set('e4', { type: 'Training', title: 'Abschlusstraining vor dem Derby', date: tomorrow(), intensity: 2, location: 'Kunstrasen - heim', startTime: '17:30', durationMinutes: 90 });
+  // Künftige Termine der Serie s1 (SCRUM-147): einer bewertet, einer von Hand geändert.
+  for (const date of ['2026-10-20', '2026-10-27', '2026-11-03']) {
+    fake.events.events.set(`serie-s1-${date}`, { type: 'Training', title: 'Training', date, intensity: 2, location: 'Kunstrasen - heim', trainingFocus: 'Eigener Ballbesitz', startTime: '17:30', durationMinutes: 90, ...(date === '2026-11-03' ? { seriesEdited: true } : {}) });
+  }
+  fake.ratings.ratings.set('serie-s1-2026-10-27', new Map([['p1', { attendance: 'present', playerId: 'p1' }]]));
   const ratings = new Map<string, Record<string, unknown>>();
   const attendances = ['present', 'absent', 'excused', 'late'];
   names.forEach((_, i) => ratings.set(`p${i + 1}`, { attendance: attendances[i % 4], effort: 2, technique: 3, tactics: 2, comprehension: 4, grade: 2.8, note: 'Gute Einstellung im Training, weiter so', playerId: `p${i + 1}` }));

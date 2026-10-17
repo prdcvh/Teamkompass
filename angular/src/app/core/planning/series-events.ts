@@ -5,7 +5,7 @@
  * Hand gelöschtes Serien-Training steht als Merker (`skipped.{serie}.{datum}`) im Planungsdokument und entsteht
  * nicht neu. Startzeiten bleiben Ortszeit-Texte (`17:30`, Europe/Berlin); die Zeitumstellung verschiebt sie nicht.
  */
-import { type TeamEvent, legacyIntensityForExertion } from '../events/event';
+import { type TeamEvent, docFromEvent, legacyIntensityForExertion } from '../events/event';
 import { isIsoDate } from '../shared/dates';
 import { type TrainingSeries, isoWeekday, seriesTitle } from './planning';
 
@@ -117,4 +117,102 @@ export function planText(plan: SeriesPlan): string {
   if (plan.deleted > 0) notes.push(`${plan.deleted} von Hand ${plan.deleted === 1 ? 'gelöschter Termin entsteht' : 'gelöschte Termine entstehen'} nicht neu`);
   if (plan.past > 0) notes.push(`${plan.past} ${plan.past === 1 ? 'Termin liegt' : 'Termine liegen'} vor heute und ${plan.past === 1 ? 'wird' : 'werden'} nicht angelegt`);
   return notes.length > 0 ? `${main} (${notes.join('; ')}.)` : main;
+}
+
+// --- Serie ändern, verlängern, kürzen, löschen (SCRUM-147) ---
+
+/** Felder eines Serien-Trainings, die die Serie vorgibt und bei einer Serienänderung angepasst werden. */
+const SERIES_FIELDS = ['title', 'exertion', 'intensity', 'location', 'trainingFocus', 'startTime', 'durationMinutes', 'locationCoords'] as const;
+
+/** Ein Serien-Event, das beim Ändern angepasst wird: nur die geänderten Felder (Dokumentform). */
+export interface SeriesEventUpdate {
+  readonly id: string;
+  readonly changes: Readonly<Record<string, unknown>>;
+}
+
+export interface SeriesChangePlan extends SeriesPlan {
+  /** Termine, die angepasst werden. */
+  readonly update: readonly SeriesEventUpdate[];
+  /** Termine (Event-IDs), die entfernt werden. */
+  readonly remove: readonly string[];
+  /** Künftige Termine, die schon stimmen. */
+  readonly unchanged: number;
+  /** Künftige Termine, die bleiben, weil es Bewertungen/Anwesenheit/Notizen gibt. */
+  readonly keptRated: number;
+  /** Künftige Termine, die bleiben, weil der Trainer sie einzeln bearbeitet hat. */
+  readonly keptEdited: number;
+}
+
+/** Von Hand bearbeitet: markiert, verlegt (anderes Datum als in der ID) oder kein Training mehr. */
+function isHandEdited(event: TeamEvent, date: string): boolean {
+  return event.seriesEdited === true || event.type !== 'Training' || event.date !== date;
+}
+
+/**
+ * Serien-Events von heute an, die eine Änderung der Serie überhaupt betreffen könnte (nicht vergangen, nicht von Hand
+ * bearbeitet). Nur bei diesen muss nachgesehen werden, ob es Bewertungen gibt.
+ */
+export function changeCandidates(seriesId: string, today: string, events: readonly TeamEvent[]): string[] {
+  return events
+    .filter((event) => {
+      const parsed = parseSeriesEventId(event.id);
+      return parsed !== null && parsed.seriesId === seriesId && parsed.date >= today && !isHandEdited(event, parsed.date);
+    })
+    .map((event) => event.id);
+}
+
+/**
+ * Was beim Speichern (`series` gesetzt) oder Löschen (`series` null) der Serie passiert. Vergangene, bewertete und von
+ * Hand bearbeitete Termine bleiben immer, wie sie sind. `rated` sind die IDs der Events mit Bewertungen/Notizen.
+ */
+export function planSeriesChange(
+  seriesId: string,
+  series: TrainingSeries | null,
+  today: string,
+  events: readonly TeamEvent[],
+  rated: ReadonlySet<string>,
+  skipped: SkippedDates,
+): SeriesChangePlan {
+  const base: SeriesPlan = series ? planSeries(series, today, new Set(events.map((event) => event.id)), skipped) : { create: [], existing: 0, deleted: 0, past: 0 };
+  const wanted = series ? new Set(seriesDates(series, today)) : new Set<string>();
+  const update: SeriesEventUpdate[] = [];
+  const remove: string[] = [];
+  let unchanged = 0;
+  let keptRated = 0;
+  let keptEdited = 0;
+  for (const event of events) {
+    const parsed = parseSeriesEventId(event.id);
+    if (parsed === null || parsed.seriesId !== seriesId || parsed.date < today) continue;
+    if (isHandEdited(event, parsed.date)) keptEdited += 1;
+    else if (rated.has(event.id)) keptRated += 1;
+    else if (series === null || !wanted.has(parsed.date)) remove.push(event.id);
+    else {
+      const target = docFromEvent(eventFromSeries(series, parsed.date));
+      const current = docFromEvent(event);
+      const changes = Object.fromEntries(SERIES_FIELDS.filter((field) => JSON.stringify(target[field]) !== JSON.stringify(current[field])).map((field) => [field, target[field]]));
+      if (Object.keys(changes).length > 0) update.push({ id: event.id, changes });
+      else unchanged += 1;
+    }
+  }
+  return { ...base, update, remove, unchanged, keptRated, keptEdited };
+}
+
+function count(n: number, one: string, many: string): string {
+  return `${n} ${n === 1 ? one : many}`;
+}
+
+/** Text der Vorschau beim Ändern/Löschen, z. B. „6 Termine werden angepasst; 2 Termine werden entfernt; 1 Termin bleibt, weil er schon bewertet ist.“ */
+export function changeText(plan: SeriesChangePlan): string {
+  const main: string[] = [];
+  if (plan.create.length > 0) main.push(count(plan.create.length, 'Training wird', 'Trainings werden') + ' angelegt');
+  if (plan.update.length > 0) main.push(count(plan.update.length, 'Termin wird', 'Termine werden') + ' angepasst');
+  if (plan.remove.length > 0) main.push(count(plan.remove.length, 'Termin wird', 'Termine werden') + ' entfernt');
+  if (plan.keptRated > 0) main.push(`${count(plan.keptRated, 'Termin bleibt', 'Termine bleiben')}, weil ${plan.keptRated === 1 ? 'er' : 'sie'} schon bewertet ${plan.keptRated === 1 ? 'ist' : 'sind'}`);
+  if (plan.keptEdited > 0) main.push(`${count(plan.keptEdited, 'Termin bleibt', 'Termine bleiben')}, weil du ${plan.keptEdited === 1 ? 'ihn' : 'sie'} von Hand geändert hast`);
+  const notes: string[] = [];
+  if (plan.existing > 0 && plan.update.length === 0 && plan.remove.length === 0) notes.push(`${plan.existing} ${plan.existing === 1 ? 'Termin gibt' : 'Termine gibt'} es schon`);
+  if (plan.deleted > 0) notes.push(`${plan.deleted} von Hand ${plan.deleted === 1 ? 'gelöschter Termin entsteht' : 'gelöschte Termine entstehen'} nicht neu`);
+  if (plan.past > 0) notes.push(`${plan.past} ${plan.past === 1 ? 'Termin liegt' : 'Termine liegen'} vor heute und ${plan.past === 1 ? 'wird' : 'werden'} nicht angelegt`);
+  const sentence = main.length === 0 ? 'Es werden keine neuen Trainings angelegt.' : `${main.join('; ')}.`;
+  return notes.length > 0 ? `${sentence} (${notes.join('; ')}.)` : sentence;
 }

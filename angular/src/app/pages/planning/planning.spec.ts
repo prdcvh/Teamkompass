@@ -4,7 +4,7 @@ import { trainerGuard } from '../../core/auth/auth.guard';
 import { MORE_GROUPS, SIDEBAR_ITEMS } from '../../core/shell/navigation';
 import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
 import { routes } from '../../app.routes';
-import { addMonthsIso } from '../../core/planning/planning';
+import { addMonthsIso, isoWeekday } from '../../core/planning/planning';
 import { formatDate, todayIso } from '../../core/shared/dates';
 import { Planning } from './planning';
 
@@ -93,6 +93,31 @@ describe('Planung (Seite)', () => {
     confirm.click();
     await vi.waitFor(() => expect(firebase.calls).toContain('deleteSeries'));
     expect(firebase.planning.series).toEqual({});
+  });
+  it('nennt beim Bearbeiten und Löschen die Folgen für die künftigen Termine (SCRUM-147)', async () => {
+    const fixture = await render();
+    const day = (offset: number) => new Date(Date.parse(`${todayIso()}T00:00:00Z`) + offset * 86_400_000).toISOString().slice(0, 10);
+    const dates = [day(7), day(14), day(21)];
+    firebase.planning.doc = {
+      series: { s1: { weekday: isoWeekday(day(7)), startTime: '17:30', durationMinutes: 90, location: '', locationCoords: null, title: '', trainingFocus: 'Umschalten', intensity: 2, startDate: day(-30), endDate: day(21) } },
+    };
+    for (const date of dates) firebase.events.events.set(`serie-s1-${date}`, { type: 'Training', title: 'Training', date, intensity: 2, location: '', trainingFocus: 'Umschalten', startTime: '17:30', durationMinutes: 90, locationCoords: null });
+    firebase.ratings.ratings.set(`serie-s1-${dates[1]}`, new Map([['p1', { attendance: 'present' }]]));
+    firebase.events.emitEvents();
+    firebase.planning.emit();
+    await fixture.whenStable();
+    (root(fixture).querySelector('.list button') as HTMLButtonElement).click();
+    await fixture.whenStable();
+    type(field(fixture, 'startTime'), '18:00');
+    await vi.waitFor(() => {
+      expect(root(fixture).querySelector('[data-testid="series-preview"]')?.textContent).toContain('2 Termine werden angepasst; 1 Termin bleibt, weil er schon bewertet ist.');
+    });
+
+    (root(fixture).querySelector('tk-series-dialog .delete') as HTMLButtonElement).click();
+    await fixture.whenStable();
+    await vi.waitFor(() => {
+      expect(root(fixture).querySelector('[data-testid="delete-preview"]')?.textContent).toContain('2 Termine werden entfernt; 1 Termin bleibt, weil er schon bewertet ist.');
+    });
   });
 });
 

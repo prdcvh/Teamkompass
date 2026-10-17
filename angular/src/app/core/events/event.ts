@@ -60,6 +60,11 @@ export interface TeamEvent {
   /** Koordinaten des Orts; null = keine hinterlegt. */
   readonly locationCoords: LocationCoords | null;
   readonly notes: string;
+  /**
+   * Nur bei Serien-Trainings (SCRUM-147): der Trainer hat diesen Termin einzeln bearbeitet. Die Serie überschreibt
+   * ihn dann nicht mehr. Fehlt, solange nichts von Hand geändert wurde.
+   */
+  readonly seriesEdited?: true;
 }
 
 /** Eingaben aus dem Formular; alles als Text, wie es der Nutzer eingibt. */
@@ -244,6 +249,7 @@ export function eventFromDoc(id: string, data: Readonly<Record<string, unknown>>
         : null,
     locationCoords: isLocationCoords(coords) ? { lat: coords.lat, lon: coords.lon, name: coords.name } : null,
     notes: text(data['notes']),
+    ...(data['seriesEdited'] === true ? { seriesEdited: true as const } : {}),
   };
 }
 

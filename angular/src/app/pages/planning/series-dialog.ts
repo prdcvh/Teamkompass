@@ -59,6 +59,8 @@ export class SeriesDialog {
         this.draft.set(series ? draftFromSeries(series) : emptySeriesDraft(todayIso(), defaultLocation));
         this.errors.set({});
         this.resetSearch();
+        // Beim Ändern: nachsehen, welche künftigen Termine schon bewertet sind (für die Vorschau).
+        if (series) void this.planning.loadProtection(series.id);
       });
     });
   }

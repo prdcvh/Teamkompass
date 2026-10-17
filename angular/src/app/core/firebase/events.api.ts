@@ -49,6 +49,40 @@ export class EventsApi {
     await batch.commit();
   }
 
+  /**
+   * Welche dieser Events haben Bewertungen/Anwesenheit oder interne Notizen (mindestens ein Dokument in einer der
+   * Unterkollektionen)? Je Event zwei kleine Abfragen, in Gruppen parallel. Ein Fehler wird weitergereicht: wer
+   * danach löscht oder überschreibt, muss die Antwort kennen.
+   */
+  async findEventsWithRecords(ids: readonly string[]): Promise<ReadonlySet<string>> {
+    const { db } = await this.connection.get();
+    const { collection, getDocs, limit, query } = await import('firebase/firestore');
+    const found = new Set<string>();
+    for (let offset = 0; offset < ids.length; offset += 10) {
+      await Promise.all(
+        ids.slice(offset, offset + 10).map(async (id) => {
+          for (const name of ['ratings', 'privateNotes'] as const) {
+            const snapshot = await getDocs(query(collection(db, 'teams', environment.teamId, 'events', id, name), limit(1)));
+            if (!snapshot.empty) found.add(id);
+          }
+        }),
+      );
+    }
+    return found;
+  }
+
+  /**
+   * Löscht mehrere Event-Dokumente in einem Schreibvorgang (höchstens 500). Anders als {@link deleteEvent} werden
+   * keine Unterkollektionen angefasst: gedacht für Events, bei denen vorher geprüft wurde, dass es dort nichts gibt.
+   */
+  async deleteEventsBatch(ids: readonly string[]): Promise<void> {
+    const { db } = await this.connection.get();
+    const { doc, writeBatch } = await import('firebase/firestore');
+    const batch = writeBatch(db);
+    for (const id of ids) batch.delete(doc(db, 'teams', environment.teamId, 'events', id));
+    await batch.commit();
+  }
+
   /** Löscht das Event samt Bewertungen und internen Notizen (in Blöcken, Limit 500 je Schreibvorgang). */
   async deleteEvent(id: string): Promise<void> {
     const { db } = await this.connection.get();
