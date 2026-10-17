@@ -2156,3 +2156,24 @@ menu {
 .event-lineup { margin: 0 0 16px; padding: 12px 14px; border: 1px solid var(--line, rgba(128, 128, 128, 0.3)); border-radius: 12px; }
 .event-lineup h3 { margin: 0 0 8px; font-size: 1rem; }
 .event-lineup-list { margin: 0 0 8px; padding-left: 18px; }
+
+/* Belastung (SCRUM-137): Vergleich der letzten 7 Tage mit dem Schnitt der 3 Wochen davor. */
+.risk-panel .risk-pill {
+  display: inline-grid;
+  padding: 0 12px;
+}
+
+.risk-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.risk-compare strong {
+  font-size: 1.3rem;
+}
+
+.risk-compare > div {
+  display: grid;
+  gap: 2px;
+}

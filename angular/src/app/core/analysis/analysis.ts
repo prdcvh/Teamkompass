@@ -42,7 +42,7 @@ export function teamStats(events: readonly TeamEvent[], ratings: RatingsByEvent,
     record: teamRecord(events, today),
     avgGrade: eventGrades.length ? roundGrade(eventGrades.reduce((sum, grade) => sum + grade, 0) / eventGrades.length) : null,
     attendanceRate: attendances.length ? Math.round((attended / attendances.length) * 100) : 0,
-    avgIntensity: events.length ? roundGrade(events.reduce((sum, event) => sum + (event.intensity || 2), 0) / events.length) : null,
+    avgIntensity: events.length ? roundGrade(events.reduce((sum, event) => sum + event.exertion, 0) / events.length) : null,
   };
 }
 

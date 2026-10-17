@@ -435,27 +435,147 @@ function playerAttendanceCount(playerId) {
   return state.events.filter((event) => event.ratings?.[playerId]?.attendance === "present" || event.ratings?.[playerId]?.attendance === "limited").length;
 }
 
-function playerInjuryRisk(playerId) {
+// --- LOAD-ASSESSMENT START (SCRUM-137) ---
+// Belastungsampel. Drei Stufen statt einer Prozentzahl (die Summe geschaetzter Punkte wirkte wie
+// eine Wahrscheinlichkeit): Unauffaellig / Beobachten / Anpassen, jeweils mit den Gruenden als Text.
+// Verletzt/Angeschlagen ist die getrennte "Verfuegbarkeit" und fliesst nicht in die Stufe ein.
+const LOAD_TIERS = {
+  unauffaellig: { level: "Unauffällig", action: "Keine Auffälligkeit in der Belastung." },
+  beobachten: { level: "Beobachten", action: "Aktuell keine Anpassung nötig, Entwicklung im Blick behalten." },
+  anpassen: { level: "Anpassen", action: "Umfang bzw. Anstrengung dosieren und auf ausreichend Erholung achten." }
+};
+
+const AVAILABILITY_INFO = {
+  fit: { key: "fit", label: "Fit", action: "" },
+  angeschlagen: { key: "angeschlagen", label: "Angeschlagen", action: "Einsatz nur nach Rücksprache, Belastung dosieren." },
+  verletzt: { key: "verletzt", label: "Verletzt", action: "Nicht einsetzen – ärztliche/physiotherapeutische Abklärung empfohlen." }
+};
+
+// Anstrengung 0-10 (angelehnt an die Borg-CR10-Skala), mit Worten.
+const EXERTION_LABELS = ["Ruhe", "sehr leicht", "leicht", "mittel", "etwas schwer", "schwer", "ziemlich schwer", "sehr schwer", "sehr, sehr schwer", "fast maximal", "maximal"];
+// Bisherige Termine haben nur eine Intensitaet 1/2/3; sie wird als 3/5/7 gelesen (keine Migration noetig).
+const LEGACY_INTENSITY_EXERTION = { 1: 3, 2: 5, 3: 7 };
+const DEFAULT_EXERTION = 5;
+const DEFAULT_SESSION_MINUTES = 90;
+
+function eventExertion(event) {
+  const own = event?.exertion;
+  if (own !== "" && own != null && Number.isFinite(Number(own)) && Number(own) >= 0 && Number(own) <= 10) return Math.round(Number(own));
+  return LEGACY_INTENSITY_EXERTION[Number(event?.intensity)] ?? DEFAULT_EXERTION;
+}
+
+// Das alte Feld "intensity" (1-3) bleibt beim Speichern passend mitgefuehrt, damit aeltere Staende lesbar bleiben.
+function legacyIntensityForExertion(exertion) {
+  return exertion <= 4 ? 1 : exertion <= 6 ? 2 : 3;
+}
+
+function exertionLabel(value) {
+  const number = Math.min(10, Math.max(0, Math.round(Number(value))));
+  return `${number} · ${EXERTION_LABELS[number]}`;
+}
+
+function eventPlannedMinutes(event) {
+  if (event?.type === "Spiel") return Number(event.matchDuration) > 0 ? Number(event.matchDuration) : DEFAULT_SESSION_MINUTES;
+  return Number(event?.durationMinutes) > 0 ? Number(event.durationMinutes) : DEFAULT_SESSION_MINUTES;
+}
+
+// Minuten eines Spielers: bei Spielen die gespielten Minuten, sonst die Dauer des Termins;
+// "eingeschraenkt" ohne eingetragene Minuten zaehlt 60 % der Dauer.
+function sessionMinutes(event, rating) {
+  const planned = eventPlannedMinutes(event);
+  if (event?.type === "Spiel" && rating?.minutes !== "" && rating?.minutes != null) return Math.max(0, Math.min(planned, Number(rating.minutes)));
+  return rating?.attendance === "limited" ? planned * 0.6 : planned;
+}
+
+// Belastung eines Termins = Minuten x Anstrengung (0-10).
+function sessionLoadValue(event, rating) {
+  return sessionMinutes(event, rating) * eventExertion(event);
+}
+
+// Reine Rechnung. sessions: [{ date: Date (Mitternacht), load, exertion }] nur fuer Termine, an denen der Spieler
+// teilgenommen hat. Nur vergangene Termine zaehlen (SCRUM-136). Woche 0 = die letzten 7 Tage (heute und 6 Tage davor),
+// Wochen 1-3 = die 3 Wochen davor (Tage 8-28), ohne Ueberschneidung.
+function assessLoad({ sessions = [], measurements = [], lastInjuryEnd = null, lastAbsenceEnd = null, status = "Fit", injuredNow = false, today }) {
+  const past = sessions
+    .map((item) => ({ ...item, ago: Math.round(daysBetween(item.date, today)) }))
+    .filter((item) => item.ago >= 0)
+    .sort((a, b) => a.ago - b.ago);
+  const weekLoads = [0, 1, 2, 3].map((week) => past.filter((item) => item.ago >= week * 7 && item.ago <= week * 7 + 6).reduce((sum, item) => sum + item.load, 0));
+  const acute = weekLoads[0];
+  const baseline = (weekLoads[1] + weekLoads[2] + weekLoads[3]) / 3;
+  const weeksWithLoad = weekLoads.filter((value) => value > 0).length;
+  const ratio = baseline > 0 ? acute / baseline : null;
+  const hints = [];
+  const infos = [];
+
+  const spike = acute > 0 && (baseline === 0 || ratio >= 1.5);
+  if (spike && weeksWithLoad >= 3) {
+    hints.push({ label: `Belastungsspitze (${roundGrade(ratio).toFixed(1).replace(".", ",")}-fach des Schnitts der 3 Wochen davor)`, weight: ratio >= 2 ? 2 : 1 });
+  } else if (spike) {
+    infos.push("Wiedereinstieg – langsam steigern");
+  }
+
+  const hard = past.filter((item) => item.ago <= 6 && item.exertion >= 7);
+  if (hard.some((item, index) => index > 0 && item.ago - hard[index - 1].ago <= 2)) {
+    hints.push({ label: "Zwei sehr harte Einheiten innerhalb von 48 Stunden", weight: 1 });
+  }
+
+  if (measurements.length >= 2) {
+    const [prev, last] = measurements.slice(-2);
+    const months = daysBetween(new Date(`${prev.date}T00:00:00`), new Date(`${last.date}T00:00:00`)) / 30;
+    const growth = months > 0 ? (Number(last.height) - Number(prev.height)) / months : 0;
+    const text = roundGrade(growth).toFixed(1).replace(".", ",");
+    if (growth >= 1.2) hints.push({ label: `Starker Wachstumsschub (${text} cm/Monat)`, weight: 2 });
+    else if (growth >= 0.6) hints.push({ label: `Wachstumsschub (${text} cm/Monat)`, weight: 1 });
+  }
+
+  if (lastInjuryEnd) {
+    const daysSinceReturn = daysBetween(new Date(`${lastInjuryEnd}T00:00:00`), today);
+    if (daysSinceReturn >= 0 && daysSinceReturn <= 21) hints.push({ label: "Rückkehr nach Verletzung", weight: 1 });
+  }
+  if (lastAbsenceEnd) {
+    const daysSinceEnd = daysBetween(new Date(`${lastAbsenceEnd}T00:00:00`), today);
+    if (daysSinceEnd >= 0 && daysSinceEnd <= 14) infos.push("Kurz nach Abwesenheit (Wiedereinstieg)");
+  }
+
+  const score = hints.reduce((sum, hint) => sum + hint.weight, 0);
+  const tier = score >= 2 ? "anpassen" : score >= 1 ? "beobachten" : "unauffaellig";
+  const reasons = [...hints.map((hint) => hint.label), ...infos];
+  const availability = injuredNow || status === "Verletzt" ? AVAILABILITY_INFO.verletzt : status === "Angeschlagen" ? AVAILABILITY_INFO.angeschlagen : AVAILABILITY_INFO.fit;
+  return {
+    tier,
+    level: LOAD_TIERS[tier].level,
+    action: LOAD_TIERS[tier].action,
+    reasons,
+    reason: reasons.join(" · ") || "Keine auffälligen Belastungsfaktoren",
+    load: roundGrade(acute),
+    baseline: roundGrade(baseline),
+    weeksWithLoad,
+    recentEvents: past.filter((item) => item.ago <= 27).length,
+    availability
+  };
+}
+// --- LOAD-ASSESSMENT END ---
+
+
+const LOAD_TIER_RANK = { unauffaellig: 0, beobachten: 1, anpassen: 2 };
+
+function daysBetween(earlier, later) {
+  return (later.getTime() - earlier.getTime()) / 86400000;
+}
+
+function playerInjuryRisk(playerId, now = new Date()) {
   const player = state.players.find((item) => item.id === playerId);
-  const recentRatings = sortedEvents()
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+  const sessions = sortedEvents()
     .filter((event) => event.ratings?.[playerId]?.attendance === "present" || event.ratings?.[playerId]?.attendance === "limited")
-    .slice(0, 6);
-  const load = recentRatings.reduce((sum, event) => {
-    const attendanceFactor = event.ratings[playerId].attendance === "limited" ? 0.6 : 1;
-    return sum + Number(event.intensity || 2) * attendanceFactor;
-  }, 0);
-  const averageRecentGrade = recentRatings.length
-    ? recentRatings.reduce((sum, event) => sum + Number(event.ratings[playerId].grade || 3), 0) / recentRatings.length
-    : 0;
-  let score = load * 7;
-  if (recentRatings.length >= 4) score += 10;
-  if (averageRecentGrade >= 4) score += 12;
-  if (player?.status === "Angeschlagen") score += 24;
-  if (player?.status === "Verletzt") score += 45;
-  if (player?.status === "Pause") score += 10;
-  const percentage = Math.max(0, Math.min(100, Math.round(score)));
-  const level = percentage >= 70 ? "Hoch" : percentage >= 40 ? "Mittel" : "Niedrig";
-  return { percentage, level, load: roundGrade(load), recentEvents: recentRatings.length };
+    .map((event) => ({
+      date: new Date(`${event.date}T00:00:00`),
+      load: sessionLoadValue(event, event.ratings[playerId]),
+      exertion: eventExertion(event)
+    }));
+  return assessLoad({ sessions, status: player?.status, today });
 }
 
 function roundGrade(value) {
@@ -472,8 +592,7 @@ function gradeToPercent(value) {
 }
 
 function intensityLabel(value) {
-  const labels = { 1: "niedrig", 2: "mittel", 3: "hoch" };
-  return `${value || 2} · ${labels[value] || "mittel"}`;
+  return exertionLabel(value);
 }
 
 // Lokales Datum als JJJJ-MM-TT (nicht UTC): "heute" muss auch zwischen 0:00 und 2:00 Uhr der richtige Tag sein.
@@ -536,7 +655,7 @@ function teamStats() {
   const attendanceRate = attendances.length
     ? Math.round((attendances.filter((value) => value === "present" || value === "limited").length / attendances.length) * 100)
     : 0;
-  const avgIntensity = state.events.length ? roundGrade(state.events.reduce((sum, event) => sum + Number(event.intensity || 2), 0) / state.events.length) : null;
+  const avgIntensity = state.events.length ? roundGrade(state.events.reduce((sum, event) => sum + eventExertion(event), 0) / state.events.length) : null;
   return { games: games.length, wins, draws, losses, goalsFor, goalsAgainst, avgGrade, attendanceRate, avgIntensity };
 }
 
@@ -640,7 +759,7 @@ function renderMetrics() {
   const fitPlayers = state.players.filter((player) => player.status === "Fit").length;
   const gradedRatings = state.players.map((player) => playerAverageGrade(player.id)).filter(Boolean);
   const teamGrade = gradedRatings.length ? roundGrade(gradedRatings.reduce((sum, grade) => sum + grade, 0) / gradedRatings.length) : null;
-  const highRiskPlayers = state.players.filter((player) => playerInjuryRisk(player.id).level === "Hoch").length;
+  const highRiskPlayers = state.players.filter((player) => playerInjuryRisk(player.id).tier === "anpassen").length;
   const stats = teamStats();
   const nextEvent = sortedEvents().find((event) => new Date(event.date) >= startOfToday());
   const metrics = [
@@ -650,7 +769,7 @@ function renderMetrics() {
     ["Teamnote", gradeLabel(teamGrade)],
     ["Bilanz", `${stats.wins}-${stats.draws}-${stats.losses}`],
     ["Tore", `${stats.goalsFor}:${stats.goalsAgainst}`],
-    ["Risiko hoch", highRiskPlayers]
+    ["Belastung hoch", highRiskPlayers]
   ];
   $("#metricsGrid").innerHTML = metrics.map(([label, value]) => `<article class="metric"><span>${label}</span><strong>${value}</strong></article>`).join("");
   if (nextEvent) $("#metricsGrid").innerHTML += `<article class="metric metric-wide"><span>Nächstes Event</span><strong>${nextEvent.date}</strong><small>${nextEvent.title}</small></article>`;
@@ -781,7 +900,7 @@ function renderSquad() {
         <td><span class="status-pill ${statusClass}">${player.status}</span></td>
         <td>${playerAttendanceCount(player.id)}</td>
         <td>${gradeLabel(playerAverageGrade(player.id))}</td>
-        <td><span class="risk-pill ${risk.level.toLowerCase()}">${risk.level}</span></td>
+        <td><span class="risk-pill ${risk.tier}" title="${risk.action} (${risk.reason})">${risk.level}</span></td>
         <td class="row-actions">
           <button class="ghost-button" data-action="profile" data-id="${player.id}">Profil</button>
           <button class="ghost-button" data-action="edit" data-id="${player.id}">Bearbeiten</button>
@@ -825,7 +944,7 @@ function renderEvents() {
         <span class="event-type">${event.type}</span>
         <strong>${event.title}</strong>
         <small>${event.date}${event.opponent ? ` · vs. ${event.opponent}` : ""}${result ? ` · ${result.goalsFor}:${result.goalsAgainst}` : ""}</small>
-        <span>Intensität ${intensityLabel(event.intensity)}</span>
+        <span>Anstrengung ${exertionLabel(eventExertion(event))}</span>
         <span>${rated} Bewertungen</span>
       </button>
     `;
@@ -845,9 +964,13 @@ function renderRatingTable() {
   $("#eventEditorTitle").textContent = event.title;
   const result = gameResult(event);
   const matchDuration = event.type === "Spiel" ? Number(event.matchDuration || 90) : "";
-  $("#eventEditorMeta").textContent = `${event.type} · ${event.date}${result ? ` · Ergebnis ${result.goalsFor}:${result.goalsAgainst}` : ""} · Intensität ${intensityLabel(event.intensity)}${event.location ? ` · ${event.location}` : ""}`;
+  $("#eventEditorMeta").textContent = `${event.type} · ${event.date}${result ? ` · Ergebnis ${result.goalsFor}:${result.goalsAgainst}` : ""} · Anstrengung ${exertionLabel(eventExertion(event))}${event.location ? ` · ${event.location}` : ""}`;
   if (matchDuration) $("#eventEditorMeta").textContent += ` · ${matchDuration} Min.`;
-  $("#selectedEventIntensity").value = String(event.intensity || 2);
+  else $("#eventEditorMeta").textContent += ` · ${eventPlannedMinutes(event)} Min.`;
+  $("#selectedEventIntensity").value = String(eventExertion(event));
+  $("#selectedTrainingDuration").value = event.type === "Training" ? eventPlannedMinutes(event) : "";
+  $("#selectedTrainingDuration").disabled = event.type !== "Training";
+  $("#selectedTrainingDuration").closest("label").hidden = event.type !== "Training";
   $("#selectedGoalsFor").value = event.goalsFor === "" ? 0 : event.goalsFor;
   $("#selectedGoalsAgainst").value = event.goalsAgainst === "" ? 0 : event.goalsAgainst;
   $("#selectedMatchDuration").value = matchDuration || 90;
@@ -980,7 +1103,8 @@ function openEventDialog() {
   $("#eventTitle").value = "";
   $("#eventType").value = "Training";
   $("#eventDate").valueAsDate = new Date();
-  $("#eventIntensity").value = "2";
+  $("#eventIntensity").value = String(DEFAULT_EXERTION);
+  $("#eventTrainingDuration").value = DEFAULT_SESSION_MINUTES;
   $("#eventLocation").value = "";
   $("#eventTrainingFocus").value = "Eigener Ballbesitz";
   $("#eventOpponent").value = "";
@@ -999,6 +1123,9 @@ function syncEventGameFields() {
     field.disabled = !isGame;
     field.closest("label").hidden = !isGame;
   });
+  const trainingDuration = $("#eventTrainingDuration");
+  trainingDuration.disabled = isGame;
+  trainingDuration.closest("label").hidden = isGame;
   const trainingFocus = $("#eventTrainingFocus");
   trainingFocus.disabled = isGame;
   trainingFocus.closest("label").hidden = isGame;
@@ -1011,7 +1138,9 @@ function saveEvent(event) {
     type: $("#eventType").value,
     title: $("#eventTitle").value.trim(),
     date: $("#eventDate").value,
-    intensity: Number($("#eventIntensity").value),
+    exertion: Number($("#eventIntensity").value),
+    intensity: legacyIntensityForExertion(Number($("#eventIntensity").value)),
+    durationMinutes: $("#eventType").value === "Training" ? Math.max(1, Number($("#eventTrainingDuration").value) || DEFAULT_SESSION_MINUTES) : "",
     location: $("#eventLocation").value.trim(),
     trainingFocus: $("#eventType").value === "Training" ? $("#eventTrainingFocus").value : "",
     opponent: $("#eventOpponent").value.trim(),
@@ -1067,7 +1196,10 @@ function updateSelectedEventMeta(field, value) {
   const event = selectedEvent();
   if (!event) return;
   const numericValue = Number(value);
-  if (field === "intensity") event[field] = numericValue;
+  if (field === "intensity") {
+    event.exertion = Math.min(10, Math.max(0, Math.round(numericValue)));
+    event.intensity = legacyIntensityForExertion(event.exertion);
+  } else if (field === "durationMinutes") event[field] = event.type === "Training" ? Math.max(1, Math.round(numericValue) || DEFAULT_SESSION_MINUTES) : "";
   else if (field === "trainingFocus") event[field] = event.type === "Training" ? value : "";
   else if (field === "matchDuration") event[field] = event.type === "Spiel" ? Math.max(1, numericValue || 90) : "";
   else event[field] = event.type === "Spiel" ? numericValue : "";
@@ -1102,11 +1234,16 @@ function renderProfileHeader(player, ratings) {
       </div>
       <div class="risk-panel">
         <div>
-          <span>Verletzungsrisiko</span>
-          <strong>${risk.level} · ${risk.percentage}%</strong>
+          <span>Belastung</span>
+          <strong><span class="risk-pill ${risk.tier}">${risk.level}</span></strong>
         </div>
-        <div class="risk-meter"><span class="${risk.level.toLowerCase()}" style="width:${risk.percentage}%"></span></div>
-        <small>Belastung ${risk.load} aus ${risk.recentEvents} jüngsten Events</small>
+        <small>${risk.reason}</small>
+        <div class="risk-compare">
+          <div><span>Belastung letzte 7 Tage</span><strong>${risk.load}</strong></div>
+          <div><span>Schnitt der 3 Wochen davor</span><strong>${risk.baseline}</strong></div>
+        </div>
+        <small>Belastung je Termin = Minuten × Anstrengung (0–10). ${risk.action}</small>
+        <small>Verfügbarkeit: <b>${risk.availability.label}</b>${risk.availability.action ? ` – ${risk.availability.action}` : ""}</small>
       </div>
     </div>
   ` : `<p class="muted">Noch kein Spieler vorhanden.</p>`;
@@ -1164,7 +1301,7 @@ function renderProfileHistory(ratings) {
     <article class="record-item">
       <div>
         <strong>${event.title}</strong>
-        <small>${event.date} · ${event.type}${gameResult(event) ? ` · ${gameResult(event).goalsFor}:${gameResult(event).goalsAgainst}` : ""} · Intensität ${intensityLabel(event.intensity)} · Note ${rating.grade}</small>
+        <small>${event.date} · ${event.type}${gameResult(event) ? ` · ${gameResult(event).goalsFor}:${gameResult(event).goalsAgainst}` : ""} · Anstrengung ${exertionLabel(eventExertion(event))} · Note ${rating.grade}</small>
         <p class="muted">${rating.note || event.notes || "Keine Notiz"}</p>
       </div>
       <span class="grade-badge">${rating.grade}</span>
@@ -1195,7 +1332,7 @@ function renderAnalyticsCards(playerId, ratings = playerRatings(playerId)) {
   const previous = ratings.at(-2)?.rating.grade;
   const trend = last && previous ? Number(previous) - Number(last) : null;
   const risk = playerInjuryRisk(playerId);
-  const recentIntensity = ratings.slice(-3).map((item) => item.event.intensity || 2);
+  const recentIntensity = ratings.slice(-3).map((item) => eventExertion(item.event));
   const avgIntensity = recentIntensity.length ? roundGrade(recentIntensity.reduce((sum, value) => sum + Number(value), 0) / recentIntensity.length) : null;
   const development = bestDevelopment(ratings);
   const bestEvent = ratings.length ? ratings.reduce((best, item) => Number(item.rating.grade) < Number(best.rating.grade) ? item : best, ratings[0]) : null;
@@ -1207,8 +1344,8 @@ function renderAnalyticsCards(playerId, ratings = playerRatings(playerId)) {
     ["Bewertete Events", ratings.length],
     ["Teilnahmen", playerAttendanceCount(playerId)],
     ["Trend", trend === null ? "-" : `${trend > 0 ? "+" : ""}${roundGrade(trend)}`],
-    ["Risiko", `${risk.level} · ${risk.percentage}%`],
-    ["Ø Intensität zuletzt", avgIntensity ? avgIntensity.toFixed(1).replace(".", ",") : "-"],
+    ["Belastung", risk.level],
+    ["Ø Anstrengung zuletzt", avgIntensity ? avgIntensity.toFixed(1).replace(".", ",") : "-"],
     ["Entwicklung Saison", development === null ? "-" : `${development > 0 ? "+" : ""}${gradeLabel(development)}`],
     ["Bestes Event", bestEvent ? `${gradeLabel(bestEvent.rating.grade)} · ${bestEvent.event.type}` : "-"],
     ["Einsatzquote", `${gameStats.appearanceRate}%`],
@@ -1226,6 +1363,7 @@ function downloadProfilePdf() {
   const ratings = playerRatings(playerId).sort((a, b) => new Date(a.event.date) - new Date(b.event.date));
   const average = playerAverageGrade(playerId);
   const gameStats = playerGameStats(playerId);
+  const risk = playerInjuryRisk(playerId);
   const logoUrl = new URL("./assets/club-logo.png", window.location.href).href;
   const performanceGraph = profilePerformanceSvg(ratings);
   const skillRows = profileSkillAverages(ratings).map((item) => `
@@ -1296,6 +1434,15 @@ function downloadProfilePdf() {
           <div class="card"><span>Tore + Vorlagen</span><strong>${gameStats.goals} + ${gameStats.assists}</strong></div>
           <div class="card"><span>Min./Spiel</span><strong>${gameStats.minutesPerGame || "-"}</strong></div>
           <div class="card"><span>Spiele</span><strong>${gameStats.appearances}/${gameStats.games}</strong></div>
+        </section>
+        <section class="load-box">
+          <h2>Belastung</h2>
+          <p><strong>${risk.level}</strong> · ${risk.reason}</p>
+          <table>
+            <thead><tr><th>Belastung letzte 7 Tage</th><th>Schnitt der 3 Wochen davor</th><th>Verfügbarkeit</th></tr></thead>
+            <tbody><tr><td>${risk.load}</td><td>${risk.baseline}</td><td>${risk.availability.label}${risk.availability.action ? ` – ${risk.availability.action}` : ""}</td></tr></tbody>
+          </table>
+          <p class="muted">Belastung je Termin = Minuten × Anstrengung (0–10).</p>
         </section>
         <section class="section-grid">
           <div>
@@ -1380,7 +1527,8 @@ function renderTeamAnalysis() {
   const thinPositions = coverage.filter(([, count]) => count <= 1).map(([position]) => position).slice(0, 6);
   const highRisk = state.players
     .map((player) => ({ player, risk: playerInjuryRisk(player.id) }))
-    .sort((a, b) => b.risk.percentage - a.risk.percentage)
+    .filter(({ risk }) => risk.tier !== "unauffaellig")
+    .sort((a, b) => (LOAD_TIER_RANK[b.risk.tier] - LOAD_TIER_RANK[a.risk.tier]) || (b.risk.load - a.risk.load))
     .slice(0, 3);
   const topPlayers = state.players
     .map((player) => ({ player, grade: playerAverageGrade(player.id), events: playerAttendanceCount(player.id) }))
@@ -1393,7 +1541,7 @@ function renderTeamAnalysis() {
     ["Torverhältnis", `${stats.goalsFor}:${stats.goalsAgainst}`],
     ["Ø Teamnote", gradeLabel(stats.avgGrade)],
     ["Teilnahmequote", `${stats.attendanceRate}%`],
-    ["Ø Intensität", stats.avgIntensity ? stats.avgIntensity.toFixed(1).replace(".", ",") : "-"],
+    ["Ø Anstrengung", stats.avgIntensity ? stats.avgIntensity.toFixed(1).replace(".", ",") : "-"],
     ["Training BB/GGB", `${focusCounts["Eigener Ballbesitz"]}/${focusCounts["Gegnerischer Ballbesitz"]}`],
     ["Training Umschalten", focusCounts.Umschalten],
     ["Geburten Q1/Q2", `${quarters.Q1}/${quarters.Q2}`],
@@ -1409,7 +1557,7 @@ function renderTeamAnalysis() {
     </article>
     <article class="team-insight">
       <strong>Belastung im Blick</strong>
-      ${highRisk.map(({ player, risk }) => `<span>${player.name} · ${risk.level} (${risk.percentage}%)</span>`).join("")}
+      ${highRisk.map(({ player, risk }) => `<span>${player.name} · ${risk.level}${risk.reason ? ` · ${risk.reason}` : ""}</span>`).join("") || "<span>Keine Auffälligkeiten.</span>"}
     </article>
     <article class="team-insight">
       <strong>Spielauswertung</strong>
@@ -1800,6 +1948,7 @@ $("#selectedEventIntensity").addEventListener("change", (event) => updateSelecte
 $("#selectedGoalsFor").addEventListener("change", (event) => updateSelectedEventMeta("goalsFor", event.target.value));
 $("#selectedGoalsAgainst").addEventListener("change", (event) => updateSelectedEventMeta("goalsAgainst", event.target.value));
 $("#selectedMatchDuration").addEventListener("change", (event) => updateSelectedEventMeta("matchDuration", event.target.value));
+$("#selectedTrainingDuration").addEventListener("change", (event) => updateSelectedEventMeta("durationMinutes", event.target.value));
 $("#selectedTrainingFocus").addEventListener("change", (event) => updateSelectedEventMeta("trainingFocus", event.target.value));
 $("#profilePlayer").addEventListener("change", drawProfile);
 $("#profilePdfBtn").addEventListener("click", downloadProfilePdf);

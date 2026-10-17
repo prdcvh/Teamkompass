@@ -10,11 +10,13 @@ import {
   eventFromDraft,
   filterEvents,
   groupByMonth,
+  plannedMinutes,
   monthLabel,
   resultText,
   sortEvents,
   validateDraft,
 } from './event';
+import { endOfWeek, sectionEvents } from './event-sections';
 
 describe('event (Logik)', () => {
   const draft = (overrides: Partial<EventDraft> = {}): EventDraft => ({ ...emptyDraft('2026-10-06'), title: 'Training Dienstag', ...overrides });
@@ -32,7 +34,9 @@ describe('event (Logik)', () => {
       expect(validateDraft(draft({ date: '2026-02-31' })).date).toBeTruthy();
       expect(validateDraft(draft({ location: 'x'.repeat(51) })).location).toContain('50');
       expect(validateDraft(draft({ notes: 'x'.repeat(1001) })).notes).toContain('1000');
-      expect(validateDraft(draft({ intensity: 7 })).intensity).toBeTruthy();
+      expect(validateDraft(draft({ exertion: 11 })).exertion).toBeTruthy();
+      expect(validateDraft(draft({ exertion: -1 })).exertion).toBeTruthy();
+      expect(validateDraft(draft({ exertion: 0 })).exertion).toBeUndefined();
     });
 
     it('prüft Spielfelder nur bei Spielen', () => {
@@ -73,6 +77,32 @@ describe('event (Logik)', () => {
       const bare = eventFromDoc('y', {});
       expect(bare).toMatchObject({ type: 'Training', title: '', intensity: 2, trainingFocus: 'Eigener Ballbesitz', goalsFor: null });
       expect(resultText(parsed)).toBe('');
+    });
+
+    it('liest die bisherige Intensität 1/2/3 als Anstrengung 3/5/7 (SCRUM-137)', () => {
+      const read = (data: Record<string, unknown>) => eventFromDoc('x', { type: 'Training', title: 't', date: '2026-10-10', ...data });
+      expect([1, 2, 3].map((intensity) => read({ intensity }).exertion)).toEqual([3, 5, 7]);
+      expect(read({ intensity: '3' }).exertion).toBe(7);
+      expect(read({}).exertion).toBe(5);
+      // Ein eigener Wert hat Vorrang, auch die 0 (Ruhe).
+      expect(read({ intensity: 3, exertion: 8 }).exertion).toBe(8);
+      expect(read({ intensity: 3, exertion: 0 }).exertion).toBe(0);
+      expect(read({ intensity: 3, exertion: 11 }).exertion).toBe(7);
+    });
+
+    it('speichert die Anstrengung und führt die alte Intensität passend mit', () => {
+      const saved = (exertion: number) => docFromEvent(eventFromDraft(draft({ exertion }), 'e1'));
+      expect(saved(8)).toMatchObject({ exertion: 8, intensity: 3 });
+      expect(saved(5)).toMatchObject({ exertion: 5, intensity: 2 });
+      expect(saved(3)).toMatchObject({ exertion: 3, intensity: 1 });
+      expect(eventFromDoc('e1', saved(7))).toMatchObject({ exertion: 7, intensity: 3 });
+    });
+
+    it('Training: Dauer ohne Eintrag zählt 90 Minuten, Spiele nutzen die Spieldauer', () => {
+      expect(plannedMinutes({ type: 'Training', matchDuration: null, durationMinutes: null })).toBe(90);
+      expect(plannedMinutes({ type: 'Training', matchDuration: null, durationMinutes: 60 })).toBe(60);
+      expect(plannedMinutes({ type: 'Spiel', matchDuration: 70, durationMinutes: null })).toBe(70);
+      expect(plannedMinutes({ type: 'Spiel', matchDuration: null, durationMinutes: null })).toBe(90);
     });
 
     it('Bearbeiten-Entwurf bildet das Event ab', () => {
@@ -191,6 +221,82 @@ describe('event (Logik)', () => {
         ['September 2026', 1],
       ]);
       expect(monthLabel('')).toBe('Ohne Datum');
+    });
+  });
+
+  describe('Bereiche und Sortierung (SCRUM-140/141)', () => {
+    const ids = (events: readonly { id: string }[]) => events.map((e) => e.id);
+
+    it('endOfWeek: Sonntag der Mo-So-Woche, auch über den Jahreswechsel', () => {
+      expect(endOfWeek('2026-10-05')).toBe('2026-10-11'); // Montag
+      expect(endOfWeek('2026-10-07')).toBe('2026-10-11'); // Mittwoch
+      expect(endOfWeek('2026-10-11')).toBe('2026-10-11'); // Sonntag
+      expect(endOfWeek('2026-12-31')).toBe('2027-01-03'); // Donnerstag
+      expect(endOfWeek('2024-12-30')).toBe('2025-01-05');
+    });
+
+    const list = [
+      event({ id: 'past1', date: '2026-10-04', title: 'Vor Montag' }),
+      event({ id: 'past2', date: '2026-09-20' }),
+      event({ id: 'today', date: '2026-10-07', startTime: '18:00' }),
+      event({ id: 'yesterday', date: '2026-10-06' }),
+      event({ id: 'sun', date: '2026-10-11' }),
+      event({ id: 'mon', date: '2026-10-12' }),
+      event({ id: 'far', date: '2027-02-01' }),
+    ];
+
+    it('heute zählt zu Diese Woche, frühere Tage der Woche sind vergangen, Sonntag/Montag-Grenze', () => {
+      const sections = sectionEvents(list, 'chronological', '2026-10-07');
+      expect(ids(sections.past)).toEqual(['yesterday', 'past1', 'past2']);
+      expect(ids(sections.week)).toEqual(['today', 'sun']);
+      expect(ids(sections.later)).toEqual(['mon', 'far']);
+    });
+
+    it('Montag früh: die ganze Woche liegt noch vor uns, der Sonntag davor ist vergangen', () => {
+      const sections = sectionEvents(list, 'chronological', '2026-10-05');
+      expect(ids(sections.past)).toEqual(['past1', 'past2']);
+      expect(ids(sections.week)).toEqual(['yesterday', 'today', 'sun']);
+    });
+
+    it('Sonntag: nur dieser Tag ist Diese Woche, der Montag danach Später', () => {
+      const sections = sectionEvents(list, 'chronological', '2026-10-11');
+      expect(ids(sections.week)).toEqual(['sun']);
+      expect(ids(sections.later)).toEqual(['mon', 'far']);
+    });
+
+    it('Jahreswechsel: Woche reicht über den 1. Januar', () => {
+      const events = [event({ id: 'a', date: '2026-12-31' }), event({ id: 'b', date: '2027-01-03' }), event({ id: 'c', date: '2027-01-04' }), event({ id: 'd', date: '2026-12-30' })];
+      const sections = sectionEvents(events, 'chronological', '2026-12-31');
+      expect(ids(sections.past)).toEqual(['d']);
+      expect(ids(sections.week)).toEqual(['a', 'b']);
+      expect(ids(sections.later)).toEqual(['c']);
+    });
+
+    it('ohne gültiges Datum gilt ein Event als vergangen', () => {
+      expect(ids(sectionEvents([event({ id: 'x', date: '' })], 'chronological', '2026-10-07').past)).toEqual(['x']);
+    });
+
+    it('Chronologisch: Vergangene jüngste zuerst, Woche/Später nächstes zuerst; am selben Tag Startzeit, ohne Startzeit zuletzt', () => {
+      const events = [
+        event({ id: 'late', date: '2026-10-08', startTime: '19:00' }),
+        event({ id: 'none', date: '2026-10-08', startTime: null }),
+        event({ id: 'early', date: '2026-10-08', startTime: '09:30' }),
+        event({ id: 'next', date: '2026-10-07' }),
+      ];
+      expect(ids(sectionEvents(events, 'chronological', '2026-10-07').week)).toEqual(['next', 'early', 'late', 'none']);
+      expect(ids(sortEvents(events, 'chronological'))).toEqual(['next', 'early', 'late', 'none']);
+      expect(ids(sectionEvents([event({ id: 'p1', date: '2026-10-01' }), event({ id: 'p2', date: '2026-10-03' })], 'chronological', '2026-10-07').past)).toEqual(['p2', 'p1']);
+    });
+
+    it('Neueste zuerst und Älteste zuerst wirken innerhalb jedes Bereichs', () => {
+      const newest = sectionEvents(list, 'date-desc', '2026-10-07');
+      expect(ids(newest.past)).toEqual(['yesterday', 'past1', 'past2']);
+      expect(ids(newest.week)).toEqual(['sun', 'today']);
+      expect(ids(newest.later)).toEqual(['far', 'mon']);
+      const oldest = sectionEvents(list, 'date-asc', '2026-10-07');
+      expect(ids(oldest.past)).toEqual(['past2', 'past1', 'yesterday']);
+      expect(ids(oldest.week)).toEqual(['today', 'sun']);
+      expect(ids(oldest.later)).toEqual(['mon', 'far']);
     });
   });
 });

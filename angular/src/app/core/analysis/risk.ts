@@ -1,42 +1,65 @@
 /**
- * Belastungsindikator (Verletzungsrisiko-Score) eines Spielers. Rechnet exakt wie die bisherige App
- * (outputs/team-manager/app.js: playerInjuryRisk) und ist eine Kernzahl (CLAUDE.md „wrong core numbers“).
+ * Belastungsampel eines Spielers (SCRUM-137). Rechnet wie die bisherige App (outputs/team-manager/app.js:
+ * `assessLoad`) und ist eine Kernzahl (CLAUDE.md „wrong core numbers“).
  *
- * Der Score kombiniert mehrere belegte Risikofaktoren statt nur die reine Belastungsmenge zu zählen. Größter
- * Einzelhebel ist die Akute:Chronische Belastungsrelation (ACWR, Gabbett 2016): eine plötzliche Belastungsspitze ist
- * der am besten belegte Prädiktor für Nicht-Kontakt-Verletzungen. Dazu kommen der aktuelle Gesundheitsstatus, das
- * Rückfallfenster nach Rückkehr aus Verletzung/Abwesenheit sowie – weil es eine Jugendmannschaft ist – der
- * Wachstumsschub aus den Körpermessungen (Apophysen-Reizungen wie Morbus Osgood-Schlatter).
+ * - Belastung pro Termin = Minuten × Anstrengung (0–10). Minuten: bei Spielen die gespielten Minuten, sonst die Dauer
+ *   des Termins (Training: Standard 90); „eingeschränkt“ ohne eingetragene Minuten zählt 60 % der Dauer.
+ * - Nur vergangene Termine zählen (SCRUM-136).
+ * - Wochenvergleich: die letzten 7 Tage gegen den Schnitt der 3 Wochen davor (Tage 8–28), ohne Überschneidung.
+ *   Die Spitzenwarnung (ab dem 1,5-fachen) gibt es nur, wenn in mindestens 3 der 4 Wochen Belastung vorhanden ist; sonst
+ *   erscheint nur der Hinweis „Wiedereinstieg – langsam steigern“. So steht nach einer Pause nicht der ganze Kader auf „Anpassen“.
+ * - Erholung: zwei Einheiten mit Anstrengung ≥ 7 innerhalb von 48 Stunden.
+ * - Wachstumsschub: ab 0,6 cm pro Monat ein Hinweis, ab 1,2 cm pro Monat ein starker Hinweis (Kemper et al. 2015).
+ * - Rückkehr nach Verletzung/Abwesenheit wie bisher.
+ * - Keine Prozentzahl: drei Stufen (Unauffällig / Beobachten / Anpassen) mit den Gründen als Text. Verletzt/Angeschlagen ist
+ *   die getrennte „Verfügbarkeit“ und fließt nicht in die Stufe ein.
  */
+import { DEFAULT_TRAINING_DURATION, type TeamEvent, plannedMinutes } from '../events/event';
 import type { Player } from '../player/player';
 import { type EventRating } from '../profile/profile';
 import { type Absence, activeAbsenceOn, isInjuryAbsence } from '../records/absence';
 import { type Measurement, sortedMeasurements } from '../records/measurement';
-import { roundGrade } from '../ratings/rating';
+import { type Rating, roundGrade } from '../ratings/rating';
 
-export type RiskTier = 'aussetzen' | 'reduzieren' | 'anpassen' | 'beobachten' | 'unauffaellig';
+export type RiskTier = 'unauffaellig' | 'beobachten' | 'anpassen';
+export type AvailabilityKey = 'fit' | 'angeschlagen' | 'verletzt';
 
-/** Sortiert von der höchsten zur niedrigsten Schwelle, damit `find` die höchste erreichte Stufe liefert. */
-export const INJURY_RISK_TIERS: readonly { min: number; tier: RiskTier; level: string; action: string }[] = [
-  { min: 75, tier: 'aussetzen', level: 'Nicht einsetzen', action: 'Vom Training/Spiel absehen, ärztliche/physiotherapeutische Abklärung empfohlen.' },
-  { min: 55, tier: 'reduzieren', level: 'Deutlich reduzieren', action: 'Belastung spürbar zurücknehmen, Rücksprache mit Physio/Arzt erwägen.' },
-  { min: 35, tier: 'anpassen', level: 'Belastung anpassen', action: 'Umfang/Intensität dosieren und auf ausreichend Erholung achten.' },
-  { min: 15, tier: 'beobachten', level: 'Beobachten', action: 'Aktuell keine Anpassung nötig, Entwicklung im Blick behalten.' },
-  { min: 0, tier: 'unauffaellig', level: 'Unauffällig', action: 'Belastung unauffällig; Verfügbarkeit individuell prüfen.' },
-];
+export const LOAD_TIERS: Readonly<Record<RiskTier, { level: string; action: string }>> = {
+  unauffaellig: { level: 'Unauffällig', action: 'Keine Auffälligkeit in der Belastung.' },
+  beobachten: { level: 'Beobachten', action: 'Aktuell keine Anpassung nötig, Entwicklung im Blick behalten.' },
+  anpassen: { level: 'Anpassen', action: 'Umfang bzw. Anstrengung dosieren und auf ausreichend Erholung achten.' },
+};
+
+export interface LoadAvailability {
+  readonly key: AvailabilityKey;
+  readonly label: string;
+  readonly action: string;
+}
+
+const AVAILABILITY: Readonly<Record<AvailabilityKey, LoadAvailability>> = {
+  fit: { key: 'fit', label: 'Fit', action: '' },
+  angeschlagen: { key: 'angeschlagen', label: 'Angeschlagen', action: 'Einsatz nur nach Rücksprache, Belastung dosieren.' },
+  verletzt: { key: 'verletzt', label: 'Verletzt', action: 'Nicht einsetzen – ärztliche/physiotherapeutische Abklärung empfohlen.' },
+};
+
+export const RISK_TIER_RANK: Readonly<Record<RiskTier, number>> = { unauffaellig: 0, beobachten: 1, anpassen: 2 };
 
 export interface InjuryRisk {
-  readonly percentage: number;
-  readonly level: string;
   readonly tier: RiskTier;
+  readonly level: string;
   readonly action: string;
-  /** Akute Belastung der letzten 7 Tage. */
+  /** Gründe als Text (Hinweise, dann Infos wie „Wiedereinstieg – langsam steigern“). */
+  readonly reasons: readonly string[];
+  readonly reason: string;
+  /** Belastung der letzten 7 Tage (Minuten × Anstrengung). */
   readonly load: number;
-  /** Wochenschnitt der Belastung über die letzten 4 Wochen (Summe der 28 Tage / 4). */
-  readonly avgLoad: number;
+  /** Schnitt der 3 Wochen davor (Tage 8–28). */
+  readonly baseline: number;
+  /** In wie vielen der 4 Wochen Belastung vorhanden war. */
+  readonly weeksWithLoad: number;
   /** Einsätze der letzten 4 Wochen. */
   readonly recentEvents: number;
-  readonly reason: string;
+  readonly availability: LoadAvailability;
 }
 
 const localMidnight = (iso: string) => new Date(`${iso}T00:00:00`);
@@ -47,8 +70,22 @@ function isoOf(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
+const label = (value: number) => roundGrade(value).toFixed(1).replace('.', ',');
+
+/** Minuten eines Spielers bei diesem Termin. */
+export function sessionMinutes(event: TeamEvent, rating: Rating): number {
+  const planned = plannedMinutes(event) || DEFAULT_TRAINING_DURATION;
+  if (event.type === 'Spiel' && rating.minutes !== null) return Math.max(0, Math.min(planned, rating.minutes));
+  return rating.attendance === 'limited' ? planned * 0.6 : planned;
+}
+
+/** Belastung eines Termins = Minuten × Anstrengung (0–10). */
+export function sessionLoad(event: TeamEvent, rating: Rating): number {
+  return sessionMinutes(event, rating) * event.exertion;
+}
+
 /**
- * @param items alle Events mit der Bewertung dieses Spielers, neueste zuerst
+ * @param items alle Events mit der Bewertung dieses Spielers
  * @param now Zeitpunkt der Auswertung (Standard: jetzt); es zählt der Kalendertag
  */
 export function injuryRisk(
@@ -61,101 +98,83 @@ export function injuryRisk(
   const today = new Date(now);
   today.setHours(0, 0, 0, 0);
   const todayStr = isoOf(today);
-  const factors: { label: string; points: number }[] = [];
 
-  const attended = items
+  // Nur vergangene Termine mit Teilnahme; „ago“ = Tage seit dem Termin (0 = heute).
+  const past = items
     .filter(({ rating }) => rating?.attendance === 'present' || rating?.attendance === 'limited')
-    .map(({ event, rating }) => {
-      const matchDuration = event.type === 'Spiel' ? (event.matchDuration ?? 90) : null;
-      const exposure =
-        matchDuration && rating!.minutes !== null
-          ? Math.max(0.15, Math.min(1, rating!.minutes / matchDuration))
-          : rating!.attendance === 'limited' ? 0.6 : 1;
-      return { date: localMidnight(event.date), sessionLoad: (event.intensity || 2) * exposure };
-    })
-    // Termine nach heute zählen noch nicht (SCRUM-136): sonst ergibt daysBetween negative Werte, die den 7-/28-Tage-
-    // Filtern genügen und den Faktor „Keine Erholung“ verfälschen.
-    .filter((item) => item.date <= today);
+    .map(({ event, rating }) => ({ ago: Math.round(daysBetween(localMidnight(event.date), today)), load: sessionLoad(event, rating!), exertion: event.exertion }))
+    .filter((item) => item.ago >= 0)
+    .sort((a, b) => a.ago - b.ago);
 
-  // Akute (7 Tage) vs. chronische (28 Tage / 4 Wochen) Belastung – ACWR-Sweetspot ca. 0,8–1,3, alles darüber ist
-  // eine Belastungsspitze mit deutlich erhöhtem Verletzungsrisiko.
-  const acuteLoad = attended.filter((item) => daysBetween(item.date, today) <= 7).reduce((sum, item) => sum + item.sessionLoad, 0);
-  const chronicLoad = attended.filter((item) => daysBetween(item.date, today) <= 28).reduce((sum, item) => sum + item.sessionLoad, 0);
-  const chronicWeeklyAvg = chronicLoad / 4;
-  const acwr = chronicWeeklyAvg > 0 ? acuteLoad / chronicWeeklyAvg : acuteLoad > 0 ? 2 : 0;
-  if (acwr > 1.3) factors.push({ label: `Akute Belastungsspitze (ACWR ${String(roundGrade(acwr)).replace('.', ',')})`, points: Math.min(45, (acwr - 1.3) * 60) });
-  else if (acwr < 0.8 && chronicWeeklyAvg > 0) factors.push({ label: 'Deutlich reduzierte Belastung', points: Math.min(10, (0.8 - acwr) * 20) });
+  // Woche 0 = letzte 7 Tage (heute und 6 Tage davor), Woche 1–3 = die 3 Wochen davor.
+  const weekLoads = [0, 1, 2, 3].map((week) => past.filter((item) => item.ago >= week * 7 && item.ago <= week * 7 + 6).reduce((sum, item) => sum + item.load, 0));
+  const acute = weekLoads[0];
+  const baseline = (weekLoads[1] + weekLoads[2] + weekLoads[3]) / 3;
+  const weeksWithLoad = weekLoads.filter((value) => value > 0).length;
+  const ratio = baseline > 0 ? acute / baseline : null;
+  const hints: { label: string; weight: number }[] = [];
+  const infos: string[] = [];
 
-  // Zwei Einsätze ohne mindestens einen Tag Pause dazwischen erhöhen das Risiko zusätzlich (kumulative Ermüdung).
-  const [latest, previous] = attended;
-  if (latest && previous) {
-    const gapDays = daysBetween(previous.date, latest.date);
-    if (gapDays <= 1) factors.push({ label: 'Keine Erholung seit letztem Einsatz', points: 12 });
-    else if (gapDays <= 2) factors.push({ label: 'Kurze Erholungszeit', points: 6 });
+  const spike = acute > 0 && (ratio === null || ratio >= 1.5);
+  if (spike && weeksWithLoad >= 3 && ratio !== null) {
+    hints.push({ label: `Belastungsspitze (${label(ratio)}-fach des Schnitts der 3 Wochen davor)`, weight: ratio >= 2 ? 2 : 1 });
+  } else if (spike) {
+    infos.push('Wiedereinstieg – langsam steigern');
   }
 
-  // Nachlassende Einsatz-Note als Ermüdungssignal über die jüngsten bewerteten Events.
-  const effortRatings = items
-    .map(({ rating }) => rating)
-    .filter((rating) => rating && (rating.attendance === 'present' || rating.attendance === 'limited') && rating.effort !== null)
-    .slice(0, 6)
-    .map((rating) => rating!.effort as number);
-  if (effortRatings.length >= 3) {
-    const recentAvg = effortRatings.slice(0, 2).reduce((sum, value) => sum + value, 0) / 2;
-    const earlier = effortRatings.slice(2);
-    const earlierAvg = earlier.reduce((sum, value) => sum + value, 0) / earlier.length;
-    const decline = recentAvg - earlierAvg;
-    if (decline > 0.5) factors.push({ label: 'Nachlassender Einsatz in Folge', points: Math.min(15, decline * 15) });
+  // Zwei sehr harte Einheiten (Anstrengung ≥ 7) innerhalb von 48 Stunden in den letzten 7 Tagen.
+  const hard = past.filter((item) => item.ago <= 6 && item.exertion >= 7);
+  if (hard.some((item, index) => index > 0 && item.ago - hard[index - 1].ago <= 2)) {
+    hints.push({ label: 'Zwei sehr harte Einheiten innerhalb von 48 Stunden', weight: 1 });
   }
 
-  // Wachstumsschub: schnelles Längenwachstum aus den quartalsweisen Körpermessungen.
+  // Wachstumsschub aus den letzten beiden Körpermessungen.
   const sorted = sortedMeasurements(measurements);
   if (sorted.length >= 2) {
     const [prev, last] = sorted.slice(-2);
     const months = daysBetween(localMidnight(prev.date), localMidnight(last.date)) / 30;
-    const growthPerMonth = months > 0 ? ((last.height ?? 0) - (prev.height ?? 0)) / months : 0;
-    const label = String(roundGrade(growthPerMonth)).replace('.', ',');
-    if (growthPerMonth >= 2) factors.push({ label: `Starker Wachstumsschub (${label} cm/Monat)`, points: 18 });
-    else if (growthPerMonth >= 1) factors.push({ label: `Wachstumsschub (${label} cm/Monat)`, points: 10 });
+    const growth = months > 0 ? ((last.height ?? 0) - (prev.height ?? 0)) / months : 0;
+    if (growth >= 1.2) hints.push({ label: `Starker Wachstumsschub (${label(growth)} cm/Monat)`, weight: 2 });
+    else if (growth >= 0.6) hints.push({ label: `Wachstumsschub (${label(growth)} cm/Monat)`, weight: 1 });
   }
 
-  // Rückkehr nach Verletzung/längerer Abwesenheit: das Rückfallrisiko ist in den ersten Wochen danach am höchsten.
-  // Das Statusfeld („ca. verletzt bis“) und eine eingetragene Verletzung beschreiben oft dieselbe Rückkehr; deshalb
-  // zählt nur die jüngste der beiden, sonst würde derselbe Faktor doppelt vergeben.
+  // Rückkehr nach Verletzung: das Statusfeld („ca. verletzt bis“) und eine eingetragene Verletzung beschreiben oft dieselbe
+  // Rückkehr; deshalb zählt nur die jüngste der beiden.
   const endedInjuries = absences.filter((item) => isInjuryAbsence(item) && item.to && item.to < todayStr).map((item) => item.to);
   if (player.injuryUntil) endedInjuries.push(player.injuryUntil);
   const lastInjuryEnd = endedInjuries.sort().at(-1);
   if (lastInjuryEnd) {
     const daysSinceReturn = daysBetween(localMidnight(lastInjuryEnd), today);
-    if (daysSinceReturn >= 0 && daysSinceReturn <= 21) factors.push({ label: 'Rückkehr nach Verletzung', points: Math.round(22 * (1 - daysSinceReturn / 21)) });
+    if (daysSinceReturn >= 0 && daysSinceReturn <= 21) hints.push({ label: 'Rückkehr nach Verletzung', weight: 1 });
   }
-  // Abwesenheiten ohne Verletzung (Urlaub, Klassenfahrt) wiegen beim Wiedereinstieg deutlich leichter und werden
-  // getrennt und nur einmal gewertet.
+  // Abwesenheiten ohne Verletzung (Urlaub, Klassenfahrt) wiegen beim Wiedereinstieg leichter: nur ein Hinweistext.
   const lastEndedAbsence = absences
     .filter((item) => !isInjuryAbsence(item) && item.to && item.to < todayStr)
     .sort((a, b) => localMidnight(b.to).getTime() - localMidnight(a.to).getTime())[0];
   if (lastEndedAbsence) {
     const daysSinceEnd = daysBetween(localMidnight(lastEndedAbsence.to), today);
-    if (daysSinceEnd <= 14) factors.push({ label: 'Kurz nach Abwesenheit (Wiedereinstieg)', points: Math.round(12 * (1 - daysSinceEnd / 14)) });
+    if (daysSinceEnd >= 0 && daysSinceEnd <= 14) infos.push('Kurz nach Abwesenheit (Wiedereinstieg)');
   }
 
-  // Aktueller Gesundheitsstatus: eine bestehende Verletzung/Beschwerde ist der mit Abstand stärkste Einzelfaktor. Eine
-  // heute laufende eingetragene Verletzung zählt genauso wie der manuell gesetzte Status „Verletzt“.
-  const activeAbsence = activeAbsenceOn(absences, todayStr);
-  if (player.status === 'Verletzt' || isInjuryAbsence(activeAbsence)) factors.push({ label: 'Aktuell verletzt', points: 75 });
-  if (player.status === 'Angeschlagen') factors.push({ label: 'Angeschlagen', points: 45 });
+  // Zwei Gewichtspunkte (oder ein starker Hinweis) ergeben „Anpassen“, ein Hinweis „Beobachten“.
+  const score = hints.reduce((sum, hint) => sum + hint.weight, 0);
+  const tier: RiskTier = score >= 2 ? 'anpassen' : score >= 1 ? 'beobachten' : 'unauffaellig';
+  const reasons = [...hints.map((hint) => hint.label), ...infos];
 
-  const percentage = Math.max(0, Math.min(100, Math.round(factors.reduce((sum, factor) => sum + factor.points, 0))));
-  const tier = INJURY_RISK_TIERS.find((entry) => percentage >= entry.min)!;
-  const topFactors = [...factors].sort((a, b) => b.points - a.points).slice(0, 2).map((factor) => factor.label);
+  // Verfügbarkeit: getrennt von der Belastung. Eine heute laufende eingetragene Verletzung zählt wie der Status „Verletzt“.
+  const injuredNow = player.status === 'Verletzt' || isInjuryAbsence(activeAbsenceOn(absences, todayStr));
+  const availability = injuredNow ? AVAILABILITY.verletzt : player.status === 'Angeschlagen' ? AVAILABILITY.angeschlagen : AVAILABILITY.fit;
+
   return {
-    percentage,
-    level: tier.level,
-    tier: tier.tier,
-    action: tier.action,
-    load: roundGrade(acuteLoad),
-    avgLoad: roundGrade(chronicWeeklyAvg),
-    recentEvents: attended.filter((item) => daysBetween(item.date, today) <= 28).length,
-    reason: topFactors.join(' · ') || 'Keine auffälligen Belastungsfaktoren',
+    tier,
+    level: LOAD_TIERS[tier].level,
+    action: LOAD_TIERS[tier].action,
+    reasons,
+    reason: reasons.join(' · ') || 'Keine auffälligen Belastungsfaktoren',
+    load: roundGrade(acute),
+    baseline: roundGrade(baseline),
+    weeksWithLoad,
+    recentEvents: past.filter((item) => item.ago <= 27).length,
+    availability,
   };
 }
