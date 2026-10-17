@@ -65,4 +65,24 @@ export class FakePlanningApi implements Pick<PlanningApi, keyof PlanningApi> {
     this.doc = { ...this.doc, skipped: { ...this.skipped, [seriesId]: { ...this.skipped[seriesId], [date]: true } } };
     this.emit();
   }
+
+  get breaks(): Record<string, unknown> {
+    return (this.doc?.['breaks'] as Record<string, unknown> | undefined) ?? {};
+  }
+
+  async saveBreak(id: string, data: Readonly<Record<string, unknown>>): Promise<void> {
+    this.calls.push('saveBreak');
+    if (this.saveError) throw this.saveError;
+    this.doc = { ...this.doc, breaks: { ...this.breaks, [id]: data } };
+    this.emit();
+  }
+
+  async deleteBreak(id: string): Promise<void> {
+    this.calls.push('deleteBreak');
+    if (this.saveError) throw this.saveError;
+    const rest = { ...this.breaks };
+    delete rest[id];
+    this.doc = { ...this.doc, breaks: rest };
+    this.emit();
+  }
 }

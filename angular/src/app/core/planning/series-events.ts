@@ -7,6 +7,7 @@
  */
 import { type TeamEvent, docFromEvent, legacyIntensityForExertion } from '../events/event';
 import { isIsoDate } from '../shared/dates';
+import { type DateRange, type PlanningBreak, inAnyRange, isInBreak } from './breaks';
 import { type TrainingSeries, isoWeekday, seriesTitle } from './planning';
 
 /** Events je Schreibvorgang (Firestore erlaubt 500; kleiner gewählt, damit ein Fehler nur einen Teil trifft). */
@@ -64,26 +65,36 @@ export interface SeriesPlan {
   readonly deleted: number;
   /** Termine vor heute (werden nicht angelegt). */
   readonly past: number;
+  /** Künftige Termine in einer Pause (entstehen nicht, SCRUM-148). */
+  readonly paused: number;
 }
 
 /**
  * Was beim Speichern der Serie passiert. `today` ist das heutige Datum; `existingIds` die IDs aller vorhandenen Events
  * (ein Spiel am selben Tag zählt nicht: es ändert nichts, das Training entsteht trotzdem).
  */
-export function planSeries(series: TrainingSeries, today: string, existingIds: ReadonlySet<string>, skipped: SkippedDates): SeriesPlan {
+export function planSeries(
+  series: TrainingSeries,
+  today: string,
+  existingIds: ReadonlySet<string>,
+  skipped: SkippedDates,
+  breaks: readonly PlanningBreak[] = [],
+): SeriesPlan {
   const all = seriesDates(series, series.startDate);
   const upcoming = new Set(seriesDates(series, today));
   const gone = skipped.get(series.id);
   const create: string[] = [];
   let existing = 0;
   let deleted = 0;
+  let paused = 0;
   for (const date of all) {
     if (!upcoming.has(date)) continue;
-    if (existingIds.has(seriesEventId(series.id, date))) existing += 1;
+    if (isInBreak(date, breaks)) paused += 1;
+    else if (existingIds.has(seriesEventId(series.id, date))) existing += 1;
     else if (gone?.has(date)) deleted += 1;
     else create.push(date);
   }
-  return { create, existing, deleted, past: all.length - upcoming.size };
+  return { create, existing, deleted, past: all.length - upcoming.size, paused };
 }
 
 /** Das Training einer Serie an einem Tag. */
@@ -109,6 +120,11 @@ export function eventFromSeries(series: TrainingSeries, date: string): TeamEvent
 }
 
 /** Text der Vorschau vor dem Speichern. */
+/** Hinweis auf Termine, die wegen einer Pause ausfallen. */
+function pausedNote(paused: number): string {
+  return `${paused} ${paused === 1 ? 'Termin fällt' : 'Termine fallen'} in eine Pause und ${paused === 1 ? 'wird' : 'werden'} nicht angelegt`;
+}
+
 export function planText(plan: SeriesPlan): string {
   const count = plan.create.length;
   const main = count === 0 ? 'Es werden keine neuen Trainings angelegt.' : count === 1 ? '1 Training wird angelegt.' : `${count} Trainings werden angelegt.`;
@@ -116,6 +132,7 @@ export function planText(plan: SeriesPlan): string {
   if (plan.existing > 0) notes.push(`${plan.existing} ${plan.existing === 1 ? 'Termin gibt' : 'Termine gibt'} es schon`);
   if (plan.deleted > 0) notes.push(`${plan.deleted} von Hand ${plan.deleted === 1 ? 'gelöschter Termin entsteht' : 'gelöschte Termine entstehen'} nicht neu`);
   if (plan.past > 0) notes.push(`${plan.past} ${plan.past === 1 ? 'Termin liegt' : 'Termine liegen'} vor heute und ${plan.past === 1 ? 'wird' : 'werden'} nicht angelegt`);
+  if (plan.paused > 0) notes.push(pausedNote(plan.paused));
   return notes.length > 0 ? `${main} (${notes.join('; ')}.)` : main;
 }
 
@@ -144,7 +161,7 @@ export interface SeriesChangePlan extends SeriesPlan {
 }
 
 /** Von Hand bearbeitet: markiert, verlegt (anderes Datum als in der ID) oder kein Training mehr. */
-function isHandEdited(event: TeamEvent, date: string): boolean {
+export function isHandEdited(event: TeamEvent, date: string): boolean {
   return event.seriesEdited === true || event.type !== 'Training' || event.date !== date;
 }
 
@@ -164,6 +181,8 @@ export function changeCandidates(seriesId: string, today: string, events: readon
 /**
  * Was beim Speichern (`series` gesetzt) oder Löschen (`series` null) der Serie passiert. Vergangene, bewertete und von
  * Hand bearbeitete Termine bleiben immer, wie sie sind. `rated` sind die IDs der Events mit Bewertungen/Notizen.
+ * Tage in einer Pause (`breaks`) bekommen kein Training: vorhandene unbewertete Serien-Trainings dort werden entfernt.
+ * Mit `scope` (SCRUM-148, Pause geändert) werden nur Termine in diesen Zeiträumen betrachtet; alles andere bleibt unberührt.
  */
 export function planSeriesChange(
   seriesId: string,
@@ -172,9 +191,12 @@ export function planSeriesChange(
   events: readonly TeamEvent[],
   rated: ReadonlySet<string>,
   skipped: SkippedDates,
+  breaks: readonly PlanningBreak[] = [],
+  scope: readonly DateRange[] | null = null,
 ): SeriesChangePlan {
-  const base: SeriesPlan = series ? planSeries(series, today, new Set(events.map((event) => event.id)), skipped) : { create: [], existing: 0, deleted: 0, past: 0 };
-  const wanted = series ? new Set(seriesDates(series, today)) : new Set<string>();
+  const planned: SeriesPlan = series ? planSeries(series, today, new Set(events.map((event) => event.id)), skipped, breaks) : { create: [], existing: 0, deleted: 0, past: 0, paused: 0 };
+  const base: SeriesPlan = scope ? { ...planned, create: planned.create.filter((date) => inAnyRange(date, scope)) } : planned;
+  const wanted = series ? new Set(seriesDates(series, today).filter((date) => !isInBreak(date, breaks))) : new Set<string>();
   const update: SeriesEventUpdate[] = [];
   const remove: string[] = [];
   let unchanged = 0;
@@ -183,6 +205,7 @@ export function planSeriesChange(
   for (const event of events) {
     const parsed = parseSeriesEventId(event.id);
     if (parsed === null || parsed.seriesId !== seriesId || parsed.date < today) continue;
+    if (scope && !inAnyRange(parsed.date, scope)) continue;
     if (isHandEdited(event, parsed.date)) keptEdited += 1;
     else if (rated.has(event.id)) keptRated += 1;
     else if (series === null || !wanted.has(parsed.date)) remove.push(event.id);
@@ -213,6 +236,7 @@ export function changeText(plan: SeriesChangePlan): string {
   if (plan.existing > 0 && plan.update.length === 0 && plan.remove.length === 0) notes.push(`${plan.existing} ${plan.existing === 1 ? 'Termin gibt' : 'Termine gibt'} es schon`);
   if (plan.deleted > 0) notes.push(`${plan.deleted} von Hand ${plan.deleted === 1 ? 'gelöschter Termin entsteht' : 'gelöschte Termine entstehen'} nicht neu`);
   if (plan.past > 0) notes.push(`${plan.past} ${plan.past === 1 ? 'Termin liegt' : 'Termine liegen'} vor heute und ${plan.past === 1 ? 'wird' : 'werden'} nicht angelegt`);
+  if (plan.paused > 0) notes.push(pausedNote(plan.paused));
   const sentence = main.length === 0 ? 'Es werden keine neuen Trainings angelegt.' : `${main.join('; ')}.`;
   return notes.length > 0 ? `${sentence} (${notes.join('; ')}.)` : sentence;
 }

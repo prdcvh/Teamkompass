@@ -56,13 +56,13 @@ describe('Serien-Trainings: Termine', () => {
     const existing = new Set([seriesEventId('sabc', '2026-10-27')]);
     const skipped = new Map([['sabc', new Set(['2026-11-03'])], ['andere', new Set(['2026-10-20'])]]);
     const plan = planSeries(series, '2026-10-14', existing, skipped);
-    expect(plan).toEqual({ create: ['2026-10-20', '2026-11-10'], existing: 1, deleted: 1, past: 0 });
+    expect(plan).toEqual({ create: ['2026-10-20', '2026-11-10'], existing: 1, deleted: 1, past: 0, paused: 0 });
   });
 
   it('formuliert die Vorschau', () => {
-    expect(planText({ create: ['a', 'b'], existing: 0, deleted: 0, past: 0 })).toBe('2 Trainings werden angelegt.');
-    expect(planText({ create: ['a'], existing: 0, deleted: 0, past: 0 })).toBe('1 Training wird angelegt.');
-    expect(planText({ create: [], existing: 2, deleted: 1, past: 3 })).toBe(
+    expect(planText({ create: ['a', 'b'], existing: 0, deleted: 0, past: 0, paused: 0 })).toBe('2 Trainings werden angelegt.');
+    expect(planText({ create: ['a'], existing: 0, deleted: 0, past: 0, paused: 0 })).toBe('1 Training wird angelegt.');
+    expect(planText({ create: [], existing: 2, deleted: 1, past: 3, paused: 0 })).toBe(
       'Es werden keine neuen Trainings angelegt. (2 Termine gibt es schon; 1 von Hand gelöschter Termin entsteht nicht neu; 3 Termine liegen vor heute und werden nicht angelegt.)',
     );
   });

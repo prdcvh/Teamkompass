@@ -7,6 +7,7 @@ import { EventsApi } from '../firebase/events.api';
 import { PlanningApi } from '../firebase/planning.api';
 import { todayIso } from '../shared/dates';
 import { SyncService } from '../shell/sync.service';
+import { type PlanningBreak, breaksFromPlanningDoc } from './breaks';
 import { type SeriesDraft, type SeriesErrors, type TrainingSeries, docFromSeries, seriesFromDraft, seriesFromPlanningDoc, validateSeriesDraft } from './planning';
 import { SERIES_EVENT_BATCH_SIZE, type SeriesChangePlan, changeCandidates, changeText, eventFromSeries, planSeriesChange, planText, skippedFromPlanningDoc } from './series-events';
 
@@ -40,10 +41,13 @@ export class PlanningService {
   private readonly events = inject(EventsService);
   private readonly eventsApi = inject(EventsApi);
 
-  private readonly stored = signal<Readonly<Record<string, unknown>> | null>(null);
+  /** Stand des Planungsdokuments (für {@link BreaksService}). */
+  readonly stored = signal<Readonly<Record<string, unknown>> | null>(null);
   readonly load = signal<PlanningLoad>('idle');
   readonly canWrite = computed(() => this.session.role() === 'trainer');
   readonly series = computed<readonly TrainingSeries[]>(() => seriesFromPlanningDoc(this.stored()));
+  /** Pausen (SCRUM-148): an ihren Tagen entstehen keine Serien-Trainings. */
+  readonly breaks = computed<readonly PlanningBreak[]>(() => breaksFromPlanningDoc(this.stored()));
   /** Meldung zum letzten Anlegen der Serien-Trainings. */
   readonly run = signal<SeriesRun>(IDLE_RUN);
   /** Stand der Prüfung auf bewertete Termine für die Vorschau im Formular (beim Speichern wird neu geprüft). */
@@ -145,13 +149,13 @@ export class PlanningService {
     const skipped = skippedFromPlanningDoc(this.stored());
     const hasEvents = draft.id !== null && changeCandidates(draft.id, todayIso(), events).length > 0;
     if (!hasEvents) {
-      const plan = planSeriesChange(series.id, series, todayIso(), events, new Set(), skipped);
+      const plan = planSeriesChange(series.id, series, todayIso(), events, new Set(), skipped, this.breaks());
       return { text: plan.update.length + plan.remove.length + plan.keptEdited + plan.keptRated + plan.unchanged === 0 ? planText(plan) : changeText(plan), count: plan.create.length };
     }
     const protection = this.protection();
     if (protection === null || protection.seriesId !== draft.id || protection.state === 'loading') return { text: 'Es wird geprüft, welche Termine schon bewertet sind …', count: 0 };
     if (protection.state === 'error') return { text: 'Es konnte nicht geprüft werden, welche Termine schon bewertet sind. Beim Speichern wird es erneut versucht; klappt auch das nicht, bleiben die Termine unverändert.', count: 0 };
-    const plan = planSeriesChange(series.id, series, todayIso(), events, protection.rated, skipped);
+    const plan = planSeriesChange(series.id, series, todayIso(), events, protection.rated, skipped, this.breaks());
     return { text: changeText(plan), count: plan.create.length };
   }
 
@@ -196,7 +200,7 @@ export class PlanningService {
       this.run.set({ state: 'error', text: `${prefix}es konnte nicht geprüft werden, welche Termine schon bewertet sind. Deshalb wurde nichts geändert. ${authErrorMessage(errorCode(error))} ${suffix}` });
       return null;
     }
-    return planSeriesChange(seriesId, series, todayIso(), events, rated, skippedFromPlanningDoc(this.stored()));
+    return planSeriesChange(seriesId, series, todayIso(), events, rated, skippedFromPlanningDoc(this.stored()), this.breaks());
   }
 
   /**
@@ -204,33 +208,26 @@ export class PlanningService {
    * sonst die Fehlermeldung (die Blöcke davor bleiben bestehen).
    */
   private async execute(series: TrainingSeries | null, plan: SeriesChangePlan, retryHint: string): Promise<string | null> {
-    const steps: (() => Promise<void>)[] = [];
+    const creates = series ? plan.create.map((date) => eventFromSeries(series, date)).map((event) => ({ id: event.id, data: docFromEvent(event) })) : [];
+    return this.writeChunks(creates, plan.update.map((entry) => ({ id: entry.id, data: entry.changes })), plan.remove, retryHint);
+  }
+
+  /** Schreibt Anlegen, Anpassen und Entfernen in Blöcken. Rückgabe: null = geschafft, sonst die Fehlermeldung. */
+  async writeChunks(
+    creates: readonly { readonly id: string; readonly data: Readonly<Record<string, unknown>> }[],
+    updates: readonly { readonly id: string; readonly data: Readonly<Record<string, unknown>> }[],
+    removes: readonly string[],
+    retryHint: string,
+  ): Promise<string | null> {
     const chunks = <T>(items: readonly T[]) => Array.from({ length: Math.ceil(items.length / SERIES_EVENT_BATCH_SIZE) }, (_, index) => items.slice(index * SERIES_EVENT_BATCH_SIZE, (index + 1) * SERIES_EVENT_BATCH_SIZE));
-    const sizes: number[] = [];
-    if (series) {
-      const creates = plan.create.map((date) => {
-        const event = eventFromSeries(series, date);
-        return { id: event.id, data: docFromEvent(event) };
-      });
-      for (const chunk of chunks(creates)) {
-        sizes.push(chunk.length);
-        steps.push(() => this.eventsApi.saveEventsBatch(chunk));
-      }
-    }
-    for (const chunk of chunks(plan.update)) {
-      sizes.push(chunk.length);
-      steps.push(() => this.eventsApi.saveEventsBatch(chunk.map((entry) => ({ id: entry.id, data: entry.changes }))));
-    }
-    for (const chunk of chunks(plan.remove)) {
-      sizes.push(chunk.length);
-      steps.push(() => this.eventsApi.deleteEventsBatch(chunk));
-    }
-    const total = sizes.reduce((sum, size) => sum + size, 0);
+    const save = (items: typeof creates) => chunks(items).map((chunk) => ({ size: chunk.length, run: () => this.eventsApi.saveEventsBatch(chunk) }));
+    const steps = [...save(creates), ...save(updates), ...chunks(removes).map((chunk) => ({ size: chunk.length, run: () => this.eventsApi.deleteEventsBatch(chunk) }))];
+    const total = steps.reduce((sum, step) => sum + step.size, 0);
     let done = 0;
     try {
-      for (const [index, step] of steps.entries()) {
-        await step();
-        done += sizes[index];
+      for (const step of steps) {
+        await step.run();
+        done += step.size;
       }
     } catch (error) {
       console.error(error);
@@ -280,7 +277,7 @@ export class PlanningService {
   }
 
   /** Löst das Schreiben aus; das Ergebnis sagt, ob es geklappt hat (Fehler sind bereits gemeldet). */
-  private write(pending: Promise<void>, failure: string): Promise<boolean> {
+  write(pending: Promise<void>, failure: string): Promise<boolean> {
     if (!this.sync.isFailed()) this.sync.state.set('syncing');
     return pending
       .then(() => {

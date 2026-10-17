@@ -3,7 +3,7 @@ import { environment } from '../../../environments/environment';
 import { FirebaseConnection } from './firebase-connection';
 import type { SnapshotMeta } from './types';
 
-/** Planung (`meta/planning`, ein einzelnes Dokument, nur Trainer). Serien liegen als Map unter `series.{id}`. */
+/** Planung (`meta/planning`, ein einzelnes Dokument, nur Trainer). Serien liegen als Map unter `series.{id}`, Pausen unter `breaks.{id}`. */
 @Injectable({ providedIn: 'root' })
 export class PlanningApi {
   private readonly connection = inject(FirebaseConnection);
@@ -42,5 +42,18 @@ export class PlanningApi {
     const { db } = await this.connection.get();
     const { doc, setDoc } = await import('firebase/firestore');
     await setDoc(doc(db, 'teams', environment.teamId, 'meta', 'planning'), { skipped: { [seriesId]: { [date]: true } } }, { merge: true });
+  }
+
+  /** Legt die Pause an oder ersetzt sie (SCRUM-148); Serien und andere Pausen bleiben unberührt. */
+  async saveBreak(id: string, data: Readonly<Record<string, unknown>>): Promise<void> {
+    const { db } = await this.connection.get();
+    const { doc, setDoc } = await import('firebase/firestore');
+    await setDoc(doc(db, 'teams', environment.teamId, 'meta', 'planning'), { breaks: { [id]: data } }, { merge: true });
+  }
+
+  async deleteBreak(id: string): Promise<void> {
+    const { db } = await this.connection.get();
+    const { doc, setDoc, deleteField } = await import('firebase/firestore');
+    await setDoc(doc(db, 'teams', environment.teamId, 'meta', 'planning'), { breaks: { [id]: deleteField() } }, { merge: true });
   }
 }

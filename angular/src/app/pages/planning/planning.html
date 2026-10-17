@@ -53,6 +53,33 @@
         </ul>
       </tk-card>
     }
+
+    <div class="section-head">
+      <h2>Pausen</h2>
+      <button tkButton size="sm" type="button" (click)="openNewBreak()">+ Pause anlegen</button>
+    </div>
+    <p class="muted">Ferien, Winter- und Sommerpausen. An diesen Tagen entstehen keine Serien-Trainings; einzelne Events bleiben bestehen.</p>
+    @if (planning.breaks().length === 0) {
+      <tk-card>
+        <div class="empty">
+          <p>Noch keine Pause eingetragen.</p>
+        </div>
+      </tk-card>
+    } @else {
+      <tk-card>
+        <ul class="list" data-testid="break-list">
+          @for (entry of planning.breaks(); track entry.id) {
+            <li class="row">
+              <div class="what">
+                <strong>{{ entry.name }}</strong>
+                <small>{{ period(entry) }}</small>
+              </div>
+              <button tkButton size="sm" type="button" (click)="openEditBreak(entry)" [attr.aria-label]="'Pause bearbeiten: ' + entry.name">Bearbeiten</button>
+            </li>
+          }
+        </ul>
+      </tk-card>
+    }
   }
 
   <tk-school-holidays-hint />
@@ -68,5 +95,16 @@
   <div class="confirm-actions">
     <button tkButton type="button" (click)="deleting.set(null)">Abbrechen</button>
     <button tkButton type="button" variant="primary" (click)="confirmDelete()">Endgültig löschen</button>
+  </div>
+</tk-dialog>
+
+<tk-break-dialog [open]="breakDialogOpen()" [entry]="editingBreak()" (closed)="breakDialogOpen.set(false)" (deleteRequested)="askDeleteBreak($event)" />
+
+<tk-dialog [open]="deletingBreak() !== null" title="Pause löschen?" (closed)="deletingBreak.set(null)">
+  <p>Die Pause „{{ deletingBreak()?.name }}“ wird gelöscht. Serien-Trainings in diesem Zeitraum entstehen wieder, außer du hast sie von Hand gelöscht.</p>
+  <p class="preview" role="status" data-testid="delete-break-preview">{{ deleteBreakPreview(deletingBreak()) ?? 'Es wird geprüft, welche Termine schon bewertet sind …' }}</p>
+  <div class="confirm-actions">
+    <button tkButton type="button" (click)="deletingBreak.set(null)">Abbrechen</button>
+    <button tkButton type="button" variant="primary" (click)="confirmDeleteBreak()">Endgültig löschen</button>
   </div>
 </tk-dialog>

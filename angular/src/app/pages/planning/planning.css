@@ -135,3 +135,11 @@ h2 {
   font-size: var(--tk-text-sm);
   font-weight: 600;
 }
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tk-space-3);
+  margin-top: var(--tk-space-4);
+}
