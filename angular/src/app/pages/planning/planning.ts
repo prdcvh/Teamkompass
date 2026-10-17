@@ -12,12 +12,13 @@ import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 import { Dialog } from '../../ui/dialog/dialog';
 import { BreakDialog } from './break-dialog';
+import { SchoolHolidaysHint } from './school-holidays-hint';
 import { SeriesDialog } from './series-dialog';
 
 /** Planung (nur Trainer): Trainingsserien verwalten. Beim Speichern entstehen die Trainings als Events. */
 @Component({
   selector: 'app-planning',
-  imports: [BreakDialog, Button, Card, Dialog, SeriesDialog],
+  imports: [BreakDialog, Button, Card, Dialog, SchoolHolidaysHint, SeriesDialog],
   templateUrl: './planning.html',
   styleUrl: './planning.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
