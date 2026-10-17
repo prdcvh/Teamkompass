@@ -3,6 +3,8 @@ import { authErrorMessage, errorCode } from '../auth/auth-errors';
 import { type EventDraft, type EventErrors, type TeamEvent, docFromEvent, eventFromDoc, eventFromDraft, validateDraft } from './event';
 import { AbsenceSyncService } from '../records/absence-sync.service';
 import { EventsApi } from '../firebase/events.api';
+import { PlanningApi } from '../firebase/planning.api';
+import { parseSeriesEventId } from '../planning/series-events';
 import { SessionService } from '../auth/session.service';
 import { SquadService } from '../player/squad.service';
 import { SyncService } from '../shell/sync.service';
@@ -18,6 +20,7 @@ export type EventsLoad = 'idle' | 'loading' | 'ready' | 'error';
 @Injectable({ providedIn: 'root' })
 export class EventsService {
   private readonly eventsApi = inject(EventsApi);
+  private readonly planningApi = inject(PlanningApi);
   private readonly session = inject(SessionService);
   private readonly sync = inject(SyncService);
   private readonly absences = inject(AbsenceSyncService);
@@ -122,6 +125,10 @@ export class EventsService {
     if (!this.canEdit()) return false;
     if (!this.sync.isFailed()) this.sync.state.set('syncing');
     try {
+      // Serien-Training (SCRUM-146): zuerst den Merker setzen, damit es bei der nächsten Serien-Speicherung nicht
+      // neu entsteht. Scheitert das Löschen danach, ist der Merker harmlos (das Event existiert ja noch).
+      const fromSeries = parseSeriesEventId(id);
+      if (fromSeries) await this.planningApi.markSkipped(fromSeries.seriesId, fromSeries.date);
       await this.eventsApi.deleteEvent(id);
       this.sync.clearError();
       return true;

@@ -10,6 +10,9 @@ export class FakeEventsApi implements Pick<EventsApi, keyof EventsApi> {
   watchEventsError: unknown = null;
   saveEventError: unknown = null;
   deleteEventError: unknown = null;
+  /** 1-basiert: der n-te Aufruf von saveEventsBatch schlägt fehl. */
+  failBatchNumber: number | null = null;
+  private batchCalls = 0;
   eventWatchers = 0;
   private eventsListener: ((docs: RawDoc[], meta: SnapshotMeta) => void) | null = null;
   private eventsErrorListener: ((error: unknown) => void) | null = null;
@@ -47,6 +50,14 @@ export class FakeEventsApi implements Pick<EventsApi, keyof EventsApi> {
     this.calls.push(`saveEvent:${id}`);
     if (this.saveEventError) throw this.saveEventError;
     this.events.set(id, { ...this.events.get(id), ...data });
+    this.emitEvents();
+  }
+
+  async saveEventsBatch(entries: readonly { readonly id: string; readonly data: Readonly<Record<string, unknown>> }[]): Promise<void> {
+    this.batchCalls += 1;
+    this.calls.push(`saveEventsBatch:${entries.length}`);
+    if (this.failBatchNumber === this.batchCalls) throw { code: 'unavailable' };
+    for (const entry of entries) this.events.set(entry.id, { ...this.events.get(entry.id), ...entry.data });
     this.emitEvents();
   }
 
