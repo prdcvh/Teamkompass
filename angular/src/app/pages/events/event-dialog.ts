@@ -3,7 +3,7 @@ import {
   EVENT_TYPES,
   type EventDraft,
   type EventErrors,
-  INTENSITIES,
+  EXERTIONS,
   MAX_MATCH_DURATION,
   MAX_NOTES_LENGTH,
   MAX_SCORE,
@@ -49,7 +49,7 @@ export class EventDialog {
   readonly deleteRequested = output<TeamEvent>();
 
   protected readonly types = EVENT_TYPES;
-  protected readonly intensities = INTENSITIES;
+  protected readonly exertions = EXERTIONS;
   protected readonly focuses = TRAINING_FOCUSES;
   protected readonly limits = { title: MAX_TITLE_LENGTH, text: MAX_TEXT_LENGTH, notes: MAX_NOTES_LENGTH, score: MAX_SCORE, duration: MAX_MATCH_DURATION, trainingDuration: MAX_TRAINING_DURATION };
 

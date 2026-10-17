@@ -70,10 +70,10 @@
         }
       </div>
       <label class="tk-label">
-        Intensität
-        <select class="tk-input" name="intensity" [value]="draft().intensity" (change)="patch({ intensity: +value($event) })">
-          @for (entry of intensities; track entry.value) {
-            <option [value]="entry.value" [selected]="draft().intensity === entry.value">{{ entry.label }}</option>
+        Anstrengung
+        <select class="tk-input" name="exertion" [value]="draft().exertion" (change)="patch({ exertion: +value($event) })">
+          @for (entry of exertions; track entry.value) {
+            <option [value]="entry.value" [selected]="draft().exertion === entry.value">{{ entry.label }}</option>
           }
         </select>
       </label>
@@ -154,7 +154,7 @@
       @if (draft().type === 'Training') {
         <div class="field">
           <label class="tk-label">
-            Dauer (Minuten, optional)
+            Dauer (Minuten, Standard 90)
             <input
               class="tk-input"
               name="durationMinutes"

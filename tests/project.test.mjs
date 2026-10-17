@@ -554,17 +554,21 @@ test("Belastung: Termine nach heute zählen nicht, Termine von heute schon (SCRU
     d.setDate(d.getDate() + offsetDays);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   };
-  const tiers = [{ min: 0, tier: "unauffaellig", level: "Unauffällig", action: "" }];
   const training = (id, offset) => ({ id, type: "Training", date: iso(offset), intensity: 2, ratings: { p: { attendance: "present", effort: "" } } });
+  const fnSource = (app, name) => {
+    const start = app.indexOf(`function ${name}(`);
+    assert.notEqual(start, -1, `function ${name} nicht gefunden`);
+    return app.slice(start, app.indexOf("\n}\n", start) + 3);
+  };
   for (const team of teams) {
     const app = await read(`outputs/${team}/app.js`);
+    const block = app.slice(app.indexOf("// --- LOAD-ASSESSMENT START"), app.indexOf("// --- LOAD-ASSESSMENT END"));
     const run = (events) => {
       const state = { players: [{ id: "p" }], events, absences: {}, measurements: {} };
       const sortedEvents = () => [...state.events].sort((a, b) => new Date(b.date) - new Date(a.date));
-      const { computePlayerInjuryRisk } = loadFunctions(app, ["computePlayerInjuryRisk", "daysBetween", "roundGrade"], {
-        state, sortedEvents, playerMeasurements: () => [], isInjuryAbsence: () => false, activeAbsenceOn: () => null, INJURY_RISK_TIERS: tiers,
-      });
-      return computePlayerInjuryRisk("p");
+      const factory = new Function("state", "sortedEvents", "playerMeasurements", "isInjuryAbsence", "activeAbsenceOn",
+        `${fnSource(app, "daysBetween")}\n${fnSource(app, "roundGrade")}\n${block}\n${fnSource(app, "computePlayerInjuryRisk")}\nreturn computePlayerInjuryRisk;`);
+      return factory(state, sortedEvents, () => [], () => false, () => null)("p");
     };
     const past = [training("a", -5), training("b", -12)];
     const base = run(past);
@@ -1081,11 +1085,13 @@ test("Diagramm-Beschriftungen: letzte Beschriftung bleibt, ohne mit der vorletzt
 test("Belastungsanzeige im Profil trennt 7-Tage-Wert und Wochenschnitt (SCRUM-135)", async () => {
   for (const team of teams) {
     const app = await read(`outputs/${team}/app.js`);
-    assert.match(app, /avgLoad: roundGrade\(chronicWeeklyAvg\)/, `${team}: Wochenschnitt fehlt im Risiko-Ergebnis`);
-    assert.match(app, /Belastung letzte 7 Tage \$\{risk\.load\} · Ø \$\{risk\.avgLoad\}\/Woche über 4 Wochen/, `${team}: Beschriftung passt nicht`);
+    assert.match(app, /baseline: roundGrade\(baseline\)/, `${team}: Schnitt der 3 Wochen davor fehlt im Ergebnis`);
+    assert.match(app, /<span>Belastung letzte 7 Tage<\/span><strong>\$\{risk\.load\}<\/strong>/, `${team}: Beschriftung 7 Tage passt nicht`);
+    assert.match(app, /<span>Schnitt der 3 Wochen davor<\/span><strong>\$\{risk\.baseline\}<\/strong>/, `${team}: Beschriftung Wochenschnitt passt nicht`);
     assert.equal(app.includes("Ø Belastung ${risk.load}/Woche"), false, `${team}: irreführende Beschriftung noch vorhanden`);
   }
   const html = await read("angular/src/app/pages/profile/profile.html");
-  assert.match(html, /Belastung letzte 7 Tage \{\{ numberLabel\(r\.load\) \}\} · Ø \{\{ numberLabel\(r\.avgLoad\) \}\}\/Woche über 4 Wochen/);
+  assert.match(html, /Belastung letzte 7 Tage/);
+  assert.match(html, /Schnitt der 3 Wochen davor/);
   assert.equal(html.includes("Ø Belastung {{ numberLabel(r.load) }}"), false);
 });

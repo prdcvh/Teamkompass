@@ -131,7 +131,7 @@ export interface DashboardFigures {
   /** Mittel der Spieler-Schnitte; null, solange niemand benotet ist. */
   readonly teamGrade: number | null;
   readonly record: TeamRecord;
-  /** Spieler mit Belastungsstufe „Deutlich reduzieren“ oder „Nicht einsetzen“. */
+  /** Spieler mit Belastungsstufe „Anpassen“. */
   readonly highLoad: number;
   readonly next: TeamEvent | null;
 }
@@ -148,8 +148,7 @@ export function dashboardFigures(data: readonly PlayerData[], events: readonly T
     teamGrade: grades.length ? roundGrade(grades.reduce((sum, grade) => sum + grade, 0) / grades.length) : null,
     record: teamRecord(events, today),
     highLoad: data.filter(({ player, items, absences, measurements }) => {
-      const tier = injuryRisk(player, items, absences, measurements, now).tier;
-      return tier === 'reduzieren' || tier === 'aussetzen';
+      return injuryRisk(player, items, absences, measurements, now).tier === 'anpassen';
     }).length,
     next: nextUpcomingEvent(events, today),
   };
