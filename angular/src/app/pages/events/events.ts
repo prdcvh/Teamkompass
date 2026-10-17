@@ -4,7 +4,7 @@ import { LayoutService, injectNarrowViewport } from '../../core/shell/layout.ser
 import {
   EVENT_SORT_OPTIONS,
   EVENT_TYPES,
-  INTENSITIES,
+  exertionLabel,
   type EventSort,
   type EventTypeFilter,
   type TeamEvent,
@@ -69,7 +69,7 @@ export class Events implements OnInit {
   protected resultText = resultText;
 
   protected intensityLabel(event: TeamEvent): string {
-    return INTENSITIES.find((entry) => entry.value === event.intensity)?.label ?? '–';
+    return exertionLabel(event.exertion);
   }
 
   /** „vs. Gegner · Ort“ bzw. nur der Ort. */

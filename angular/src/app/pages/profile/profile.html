@@ -56,12 +56,16 @@
         @if (risk(); as r) {
           <div class="risk" [attr.data-tier]="r.tier">
             <div class="risk-head">
-              <span>Belastungsindikator</span>
-              <strong>{{ r.level }} · {{ r.percentage }}%</strong>
+              <span>Belastung</span>
+              <strong class="risk-level">{{ r.level }}</strong>
             </div>
-            <div class="risk-meter" role="img" [attr.aria-label]="'Belastungsindikator ' + r.percentage + ' Prozent, ' + r.level"><span [style.width.%]="r.percentage"></span></div>
-            <small>{{ r.reason }} · Belastung letzte 7 Tage {{ numberLabel(r.load) }} · Ø {{ numberLabel(r.avgLoad) }}/Woche über 4 Wochen ({{ r.recentEvents }} Einsätze/4 Wochen)</small>
-            <small>{{ r.action }}</small>
+            <small>{{ r.reason }}</small>
+            <div class="risk-compare">
+              <div><span>Belastung letzte 7 Tage</span><strong>{{ numberLabel(r.load) }}</strong></div>
+              <div><span>Schnitt der 3 Wochen davor</span><strong>{{ numberLabel(r.baseline) }}</strong></div>
+            </div>
+            <small>Belastung je Termin = Minuten × Anstrengung (0–10). {{ r.action }}</small>
+            <small class="risk-availability" [attr.data-availability]="r.availability.key">Verfügbarkeit: <b>{{ r.availability.label }}</b>@if (r.availability.action) { – {{ r.availability.action }}}</small>
           </div>
         }
       </tk-card>

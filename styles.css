@@ -1407,3 +1407,54 @@ menu {
     font-size: 0.78rem;
   }
 }
+
+/* Belastung (SCRUM-137): drei Stufen statt Prozentzahl. */
+.risk-pill.unauffaellig {
+  color: #0a5b3a;
+  background: #dff0e6;
+}
+
+.risk-pill.beobachten {
+  color: #55690d;
+  background: #eef2d6;
+}
+
+.risk-pill.anpassen {
+  color: #7a4b0d;
+  background: #faebd6;
+}
+
+:root[data-theme="dark"] .risk-pill.unauffaellig {
+  color: #98e7c1;
+  background: #173126;
+}
+
+:root[data-theme="dark"] .risk-pill.beobachten {
+  color: #cfe08a;
+  background: #2b301a;
+}
+
+:root[data-theme="dark"] .risk-pill.anpassen {
+  color: #f3ca7c;
+  background: #352918;
+}
+
+.risk-panel .risk-pill {
+  display: inline-grid;
+  padding: 0 12px;
+}
+
+.risk-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.risk-compare strong {
+  font-size: 1.3rem;
+}
+
+.risk-compare > div {
+  display: grid;
+  gap: 2px;
+}

@@ -27,6 +27,7 @@ const event = (id: string, extra: Partial<TeamEvent> = {}): TeamEvent => ({
   title: id,
   date: '2026-10-01',
   intensity: 2,
+  exertion: 5,
   location: '',
   trainingFocus: 'Eigener Ballbesitz',
   opponent: '',
@@ -69,9 +70,9 @@ describe('Teamanalyse', () => {
 
   it('Kennzahlen: Bilanz ohne Zukunftsspiele, Teamnote, Teilnahmequote, Intensität', () => {
     const events = [
-      event('e1', { type: 'Spiel', date: '2026-10-01', goalsFor: 3, goalsAgainst: 1, intensity: 3 }),
-      event('e2', { type: 'Spiel', date: '2099-01-01', goalsFor: 0, goalsAgainst: 0, intensity: 1 }),
-      event('e3', { date: '2026-10-02', intensity: 2 }),
+      event('e1', { type: 'Spiel', date: '2026-10-01', goalsFor: 3, goalsAgainst: 1, exertion: 7 }),
+      event('e2', { type: 'Spiel', date: '2099-01-01', goalsFor: 0, goalsAgainst: 0, exertion: 3 }),
+      event('e3', { date: '2026-10-02', exertion: 5 }),
     ];
     const byEvent = ratings({
       e1: { a: rating(2), b: rating(4, { attendance: 'limited' }), c: rating(1, { attendance: 'absent' }) },
@@ -82,7 +83,7 @@ describe('Teamanalyse', () => {
     expect(stats.record).toEqual({ wins: 1, draws: 0, losses: 0, goalsFor: 3, goalsAgainst: 1 });
     expect(stats.avgGrade).toBe(2.5); // e1: 3, e3: 2 → Mittel 2,5
     expect(stats.attendanceRate).toBe(75); // present, limited, absent, present = 3 von 4; excluded zählt nicht
-    expect(stats.avgIntensity).toBe(2);
+    expect(stats.avgIntensity).toBe(5);
   });
 
   it('Kennzahlen ohne Daten', () => {

@@ -49,7 +49,7 @@ describe('TeamAnalysis (Teamanalyse)', () => {
       Torverhältnis: '3:1',
       'Ø Teamnote': '2,5', // Spiel Ø 3,0 · Training Ø 2,0
       Teilnahmequote: '100%',
-      'Ø Intensität': '2,5',
+      'Ø Anstrengung': '6,0',
       'Training BB/GGB': '0/0',
       'Training Umschalten': '1',
       'Geburten Q1/Q2': '1/0',
