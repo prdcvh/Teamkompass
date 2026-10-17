@@ -77,9 +77,9 @@
               <article>
                 <strong>Belastung im Blick</strong>
                 @for (entry of loadWatch(); track entry.player.id) {
-                  <span>{{ entry.player.name }} · {{ entry.risk.level }} ({{ entry.risk.percentage }}%)@if (entry.risk.reason) { · {{ entry.risk.reason }}}</span>
+                  <span>{{ entry.player.name }} · {{ entry.risk.level }}@if (entry.risk.reason) { · {{ entry.risk.reason }}}</span>
                 } @empty {
-                  <span>Noch keine Spieler im Kader.</span>
+                  <span>Keine Auffälligkeiten.</span>
                 }
               </article>
               <article>

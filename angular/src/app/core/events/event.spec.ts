@@ -10,6 +10,7 @@ import {
   eventFromDraft,
   filterEvents,
   groupByMonth,
+  plannedMinutes,
   monthLabel,
   resultText,
   sortEvents,
@@ -33,7 +34,9 @@ describe('event (Logik)', () => {
       expect(validateDraft(draft({ date: '2026-02-31' })).date).toBeTruthy();
       expect(validateDraft(draft({ location: 'x'.repeat(51) })).location).toContain('50');
       expect(validateDraft(draft({ notes: 'x'.repeat(1001) })).notes).toContain('1000');
-      expect(validateDraft(draft({ intensity: 7 })).intensity).toBeTruthy();
+      expect(validateDraft(draft({ exertion: 11 })).exertion).toBeTruthy();
+      expect(validateDraft(draft({ exertion: -1 })).exertion).toBeTruthy();
+      expect(validateDraft(draft({ exertion: 0 })).exertion).toBeUndefined();
     });
 
     it('prüft Spielfelder nur bei Spielen', () => {
@@ -74,6 +77,32 @@ describe('event (Logik)', () => {
       const bare = eventFromDoc('y', {});
       expect(bare).toMatchObject({ type: 'Training', title: '', intensity: 2, trainingFocus: 'Eigener Ballbesitz', goalsFor: null });
       expect(resultText(parsed)).toBe('');
+    });
+
+    it('liest die bisherige Intensität 1/2/3 als Anstrengung 3/5/7 (SCRUM-137)', () => {
+      const read = (data: Record<string, unknown>) => eventFromDoc('x', { type: 'Training', title: 't', date: '2026-10-10', ...data });
+      expect([1, 2, 3].map((intensity) => read({ intensity }).exertion)).toEqual([3, 5, 7]);
+      expect(read({ intensity: '3' }).exertion).toBe(7);
+      expect(read({}).exertion).toBe(5);
+      // Ein eigener Wert hat Vorrang, auch die 0 (Ruhe).
+      expect(read({ intensity: 3, exertion: 8 }).exertion).toBe(8);
+      expect(read({ intensity: 3, exertion: 0 }).exertion).toBe(0);
+      expect(read({ intensity: 3, exertion: 11 }).exertion).toBe(7);
+    });
+
+    it('speichert die Anstrengung und führt die alte Intensität passend mit', () => {
+      const saved = (exertion: number) => docFromEvent(eventFromDraft(draft({ exertion }), 'e1'));
+      expect(saved(8)).toMatchObject({ exertion: 8, intensity: 3 });
+      expect(saved(5)).toMatchObject({ exertion: 5, intensity: 2 });
+      expect(saved(3)).toMatchObject({ exertion: 3, intensity: 1 });
+      expect(eventFromDoc('e1', saved(7))).toMatchObject({ exertion: 7, intensity: 3 });
+    });
+
+    it('Training: Dauer ohne Eintrag zählt 90 Minuten, Spiele nutzen die Spieldauer', () => {
+      expect(plannedMinutes({ type: 'Training', matchDuration: null, durationMinutes: null })).toBe(90);
+      expect(plannedMinutes({ type: 'Training', matchDuration: null, durationMinutes: 60 })).toBe(60);
+      expect(plannedMinutes({ type: 'Spiel', matchDuration: 70, durationMinutes: null })).toBe(70);
+      expect(plannedMinutes({ type: 'Spiel', matchDuration: null, durationMinutes: null })).toBe(90);
     });
 
     it('Bearbeiten-Entwurf bildet das Event ab', () => {
