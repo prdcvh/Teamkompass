@@ -24,7 +24,8 @@ describe('Datenformat alte App ↔ Angular', () => {
     };
     expect(docFromPlayer(playerFromDoc('p1', live))).toEqual(live);
     // Ältere Dokumente ohne „verletzt seit“ (SCRUM-164): bleiben lesbar, das Feld wird leer ergänzt.
-    const { injuredSince: _, ...legacy } = live;
+    const legacy: Record<string, unknown> = { ...live };
+    delete legacy['injuredSince'];
     expect(docFromPlayer(playerFromDoc('p1', legacy))).toEqual({ ...legacy, injuredSince: '' });
   });
 
