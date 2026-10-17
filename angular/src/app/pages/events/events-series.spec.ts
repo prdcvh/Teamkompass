@@ -4,6 +4,7 @@ import { provideRouter } from '@angular/router';
 import { SessionService } from '../../core/auth/session.service';
 import { LayoutService } from '../../core/shell/layout.service';
 import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
+import { WeatherService } from '../../core/weather/weather.service';
 import { Events } from './events';
 
 describe('Events: Wiederholen-Symbol für Serien-Trainings (SCRUM-146)', () => {
@@ -15,6 +16,8 @@ describe('Events: Wiederholen-Symbol für Serien-Trainings (SCRUM-146)', () => {
       providers: [provideRouter([]), ...provideFakeFirebase(firebase), { provide: LayoutService, useValue: { isMobile: signal(mobile) } }],
     });
     TestBed.inject(SessionService).role.set('trainer');
+    // Feste Uhr: Montag, 19.10.2026 – beide Trainings stehen in „Diese Woche“ (aufgeklappt, SCRUM-140).
+    TestBed.inject(WeatherService).now = () => new Date('2026-10-19T07:00:00Z');
     const fixture = TestBed.createComponent(Events);
     await fixture.whenStable();
     await vi.waitFor(() => {
