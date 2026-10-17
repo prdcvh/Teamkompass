@@ -46,7 +46,7 @@ h1 {
 .notice p,
 .metrics {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(var(--metric-count, 4), minmax(0, 1fr));
   gap: var(--tk-space-3);
 }
 
@@ -255,8 +255,8 @@ td {
   }
 
   .metrics {
-    grid-template-columns: repeat(4, 1fr);
-    gap: 0;
+    grid-template-columns: repeat(var(--metric-count, 4), minmax(0, 1fr));
+    gap: var(--tk-space-3) 0;
     padding: var(--tk-space-3);
     background: var(--tk-surface);
     border: 1px solid var(--tk-line);

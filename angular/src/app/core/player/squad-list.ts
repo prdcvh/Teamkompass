@@ -1,5 +1,16 @@
-/** Kaderliste: Filtern, Sortieren, Statuszählung und Gruppieren nach Mannschaftsteil. */
-import { type Player, type PlayerStatus, positionText } from './player';
+/**
+ * Kaderliste: Filtern, Sortieren, Statuszählung und Gruppieren nach Mannschaftsteil. Maßgeblich ist der wirksame
+ * Status (`statusOf`): eine heute laufende Abwesenheit überlagert den gespeicherten Status (SCRUM-164).
+ */
+import type { EffectiveStatus } from '../records/availability';
+import { type Player, positionText } from './player';
+
+/** Liefert den anzuzeigenden Status eines Spielers; ohne Angabe der gespeicherte. */
+export type StatusOf = (player: Player) => EffectiveStatus;
+const storedStatus: StatusOf = (player) => player.status;
+
+/** Alle Status der Kaderliste in Anzeige-Reihenfolge (Filter und Zähler). */
+export const SQUAD_STATUSES: readonly EffectiveStatus[] = ['Fit', 'Angeschlagen', 'Verletzt', 'Abwesend', 'Gesperrt', 'Pause'];
 
 export type SortKey = 'number' | 'name' | 'position' | 'age' | 'status';
 export const SORT_OPTIONS: readonly { readonly key: SortKey; readonly label: string }[] = [
@@ -18,17 +29,18 @@ export interface SquadFilter {
   readonly status: string;
 }
 
-export function filterPlayers(players: readonly Player[], filter: SquadFilter): Player[] {
+export function filterPlayers(players: readonly Player[], filter: SquadFilter, statusOf: StatusOf = storedStatus): Player[] {
   const query = filter.query.trim().toLowerCase();
   return players.filter((player) => {
+    const status = statusOf(player);
     if (filter.position !== 'all' && !player.positions.includes(filter.position)) return false;
-    if (filter.status !== 'all' && player.status !== filter.status) return false;
+    if (filter.status !== 'all' && status !== filter.status) return false;
     if (!query) return true;
-    return [player.name, positionText(player), player.status, String(player.number)].join(' ').toLowerCase().includes(query);
+    return [player.name, positionText(player), status, String(player.number)].join(' ').toLowerCase().includes(query);
   });
 }
 
-export function sortPlayers(players: readonly Player[], key: SortKey): Player[] {
+export function sortPlayers(players: readonly Player[], key: SortKey, statusOf: StatusOf = storedStatus): Player[] {
   const byNumber = (a: Player, b: Player) => a.number - b.number;
   const collate = (a: string, b: string) => a.localeCompare(b, 'de');
   const sorted = [...players];
@@ -44,7 +56,7 @@ export function sortPlayers(players: readonly Player[], key: SortKey): Player[] 
       sorted.sort((a, b) => (b.birthdate || '0000').localeCompare(a.birthdate || '0000') || byNumber(a, b));
       break;
     case 'status':
-      sorted.sort((a, b) => collate(a.status, b.status) || byNumber(a, b));
+      sorted.sort((a, b) => collate(statusOf(a), statusOf(b)) || byNumber(a, b));
       break;
     default:
       sorted.sort(byNumber);
@@ -52,9 +64,9 @@ export function sortPlayers(players: readonly Player[], key: SortKey): Player[] 
   return sorted;
 }
 
-export function statusCounts(players: readonly Player[]): Record<PlayerStatus, number> {
-  const counts: Record<PlayerStatus, number> = { Fit: 0, Angeschlagen: 0, Verletzt: 0, Pause: 0 };
-  for (const player of players) counts[player.status] += 1;
+export function statusCounts(players: readonly Player[], statusOf: StatusOf = storedStatus): Record<EffectiveStatus, number> {
+  const counts: Record<EffectiveStatus, number> = { Fit: 0, Angeschlagen: 0, Verletzt: 0, Abwesend: 0, Gesperrt: 0, Pause: 0 };
+  for (const player of players) counts[statusOf(player)] += 1;
   return counts;
 }
 

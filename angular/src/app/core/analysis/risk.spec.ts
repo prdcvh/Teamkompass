@@ -13,7 +13,7 @@ import { injuryRisk, sessionLoad } from './risk';
 describe('risk (Belastungsampel)', () => {
   const NOW = new Date('2026-10-16T15:30:00');
   const player = (overrides: Partial<Player> = {}): Player => ({
-    id: 'p', name: 'Test', positions: ['ST'], number: 9, birthdate: '2012-01-01', status: 'Fit', injuryUntil: '', consentStatus: 'granted', consentDate: '', ...overrides,
+    id: 'p', name: 'Test', positions: ['ST'], number: 9, birthdate: '2012-01-01', status: 'Fit', injuryUntil: '', injuredSince: '', consentStatus: 'granted', consentDate: '', ...overrides,
   });
   const dayAgo = (n: number): string => {
     const date = new Date(2026, 9, 16 - n);
