@@ -4,6 +4,7 @@ import { provideRouter } from '@angular/router';
 import { LayoutService } from '../../core/shell/layout.service';
 import { SessionService } from '../../core/auth/session.service';
 import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
+import { WeatherService } from '../../core/weather/weather.service';
 import { Events } from './events';
 
 /** Leseansicht und Stift-Umschaltung der Event-Maske (SCRUM-144). */
@@ -17,6 +18,8 @@ describe('Events: Anschauen und Bearbeiten über den Stift', () => {
       providers: [provideRouter([]), ...provideFakeFirebase(firebase), { provide: LayoutService, useValue: { isMobile: signal(false) } }],
     });
     TestBed.inject(SessionService).role.set(role);
+    // Feste Uhr in der Woche des Events, damit es in „Diese Woche“ (aufgeklappt) steht (SCRUM-140).
+    TestBed.inject(WeatherService).now = () => new Date('2026-10-05T07:00:00Z');
     const fixture = TestBed.createComponent(Events);
     await fixture.whenStable();
     await vi.waitFor(() => {

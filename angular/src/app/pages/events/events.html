@@ -69,34 +69,62 @@
           }
         </div>
       </tk-card>
-    } @else if (cards()) {
-      @for (month of months(); track month.label) {
-        <h2 class="group">{{ month.label }} · {{ month.events.length }}</h2>
-        <tk-card>
-          <ul class="cards">
-            @for (event of month.events; track event.id) {
-              <li class="row">
-                <a class="event-card" [routerLink]="['/events', event.id]" [attr.aria-label]="'Event bewerten: ' + event.title">
-                  <span class="badge" [attr.data-type]="event.type">{{ event.type }}</span>
-                  <span class="what">
-                    <strong>{{ event.title }}</strong>
-                    <small>{{ formatDate(event.date) }}@if (detail(event); as info) { · {{ info }}}</small>
-                  </span>
-                  @if (resultText(event); as result) {
-                    <span class="result">{{ result }}</span>
-                  }
-                </a>
-                <button tkButton size="sm" type="button" (click)="openView(event)" [attr.aria-label]="'Event anschauen: ' + event.title">Anschauen</button>
-                <!-- Eigene Zeile über die volle Kartenbreite, nicht gequetscht neben „Bearbeiten“ (SCRUM-155). -->
-                <tk-weather class="card-weather" [event]="event" />
-              </li>
-            }
-          </ul>
-        </tk-card>
-      }
     } @else {
-      <tk-card>
-        <div class="table-wrap">
+      @if (sections().past.length > 0) {
+        <section class="section" aria-labelledby="sec-past">
+          <h2 class="sec-head">
+            <button type="button" id="sec-past" class="toggle" [attr.aria-expanded]="showPast()" aria-controls="sec-past-body" (click)="pastOpen.set(!pastOpen())">
+              <tk-icon name="chevron-right" class="chev" [class.open]="showPast()" />
+              Vergangene Events <span class="count">({{ sections().past.length }})</span>
+            </button>
+          </h2>
+          <div id="sec-past-body" [hidden]="!showPast()">
+            @if (showPast()) {
+              <ng-container *ngTemplateOutlet="body; context: { list: sections().past, months: pastMonths() }" />
+            }
+          </div>
+        </section>
+      }
+
+      <section class="section" aria-labelledby="sec-week">
+        <h2 class="sec-head static" id="sec-week">Diese Woche <span class="count">({{ sections().week.length }})</span></h2>
+        @if (sections().week.length === 0) {
+          <p class="muted week-empty">Diese Woche keine Events</p>
+        } @else {
+          <ng-container *ngTemplateOutlet="body; context: { list: sections().week, months: null }" />
+        }
+      </section>
+
+      @if (sections().later.length > 0) {
+        <section class="section" aria-labelledby="sec-later">
+          <h2 class="sec-head">
+            <button type="button" id="sec-later" class="toggle" [attr.aria-expanded]="showLater()" aria-controls="sec-later-body" (click)="laterOpen.set(!laterOpen())">
+              <tk-icon name="chevron-right" class="chev" [class.open]="showLater()" />
+              Später <span class="count">({{ sections().later.length }})</span>
+            </button>
+          </h2>
+          <div id="sec-later-body" [hidden]="!showLater()">
+            @if (showLater()) {
+              <ng-container *ngTemplateOutlet="body; context: { list: sections().later, months: laterMonths() }" />
+            }
+          </div>
+        </section>
+      }
+    }
+
+    <ng-template #body let-list="list" let-months="months">
+      @if (cards()) {
+        @if (months) {
+          @for (month of months; track month.label) {
+            <h3 class="group">{{ month.label }} · {{ month.events.length }}</h3>
+            <ng-container *ngTemplateOutlet="cardList; context: { list: month.events }" />
+          }
+        } @else {
+          <ng-container *ngTemplateOutlet="cardList; context: { list: list }" />
+        }
+      } @else {
+        <tk-card>
+          <div class="table-wrap">
           <table>
             <thead>
               <tr>
@@ -110,7 +138,7 @@
               </tr>
             </thead>
             <tbody>
-              @for (event of visible(); track event.id) {
+              @for (event of list; track event.id) {
                 <tr>
                   <td class="date">{{ formatDate(event.date) }}</td>
                   <td><strong>{{ event.title }}</strong></td>
@@ -133,9 +161,34 @@
               }
             </tbody>
           </table>
-        </div>
+          </div>
+        </tk-card>
+      }
+    </ng-template>
+
+    <ng-template #cardList let-list="list">
+      <tk-card>
+        <ul class="cards">
+            @for (event of list; track event.id) {
+              <li class="row">
+                <a class="event-card" [routerLink]="['/events', event.id]" [attr.aria-label]="'Event bewerten: ' + event.title">
+                  <span class="badge" [attr.data-type]="event.type">{{ event.type }}</span>
+                  <span class="what">
+                    <strong>{{ event.title }}</strong>
+                    <small>{{ formatDate(event.date) }}@if (detail(event); as info) { · {{ info }}}</small>
+                  </span>
+                  @if (resultText(event); as result) {
+                    <span class="result">{{ result }}</span>
+                  }
+                </a>
+                <button tkButton size="sm" type="button" (click)="openView(event)" [attr.aria-label]="'Event anschauen: ' + event.title">Anschauen</button>
+                <!-- Eigene Zeile über die volle Kartenbreite, nicht gequetscht neben „Bearbeiten“ (SCRUM-155). -->
+                <tk-weather class="card-weather" [event]="event" />
+              </li>
+            }
+        </ul>
       </tk-card>
-    }
+    </ng-template>
     <p class="muted"><a [href]="source.url" target="_blank" rel="noopener noreferrer">{{ source.text }}</a></p>
   }
 
