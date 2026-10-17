@@ -90,7 +90,7 @@ export class Profile implements OnInit {
       { label: 'Bewertete Events', value: String(f.ratedEvents) },
       { label: 'Teilnahmen', value: String(f.attendances) },
       { label: 'Trend', value: numberLabel(f.trend, { signed: true }) },
-      { label: 'Ø Intensität zuletzt', value: numberLabel(f.recentIntensity) },
+      { label: 'Ø Anstrengung zuletzt', value: numberLabel(f.recentIntensity) },
       { label: 'Entwicklung Saison', value: numberLabel(f.development, { signed: true }) },
       { label: 'Bestes Event', value: f.best ? `${gradeLabel(f.best.grade)} · ${f.best.event.type}` : '–' },
       { label: 'Einsatzquote', value: `${g.appearanceRate}%` },

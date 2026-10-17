@@ -17,7 +17,7 @@ import { BLANK_RATING, type Rating } from '../ratings/rating';
 describe('profile (Auswertungen)', () => {
   const TODAY = '2026-10-10';
   const event = (id: string, date: string, overrides: Partial<TeamEvent> = {}): TeamEvent => ({
-    id, type: 'Training', title: `Event ${id}`, date, intensity: 2, location: '', trainingFocus: 'Umschalten', opponent: '',
+    id, type: 'Training', title: `Event ${id}`, date, intensity: 2, exertion: 5, location: '', trainingFocus: 'Umschalten', opponent: '',
     goalsFor: null, goalsAgainst: null, matchDuration: null, startTime: null, durationMinutes: null, locationCoords: null, notes: '', ...overrides,
   });
   const game = (id: string, date: string, duration = 90) => event(id, date, { type: 'Spiel', matchDuration: duration, trainingFocus: '' });
@@ -63,9 +63,9 @@ describe('profile (Auswertungen)', () => {
 
   describe('Trend, Entwicklung, Bestes Event', () => {
     const items: EventRating[] = [
-      { event: event('a', '2026-10-01', { intensity: 1 }), rating: rated(4) },
-      { event: event('b', '2026-10-02', { intensity: 3 }), rating: rated(3) },
-      { event: event('c', '2026-10-03', { intensity: 3 }), rating: rated(2) },
+      { event: event('a', '2026-10-01', { exertion: 3 }), rating: rated(4) },
+      { event: event('b', '2026-10-02', { exertion: 7 }), rating: rated(3) },
+      { event: event('c', '2026-10-03', { exertion: 7 }), rating: rated(2) },
       { event: game('d', '2026-10-04'), rating: rated(1) },
     ];
 
@@ -74,7 +74,7 @@ describe('profile (Auswertungen)', () => {
       expect(figures.trend).toBe(1);
       expect(figures.development).toBe(3);
       expect(figures.best?.event.id).toBe('d');
-      expect(figures.recentIntensity).toBe(2.7);
+      expect(figures.recentIntensity).toBe(6.3);
     });
 
     it('Trend und Entwicklung brauchen mindestens zwei benotete Events', () => {

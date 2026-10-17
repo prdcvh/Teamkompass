@@ -1,0 +1,62 @@
+@let mode = hint.mode();
+@if (mode) {
+  <aside class="hint" role="status" aria-label="Zum Startbildschirm hinzufügen" (keydown.escape)="later()">
+    <div class="text">
+      <strong>TeamKompass auf den Startbildschirm</strong>
+      <span>
+        @if (mode === 'prompt') {
+          Installiere die App und öffne sie wie jede andere.
+        } @else {
+          Dann öffnest du die App mit einem Tipp, wie jede andere.
+        }
+      </span>
+    </div>
+    <div class="actions">
+      @if (mode === 'prompt') {
+        <button tkButton variant="primary" size="sm" type="button" (click)="hint.install()">Installieren</button>
+      } @else {
+        <button tkButton variant="primary" size="sm" type="button" (click)="steps.set(true)">Anleitung</button>
+      }
+      <button tkButton size="sm" type="button" (click)="later()">Später</button>
+      <button tkButton variant="ghost" size="sm" type="button" (click)="never()">Nicht mehr anzeigen</button>
+    </div>
+  </aside>
+
+  <tk-dialog [open]="steps()" title="Zum Startbildschirm hinzufügen" (closed)="steps.set(false)">
+    @if (mode === 'ios-steps') {
+      <ol class="steps">
+        <li>
+          <span class="symbol"><tk-icon name="share" /></span>
+          <span>Tippe unten in Safari auf das <strong>Teilen-Symbol</strong> (Quadrat mit Pfeil nach oben).</span>
+        </li>
+        <li>
+          <span class="symbol"><tk-icon name="plus" /></span>
+          <span>Wähle <strong>„Zum Home-Bildschirm“</strong>.</span>
+        </li>
+        <li>
+          <span class="symbol"><tk-icon name="check" /></span>
+          <span>Tippe oben rechts auf <strong>„Hinzufügen“</strong>.</span>
+        </li>
+      </ol>
+    } @else {
+      <ol class="steps">
+        <li>
+          <span class="symbol"><tk-icon name="more-vertical" /></span>
+          <span>Tippe oben rechts im Browser auf das <strong>Menü (drei Punkte)</strong>.</span>
+        </li>
+        <li>
+          <span class="symbol"><tk-icon name="plus" /></span>
+          <span>Wähle <strong>„Zum Startbildschirm hinzufügen“</strong> oder <strong>„App installieren“</strong>.</span>
+        </li>
+        <li>
+          <span class="symbol"><tk-icon name="check" /></span>
+          <span>Bestätige mit <strong>„Hinzufügen“</strong> bzw. <strong>„Installieren“</strong>.</span>
+        </li>
+      </ol>
+    }
+    <div class="actions">
+      <button tkButton variant="primary" type="button" (click)="steps.set(false)">Verstanden</button>
+      <button tkButton variant="ghost" type="button" (click)="never()">Nicht mehr anzeigen</button>
+    </div>
+  </tk-dialog>
+}

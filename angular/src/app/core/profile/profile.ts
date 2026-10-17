@@ -144,7 +144,7 @@ export function profileFigures(items: readonly EventRating[], today: string): Pr
   const graded = gradedEvents(items);
   const last = graded.at(-1)?.grade;
   const previous = graded.at(-2)?.grade;
-  const recent = graded.slice(-3).map((entry) => entry.event.intensity || 2);
+  const recent = graded.slice(-3).map((entry) => entry.event.exertion);
   return {
     average: averageGrade(graded),
     gameAverage: averageGrade(graded.filter((entry) => entry.event.type === 'Spiel')),

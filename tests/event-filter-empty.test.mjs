@@ -25,6 +25,8 @@ async function setup(team, events) {
     const escapeHtml = (v) => String(v);
     const gameResult = () => null;
     const intensityLabel = () => "";
+    const exertionLabel = () => "";
+    const eventExertion = () => 5;
     const selectedEvent = () => state.events.find((e) => e.id === state.selectedEventId) || state.events[0];
     const renderRatingTable = () => {};
     function syncEventSelect() {} // SCRUM-129 (liegt ausserhalb des ausgeschnittenen Bereichs)
