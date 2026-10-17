@@ -180,6 +180,23 @@ describe('PlanningService: Serien-Trainings anlegen', () => {
     expect(firebase.events.events.size).toBe(0);
   });
 
+  it('setzt keinen Merker, wenn die Serie schon gelöscht ist und nur ein Termin übrig blieb (SCRUM-161)', async () => {
+    const planning = await setup();
+    planning.saveSeries(base);
+    await done(planning);
+    const [saved] = planning.series();
+    const id = seriesEventId(saved.id, '2026-11-03');
+    // Ein von Hand geänderter Termin bleibt beim Löschen der Serie bestehen.
+    firebase.events.events.set(id, { ...(firebase.events.events.get(id) as object), seriesEdited: true });
+    firebase.events.emitEvents();
+    planning.deleteSeries(saved.id);
+    await vi.waitFor(() => expect(planning.series()).toHaveLength(0));
+    expect(firebase.events.events.has(id)).toBe(true);
+    expect(await TestBed.inject(EventsService).remove(id)).toBe(true);
+    expect(firebase.events.events.has(id)).toBe(false);
+    expect(firebase.planning.skipped).toEqual({});
+  });
+
   it('bricht das Löschen ab, wenn der Merker nicht gesetzt werden kann', async () => {
     const planning = await setup();
     planning.saveSeries(base);
