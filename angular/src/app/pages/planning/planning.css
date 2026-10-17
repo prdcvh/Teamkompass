@@ -111,3 +111,17 @@ h2 {
     align-items: stretch;
   }
 }
+
+.run {
+  padding: var(--tk-space-3);
+  color: var(--tk-ink);
+  background: var(--tk-field);
+  border-radius: var(--tk-radius-md, 8px);
+  font-size: var(--tk-text-sm);
+}
+
+.run[data-state='error'] {
+  color: var(--tk-red);
+  background: var(--tk-soft-red);
+  font-weight: 600;
+}

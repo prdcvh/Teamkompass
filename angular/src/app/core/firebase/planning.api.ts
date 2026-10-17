@@ -30,9 +30,17 @@ export class PlanningApi {
     await setDoc(doc(db, 'teams', environment.teamId, 'meta', 'planning'), { series: { [id]: data } }, { merge: true });
   }
 
+  /** Löscht die Serie samt den Merkern ihrer von Hand gelöschten Termine. */
   async deleteSeries(id: string): Promise<void> {
     const { db } = await this.connection.get();
     const { doc, setDoc, deleteField } = await import('firebase/firestore');
-    await setDoc(doc(db, 'teams', environment.teamId, 'meta', 'planning'), { series: { [id]: deleteField() } }, { merge: true });
+    await setDoc(doc(db, 'teams', environment.teamId, 'meta', 'planning'), { series: { [id]: deleteField() }, skipped: { [id]: deleteField() } }, { merge: true });
+  }
+
+  /** Merkt, dass das Serien-Training dieses Tages von Hand gelöscht wurde und nicht neu entstehen soll. */
+  async markSkipped(seriesId: string, date: string): Promise<void> {
+    const { db } = await this.connection.get();
+    const { doc, setDoc } = await import('firebase/firestore');
+    await setDoc(doc(db, 'teams', environment.teamId, 'meta', 'planning'), { skipped: { [seriesId]: { [date]: true } } }, { merge: true });
   }
 }

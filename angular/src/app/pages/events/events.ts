@@ -16,6 +16,7 @@ import {
 } from '../../core/events/event';
 import { sectionEvents } from '../../core/events/event-sections';
 import { EventsService } from '../../core/events/events.service';
+import { isSeriesEvent } from '../../core/planning/series-events';
 import { SyncService } from '../../core/shell/sync.service';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
@@ -81,6 +82,11 @@ export class Events implements OnInit {
 
   protected intensityLabel(event: TeamEvent): string {
     return exertionLabel(event.exertion);
+  }
+
+  /** Das Training stammt aus einer Trainingsserie (SCRUM-146). */
+  protected fromSeries(event: TeamEvent): boolean {
+    return isSeriesEvent(event.id);
   }
 
   /** „vs. Gegner · Ort“ bzw. nur der Ort. */

@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { EXERTIONS } from '../../core/events/event';
 import { type TrainingSeries, seriesTitle, weekdayLabel } from '../../core/planning/planning';
+import { EventsService } from '../../core/events/events.service';
 import { PlanningService } from '../../core/planning/planning.service';
 import { formatDate } from '../../core/shared/dates';
 import { SyncService } from '../../core/shell/sync.service';
@@ -10,7 +11,7 @@ import { Card } from '../../ui/card/card';
 import { Dialog } from '../../ui/dialog/dialog';
 import { SeriesDialog } from './series-dialog';
 
-/** Planung (nur Trainer): Trainingsserien verwalten. Die Termine selbst entstehen erst in einem späteren Schritt (SCRUM-146). */
+/** Planung (nur Trainer): Trainingsserien verwalten. Beim Speichern entstehen die Trainings als Events. */
 @Component({
   selector: 'app-planning',
   imports: [Button, Card, Dialog, SeriesDialog],
@@ -21,6 +22,7 @@ import { SeriesDialog } from './series-dialog';
 export class Planning implements OnInit {
   protected readonly planning = inject(PlanningService);
   protected readonly sync = inject(SyncService);
+  private readonly events = inject(EventsService);
   private readonly settings = inject(TeamSettingsService);
 
   protected readonly dialogOpen = signal(false);
@@ -33,6 +35,8 @@ export class Planning implements OnInit {
 
   ngOnInit(): void {
     this.planning.start();
+    // Die vorhandenen Events werden für die Vorschau und das Anlegen der Serien-Trainings gebraucht.
+    this.events.start();
     // Der Standardort belegt neue Serien vor; ohne ihn bleibt das Ortsfeld leer.
     this.settings.start();
   }

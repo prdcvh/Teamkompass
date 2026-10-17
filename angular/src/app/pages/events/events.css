@@ -334,3 +334,13 @@ p.muted a {
     transition: none;
   }
 }
+
+/* Kleines Wiederholen-Symbol: das Training stammt aus einer Serie (SCRUM-146). */
+.series-mark {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  margin-left: var(--tk-space-2);
+  vertical-align: -0.1em;
+  color: var(--tk-muted);
+}

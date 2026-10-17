@@ -2,7 +2,7 @@
  * Planung (SCRUM-145): Trainingsserien. Eine Serie ist ein fester Trainingstag (Wochentag, Startzeit, Dauer, Ort)
  * mit Start- und Enddatum. Sie liegt im Dokument `teams/{teamId}/meta/planning` unter `series.{id}` (eine Map statt
  * einer Liste, damit zwei Trainer verschiedene Serien gleichzeitig ändern können und weitere Teile – Pausen,
- * SCRUM-148 – im selben Dokument Platz haben). Hier entstehen noch keine Events (SCRUM-146).
+ * SCRUM-148 – im selben Dokument Platz haben). Die Trainings der Serie legt `series-events.ts` an (SCRUM-146).
  */
 import {
   DEFAULT_EXERTION,
