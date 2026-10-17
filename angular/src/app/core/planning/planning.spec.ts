@@ -73,7 +73,7 @@ describe('Planung: Datumshilfen', () => {
 
 describe('Planung: Dokument', () => {
   it('überspringt unbrauchbare Serien und sortiert', () => {
-    const base = { durationMinutes: 90, location: '', locationCoords: null, title: '', trainingFocus: 'Umschalten', intensity: 2, startDate: '2026-10-20', endDate: '2027-01-01' };
+    const base = { durationMinutes: 90, location: '', locationCoords: null, title: '', trainingFocus: 'Umschalten', exertion: 2, startDate: '2026-10-20', endDate: '2027-01-01' };
     const doc = {
       series: {
         b: { ...base, weekday: 4, startTime: '18:00' },
@@ -87,6 +87,12 @@ describe('Planung: Dokument', () => {
     expect(series[0].locationCoords).toBeNull();
     expect(seriesFromPlanningDoc(null)).toEqual([]);
     expect(seriesFromPlanningDoc({ series: [1] })).toEqual([]);
+  });
+
+  it('liest die Anstrengung 0–10 und eine alte Intensität 1–3 als 3/5/7 (SCRUM-137)', () => {
+    const base = { weekday: 2, startTime: '17:30', durationMinutes: 90, startDate: '2026-10-20', endDate: '2027-01-01' };
+    const exertions = seriesFromPlanningDoc({ series: { a: { ...base, exertion: 8 }, b: { ...base, startTime: '18:00', intensity: 3 }, c: { ...base, startTime: '19:00' } } }).map((entry) => entry.exertion);
+    expect(exertions).toEqual([8, 7, 5]);
   });
 });
 

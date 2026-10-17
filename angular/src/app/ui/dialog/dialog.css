@@ -32,6 +32,12 @@ h2 {
   font-size: 20px;
 }
 
+.tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .close {
   width: 36px;
   height: 36px;

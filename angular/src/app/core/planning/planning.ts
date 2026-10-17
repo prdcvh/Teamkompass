@@ -5,8 +5,10 @@
  * SCRUM-148 – im selben Dokument Platz haben). Die Trainings der Serie legt `series-events.ts` an (SCRUM-146).
  */
 import {
+  DEFAULT_EXERTION,
   EVENT_TYPES,
-  INTENSITIES,
+  EXERTIONS,
+  exertionFromLegacyIntensity,
   type LocationCoords,
   MAX_TEXT_LENGTH,
   MAX_TITLE_LENGTH,
@@ -44,7 +46,7 @@ export interface TrainingSeries {
   /** Leer = „Training“. */
   readonly title: string;
   readonly trainingFocus: string;
-  readonly intensity: number;
+  readonly exertion: number;
   /** ISO-Datum, erster möglicher Termin. */
   readonly startDate: string;
   /** ISO-Datum, letzter möglicher Termin (Pflicht). */
@@ -61,13 +63,13 @@ export interface SeriesDraft {
   readonly locationCoords: LocationCoords | null;
   readonly title: string;
   readonly trainingFocus: string;
-  readonly intensity: number;
+  readonly exertion: number;
   readonly startDate: string;
   readonly endDate: string;
 }
 
 export type SeriesErrors = Partial<
-  Record<'weekday' | 'startTime' | 'durationMinutes' | 'location' | 'title' | 'intensity' | 'startDate' | 'endDate' | 'locationCoords', string>
+  Record<'weekday' | 'startTime' | 'durationMinutes' | 'location' | 'title' | 'exertion' | 'startDate' | 'endDate' | 'locationCoords', string>
 >;
 
 export function seriesTitle(series: Pick<TrainingSeries, 'title'>): string {
@@ -113,7 +115,7 @@ export function emptySeriesDraft(today: string, defaultLocation: { readonly text
     locationCoords: defaultLocation?.coords ?? null,
     title: '',
     trainingFocus: TRAINING_FOCUSES[0],
-    intensity: 2,
+    exertion: DEFAULT_EXERTION,
     startDate: today,
     endDate: '',
   };
@@ -129,7 +131,7 @@ export function draftFromSeries(series: TrainingSeries): SeriesDraft {
     locationCoords: series.locationCoords,
     title: series.title,
     trainingFocus: series.trainingFocus,
-    intensity: series.intensity,
+    exertion: series.exertion,
     startDate: series.startDate,
     endDate: series.endDate,
   };
@@ -149,7 +151,7 @@ export function validateSeriesDraft(draft: SeriesDraft): SeriesErrors {
   if (draft.title.trim().length > MAX_TITLE_LENGTH) errors.title = `Der Titel darf höchstens ${MAX_TITLE_LENGTH} Zeichen lang sein.`;
   if (draft.location.trim().length > MAX_TEXT_LENGTH) errors.location = `Der Ort darf höchstens ${MAX_TEXT_LENGTH} Zeichen lang sein.`;
   if (draft.locationCoords !== null && !isLocationCoords(draft.locationCoords)) errors.locationCoords = 'Die gewählten Koordinaten sind ungültig. Bitte den Ort neu suchen.';
-  if (!INTENSITIES.some((entry) => entry.value === draft.intensity)) errors.intensity = 'Bitte eine Intensität wählen.';
+  if (!EXERTIONS.some((entry) => entry.value === draft.exertion)) errors.exertion = 'Bitte eine Anstrengung wählen.';
 
   const startOk = isIsoDate(draft.startDate);
   const endOk = isIsoDate(draft.endDate);
@@ -177,7 +179,7 @@ export function seriesFromDraft(draft: SeriesDraft, id: string): TrainingSeries 
     locationCoords: draft.locationCoords === null ? null : { lat: draft.locationCoords.lat, lon: draft.locationCoords.lon, name: draft.locationCoords.name },
     title: draft.title.trim(),
     trainingFocus: draft.trainingFocus,
-    intensity: draft.intensity,
+    exertion: draft.exertion,
     startDate: draft.startDate,
     endDate: draft.endDate,
   };
@@ -193,7 +195,7 @@ export function docFromSeries(series: TrainingSeries): Record<string, unknown> {
     locationCoords: series.locationCoords,
     title: series.title,
     trainingFocus: series.trainingFocus,
-    intensity: series.intensity,
+    exertion: series.exertion,
     startDate: series.startDate,
     endDate: series.endDate,
   };
@@ -203,7 +205,7 @@ export function docFromSeries(series: TrainingSeries): Record<string, unknown> {
 export function seriesFromDoc(id: string, data: unknown): TrainingSeries | null {
   if (typeof data !== 'object' || data === null) return null;
   const raw = data as Record<string, unknown>;
-  const { weekday, startTime, durationMinutes, startDate, endDate, intensity } = raw;
+  const { weekday, startTime, durationMinutes, startDate, endDate, exertion } = raw;
   if (typeof weekday !== 'number' || !WEEKDAYS.some((day) => day.value === weekday)) return null;
   if (!isTime(startTime)) return null;
   if (typeof durationMinutes !== 'number' || !Number.isInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > MAX_TRAINING_DURATION) return null;
@@ -219,7 +221,8 @@ export function seriesFromDoc(id: string, data: unknown): TrainingSeries | null 
     locationCoords: isLocationCoords(coords) ? { lat: coords.lat, lon: coords.lon, name: coords.name } : null,
     title: text(raw['title'], MAX_TITLE_LENGTH),
     trainingFocus: text(raw['trainingFocus'], MAX_TEXT_LENGTH) || TRAINING_FOCUSES[0],
-    intensity: typeof intensity === 'number' && INTENSITIES.some((entry) => entry.value === intensity) ? intensity : 2,
+    // Anstrengung 0–10 (SCRUM-137); eine ältere Serie mit Intensität 1–3 wird wie bei Events als 3/5/7 gelesen.
+    exertion: typeof exertion === 'number' && EXERTIONS.some((entry) => entry.value === exertion) ? exertion : exertionFromLegacyIntensity(raw['intensity']),
     startDate,
     endDate,
   };

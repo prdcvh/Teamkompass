@@ -143,7 +143,7 @@ describe('Sicherung einspielen: Zusammenfassung und Schreibliste', () => {
 describe('Sicherung einspielen: Live-App und Angular gegenseitig', () => {
   const player = (id: string, name: string): Player => ({ id, name, positions: ['ST'], number: 9, birthdate: '2012-02-05', status: 'Fit', injuryUntil: '', consentStatus: 'granted', consentDate: '' });
   const event = (id: string, title: string): TeamEvent =>
-    ({ id, title, date: '2026-09-01', type: 'Training', intensity: 2, location: '', trainingFocus: 'Umschalten', opponent: '', goalsFor: null, goalsAgainst: null, matchDuration: null, notes: '' }) as TeamEvent;
+    ({ id, title, date: '2026-09-01', type: 'Training', intensity: 2, exertion: 5, location: '', trainingFocus: 'Umschalten', opponent: '', goalsFor: null, goalsAgainst: null, matchDuration: null, notes: '' }) as TeamEvent;
   const angularExport = () =>
     JSON.parse(
       JSON.stringify(

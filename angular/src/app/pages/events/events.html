@@ -69,12 +69,107 @@
           }
         </div>
       </tk-card>
-    } @else if (cards()) {
-      @for (month of months(); track month.label) {
-        <h2 class="group">{{ month.label }} · {{ month.events.length }}</h2>
+    } @else {
+      @if (sections().past.length > 0) {
+        <section class="section" aria-labelledby="sec-past">
+          <h2 class="sec-head">
+            <button type="button" id="sec-past" class="toggle" [attr.aria-expanded]="showPast()" aria-controls="sec-past-body" (click)="pastOpen.set(!pastOpen())">
+              <tk-icon name="chevron-right" class="chev" [class.open]="showPast()" />
+              Vergangene Events <span class="count">({{ sections().past.length }})</span>
+            </button>
+          </h2>
+          <div id="sec-past-body" [hidden]="!showPast()">
+            @if (showPast()) {
+              <ng-container *ngTemplateOutlet="body; context: { list: sections().past, months: pastMonths() }" />
+            }
+          </div>
+        </section>
+      }
+
+      <section class="section" aria-labelledby="sec-week">
+        <h2 class="sec-head static" id="sec-week">Diese Woche <span class="count">({{ sections().week.length }})</span></h2>
+        @if (sections().week.length === 0) {
+          <p class="muted week-empty">Diese Woche keine Events</p>
+        } @else {
+          <ng-container *ngTemplateOutlet="body; context: { list: sections().week, months: null }" />
+        }
+      </section>
+
+      @if (sections().later.length > 0) {
+        <section class="section" aria-labelledby="sec-later">
+          <h2 class="sec-head">
+            <button type="button" id="sec-later" class="toggle" [attr.aria-expanded]="showLater()" aria-controls="sec-later-body" (click)="laterOpen.set(!laterOpen())">
+              <tk-icon name="chevron-right" class="chev" [class.open]="showLater()" />
+              Später <span class="count">({{ sections().later.length }})</span>
+            </button>
+          </h2>
+          <div id="sec-later-body" [hidden]="!showLater()">
+            @if (showLater()) {
+              <ng-container *ngTemplateOutlet="body; context: { list: sections().later, months: laterMonths() }" />
+            }
+          </div>
+        </section>
+      }
+    }
+
+    <ng-template #body let-list="list" let-months="months">
+      @if (cards()) {
+        @if (months) {
+          @for (month of months; track month.label) {
+            <h3 class="group">{{ month.label }} · {{ month.events.length }}</h3>
+            <ng-container *ngTemplateOutlet="cardList; context: { list: month.events }" />
+          }
+        } @else {
+          <ng-container *ngTemplateOutlet="cardList; context: { list: list }" />
+        }
+      } @else {
         <tk-card>
-          <ul class="cards">
-            @for (event of month.events; track event.id) {
+          <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Datum</th>
+                <th scope="col">Titel</th>
+                <th scope="col">Typ</th>
+                <th scope="col">Ort / Gegner</th>
+                <th scope="col">Anstrengung</th>
+                <th scope="col">Ergebnis</th>
+                <th scope="col"><span class="tk-sr-only">Aktionen</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (event of list; track event.id) {
+                <tr>
+                  <td class="date">{{ formatDate(event.date) }}</td>
+                  <td><strong>{{ event.title }}</strong>@if (fromSeries(event)) { <span class="series-mark" role="img" aria-label="Aus Trainingsserie" title="Aus Trainingsserie"><tk-icon name="repeat" /></span> }</td>
+                  <td><span class="badge" [attr.data-type]="event.type">{{ event.type }}</span></td>
+                  <td>{{ detail(event) || '–' }}<div class="weather"><tk-weather [event]="event" /></div></td>
+                  <td>{{ intensityLabel(event) }}</td>
+                  <td>{{ resultText(event) || '–' }}</td>
+                  <td>
+                    <div class="actions">
+                      @if (events.canWrite()) {
+                        <a tkButton size="sm" variant="primary" [routerLink]="['/events', event.id]" [attr.aria-label]="'Bewerten: ' + event.title">Bewerten</a>
+                      }
+                      <button tkButton size="sm" type="button" (click)="openView(event)" [attr.aria-label]="'Anschauen: ' + event.title">Anschauen</button>
+                      @if (events.canWrite()) {
+                        <button tkButton size="sm" type="button" class="danger" (click)="askDelete(event)" [attr.aria-label]="'Löschen: ' + event.title">Löschen</button>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+          </div>
+        </tk-card>
+      }
+    </ng-template>
+
+    <ng-template #cardList let-list="list">
+      <tk-card>
+        <ul class="cards">
+            @for (event of list; track event.id) {
               <li class="row">
                 <a class="event-card" [routerLink]="['/events', event.id]" [attr.aria-label]="'Event bewerten: ' + event.title">
                   <span class="badge" [attr.data-type]="event.type">{{ event.type }}</span>
@@ -86,58 +181,14 @@
                     <span class="result">{{ result }}</span>
                   }
                 </a>
-                @if (events.canWrite()) {
-                  <button tkButton size="sm" type="button" (click)="openEdit(event)" [attr.aria-label]="'Event bearbeiten: ' + event.title">Bearbeiten</button>
-                }
+                <button tkButton size="sm" type="button" (click)="openView(event)" [attr.aria-label]="'Event anschauen: ' + event.title">Anschauen</button>
                 <!-- Eigene Zeile über die volle Kartenbreite, nicht gequetscht neben „Bearbeiten“ (SCRUM-155). -->
                 <tk-weather class="card-weather" [event]="event" />
               </li>
             }
-          </ul>
-        </tk-card>
-      }
-    } @else {
-      <tk-card>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">Datum</th>
-                <th scope="col">Titel</th>
-                <th scope="col">Typ</th>
-                <th scope="col">Ort / Gegner</th>
-                <th scope="col">Intensität</th>
-                <th scope="col">Ergebnis</th>
-                @if (events.canWrite()) {
-                  <th scope="col"><span class="tk-sr-only">Aktionen</span></th>
-                }
-              </tr>
-            </thead>
-            <tbody>
-              @for (event of visible(); track event.id) {
-                <tr>
-                  <td class="date">{{ formatDate(event.date) }}</td>
-                  <td><strong>{{ event.title }}</strong>@if (fromSeries(event)) { <span class="series-mark" role="img" aria-label="Aus Trainingsserie" title="Aus Trainingsserie"><tk-icon name="repeat" /></span> }</td>
-                  <td><span class="badge" [attr.data-type]="event.type">{{ event.type }}</span></td>
-                  <td>{{ detail(event) || '–' }}<div class="weather"><tk-weather [event]="event" /></div></td>
-                  <td>{{ intensityLabel(event) }}</td>
-                  <td>{{ resultText(event) || '–' }}</td>
-                  @if (events.canWrite()) {
-                    <td>
-                      <div class="actions">
-                        <a tkButton size="sm" variant="primary" [routerLink]="['/events', event.id]" [attr.aria-label]="'Bewerten: ' + event.title">Bewerten</a>
-                        <button tkButton size="sm" type="button" (click)="openEdit(event)" [attr.aria-label]="'Bearbeiten: ' + event.title">Bearbeiten</button>
-                        <button tkButton size="sm" type="button" class="danger" (click)="askDelete(event)" [attr.aria-label]="'Löschen: ' + event.title">Löschen</button>
-                      </div>
-                    </td>
-                  }
-                </tr>
-              }
-            </tbody>
-          </table>
-        </div>
+        </ul>
       </tk-card>
-    }
+    </ng-template>
     <p class="muted"><a [href]="source.url" target="_blank" rel="noopener noreferrer">{{ source.text }}</a></p>
   }
 
@@ -146,9 +197,9 @@
   }
 </section>
 
-@if (events.canWrite()) {
-  <tk-event-dialog [open]="dialogOpen()" [event]="editing()" (closed)="closeDialog()" (deleteRequested)="askDelete($event)" />
+<tk-event-dialog [open]="dialogOpen()" [event]="editing()" [canEdit]="events.canWrite()" (closed)="closeDialog()" (deleteRequested)="askDelete($event)" />
 
+@if (events.canWrite()) {
   <tk-dialog [open]="deleting() !== null" title="Event löschen?" (closed)="cancelDelete()">
     <p>
       „{{ deleting()?.title }}“ wird mit allen Bewertungen und internen Notizen gelöscht. Das lässt sich nicht rückgängig machen.

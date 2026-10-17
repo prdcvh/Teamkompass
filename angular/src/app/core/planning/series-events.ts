@@ -5,7 +5,7 @@
  * Hand gelöschtes Serien-Training steht als Merker (`skipped.{serie}.{datum}`) im Planungsdokument und entsteht
  * nicht neu. Startzeiten bleiben Ortszeit-Texte (`17:30`, Europe/Berlin); die Zeitumstellung verschiebt sie nicht.
  */
-import { type TeamEvent, docFromEvent } from '../events/event';
+import { type TeamEvent, docFromEvent, legacyIntensityForExertion } from '../events/event';
 import { isIsoDate } from '../shared/dates';
 import { type DateRange, type PlanningBreak, inAnyRange, isInBreak } from './breaks';
 import { type TrainingSeries, isoWeekday, seriesTitle } from './planning';
@@ -104,7 +104,8 @@ export function eventFromSeries(series: TrainingSeries, date: string): TeamEvent
     type: 'Training',
     title: seriesTitle(series),
     date,
-    intensity: series.intensity,
+    exertion: series.exertion,
+    intensity: legacyIntensityForExertion(series.exertion),
     location: series.location,
     trainingFocus: series.trainingFocus,
     opponent: '',
@@ -138,7 +139,7 @@ export function planText(plan: SeriesPlan): string {
 // --- Serie ändern, verlängern, kürzen, löschen (SCRUM-147) ---
 
 /** Felder eines Serien-Trainings, die die Serie vorgibt und bei einer Serienänderung angepasst werden. */
-const SERIES_FIELDS = ['title', 'intensity', 'location', 'trainingFocus', 'startTime', 'durationMinutes', 'locationCoords'] as const;
+const SERIES_FIELDS = ['title', 'exertion', 'intensity', 'location', 'trainingFocus', 'startTime', 'durationMinutes', 'locationCoords'] as const;
 
 /** Ein Serien-Event, das beim Ändern angepasst wird: nur die geänderten Felder (Dokumentform). */
 export interface SeriesEventUpdate {

@@ -22,11 +22,12 @@ describe('Serie ändern: Plan (feste Uhr 14.10.2026)', () => {
   const events = allEvents();
 
   it('passt künftige Termine an und lässt vergangene unberührt', () => {
-    const changed = { ...series, startTime: '18:00', durationMinutes: 60, location: 'Kunstrasen', title: 'Techniktraining', intensity: 3, trainingFocus: 'Umschalten' };
+    const changed = { ...series, startTime: '18:00', durationMinutes: 60, location: 'Kunstrasen', title: 'Techniktraining', exertion: 8, trainingFocus: 'Umschalten' };
     const plan = planSeriesChange('sabc', changed, TODAY, events, new Set(), noSkips);
     expect(plan.update.map((entry) => entry.id)).toEqual(ids(['2026-10-20', '2026-10-27', '2026-11-03', '2026-11-10', '2026-11-17']));
     expect(plan.update[0].changes).toEqual({
       title: 'Techniktraining',
+      exertion: 8,
       intensity: 3,
       location: 'Kunstrasen',
       trainingFocus: 'Umschalten',
