@@ -20,6 +20,7 @@ const ICONS = {
   logout: ['M10 5H5v14h5', 'M15 8l4 4-4 4', 'M19 12H9'],
   'chevron-right': ['M9 6l6 6-6 6'],
   close: ['M6 6l12 12', 'M18 6L6 18'],
+  edit: ['M4 20h4L19 9l-4-4L4 16z', 'M13 7l4 4'],
   plus: ['M12 5v14', 'M5 12h14'],
   share: ['M12 15V4', 'M8 8l4-4 4 4', 'M6 11H5v9h14v-9h-1'],
   check: ['M5 12.5l4.5 4.5L19 7.5'],
