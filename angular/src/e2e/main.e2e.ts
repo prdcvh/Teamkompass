@@ -72,10 +72,6 @@ function seed(): FakeFirebase {
       s1: { weekday: 2, startTime: '17:30', durationMinutes: 90, location: 'Kunstrasen - heim', locationCoords: null, title: '', trainingFocus: 'Eigener Ballbesitz', intensity: 2, startDate: '2026-10-20', endDate: '2027-03-30' },
       s2: { weekday: 4, startTime: '18:00', durationMinutes: 75, location: 'Sporthalle am Hang mit sehr langem Namen', locationCoords: null, title: 'Torwart- und Athletiktraining im Wechsel', trainingFocus: 'Umschalten', intensity: 3, startDate: '2026-10-22', endDate: '2027-03-25' },
     },
-    breaks: {
-      b1: { name: 'Herbstferien', startDate: '2026-10-26', endDate: '2026-11-08' },
-      b2: { name: 'Winterpause mit einem ziemlich langen Namen für die Listenansicht', startDate: '2026-12-21', endDate: '2027-01-09' },
-    },
   };
   // Pausen liegen im eigenen, für alle Teammitglieder lesbaren Dokument meta/breaks (SCRUM-150).
   fake.planning.breaksDoc = {
