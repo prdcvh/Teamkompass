@@ -48,50 +48,7 @@
             <p class="muted">Noch keine Aufstellung gespeichert.</p>
             <a tkButton variant="primary" routerLink="/aufstellung">Aufstellung anlegen</a>
           } @else {
-            <div class="lineup">
-              <a class="lineup-link" routerLink="/aufstellung" [attr.aria-label]="'Aufstellung öffnen, Formation ' + lineupSummary().formation">
-                <div class="pitch" [class.horizontal]="!mobile()" aria-hidden="true">
-                  @if (mobile()) {
-                    <svg class="marks" viewBox="0 0 100 133" preserveAspectRatio="none">
-                      <rect x="3" y="3" width="94" height="127" rx="1" />
-                      <line x1="3" y1="66.5" x2="97" y2="66.5" />
-                      <circle cx="50" cy="66.5" r="11" />
-                      <circle class="spot" cx="50" cy="66.5" r="0.9" />
-                      <rect x="23" y="3" width="54" height="22" />
-                      <rect x="37" y="3" width="26" height="8" />
-                      <rect x="23" y="108" width="54" height="22" />
-                      <rect x="37" y="122" width="26" height="8" />
-                    </svg>
-                  } @else {
-                    <svg class="marks" viewBox="0 0 160 100" preserveAspectRatio="none">
-                      <rect x="3" y="3" width="154" height="94" rx="1" />
-                      <line x1="80" y1="3" x2="80" y2="97" />
-                      <circle cx="80" cy="50" r="11" />
-                      <circle class="spot" cx="80" cy="50" r="0.9" />
-                      <rect x="3" y="23" width="22" height="54" />
-                      <rect x="3" y="37" width="8" height="26" />
-                      <rect x="135" y="23" width="22" height="54" />
-                      <rect x="149" y="37" width="8" height="26" />
-                    </svg>
-                  }
-                  @for (marker of markers(); track marker.id) {
-                    <span class="marker" [class.keeper]="marker.keeper" [style.left.%]="marker.left" [style.top.%]="marker.top">
-                      <span class="shirt">{{ marker.number }}</span>
-                      <span class="name">{{ marker.label }}</span>
-                    </span>
-                  }
-                </div>
-              </a>
-              <div class="lineup-side">
-                <p class="formation">{{ lineupSummary().formation }}</p>
-                <p class="muted">{{ lineupSummary().count }} von 11 Spielern auf dem Platz</p>
-                <ul class="lineup-rows">
-                  @for (row of lineupSummary().rows; track row.label) {
-                    <li><span class="zone">{{ row.label }}</span><span>{{ row.names.join(' · ') }}</span></li>
-                  }
-                </ul>
-              </div>
-            </div>
+            <app-home-lineup [summary]="lineupSummary()" [markers]="markers()" [mobile]="mobile()" />
           }
         </div>
       </tk-card>
@@ -164,32 +121,7 @@
             @if (board().length === 0) {
               <p class="muted">Noch keine benoteten Events.</p>
             } @else {
-              <ol class="board">
-                @for (entry of board(); track entry.player.id; let i = $index) {
-                  <li [class.top]="i === 0">
-                    <span class="rank">{{ i + 1 }}</span>
-                    <span class="avatar" aria-hidden="true">{{ entry.initials }}</span>
-                    <span class="who">
-                      <a class="player-link" [routerLink]="['/profile', entry.player.id]">{{ entry.player.name }}</a>
-                      <span class="muted">{{ entry.events }} {{ entry.events === 1 ? 'Einsatz' : 'Einsätze' }}</span>
-                    </span>
-                    <svg class="spark" [attr.viewBox]="'0 0 ' + entry.spark.width + ' ' + entry.spark.height" role="img" [attr.aria-label]="'Letzte Noten: ' + entry.spark.label">
-                      <line class="base" x1="0" [attr.y1]="entry.spark.height / 2" [attr.x2]="entry.spark.width" [attr.y2]="entry.spark.height / 2" />
-                      <path [attr.d]="entry.spark.path" />
-                      @if (entry.spark.last; as last) {
-                        <circle [attr.cx]="last.x" [attr.cy]="last.y" r="3" />
-                      }
-                    </svg>
-                    <span class="trend" [attr.data-trend]="entry.trend" [attr.title]="entry.trendText">
-                      @if (entry.trend) {
-                        <span aria-hidden="true">{{ entry.trend === 'besser' ? '↗' : entry.trend === 'schlechter' ? '↘' : '→' }}</span>
-                        <span class="tk-sr-only">{{ entry.trendText }}</span>
-                      }
-                    </span>
-                    <strong class="grade" [attr.data-tone]="entry.tone">Ø {{ numberLabel(entry.grade) }}</strong>
-                  </li>
-                }
-              </ol>
+              <app-home-board [entries]="board()" [mobile]="mobile()" />
             }
           </div>
         </tk-card>
