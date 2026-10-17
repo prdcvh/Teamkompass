@@ -309,9 +309,10 @@ export function resultText(event: TeamEvent): string {
 }
 
 export type EventTypeFilter = 'all' | EventType;
-export type EventSort = 'date-desc' | 'date-asc';
+export type EventSort = 'chronological' | 'date-desc' | 'date-asc';
 
 export const EVENT_SORT_OPTIONS: readonly { readonly key: EventSort; readonly label: string }[] = [
+  { key: 'chronological', label: 'Chronologisch' },
   { key: 'date-desc', label: 'Neueste zuerst' },
   { key: 'date-asc', label: 'Älteste zuerst' },
 ];
@@ -330,7 +331,14 @@ export function filterEvents(events: readonly TeamEvent[], filter: EventFilter):
   });
 }
 
+/** Datum, dann Startzeit; Events ohne Startzeit stehen am Ende des Tages. */
+function compareChronological(a: TeamEvent, b: TeamEvent): number {
+  return a.date.localeCompare(b.date) || (a.startTime ?? '99:99').localeCompare(b.startTime ?? '99:99') || a.title.localeCompare(b.title, 'de');
+}
+
+/** `chronological` = aufsteigend nach Datum und Startzeit (SCRUM-141). */
 export function sortEvents(events: readonly TeamEvent[], sort: EventSort): TeamEvent[] {
+  if (sort === 'chronological') return [...events].sort(compareChronological);
   const direction = sort === 'date-asc' ? 1 : -1;
   return [...events].sort((a, b) => direction * a.date.localeCompare(b.date) || a.title.localeCompare(b.title, 'de'));
 }
