@@ -321,8 +321,7 @@ describe('Events (Events-Seite)', () => {
     it('zeigt für Medizin weder Anlegen noch Bearbeiten', async () => {
       const fixture = await render('medical', true);
       expect(q(fixture, '.fab')).toBeNull();
-      openAll(fixture);
-      expect(qa(fixture, '.row button').map(text)).toEqual(['Anschauen', 'Anschauen', 'Anschauen']);
+      expect(qa(fixture, '.row button').map(text)).toEqual(['Anschauen', 'Anschauen']); // nur „Diese Woche“ ist offen
     });
   });
 });

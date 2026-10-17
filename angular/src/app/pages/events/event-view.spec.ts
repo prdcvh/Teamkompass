@@ -57,7 +57,7 @@ describe('Events: Anschauen und Bearbeiten über den Stift', () => {
       const content = text(dialog.querySelector('dl'));
       expect(content).toContain('Training Montag');
       expect(content).toContain('Kunstrasen');
-      expect(content).toContain('2 · mittel');
+      expect(content).toContain('Anstrengung5 · schwer'); // alte Intensität 2 → Anstrengung 5 (SCRUM-137)
       for (const missing of ['Gegner', 'Startzeit', '–']) expect(content).not.toContain(missing);
       const notes = dialog.querySelector<HTMLElement>('.notes')!;
       expect(notes.textContent).toBe('Erste Zeile\n<b>zweite</b> Zeile');
