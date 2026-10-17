@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, OnInit, computed, effect, inject, s
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
-import { INTENSITIES, formatDate, resultText } from '../../core/events/event';
+import { exertionLabel, formatDate, resultText } from '../../core/events/event';
 import { EventsService } from '../../core/events/events.service';
 import { LineupService } from '../../core/lineup/lineup.service';
 import { lineupSummary } from '../../core/lineup/lineup';
@@ -135,7 +135,8 @@ export class EventRating implements OnInit {
   }
 
   protected intensity(): string {
-    return INTENSITIES.find((entry) => entry.value === this.event()?.intensity)?.label ?? '';
+    const event = this.event();
+    return event ? exertionLabel(event.exertion) : '';
   }
 
   protected attendanceOf(player: Player): Attendance {

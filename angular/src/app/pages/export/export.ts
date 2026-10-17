@@ -147,7 +147,7 @@ export class Export implements OnInit {
     const entry = this.team.data().find((item) => item.player.id === player?.id);
     if (!player || !entry) return;
     this.files.print(
-      profileReportHtml({ teamName: environment.teamName, player, items: entry.items, absences: entry.absences, today: todayIso() }),
+      profileReportHtml({ teamName: environment.teamName, player, items: entry.items, absences: entry.absences, measurements: entry.measurements, today: todayIso() }),
     );
     this.workspace.record(`Spielerprofil als PDF vorbereitet (${player.name})`);
     this.done.set('Der Druckdialog wurde geöffnet – dort „Als PDF speichern“ wählen.');

@@ -114,7 +114,7 @@ describe('PlanningService: Serien-Trainings anlegen', () => {
     expect(firebase.events.events.size).toBe(78);
     const [id, data] = [...firebase.events.events][0];
     expect(id).toMatch(/^serie-s[0-9a-f]{16}-2026-10-20$/);
-    expect(eventFromDoc(id, data)).toMatchObject({ type: 'Training', title: 'Training', date: '2026-10-20', startTime: '17:30', durationMinutes: 90, intensity: 2 });
+    expect(eventFromDoc(id, data)).toMatchObject({ type: 'Training', title: 'Training', date: '2026-10-20', startTime: '17:30', durationMinutes: 90, exertion: 5, intensity: 2 });
   });
 
   it('legt beim zweiten Speichern nichts doppelt an', async () => {

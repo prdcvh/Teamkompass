@@ -5,7 +5,7 @@
  * Hand gelöschtes Serien-Training steht als Merker (`skipped.{serie}.{datum}`) im Planungsdokument und entsteht
  * nicht neu. Startzeiten bleiben Ortszeit-Texte (`17:30`, Europe/Berlin); die Zeitumstellung verschiebt sie nicht.
  */
-import { type TeamEvent } from '../events/event';
+import { type TeamEvent, legacyIntensityForExertion } from '../events/event';
 import { isIsoDate } from '../shared/dates';
 import { type TrainingSeries, isoWeekday, seriesTitle } from './planning';
 
@@ -93,7 +93,8 @@ export function eventFromSeries(series: TrainingSeries, date: string): TeamEvent
     type: 'Training',
     title: seriesTitle(series),
     date,
-    intensity: series.intensity,
+    exertion: series.exertion,
+    intensity: legacyIntensityForExertion(series.exertion),
     location: series.location,
     trainingFocus: series.trainingFocus,
     opponent: '',

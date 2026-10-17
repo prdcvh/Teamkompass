@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
-import { INTENSITIES, MAX_TEXT_LENGTH, MAX_TITLE_LENGTH, MAX_TRAINING_DURATION, TRAINING_FOCUSES } from '../../core/events/event';
+import { EXERTIONS, MAX_TEXT_LENGTH, MAX_TITLE_LENGTH, MAX_TRAINING_DURATION, TRAINING_FOCUSES } from '../../core/events/event';
 import { type GeocodedPlace, GeocodingService, GEOCODING_MIN_QUERY, coordsFromPlace, geocodingMessage, placeLabel } from '../../core/geocoding/geocoding.service';
 import { DEFAULT_SERIES_TITLE, MAX_SERIES_MONTHS, type SeriesDraft, type SeriesErrors, type TrainingSeries, WEEKDAYS, draftFromSeries, emptySeriesDraft } from '../../core/planning/planning';
 import { PlanningService } from '../../core/planning/planning.service';
@@ -29,7 +29,7 @@ export class SeriesDialog {
   readonly deleteRequested = output<TrainingSeries>();
 
   protected readonly weekdays = WEEKDAYS;
-  protected readonly intensities = INTENSITIES;
+  protected readonly exertions = EXERTIONS;
   protected readonly focuses = TRAINING_FOCUSES;
   protected readonly limits = { title: MAX_TITLE_LENGTH, text: MAX_TEXT_LENGTH, duration: MAX_TRAINING_DURATION, months: MAX_SERIES_MONTHS };
   protected readonly defaultTitle = DEFAULT_SERIES_TITLE;

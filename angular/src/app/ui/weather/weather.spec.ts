@@ -25,7 +25,7 @@ function dayResponse(date: string): unknown {
 
 function makeEvent(patch: Partial<TeamEvent> = {}): TeamEvent {
   return {
-    id: 'e1', type: 'Training', title: 'Training', date: '2026-10-17', intensity: 2, location: 'Platz', trainingFocus: '', opponent: '',
+    id: 'e1', type: 'Training', title: 'Training', date: '2026-10-17', intensity: 2, exertion: 5, location: 'Platz', trainingFocus: '', opponent: '',
     goalsFor: null, goalsAgainst: null, matchDuration: null, startTime: '18:00', durationMinutes: 90,
     locationCoords: { lat: 50.18, lon: 8.46, name: 'Königstein' }, notes: '', ...patch,
   };
