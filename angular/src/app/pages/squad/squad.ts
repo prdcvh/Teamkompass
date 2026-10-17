@@ -77,6 +77,11 @@ export class Squad implements OnInit {
     const always: readonly EffectiveStatus[] = ['Fit', 'Angeschlagen', 'Verletzt', 'Pause'];
     return SQUAD_STATUSES.filter((status) => always.includes(status) || counts[status] > 0).map((status) => ({ status, count: counts[status], tone: METRIC_TONES[status] }));
   });
+  /** Spalten der Zähler: schmal (Handy/Karten) bei mehr als vier Zählern zwei Reihen à drei, sonst eine Reihe. */
+  protected readonly metricColumns = computed(() => {
+    const count = this.metrics().length;
+    return this.cards() && count > 4 ? 3 : count;
+  });
   /** Positionen aus den Spielerdaten (auch eigene), damit sich jede vorhandene Position filtern lässt. */
   protected readonly positionFilterOptions = computed(() => {
     const own = this.squad.players().flatMap((player) => player.positions);

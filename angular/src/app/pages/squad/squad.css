@@ -256,7 +256,7 @@ td {
 
   .metrics {
     grid-template-columns: repeat(var(--metric-count, 4), minmax(0, 1fr));
-    gap: 0;
+    gap: var(--tk-space-3) 0;
     padding: var(--tk-space-3);
     background: var(--tk-surface);
     border: 1px solid var(--tk-line);

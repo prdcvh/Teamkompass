@@ -282,6 +282,8 @@ describe('Squad (Kader-Seite)', () => {
       const cards = qa(fixture, '.player-card').map(text);
       expect(cards.find((card) => card.includes('Jonas Keller'))).toContain('Verletzt');
       expect(cards.find((card) => card.includes('Elias Wagner'))).toContain('Gesperrt');
+      // Fünf Zähler passen am Handy nicht in eine Reihe: zwei Reihen à drei.
+      expect(q<HTMLElement>(fixture, '.metrics')!.style.getPropertyValue('--metric-count')).toBe('3');
     });
   });
 

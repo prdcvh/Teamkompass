@@ -25,7 +25,7 @@
   } @else if (squad.load() !== 'ready') {
     <p class="muted" role="status">Kader wird geladen …</p>
   } @else {
-    <section class="metrics" aria-label="Verfügbarkeit" [style.--metric-count]="metrics().length">
+    <section class="metrics" aria-label="Verfügbarkeit" [style.--metric-count]="metricColumns()">
       @for (metric of metrics(); track metric.status) {
         <div><span class="count">{{ metric.count }}</span><span class="label"><span class="dot" [attr.data-tone]="metric.tone"></span>{{ metric.status }}</span></div>
       }
