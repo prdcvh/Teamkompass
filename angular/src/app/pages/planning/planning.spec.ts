@@ -61,7 +61,7 @@ describe('Planung (Seite)', () => {
   it('löscht eine Serie nach Bestätigung', async () => {
     const fixture = await render();
     firebase.planning.doc = {
-      series: { s1: { weekday: 2, startTime: '17:30', durationMinutes: 90, location: '', locationCoords: null, title: '', trainingFocus: 'Umschalten', intensity: 2, startDate: '2026-01-05', endDate: '2026-06-30' } },
+      series: { s1: { weekday: 2, startTime: '17:30', durationMinutes: 90, location: '', locationCoords: null, title: '', trainingFocus: 'Umschalten', exertion: 2, startDate: '2026-01-05', endDate: '2026-06-30' } },
     };
     firebase.planning.emit();
     await fixture.whenStable();
