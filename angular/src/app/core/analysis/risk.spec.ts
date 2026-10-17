@@ -85,6 +85,13 @@ describe('risk (Belastungsampel)', () => {
     expect(strong.reasons[0]).toBe('Starker Wachstumsschub (1,3 cm/Monat)');
   });
 
+  it('Wachstum zählt nur Messungen der letzten 90 Tage (SCRUM-157)', () => {
+    const run = (a: string, b: string) => risk([], player(), [], [measurement('m1', a, 150), measurement('m2', b, 151.5)]);
+    expect(run('2025-09-01', '2025-10-01').tier).toBe('unauffaellig');
+    expect(run('2026-06-01', '2026-10-01').tier).toBe('unauffaellig');
+    expect(run('2026-08-01', '2026-09-01').tier).toBe('anpassen');
+  });
+
   it('Intensität 1/2/3 wird als Anstrengung 3/5/7 gelesen und fließt so in die Belastung ein', () => {
     expect([1, 2, 3].map(exertionFromLegacyIntensity)).toEqual([3, 5, 7]);
     const event = entry(2).event;
