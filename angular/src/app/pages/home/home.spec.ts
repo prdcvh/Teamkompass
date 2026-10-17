@@ -47,7 +47,7 @@ describe('Home (Start-Dashboard)', () => {
     const fixture = await render();
     await ready(fixture);
     const stats = [...root(fixture).querySelectorAll('.stat')].map((el) => `${el.querySelector('span')?.textContent} ${el.querySelector('strong')?.textContent}`);
-    expect(stats).toEqual(['Kader 2', 'Fit 1', 'Events 2', 'Teamnote 2', 'Bilanz (S-U-N) 1-0-0', 'Tore 3:1', 'Belastung hoch 1']);
+    expect(stats).toEqual(['Kader 2', 'Fit 1', 'Events 2', 'Teamnote 2', 'Bilanz (S-U-N) 1-0-0', 'Tore 3:1', 'Belastung hoch 0']);
     expect(text(fixture)).toContain('Ali Adler');
     expect(text(fixture)).toContain('Ø 2');
     expect(text(fixture)).toContain('vs. SV Nord');

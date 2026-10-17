@@ -9,7 +9,7 @@ describe('team (Dashboard-Auswertungen)', () => {
   const TODAY = '2026-10-10';
   const NOW = new Date('2026-10-10T12:00:00');
   const event = (id: string, date: string, overrides: Partial<TeamEvent> = {}): TeamEvent => ({
-    id, type: 'Training', title: `Event ${id}`, date, intensity: 2, location: '', trainingFocus: '', opponent: '',
+    id, type: 'Training', title: `Event ${id}`, date, intensity: 2, exertion: 5, location: '', trainingFocus: '', opponent: '',
     goalsFor: null, goalsAgainst: null, matchDuration: null, startTime: null, durationMinutes: null, locationCoords: null, notes: '', ...overrides,
   });
   const game = (id: string, date: string, goalsFor: number | null, goalsAgainst: number | null) => event(id, date, { type: 'Spiel', goalsFor, goalsAgainst, matchDuration: 90 });
@@ -130,10 +130,12 @@ describe('team (Dashboard-Auswertungen)', () => {
       expect(dashboardFigures([data(player('a'), [])], [], TODAY, NOW).teamGrade).toBeNull();
     });
 
-    it('Belastung hoch zählt nur die Stufen „Deutlich reduzieren“ und „Nicht einsetzen“', () => {
-      const injured = player('a', { status: 'Verletzt', injuryUntil: '2026-10-20' }); // 75 Punkte → Nicht einsetzen
+    it('Belastung hoch zählt nur die Stufe „Anpassen“, nicht die Verfügbarkeit (SCRUM-137)', () => {
+      const injured = player('a', { status: 'Verletzt', injuryUntil: '2026-10-20' }); // Verletzt ist Verfügbarkeit, keine Belastungsstufe
+      const growing = player('c');
       const fit = player('b');
-      const figures = dashboardFigures([data(injured, []), data(fit, [])], [], TODAY, NOW);
+      const growth = [{ id: 'm1', date: '2026-09-01', height: 150, weight: 40 }, { id: 'm2', date: '2026-10-01', height: 151.3, weight: 41 }]; // 1,3 cm/Monat
+      const figures = dashboardFigures([data(injured, []), data(fit, []), { ...data(growing, []), measurements: growth }], [], TODAY, NOW);
       expect(figures.highLoad).toBe(1);
     });
   });

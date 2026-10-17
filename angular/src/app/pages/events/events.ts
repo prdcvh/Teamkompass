@@ -1,10 +1,11 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { LayoutService, injectNarrowViewport } from '../../core/shell/layout.service';
 import {
   EVENT_SORT_OPTIONS,
   EVENT_TYPES,
-  INTENSITIES,
+  exertionLabel,
   type EventSort,
   type EventTypeFilter,
   type TeamEvent,
@@ -12,24 +13,25 @@ import {
   formatDate,
   groupByMonth,
   resultText,
-  sortEvents,
 } from '../../core/events/event';
-import { isSeriesEvent } from '../../core/planning/series-events';
+import { sectionEvents } from '../../core/events/event-sections';
 import { EventsService } from '../../core/events/events.service';
+import { isSeriesEvent } from '../../core/planning/series-events';
 import { SyncService } from '../../core/shell/sync.service';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 import { Dialog } from '../../ui/dialog/dialog';
 import { Icon } from '../../ui/icon/icon';
 import { BreakNotice } from '../../ui/break-notice/break-notice';
+import { WeatherService } from '../../core/weather/weather.service';
 import { Weather } from '../../ui/weather/weather';
-import { WEATHER_ATTRIBUTION } from '../../core/weather/weather';
+import { WEATHER_ATTRIBUTION, berlinNow } from '../../core/weather/weather';
 import { EventDialog } from './event-dialog';
 
 /** Events (Training/Spiel): Liste mit Suche und Typfilter, anlegen, nachträglich bearbeiten und löschen. */
 @Component({
   selector: 'app-events',
-  imports: [RouterLink, Button, Card, Dialog, Icon, EventDialog, Weather, BreakNotice],
+  imports: [NgTemplateOutlet, RouterLink, Button, Card, Dialog, Icon, EventDialog, Weather, BreakNotice],
   templateUrl: './events.html',
   styleUrl: './events.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -38,6 +40,7 @@ export class Events implements OnInit {
   protected readonly events = inject(EventsService);
   protected readonly sync = inject(SyncService);
   protected readonly mobile = inject(LayoutService).isMobile;
+  private readonly weather = inject(WeatherService);
   private readonly narrow = injectNarrowViewport();
   /** Kartenliste statt Tabelle: auf dem Handy und überall, wo die Tabelle nicht neben das Seitenmenü passt (SCRUM-134). */
   protected readonly cards = computed(() => this.mobile() || this.narrow());
@@ -48,7 +51,7 @@ export class Events implements OnInit {
 
   protected readonly query = signal('');
   protected readonly type = signal<EventTypeFilter>('all');
-  protected readonly sort = signal<EventSort>('date-desc');
+  protected readonly sort = signal<EventSort>('chronological');
 
   /** Dialog-Zustand: `editing` = null und `dialogOpen` = true bedeutet „neues Event“. */
   protected readonly dialogOpen = signal(false);
@@ -57,10 +60,18 @@ export class Events implements OnInit {
   protected readonly deleteFailed = signal(false);
   protected readonly deleteBusy = signal(false);
 
-  protected readonly visible = computed(() =>
-    sortEvents(filterEvents(this.events.events(), { query: this.query(), type: this.type() }), this.sort()),
-  );
-  protected readonly months = computed(() => groupByMonth(this.visible()));
+  protected readonly pastOpen = signal(false);
+  protected readonly laterOpen = signal(false);
+
+  protected readonly visible = computed(() => filterEvents(this.events.events(), { query: this.query(), type: this.type() }));
+  /** Drei Bereiche (SCRUM-140); „heute“ nach Berliner Datum, über dieselbe Uhr wie die Wetteranzeige. */
+  protected readonly sections = computed(() => sectionEvents(this.visible(), this.sort(), berlinNow(this.weather.now()).date));
+  protected readonly searching = computed(() => this.query().trim() !== '');
+  /** Bei aktiver Suche klappen Bereiche mit Treffern von selbst auf. */
+  protected readonly showPast = computed(() => this.pastOpen() || this.searching());
+  protected readonly showLater = computed(() => this.laterOpen() || this.searching());
+  protected readonly pastMonths = computed(() => groupByMonth(this.sections().past));
+  protected readonly laterMonths = computed(() => groupByMonth(this.sections().later));
   protected readonly filtering = computed(() => this.query().trim() !== '' || this.type() !== 'all');
 
   ngOnInit(): void {
@@ -71,14 +82,15 @@ export class Events implements OnInit {
   protected resultText = resultText;
 
   protected intensityLabel(event: TeamEvent): string {
-    return INTENSITIES.find((entry) => entry.value === event.intensity)?.label ?? '–';
+    return exertionLabel(event.exertion);
   }
 
-  /** „vs. Gegner · Ort“ bzw. nur der Ort. */
+  /** Das Training stammt aus einer Trainingsserie (SCRUM-146). */
   protected fromSeries(event: TeamEvent): boolean {
     return isSeriesEvent(event.id);
   }
 
+  /** „vs. Gegner · Ort“ bzw. nur der Ort. */
   protected detail(event: TeamEvent): string {
     return [event.opponent ? `vs. ${event.opponent}` : '', event.location].filter(Boolean).join(' · ');
   }
@@ -92,8 +104,8 @@ export class Events implements OnInit {
     this.dialogOpen.set(true);
   }
 
-  protected openEdit(event: TeamEvent): void {
-    if (!this.events.canWrite()) return;
+  /** „Anschauen“: öffnet die Leseansicht; das Bearbeiten schaltet der Stift im Dialog frei (nur Trainer). */
+  protected openView(event: TeamEvent): void {
     this.editing.set(event);
     this.dialogOpen.set(true);
   }

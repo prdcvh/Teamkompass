@@ -79,10 +79,10 @@
         </select>
       </label>
       <label class="tk-label">
-        Intensität
-        <select class="tk-input" name="intensity" (change)="patch({ intensity: +value($event) })">
-          @for (entry of intensities; track entry.value) {
-            <option [value]="entry.value" [selected]="draft().intensity === entry.value">{{ entry.label }}</option>
+        Anstrengung
+        <select class="tk-input" name="exertion" (change)="patch({ exertion: +value($event) })">
+          @for (entry of exertions; track entry.value) {
+            <option [value]="entry.value" [selected]="draft().exertion === entry.value">{{ entry.label }}</option>
           }
         </select>
       </label>

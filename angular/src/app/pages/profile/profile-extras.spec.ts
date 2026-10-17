@@ -32,13 +32,18 @@ describe('Profile: Zusatzdaten', () => {
     expect(q(fixture, 'tk-profile-extras svg')).not.toBeNull(); // Diagramm nur sichtbar, wenn die Messungen jünger als 12 Monate sind
   });
 
-  it('die laufende Verletzung überlagert den Status und füllt den Belastungsindikator', async () => {
+  it('die laufende Verletzung überlagert den Status und trennt Verfügbarkeit und Belastung', async () => {
     const fixture = await renderExtras();
     expect(text(q(fixture, '.status-line'))).toContain('Verletzt');
-    expect(text(q(fixture, '.risk'))).toContain('Belastungsindikator');
-    expect(text(q(fixture, '.risk'))).toContain('Nicht einsetzen · 85%');
-    expect(text(q(fixture, '.risk'))).toContain('Aktuell verletzt');
-    expect(q(fixture, '.risk')?.getAttribute('data-tier')).toBe('aussetzen');
+    const risk = text(q(fixture, '.risk'));
+    expect(risk).toContain('Belastung letzte 7 Tage');
+    expect(risk).toContain('Schnitt der 3 Wochen davor');
+    expect(risk).not.toContain('%');
+    // Verfügbarkeit steht für sich: „Nicht einsetzen“ kommt nur von der Verletzung, nicht aus der Belastungsstufe.
+    expect(risk).toContain('Verfügbarkeit: Verletzt – Nicht einsetzen');
+    // Die Stufe kommt hier aus dem starken Wachstumsschub der Messwerte (1,6 cm/Monat), nicht aus der Verletzung.
+    expect(risk).toContain('Starker Wachstumsschub');
+    expect(q(fixture, '.risk')?.getAttribute('data-tier')).toBe('anpassen');
   });
 
   it('legt einen Förderplan an und prüft Pflichtfelder', async () => {

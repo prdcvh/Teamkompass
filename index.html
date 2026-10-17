@@ -155,14 +155,23 @@
                   </label>
                 </div>
                 <div class="event-meta-editor">
-                  <label>Intensität
+                  <label>Anstrengung
                   <select id="selectedEventIntensity">
-                    <option value="1">1 · niedrig</option>
-                    <option value="2">2 · mittel</option>
-                    <option value="3">3 · hoch</option>
+                    <option value="0">0 · Ruhe</option>
+                    <option value="1">1 · sehr leicht</option>
+                    <option value="2">2 · leicht</option>
+                    <option value="3">3 · mittel</option>
+                    <option value="4">4 · etwas schwer</option>
+                    <option value="5">5 · schwer</option>
+                    <option value="6">6 · ziemlich schwer</option>
+                    <option value="7">7 · sehr schwer</option>
+                    <option value="8">8 · sehr, sehr schwer</option>
+                    <option value="9">9 · fast maximal</option>
+                    <option value="10">10 · maximal</option>
                   </select>
                 </label>
                 <label>Spieldauer <input id="selectedMatchDuration" type="number" min="1" max="150" /></label>
+                <label>Dauer (Min.) <input id="selectedTrainingDuration" type="number" min="1" max="300" /></label>
                 <label>Trainingsfokus
                   <select id="selectedTrainingFocus">
                     <option value="Eigener Ballbesitz">Eigener Ballbesitz</option>
@@ -320,11 +329,19 @@
             </select>
           </label>
           <label>Datum <input id="eventDate" type="date" required /></label>
-          <label>Intensität
+          <label>Anstrengung
             <select id="eventIntensity" required>
-              <option value="1">1 · niedrig</option>
-              <option value="2">2 · mittel</option>
-              <option value="3">3 · hoch</option>
+              <option value="0">0 · Ruhe</option>
+              <option value="1">1 · sehr leicht</option>
+              <option value="2">2 · leicht</option>
+              <option value="3">3 · mittel</option>
+              <option value="4">4 · etwas schwer</option>
+              <option value="5">5 · schwer</option>
+              <option value="6">6 · ziemlich schwer</option>
+              <option value="7">7 · sehr schwer</option>
+              <option value="8">8 · sehr, sehr schwer</option>
+              <option value="9">9 · fast maximal</option>
+              <option value="10">10 · maximal</option>
             </select>
           </label>
           <label>Ort <input id="eventLocation" maxlength="50" placeholder="Sportplatz, Halle, auswärts" /></label>
@@ -337,6 +354,7 @@
           </label>
           <label>Gegner <input id="eventOpponent" maxlength="50" placeholder="nur bei Spielen" /></label>
           <label>Spieldauer <input id="eventMatchDuration" type="number" min="1" max="150" value="90" /></label>
+          <label>Dauer (Min.) <input id="eventTrainingDuration" type="number" min="1" max="300" value="90" /></label>
           <label>Eigene Tore <input id="eventGoalsFor" type="number" min="0" max="99" value="0" /></label>
           <label>Gegentore <input id="eventGoalsAgainst" type="number" min="0" max="99" value="0" /></label>
         </div>
