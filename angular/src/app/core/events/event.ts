@@ -5,17 +5,14 @@
  * interne Notizen liegen in Unterkollektionen und gehören nie ins Event-Dokument.
  */
 import { formatDate, isIsoDate } from '../shared/dates';
+import { DEFAULT_EXERTION, DEFAULT_TRAINING_DURATION, exertionFromLegacyIntensity, legacyIntensityForExertion } from './exertion';
 
 export { formatDate };
+export { DEFAULT_EXERTION, DEFAULT_TRAINING_DURATION, EXERTIONS, exertionFromLegacyIntensity, exertionLabel, legacyIntensityForExertion, plannedMinutes } from './exertion';
 
 export const EVENT_TYPES = ['Training', 'Spiel'] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
-export const INTENSITIES = [
-  { value: 1, label: '1 · niedrig' },
-  { value: 2, label: '2 · mittel' },
-  { value: 3, label: '3 · hoch' },
-] as const;
 
 export const TRAINING_FOCUSES = ['Eigener Ballbesitz', 'Gegnerischer Ballbesitz', 'Umschalten'] as const;
 
@@ -43,6 +40,9 @@ export interface TeamEvent {
   readonly title: string;
   /** ISO-Datum (JJJJ-MM-TT). */
   readonly date: string;
+  /** Anstrengung 0–10 (Trainer-Einschätzung); ältere Termine ohne eigenen Wert: Intensität 1/2/3 gelesen als 3/5/7. */
+  readonly exertion: number;
+  /** Altes Feld (1–3); wird aus der Anstrengung mitgeführt. */
   readonly intensity: number;
   readonly location: string;
   /** Nur bei Training. */
@@ -68,7 +68,7 @@ export interface EventDraft {
   readonly type: EventType;
   readonly title: string;
   readonly date: string;
-  readonly intensity: number;
+  readonly exertion: number;
   readonly location: string;
   readonly trainingFocus: string;
   readonly opponent: string;
@@ -83,7 +83,7 @@ export interface EventDraft {
 }
 
 export type EventErrors = Partial<
-  Record<'title' | 'date' | 'intensity' | 'location' | 'opponent' | 'goalsFor' | 'goalsAgainst' | 'matchDuration' | 'startTime' | 'durationMinutes' | 'locationCoords' | 'notes', string>
+  Record<'title' | 'date' | 'exertion' | 'location' | 'opponent' | 'goalsFor' | 'goalsAgainst' | 'matchDuration' | 'startTime' | 'durationMinutes' | 'locationCoords' | 'notes', string>
 >;
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -110,7 +110,7 @@ export function emptyDraft(today: string): EventDraft {
     type: 'Training',
     title: '',
     date: today,
-    intensity: 2,
+    exertion: DEFAULT_EXERTION,
     location: '',
     trainingFocus: TRAINING_FOCUSES[0],
     opponent: '',
@@ -118,7 +118,7 @@ export function emptyDraft(today: string): EventDraft {
     goalsAgainst: '',
     matchDuration: String(DEFAULT_MATCH_DURATION),
     startTime: '',
-    durationMinutes: '',
+    durationMinutes: String(DEFAULT_TRAINING_DURATION),
     locationCoords: null,
     notes: '',
   };
@@ -130,7 +130,7 @@ export function draftFromEvent(event: TeamEvent): EventDraft {
     type: event.type,
     title: event.title,
     date: event.date,
-    intensity: event.intensity,
+    exertion: event.exertion,
     location: event.location,
     trainingFocus: event.trainingFocus || TRAINING_FOCUSES[0],
     opponent: event.opponent,
@@ -138,7 +138,7 @@ export function draftFromEvent(event: TeamEvent): EventDraft {
     goalsAgainst: event.goalsAgainst === null ? '' : String(event.goalsAgainst),
     matchDuration: String(event.matchDuration ?? DEFAULT_MATCH_DURATION),
     startTime: event.startTime ?? '',
-    durationMinutes: event.durationMinutes === null ? '' : String(event.durationMinutes),
+    durationMinutes: event.durationMinutes === null ? (event.type === 'Training' ? String(DEFAULT_TRAINING_DURATION) : '') : String(event.durationMinutes),
     locationCoords: event.locationCoords,
     notes: event.notes,
   };
@@ -159,7 +159,7 @@ export function validateDraft(draft: EventDraft): EventErrors {
   else if (title.length > MAX_TITLE_LENGTH) errors.title = `Der Titel darf höchstens ${MAX_TITLE_LENGTH} Zeichen lang sein.`;
 
   if (!isIsoDate(draft.date)) errors.date = 'Bitte ein gültiges Datum eingeben.';
-  if (!INTENSITIES.some((entry) => entry.value === draft.intensity)) errors.intensity = 'Bitte eine Intensität von 1 bis 3 wählen.';
+  if (!Number.isInteger(draft.exertion) || draft.exertion < 0 || draft.exertion > 10) errors.exertion = 'Bitte eine Anstrengung von 0 bis 10 wählen.';
   if (draft.location.trim().length > MAX_TEXT_LENGTH) errors.location = `Der Ort darf höchstens ${MAX_TEXT_LENGTH} Zeichen lang sein.`;
   if (draft.startTime.trim() !== '' && !isTime(draft.startTime.trim())) errors.startTime = 'Bitte eine Uhrzeit im Format HH:MM eingeben.';
   if (draft.locationCoords !== null && !isLocationCoords(draft.locationCoords)) errors.locationCoords = 'Die Koordinaten des Orts sind ungültig.';
@@ -194,7 +194,8 @@ export function eventFromDraft(draft: EventDraft, id: string): TeamEvent {
     type: draft.type,
     title: draft.title.trim(),
     date: draft.date,
-    intensity: draft.intensity,
+    exertion: draft.exertion,
+    intensity: legacyIntensityForExertion(draft.exertion),
     location: draft.location.trim(),
     trainingFocus: game ? '' : draft.trainingFocus,
     opponent: draft.opponent.trim(),
@@ -218,6 +219,7 @@ export function eventFromDoc(id: string, data: Readonly<Record<string, unknown>>
   };
   const type = EVENT_TYPES.find((value) => value === data['type']) ?? 'Training';
   const intensity = Number(data['intensity']);
+  const ownExertion = data['exertion'] === '' || data['exertion'] === null || data['exertion'] === undefined ? Number.NaN : Number(data['exertion']);
   const duration = Number(data['matchDuration']);
   const trainingMinutes = Number(data['durationMinutes']);
   const startTime = typeof data['startTime'] === 'string' ? data['startTime'].trim() : '';
@@ -227,7 +229,8 @@ export function eventFromDoc(id: string, data: Readonly<Record<string, unknown>>
     type,
     title: text(data['title']),
     date: text(data['date']),
-    intensity: INTENSITIES.some((entry) => entry.value === intensity) ? intensity : 2,
+    exertion: Number.isInteger(ownExertion) && ownExertion >= 0 && ownExertion <= 10 ? ownExertion : exertionFromLegacyIntensity(intensity),
+    intensity: [1, 2, 3].includes(intensity) ? intensity : 2,
     location: text(data['location']),
     trainingFocus: type === 'Spiel' ? '' : text(data['trainingFocus']) || TRAINING_FOCUSES[0],
     opponent: text(data['opponent']),
@@ -251,6 +254,7 @@ export function docFromEvent(event: TeamEvent): Record<string, unknown> {
     type: event.type,
     title: event.title,
     date: event.date,
+    exertion: event.exertion,
     intensity: event.intensity,
     location: event.location,
     trainingFocus: event.trainingFocus,
@@ -305,9 +309,10 @@ export function resultText(event: TeamEvent): string {
 }
 
 export type EventTypeFilter = 'all' | EventType;
-export type EventSort = 'date-desc' | 'date-asc';
+export type EventSort = 'chronological' | 'date-desc' | 'date-asc';
 
 export const EVENT_SORT_OPTIONS: readonly { readonly key: EventSort; readonly label: string }[] = [
+  { key: 'chronological', label: 'Chronologisch' },
   { key: 'date-desc', label: 'Neueste zuerst' },
   { key: 'date-asc', label: 'Älteste zuerst' },
 ];
@@ -326,7 +331,14 @@ export function filterEvents(events: readonly TeamEvent[], filter: EventFilter):
   });
 }
 
+/** Datum, dann Startzeit; Events ohne Startzeit stehen am Ende des Tages. */
+function compareChronological(a: TeamEvent, b: TeamEvent): number {
+  return a.date.localeCompare(b.date) || (a.startTime ?? '99:99').localeCompare(b.startTime ?? '99:99') || a.title.localeCompare(b.title, 'de');
+}
+
+/** `chronological` = aufsteigend nach Datum und Startzeit (SCRUM-141). */
 export function sortEvents(events: readonly TeamEvent[], sort: EventSort): TeamEvent[] {
+  if (sort === 'chronological') return [...events].sort(compareChronological);
   const direction = sort === 'date-asc' ? 1 : -1;
   return [...events].sort((a, b) => direction * a.date.localeCompare(b.date) || a.title.localeCompare(b.title, 'de'));
 }

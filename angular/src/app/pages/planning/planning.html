@@ -40,7 +40,7 @@
             <li class="row">
               <div class="what">
                 <strong>{{ weekday(series.weekday) }}, {{ series.startTime }} Uhr · {{ title(series) }}</strong>
-                <small>{{ series.durationMinutes }} Min.{{ series.location ? ' · ' + series.location : '' }} · {{ series.trainingFocus }} · Intensität {{ intensity(series) }}</small>
+                <small>{{ series.durationMinutes }} Min.{{ series.location ? ' · ' + series.location : '' }} · {{ series.trainingFocus }} · Anstrengung {{ exertion(series) }}</small>
                 <small>{{ formatDate(series.startDate) }} bis {{ formatDate(series.endDate) }}</small>
               </div>
               <button tkButton size="sm" type="button" (click)="openEdit(series)" [attr.aria-label]="'Serie bearbeiten: ' + weekday(series.weekday) + ' ' + series.startTime">Bearbeiten</button>

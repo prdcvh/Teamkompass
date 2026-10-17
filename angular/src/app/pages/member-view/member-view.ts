@@ -15,6 +15,7 @@ import { SquadService } from '../../core/player/squad.service';
 import { SyncService } from '../../core/shell/sync.service';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
+import { InstallHint } from '../../ui/install-hint/install-hint';
 import { Status } from '../../ui/status/status';
 import { ProfileExtras } from '../profile/profile-extras';
 
@@ -29,7 +30,7 @@ import { ProfileExtras } from '../profile/profile-extras';
  */
 @Component({
   selector: 'app-member-view',
-  imports: [RouterLink, Button, Card, Status, ProfileExtras],
+  imports: [RouterLink, Button, Card, InstallHint, Status, ProfileExtras],
   templateUrl: './member-view.html',
   styleUrls: ['../profile/profile.css', './member-view.css', '../../ui/chart/chart.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,

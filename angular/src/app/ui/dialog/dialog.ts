@@ -20,7 +20,11 @@ import {
       <div class="panel">
         <header>
           <h2>{{ title() }}</h2>
-          <button type="button" class="close" aria-label="Schließen" (click)="requestClose()">×</button>
+          <div class="tools">
+            <!-- Optionale Aktionen neben dem Schließen-Knopf (z. B. Stift „Bearbeiten“, SCRUM-144) -->
+            <ng-content select="[tkDialogAction]" />
+            <button type="button" class="close" aria-label="Schließen" (click)="requestClose()">×</button>
+          </div>
         </header>
         <ng-content />
       </div>

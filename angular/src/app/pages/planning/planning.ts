@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
-import { INTENSITIES } from '../../core/events/event';
+import { EXERTIONS } from '../../core/events/event';
 import { type TrainingSeries, seriesTitle, weekdayLabel } from '../../core/planning/planning';
 import { PlanningService } from '../../core/planning/planning.service';
 import { formatDate } from '../../core/shared/dates';
@@ -38,8 +38,8 @@ export class Planning implements OnInit {
     this.settings.start();
   }
 
-  protected intensity(series: TrainingSeries): string {
-    return INTENSITIES.find((entry) => entry.value === series.intensity)?.label ?? '';
+  protected exertion(series: TrainingSeries): string {
+    return EXERTIONS.find((entry) => entry.value === series.exertion)?.label ?? '';
   }
 
   protected openNew(): void {
