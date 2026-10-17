@@ -122,8 +122,11 @@ keeps the board current, reports at sprint end).
 - **Working hours (standing instruction from the PO, 2026-10-01).** The PO
   keeps a free coding window of about 5 hours every day, and wants to review
   tickets in the morning. So: Claude does its development work **at night**
-  (a scheduled night session, starting around 22:30 Europe/Berlin, finished by
-  about 06:30). During the day Claude does **not** start new tickets and does
+  (a scheduled night session, starting around 22:30 Europe/Berlin). It has
+  **no fixed end time** (PO, 2026-10-16): it keeps working until the usage
+  limit is used up (see "Quota" below), even if that runs into the morning.
+  Apart from that running night session, during the day Claude does **not**
+  start new tickets and does
   **not** push or merge to `main` — not even right after the PO approves
   tickets — unless the PO explicitly asks in chat. Answering questions and
   small Jira housekeeping are fine at any time.
@@ -159,13 +162,23 @@ keeps the board current, reports at sprint end).
   next suitable (non-overlapping) ticket and checks the finished one while
   the new one works. It keeps refilling until the sprint has no `Zu
   erledigen` tickets left or the usage quota is nearly used up.
+- **Model per ticket (PO, 2026-10-16): best quality that still leaves room
+  for many tickets.** The main session picks the model for each sub-agent
+  (Agent tool `model`): **Sonnet** by default (S/M tickets, PR follow-ups);
+  **Opus** for L tickets, critical tickets (priority `High`: data
+  protection, security, data loss, wrong core numbers) and rework after a
+  failed check on a tricky problem. Never Haiku for ticket work. When a
+  ticket is started, the ticket gets a one-line comment naming the model and
+  why (e.g. "Modell: Sonnet 5.5 – kleines Ticket"). If the PO has written a
+  model into the ticket (e.g. "Modell: Opus"), that one is used instead.
+  Model names go into Jira only, never into commits or PRs.
 - **Quota: use it up, but never stop mid-ticket (PO, 2026-10-15).** The
   exact remaining quota isn't visible, so the main session keeps a running
   tally (estimated vs. actual tokens per ticket) and only starts a ticket it
   expects to finish completely, including the check and any rework. Once the
   system warns that the usage limit is near, no new tickets start; running
-  ones are finished and checked, then the final report is written. Late in
-  the night prefer small tickets over starting a large one. As a safety net
+  ones are finished and checked, then the final report is written. When the
+  quota is getting low prefer small tickets over starting a large one. As a safety net
   against a hard stop anyway, sub-agents push early and open a Draft PR
   after the first meaningful commit (marked ready at the end) and keep the
   Jira status current.
