@@ -152,15 +152,11 @@ describe('Events (Events-Seite)', () => {
       expect(firebase.calls.some((call) => call.startsWith('saveEvent'))).toBe(false);
     });
 
-    const openView = async (fixture: Awaited<ReturnType<typeof render>>) => {
-      qa<HTMLButtonElement>(fixture, 'tbody tr button').find((button) => text(button) === 'Anschauen' && button.getAttribute('aria-label') === 'Anschauen: Training Montag')!.click();
-      await flush(fixture);
-      return q<HTMLElement>(fixture, 'tk-event-dialog')!;
-    };
-
     it('bearbeitet ein Event nachträglich (Titel, Datum, Ort, Notiz)', async () => {
       const fixture = await render();
-      const dialog = await openView(fixture);
+      qa<HTMLButtonElement>(fixture, 'tbody tr button').find((button) => text(button) === 'Anschauen' && button.getAttribute('aria-label') === 'Anschauen: Training Montag')!.click();
+      await flush(fixture);
+      const dialog = q<HTMLElement>(fixture, 'tk-event-dialog')!;
       dialog.querySelector<HTMLButtonElement>('.edit-pen')!.click();
       await flush(fixture);
       expect(text(dialog.querySelector('h2'))).toBe('Event bearbeiten');
