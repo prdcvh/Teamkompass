@@ -55,4 +55,16 @@ export class FakeLineupApi implements Pick<LineupApi, keyof LineupApi> {
     this.lineup = { ...this.lineup, byEvent };
     this.emitLineup();
   }
+
+  deleteEventLineupError: unknown = null;
+
+  async deleteEventLineup(eventId: string): Promise<void> {
+    this.calls.push(`deleteEventLineup:${eventId}`);
+    if (this.deleteEventLineupError) throw this.deleteEventLineupError;
+    if (!this.lineup) return;
+    const byEvent = { ...((this.lineup['byEvent'] as Record<string, unknown> | undefined) ?? {}) };
+    delete byEvent[eventId];
+    this.lineup = { ...this.lineup, byEvent };
+    this.emitLineup();
+  }
 }
