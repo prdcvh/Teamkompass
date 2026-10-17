@@ -15,6 +15,7 @@ svg {
 }
 
 /* Die drei Punkte sind nur kurze Striche – dicker zeichnen, damit sie als Punkte lesbar sind. */
-:host([data-icon='more']) svg {
+:host([data-icon='more']) svg,
+:host([data-icon='more-vertical']) svg {
   stroke-width: 3.4;
 }
