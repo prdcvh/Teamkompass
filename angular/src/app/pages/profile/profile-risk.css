@@ -18,30 +18,43 @@
   color: var(--tk-muted);
 }
 
-.risk-meter {
-  height: 8px;
-  overflow: hidden;
-  background: var(--tk-field);
+.risk-level {
+  padding: 2px var(--tk-space-3);
+  color: var(--tk-green);
+  background: var(--tk-soft-green, transparent);
   border-radius: var(--tk-radius-pill);
 }
 
-.risk-meter span {
-  display: block;
-  height: 100%;
-  background: var(--tk-green);
+.risk[data-tier='beobachten'] .risk-level {
+  color: var(--tk-blue, #2563eb);
 }
 
-.risk[data-tier='beobachten'] .risk-meter span {
-  background: var(--tk-blue, #2563eb);
+.risk[data-tier='anpassen'] .risk-level {
+  color: var(--tk-amber);
 }
 
-.risk[data-tier='anpassen'] .risk-meter span {
-  background: var(--tk-amber);
+.risk-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--tk-space-3);
 }
 
-.risk[data-tier='reduzieren'] .risk-meter span,
-.risk[data-tier='aussetzen'] .risk-meter span {
-  background: var(--tk-red);
+.risk-compare div {
+  display: grid;
+  gap: 2px;
+}
+
+.risk-compare span {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+.risk-compare strong {
+  font-size: var(--tk-text-lg, 1.25rem);
+}
+
+.risk-availability[data-availability='verletzt'] {
+  color: var(--tk-red);
 }
 
 .risk small {

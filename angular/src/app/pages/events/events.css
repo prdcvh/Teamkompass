@@ -275,3 +275,62 @@ td.date {
 p.muted a {
   color: inherit;
 }
+
+/* Drei Bereiche der Liste (SCRUM-140) */
+.section {
+  display: grid;
+  gap: var(--tk-space-3);
+}
+
+.sec-head {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.sec-head.static {
+  padding-block: var(--tk-space-2);
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--tk-space-2);
+  width: 100%;
+  min-height: var(--tk-touch);
+  padding: var(--tk-space-2) 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.toggle:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.chev {
+  transition: transform 0.15s;
+}
+
+.chev.open {
+  transform: rotate(90deg);
+}
+
+.count {
+  color: var(--tk-muted);
+  font-weight: 400;
+}
+
+.week-empty {
+  margin: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chev {
+    transition: none;
+  }
+}

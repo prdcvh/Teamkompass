@@ -5,7 +5,7 @@ import { LayoutService } from '../../core/shell/layout.service';
 import { todayIso } from '../../core/shared/dates';
 import { numberLabel } from '../../core/profile/profile';
 import { gradeLabel } from '../../core/ratings/rating';
-import { injuryRisk } from '../../core/analysis/risk';
+import { RISK_TIER_RANK, injuryRisk } from '../../core/analysis/risk';
 import { SessionService } from '../../core/auth/session.service';
 import { SyncService } from '../../core/shell/sync.service';
 import { leaders } from '../../core/team/team';
@@ -58,7 +58,7 @@ export class TeamAnalysis implements OnInit {
       { label: 'Torverhältnis', value: `${record.goalsFor}:${record.goalsAgainst}` },
       { label: 'Ø Teamnote', value: gradeLabel(stats.avgGrade) },
       { label: 'Teilnahmequote', value: `${stats.attendanceRate}%` },
-      { label: 'Ø Intensität', value: stats.avgIntensity === null ? '-' : stats.avgIntensity.toFixed(1).replace('.', ',') },
+      { label: 'Ø Anstrengung', value: stats.avgIntensity === null ? '-' : stats.avgIntensity.toFixed(1).replace('.', ',') },
       { label: 'Training BB/GGB', value: `${focus['Eigener Ballbesitz']}/${focus['Gegnerischer Ballbesitz']}` },
       { label: 'Training Umschalten', value: String(focus['Umschalten']) },
       { label: 'Geburten Q1/Q2', value: `${quarters.Q1}/${quarters.Q2}` },
@@ -73,7 +73,8 @@ export class TeamAnalysis implements OnInit {
     return this.team
       .data()
       .map(({ player, items, absences, measurements }) => ({ player, risk: injuryRisk(player, items, absences, measurements, now) }))
-      .sort((a, b) => b.risk.percentage - a.risk.percentage)
+      .filter((entry) => entry.risk.tier !== 'unauffaellig')
+      .sort((a, b) => RISK_TIER_RANK[b.risk.tier] - RISK_TIER_RANK[a.risk.tier] || b.risk.load - a.risk.load)
       .slice(0, 3);
   });
 
