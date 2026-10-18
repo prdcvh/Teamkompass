@@ -62,6 +62,7 @@ export class FakePlanningApi implements Pick<PlanningApi, keyof PlanningApi> {
   async markSkipped(seriesId: string, date: string): Promise<void> {
     this.calls.push(`markSkipped:${seriesId}:${date}`);
     if (this.skipError) throw this.skipError;
+    if (this.series[seriesId] === undefined) return; // wie die echte API: ohne Serie kein Merker (SCRUM-161)
     this.doc = { ...this.doc, skipped: { ...this.skipped, [seriesId]: { ...this.skipped[seriesId], [date]: true } } };
     this.emit();
   }

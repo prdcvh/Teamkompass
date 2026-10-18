@@ -1,11 +1,11 @@
 import type { Player } from '../player/player';
 import { BLANK_RATING, type Rating } from '../ratings/rating';
 import type { Absence } from './absence';
-import { autoAbsenceRating, effectiveStatus, unavailabilityReason } from './availability';
+import { OPEN_INJURY_REASON, autoAbsenceRating, effectiveStatus, keepPastOpenInjury, unavailabilityReason } from './availability';
 
 describe('Verfügbarkeit', () => {
   const player = (overrides: Partial<Player> = {}): Player => ({
-    id: 'p1', name: 'Test', positions: ['ST'], number: 9, birthdate: '2012-01-01', status: 'Fit', injuryUntil: '', consentStatus: 'granted', consentDate: '', ...overrides,
+    id: 'p1', name: 'Test', positions: ['ST'], number: 9, birthdate: '2012-01-01', status: 'Fit', injuryUntil: '', injuredSince: '', consentStatus: 'granted', consentDate: '', ...overrides,
   });
   const absence = (overrides: Partial<Absence> = {}): Absence => ({ id: 'a1', kind: 'absence', label: 'Urlaub', detail: '', from: '2026-10-05', to: '2026-10-12', ...overrides });
 
@@ -15,6 +15,27 @@ describe('Verfügbarkeit', () => {
     expect(unavailabilityReason(player(), [absence()], '2026-10-06')).toBe('Urlaub (bis 12.10.2026)');
     expect(unavailabilityReason(player(), [absence({ kind: 'injury', label: 'Verletzung', to: '' })], '2026-10-06')).toBe('Verletzung (Ende offen)');
     expect(unavailabilityReason(player(), [], '2026-10-06')).toBeNull();
+  });
+
+  it('Status „Verletzt“ ohne Datum gilt ab dem Tag, an dem er gesetzt wurde, bis auf Weiteres (SCRUM-164)', () => {
+    const injured = player({ status: 'Verletzt', injuryUntil: '', injuredSince: '2026-10-17' });
+    expect(unavailabilityReason(injured, [], '2026-10-17')).toBe(OPEN_INJURY_REASON);
+    expect(unavailabilityReason(injured, [], '2027-03-01')).toBe('Verletzt (bis auf Weiteres)');
+    expect(unavailabilityReason(injured, [], '2026-10-16')).toBeNull(); // vergangene Termine bleiben
+    // Ältere Daten ohne „verletzt seit“: kein Startdatum bekannt, deshalb nichts vorbelegen.
+    expect(unavailabilityReason(player({ status: 'Verletzt', injuryUntil: '' }), [], '2026-10-20')).toBeNull();
+    // Ein anderer Status mit übrig gebliebenem Datum zählt nicht.
+    expect(unavailabilityReason(player({ status: 'Fit', injuredSince: '2026-10-17' }), [], '2026-10-20')).toBeNull();
+    // Mit „ca. verletzt bis“ gilt weiter dieses Datum.
+    expect(unavailabilityReason(player({ status: 'Verletzt', injuryUntil: '2026-10-20', injuredSince: '2026-10-17' }), [], '2026-10-25')).toBeNull();
+  });
+
+  it('Status „Verletzt“ ohne Datum zurückgenommen: vergangenes „Fehlt“ bleibt dauerhaft stehen', () => {
+    const auto: Rating = { ...BLANK_RATING, attendance: 'absent', note: OPEN_INJURY_REASON, autoAbsence: true };
+    expect(keepPastOpenInjury(auto)).toEqual({ ...auto, autoAbsence: false });
+    expect(keepPastOpenInjury({ ...auto, note: 'Urlaub (bis 12.10.2026)' })).toBeNull(); // andere Gründe: unverändert
+    expect(keepPastOpenInjury({ ...auto, autoAbsence: false })).toBeNull();
+    expect(keepPastOpenInjury(null)).toBeNull();
   });
 
   it('Anzeige-Status: laufende Abwesenheit überlagert den Status', () => {

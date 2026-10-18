@@ -640,7 +640,7 @@ test("Gelöschte oder verkürzte Abwesenheit setzt automatisch gesetzte „Fehlt
       selectedEventId: "e1"
     };
     const context = { state, persist: () => {}, cloudSaveRating: (...args) => saved.push(args), renderEvents: () => {} };
-    const fns = loadFunctions(source, ["roundGrade", "calculatedGrade", "normalizeRating", "blankRating", "hasRatingData", "formatDate", "isInjuryAbsence", "absenceTitle", "absenceCoversDate", "activeAbsenceOn", "unavailabilityReason", "applyAutoAbsence", "reconcileAbsences", "selectedEvent", "updateRating"], context);
+    const fns = loadFunctions(source, ["roundGrade", "calculatedGrade", "normalizeRating", "blankRating", "hasRatingData", "formatDate", "isInjuryAbsence", "absenceTitle", "absenceCoversDate", "activeAbsenceOn", "isOpenInjury", "unavailabilityReason", "applyAutoAbsence", "reconcileAbsences", "selectedEvent", "updateRating"], context);
     const attendance = () => state.events.map((event) => event.ratings.p1?.attendance || "open").join(",");
 
     fns.reconcileAbsences();

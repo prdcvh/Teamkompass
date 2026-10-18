@@ -41,11 +41,22 @@ export class PlanningApi {
     await setDoc(doc(db, 'teams', environment.teamId, 'meta', 'planning'), { series: { [id]: deleteField() }, skipped: { [id]: deleteField() } }, { merge: true });
   }
 
-  /** Merkt, dass das Serien-Training dieses Tages von Hand gelöscht wurde und nicht neu entstehen soll. */
+  /**
+   * Merkt, dass das Serien-Training dieses Tages von Hand gelöscht wurde und nicht neu entstehen soll. Nur, wenn die Serie
+   * noch existiert (SCRUM-161): Bleibt nach dem Löschen einer Serie ein Termin übrig, soll sein Löschen keinen Merker
+   * ohne Serie im Dokument zurücklassen. Lässt sich die Serie nicht nachsehen (z. B. offline ohne Zwischenspeicher),
+   * wird der Merker vorsichtshalber gesetzt.
+   */
   async markSkipped(seriesId: string, date: string): Promise<void> {
     const { db } = await this.connection.get();
-    const { doc, setDoc } = await import('firebase/firestore');
-    await setDoc(doc(db, 'teams', environment.teamId, 'meta', 'planning'), { skipped: { [seriesId]: { [date]: true } } }, { merge: true });
+    const { doc, getDoc, setDoc } = await import('firebase/firestore');
+    const ref = doc(db, 'teams', environment.teamId, 'meta', 'planning');
+    const seriesExists = await getDoc(ref).then(
+      (snapshot) => (snapshot.get(`series.${seriesId}`) ?? null) !== null,
+      () => true,
+    );
+    if (!seriesExists) return;
+    await setDoc(ref, { skipped: { [seriesId]: { [date]: true } } }, { merge: true });
   }
 
   /** Beobachtet das Pausen-Dokument `meta/breaks` (lesbar für alle Teammitglieder). */

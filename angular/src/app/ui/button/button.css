@@ -48,8 +48,11 @@
   pointer-events: none;
 }
 
+/* Touch-Geräte: auch die kleine Größe (sm) braucht mindestens 44 px (SCRUM-158).
+   Die sm-Regel oben ist spezifischer als :host allein, deshalb eigener Selektor. */
 @media (pointer: coarse) {
-  :host {
+  :host,
+  :host([data-size='sm']) {
     min-height: var(--tk-touch);
   }
 }
