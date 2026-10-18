@@ -2664,8 +2664,10 @@ function assessLoad({ sessions = [], measurements = [], lastInjuryEnd = null, la
     hints.push({ label: "Zwei sehr harte Einheiten innerhalb von 48 Stunden", weight: 1 });
   }
 
-  if (measurements.length >= 2) {
-    const [prev, last] = measurements.slice(-2);
+  // SCRUM-157: nur Messungen der letzten ca. 3 Monate (90 Tage) zaehlen, sonst bleibt ein alter Schub ewig stehen.
+  const recentMeasurements = measurements.filter((item) => daysBetween(new Date(`${item.date}T00:00:00`), today) <= 90);
+  if (recentMeasurements.length >= 2) {
+    const [prev, last] = recentMeasurements.slice(-2);
     const months = daysBetween(new Date(`${prev.date}T00:00:00`), new Date(`${last.date}T00:00:00`)) / 30;
     const growth = months > 0 ? (Number(last.height) - Number(prev.height)) / months : 0;
     const text = roundGrade(growth).toFixed(1).replace(".", ",");
