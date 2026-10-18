@@ -2664,8 +2664,10 @@ function assessLoad({ sessions = [], measurements = [], lastInjuryEnd = null, la
     hints.push({ label: "Zwei sehr harte Einheiten innerhalb von 48 Stunden", weight: 1 });
   }
 
-  if (measurements.length >= 2) {
-    const [prev, last] = measurements.slice(-2);
+  // SCRUM-157: nur Messungen der letzten ca. 3 Monate (90 Tage) zaehlen, sonst bleibt ein alter Schub ewig stehen.
+  const recentMeasurements = measurements.filter((item) => daysBetween(new Date(`${item.date}T00:00:00`), today) <= 90);
+  if (recentMeasurements.length >= 2) {
+    const [prev, last] = recentMeasurements.slice(-2);
     const months = daysBetween(new Date(`${prev.date}T00:00:00`), new Date(`${last.date}T00:00:00`)) / 30;
     const growth = months > 0 ? (Number(last.height) - Number(prev.height)) / months : 0;
     const text = roundGrade(growth).toFixed(1).replace(".", ",");
@@ -2770,6 +2772,7 @@ function formatDate(value) {
   return new Date(`${value}T00:00:00`).toLocaleDateString("de-DE");
 }
 
+// AVAILABILITY START (Verfuegbarkeit + automatisches "Fehlt", getestet in tests/availability.test.mjs)
 // Ein offenes Enddatum ist nur bei Verletzungen zulaessig - dort steht die Rueckkehr
 // am Anfang haeufig noch nicht fest, der Eintrag laeuft dann bis er beendet wird.
 // Bei allen anderen Gruenden ist "Bis" Pflicht, ein Eintrag ohne Ende bleibt wirkungslos.
@@ -2788,11 +2791,27 @@ function activeAbsenceOn(playerId, dateStr) {
 // Verletzung (Status "Verletzt" + "ca. verletzt bis") und eingetragene Abwesenheiten
 // (Verletzung, Urlaub, Klassenfahrt etc.) fuehren beide dazu, dass ein Spieler fuer Events in
 // diesem Zeitraum automatisch als "Fehlt" vorbelegt wird - siehe applyAutoAbsence/reconcileAbsences.
+// Status "Verletzt" ohne "ca. verletzt bis" (SCRUM-164): gilt ab dem Tag, an dem er gesetzt
+// wurde (injuredSince), bis auf Weiteres - also fuer alle Termine ab diesem Tag.
+const OPEN_INJURY_REASON = "Verletzt (bis auf Weiteres)";
+
+function isOpenInjury(player) {
+  return player?.status === "Verletzt" && !player.injuryUntil;
+}
+
+// "Verletzt seit": bleibt der Spieler verletzt, gilt der bisherige Tag weiter; wird er neu auf
+// "Verletzt" gesetzt (oder fehlt der Tag bei aelteren Daten), gilt heute. Sonst leer.
+function injuredSinceFor(status, previous, today) {
+  if (status !== "Verletzt") return "";
+  return previous?.status === "Verletzt" && previous.injuredSince ? previous.injuredSince : today;
+}
+
 function unavailabilityReason(player, dateStr) {
   if (!player || !dateStr) return null;
   if (player.status === "Verletzt" && player.injuryUntil && dateStr <= player.injuryUntil) {
     return `Verletzt (ca. bis ${formatDate(player.injuryUntil)})`;
   }
+  if (isOpenInjury(player) && player.injuredSince && dateStr >= player.injuredSince) return OPEN_INJURY_REASON;
   const absence = activeAbsenceOn(player.id, dateStr);
   if (!absence) return null;
   return `${absenceTitle(absence)} (${absence.to ? `bis ${formatDate(absence.to)}` : "Ende offen"})`;
@@ -2826,10 +2845,22 @@ function blankRating() {
 //   weitere Eingabe). Eine manuell gesetzte Anwesenheit sowie Teilnoten/Notizen bleiben unangetastet.
 // - Rueckwaerts: nur Eintraege mit autoAbsence-Markierung. Die Markierung faellt weg, sobald
 //   jemand das Rating von Hand aendert (updateRating) - dann bleibt es immer stehen.
-function applyAutoAbsence(event) {
+// options (SCRUM-164, nur fuer den geaenderten Spieler options.playerId): Termine vor
+// options.pastBefore werden nicht angefasst ("Verletzt" ohne Datum wirkt nur nach vorn). Mit
+// options.keepPastOpenInjury (Status "Verletzt" ohne Datum zurueckgenommen) bleibt das vergangene,
+// automatisch gesetzte "Fehlt" dauerhaft stehen: die Markierung faellt weg wie bei Handeingabe.
+function applyAutoAbsence(event, options = {}) {
   let changed = false;
   state.players.forEach((player) => {
     const existing = event.ratings?.[player.id];
+    if (options.playerId === player.id && options.pastBefore && event.date && event.date < options.pastBefore) {
+      if (options.keepPastOpenInjury && existing?.autoAbsence && existing.note === OPEN_INJURY_REASON) {
+        event.ratings[player.id] = { ...existing, autoAbsence: false };
+        cloudSaveRating(event.id, player.id, event.ratings[player.id]);
+        changed = true;
+      }
+      return;
+    }
     const reason = unavailabilityReason(player, event.date);
     if (existing?.autoAbsence) {
       if (reason && existing.note === reason) return;
@@ -2851,11 +2882,12 @@ function applyAutoAbsence(event) {
   return changed;
 }
 
-function reconcileAbsences() {
+function reconcileAbsences(options = {}) {
   let changed = false;
-  state.events.forEach((event) => { if (applyAutoAbsence(event)) changed = true; });
+  state.events.forEach((event) => { if (applyAutoAbsence(event, options)) changed = true; });
   if (changed) persist();
 }
+// AVAILABILITY END
 
 function ageFromBirthdate(value) {
   if (!value) return null;
@@ -4007,12 +4039,18 @@ function savePlayer(event) {
     consentDate: $("#playerConsentDate").value
   };
   const existingIndex = state.players.findIndex((item) => item.id === id);
+  const previous = existingIndex >= 0 ? state.players[existingIndex] : null;
+  const today = localIsoDate();
+  player.injuredSince = injuredSinceFor(player.status, previous, today);
   if (existingIndex >= 0) state.players[existingIndex] = player;
   else state.players.push(player);
   $("#playerDialog").close();
   persist();
   cloudSavePlayer(player);
-  reconcileAbsences();
+  // "Verletzt" ohne Datum wirkt nur ab heute; wird es zurueckgenommen, bleibt vergangenes "Fehlt" (SCRUM-164).
+  const wasOpen = isOpenInjury(previous);
+  const open = isOpenInjury(player);
+  reconcileAbsences(wasOpen || open ? { playerId: id, pastBefore: today, keepPastOpenInjury: wasOpen && !open } : {});
   renderAll();
 }
 

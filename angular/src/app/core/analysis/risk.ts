@@ -128,8 +128,8 @@ export function injuryRisk(
     hints.push({ label: 'Zwei sehr harte Einheiten innerhalb von 48 Stunden', weight: 1 });
   }
 
-  // Wachstumsschub aus den letzten beiden Körpermessungen.
-  const sorted = sortedMeasurements(measurements);
+  // Wachstumsschub aus den letzten beiden Körpermessungen – nur Messungen der letzten ca. 3 Monate (90 Tage) zählen (SCRUM-157).
+  const sorted = sortedMeasurements(measurements).filter((item) => daysBetween(localMidnight(item.date), today) <= 90);
   if (sorted.length >= 2) {
     const [prev, last] = sorted.slice(-2);
     const months = daysBetween(localMidnight(prev.date), localMidnight(last.date)) / 30;

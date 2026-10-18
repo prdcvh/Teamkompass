@@ -116,6 +116,36 @@ describe('EventsService', () => {
     expect(events.events()).toHaveLength(0);
   });
 
+  it('löscht mit dem Event auch dessen gespeicherte Aufstellung, andere bleiben (SCRUM-128)', async () => {
+    const events = setup();
+    firebase.lineup.lineup = { assignments: { a: 'p1' }, byEvent: { e1: { x: 1 }, e2: { y: 2 } } };
+    events.start();
+    await vi.waitFor(() => expect(events.load()).toBe('ready'));
+    expect(await events.remove('e1')).toBe(true);
+    expect(firebase.lineup.lineup).toEqual({ assignments: { a: 'p1' }, byEvent: { e2: { y: 2 } } });
+  });
+
+  it('löscht die Aufstellung nicht, wenn das Event nicht gelöscht werden konnte (SCRUM-128)', async () => {
+    const events = setup();
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    firebase.lineup.lineup = { byEvent: { e1: { x: 1 } } };
+    events.start();
+    await vi.waitFor(() => expect(events.load()).toBe('ready'));
+    firebase.events.deleteEventError = { code: 'unavailable' };
+    expect(await events.remove('e1')).toBe(false);
+    expect(firebase.lineup.lineup).toEqual({ byEvent: { e1: { x: 1 } } });
+  });
+
+  it('meldet, wenn die Aufstellung nicht gelöscht werden konnte (SCRUM-128)', async () => {
+    const events = setup();
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    events.start();
+    await vi.waitFor(() => expect(events.load()).toBe('ready'));
+    firebase.lineup.deleteEventLineupError = { code: 'unavailable' };
+    expect(await events.remove('e1')).toBe(false);
+    expect(TestBed.inject(SyncService).state()).toBe('error');
+  });
+
   it('verwirft Daten und Abo beim Abmelden', async () => {
     const events = setup();
     events.start();
@@ -151,6 +181,17 @@ describe('EventsService', () => {
       expect(rating?.['autoAbsence']).toBe(true);
       expect(String(rating?.['note'])).toContain('Urlaub');
       expect(firebase.ratings.ratings.get(eventId)?.has('p2')).toBe(false);
+    });
+
+    it('belegt ein später angelegtes Event auch für „Verletzt“ ohne Datum vor (SCRUM-164)', async () => {
+      const events = await ready();
+      firebase.players.players.set('p2', { name: 'Ben', positions: ['IV'], number: 4, birthdate: '2012-06-06', status: 'Verletzt', injuryUntil: '', injuredSince: '2026-10-01' });
+      firebase.players.emitPlayers();
+      events.save(draft({ date: '2026-12-01' }));
+      await vi.waitFor(() => expect(saved()).toHaveLength(1));
+      const eventId = [...firebase.events.events.keys()].find((id) => id !== 'e1')!;
+      expect(firebase.ratings.ratings.get(eventId)?.get('p2')).toMatchObject({ attendance: 'absent', autoAbsence: true, note: 'Verletzt (bis auf Weiteres)' });
+      expect(firebase.ratings.ratings.get(eventId)?.has('p1')).toBe(false); // Urlaub endet am 20.10.
     });
 
     it('prüft bei geändertem Datum erneut, bei gleichem Datum nicht', async () => {

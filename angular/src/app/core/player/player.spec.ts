@@ -1,4 +1,4 @@
-import { type Player, type PlayerDraft, consentRevokedMessage, isConsentRevoked, docFromPlayer, draftFromPlayer, emptyDraft, nextFreeNumber, parsePositions, playerFromDoc, playerFromDraft, validateDraft } from './player';
+import { type Player, type PlayerDraft, consentRevokedMessage, isConsentRevoked, docFromPlayer, draftFromPlayer, emptyDraft, injuredSinceFor, nextFreeNumber, parsePositions, playerFromDoc, playerFromDraft, validateDraft } from './player';
 
 const NOW = new Date(2026, 9, 2); // 2. Oktober 2026
 
@@ -10,6 +10,7 @@ function player(overrides: Partial<Player> & { id: string }): Player {
     birthdate: '2012-03-12',
     status: 'Fit',
     injuryUntil: '',
+    injuredSince: '',
     consentStatus: 'pending',
     consentDate: '',
     ...overrides,
@@ -84,9 +85,9 @@ describe('Spieler-Logik', () => {
     });
 
     it('schreibt dieselben Felder wie die bisherige App und liest sie zurück', () => {
-      const original = player({ id: 'a', positions: ['IV', 'LV'], status: 'Verletzt', injuryUntil: '2026-12-01', consentStatus: 'granted', consentDate: '2026-08-01' });
+      const original = player({ id: 'a', positions: ['IV', 'LV'], status: 'Verletzt', injuryUntil: '2026-12-01', injuredSince: '2026-10-01', consentStatus: 'granted', consentDate: '2026-08-01' });
       const doc = docFromPlayer(original);
-      expect(Object.keys(doc).sort()).toEqual(['birthdate', 'consentDate', 'consentStatus', 'id', 'injuryUntil', 'name', 'number', 'positions', 'status']);
+      expect(Object.keys(doc).sort()).toEqual(['birthdate', 'consentDate', 'consentStatus', 'id', 'injuredSince', 'injuryUntil', 'name', 'number', 'positions', 'status']);
       expect(playerFromDoc('a', doc, NOW)).toEqual(original);
     });
 
@@ -107,5 +108,28 @@ describe('Einwilligung (SCRUM-51)', () => {
 
   it('nennt den Spieler in der Warnung', () => {
     expect(consentRevokedMessage('Ali Adler')).toContain('Ali Adler');
+  });
+
+  describe('„Verletzt seit“ (SCRUM-164)', () => {
+    const draftOf = (status: PlayerDraft['status'], injuryUntil = '') => ({ ...draftFromPlayer(player({ id: 'a' })), status, injuryUntil });
+    const now = new Date('2026-10-17T10:00:00');
+
+    it('merkt sich beim Setzen auf „Verletzt“ den heutigen Tag', () => {
+      expect(injuredSinceFor('Verletzt', null, '2026-10-17')).toBe('2026-10-17');
+      expect(playerFromDraft(draftOf('Verletzt'), 'a', player({ id: 'a' }), now).injuredSince).toBe('2026-10-17');
+    });
+
+    it('behält den Tag, solange der Spieler verletzt bleibt (auch wenn ein Datum dazukommt)', () => {
+      const previous = player({ id: 'a', status: 'Verletzt', injuredSince: '2026-10-01' });
+      expect(playerFromDraft(draftOf('Verletzt', '2026-11-01'), 'a', previous, now).injuredSince).toBe('2026-10-01');
+      // Ältere Daten ohne Tag: ab heute.
+      expect(playerFromDraft(draftOf('Verletzt'), 'a', player({ id: 'a', status: 'Verletzt' }), now).injuredSince).toBe('2026-10-17');
+    });
+
+    it('leert den Tag bei jedem anderen Status', () => {
+      const previous = player({ id: 'a', status: 'Verletzt', injuredSince: '2026-10-01' });
+      expect(playerFromDraft(draftOf('Fit'), 'a', previous, now).injuredSince).toBe('');
+      expect(playerFromDoc('a', { name: 'X', status: 'Fit', injuredSince: '2026-10-01' }).injuredSince).toBe('');
+    });
   });
 });
