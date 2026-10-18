@@ -39,7 +39,7 @@
       <p class="muted" role="status">Zugänge werden geladen …</p>
     } @else if (tabRows().length === 0) {
       <tk-card>
-        <div class="empty" id="access-panel" role="tabpanel">
+        <div class="empty" id="access-panel" role="tabpanel" [attr.aria-labelledby]="'access-tab-' + tab()">
           @if (tab() === 'players') {
             <p>Noch keine Spieler-Zugänge vergeben.</p>
             <button tkButton variant="primary" type="button" [disabled]="squad.load() !== 'ready'" (click)="inviteOpen.set(true)">+ Zugang erzeugen</button>
