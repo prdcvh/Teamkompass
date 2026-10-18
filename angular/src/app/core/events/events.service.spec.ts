@@ -116,6 +116,36 @@ describe('EventsService', () => {
     expect(events.events()).toHaveLength(0);
   });
 
+  it('löscht mit dem Event auch dessen gespeicherte Aufstellung, andere bleiben (SCRUM-128)', async () => {
+    const events = setup();
+    firebase.lineup.lineup = { assignments: { a: 'p1' }, byEvent: { e1: { x: 1 }, e2: { y: 2 } } };
+    events.start();
+    await vi.waitFor(() => expect(events.load()).toBe('ready'));
+    expect(await events.remove('e1')).toBe(true);
+    expect(firebase.lineup.lineup).toEqual({ assignments: { a: 'p1' }, byEvent: { e2: { y: 2 } } });
+  });
+
+  it('löscht die Aufstellung nicht, wenn das Event nicht gelöscht werden konnte (SCRUM-128)', async () => {
+    const events = setup();
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    firebase.lineup.lineup = { byEvent: { e1: { x: 1 } } };
+    events.start();
+    await vi.waitFor(() => expect(events.load()).toBe('ready'));
+    firebase.events.deleteEventError = { code: 'unavailable' };
+    expect(await events.remove('e1')).toBe(false);
+    expect(firebase.lineup.lineup).toEqual({ byEvent: { e1: { x: 1 } } });
+  });
+
+  it('meldet, wenn die Aufstellung nicht gelöscht werden konnte (SCRUM-128)', async () => {
+    const events = setup();
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    events.start();
+    await vi.waitFor(() => expect(events.load()).toBe('ready'));
+    firebase.lineup.deleteEventLineupError = { code: 'unavailable' };
+    expect(await events.remove('e1')).toBe(false);
+    expect(TestBed.inject(SyncService).state()).toBe('error');
+  });
+
   it('verwirft Daten und Abo beim Abmelden', async () => {
     const events = setup();
     events.start();

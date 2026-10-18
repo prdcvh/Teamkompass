@@ -43,4 +43,18 @@ export class LineupApi {
     const { doc, setDoc } = await import('firebase/firestore');
     await setDoc(doc(db, 'teams', environment.teamId, 'meta', 'lineup'), { byEvent: { [eventId]: entry } }, { merge: true });
   }
+
+  /**
+   * Entfernt die Aufstellung eines Spiels (`byEvent.<id>`) – wie die Live-App (cloudDeleteEventLineup). Gibt es das
+   * Dokument noch gar nicht, ist nichts zu löschen (kein Fehler).
+   */
+  async deleteEventLineup(eventId: string): Promise<void> {
+    const { db } = await this.connection.get();
+    const { doc, updateDoc, deleteField } = await import('firebase/firestore');
+    try {
+      await updateDoc(doc(db, 'teams', environment.teamId, 'meta', 'lineup'), { [`byEvent.${eventId}`]: deleteField() });
+    } catch (error) {
+      if ((error as { code?: string } | null)?.code !== 'not-found') throw error;
+    }
+  }
 }
