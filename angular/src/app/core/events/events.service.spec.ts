@@ -153,6 +153,17 @@ describe('EventsService', () => {
       expect(firebase.ratings.ratings.get(eventId)?.has('p2')).toBe(false);
     });
 
+    it('belegt ein später angelegtes Event auch für „Verletzt“ ohne Datum vor (SCRUM-164)', async () => {
+      const events = await ready();
+      firebase.players.players.set('p2', { name: 'Ben', positions: ['IV'], number: 4, birthdate: '2012-06-06', status: 'Verletzt', injuryUntil: '', injuredSince: '2026-10-01' });
+      firebase.players.emitPlayers();
+      events.save(draft({ date: '2026-12-01' }));
+      await vi.waitFor(() => expect(saved()).toHaveLength(1));
+      const eventId = [...firebase.events.events.keys()].find((id) => id !== 'e1')!;
+      expect(firebase.ratings.ratings.get(eventId)?.get('p2')).toMatchObject({ attendance: 'absent', autoAbsence: true, note: 'Verletzt (bis auf Weiteres)' });
+      expect(firebase.ratings.ratings.get(eventId)?.has('p1')).toBe(false); // Urlaub endet am 20.10.
+    });
+
     it('prüft bei geändertem Datum erneut, bei gleichem Datum nicht', async () => {
       const events = await ready();
       events.save(draft({ id: 'e1', date: '2026-10-05', title: 'Training Mo' })); // gleiches Datum

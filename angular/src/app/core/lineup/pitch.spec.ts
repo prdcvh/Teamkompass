@@ -10,6 +10,7 @@ const player = (id: string, number: number, positions: string[]): Player => ({
   birthdate: '2012-01-01',
   status: 'Fit',
   injuryUntil: '',
+  injuredSince: '',
   consentStatus: 'pending',
   consentDate: '',
 });

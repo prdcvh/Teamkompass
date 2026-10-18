@@ -49,6 +49,7 @@ const player = (id: string, birthdate: string, positions: string[]): Player => (
   birthdate,
   status: 'Fit',
   injuryUntil: '',
+  injuredSince: '',
   consentStatus: 'pending',
   consentDate: '',
 });

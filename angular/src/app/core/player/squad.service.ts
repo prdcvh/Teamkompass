@@ -5,6 +5,8 @@ import { PlayersApi } from '../firebase/players.api';
 import type { SnapshotMeta } from '../firebase/types';
 import { type Player, type PlayerDraft, type PlayerErrors, playerFromDoc, playerFromDraft, docFromPlayer, validateDraft } from './player';
 import { EventsService } from '../events/events.service';
+import { isOpenInjury } from '../records/availability';
+import { todayIso } from '../shared/dates';
 import { SessionService } from '../auth/session.service';
 import { SyncService } from '../shell/sync.service';
 
@@ -32,6 +34,7 @@ export class SquadService {
   readonly canEdit = computed(() => this.canWrite() && this.load() === 'ready');
 
   private unsubscribe: (() => void) | null = null;
+  private waiters: (() => void)[] = [];
   /** Erhöht bei jedem start/stop, damit ein spät eintreffendes Abo eines alten Laufs verworfen wird. */
   private generation = 0;
 
@@ -56,6 +59,7 @@ export class SquadService {
       if (generation !== this.generation) return;
       this.players.set(players);
       this.load.set('ready');
+      this.flushWaiters();
       this.sync.applySnapshot(meta);
     };
     const onError = (error: unknown) => {
@@ -89,6 +93,20 @@ export class SquadService {
     this.load.set('idle');
     this.error.set('');
     this.sync.reset();
+    this.flushWaiters();
+  }
+
+  /** Startet das Abo (falls nötig) und liefert die Spieler, sobald sie geladen sind; bei Fehler oder Abbruch leer. */
+  async whenLoaded(): Promise<readonly Player[]> {
+    this.start();
+    if (this.load() === 'loading') await new Promise<void>((resolve) => this.waiters.push(resolve));
+    return this.load() === 'ready' ? this.players() : [];
+  }
+
+  private flushWaiters(): void {
+    const waiting = this.waiters;
+    this.waiters = [];
+    waiting.forEach((resolve) => resolve());
   }
 
   /**
@@ -102,19 +120,25 @@ export class SquadService {
     const errors = validateDraft(draft, this.players());
     if (Object.keys(errors).length > 0) return errors;
     const id = draft.id ?? `p${crypto.randomUUID()}`;
-    const player = playerFromDraft(draft, id);
     const previous = this.players().find((entry) => entry.id === id);
+    const now = new Date();
+    const today = todayIso(now);
+    const player = playerFromDraft(draft, id, previous ?? null, now);
     if (!this.sync.isFailed()) this.sync.state.set('syncing');
     void this.playersApi
       .savePlayer(id, docFromPlayer(player))
       .then(() => this.sync.clearError())
-      // Status oder „verletzt bis“ geändert: Events dieses Spielers automatisch abgleichen (SCRUM-80).
+      // Status, „verletzt bis“ oder „verletzt seit“ geändert: Events dieses Spielers automatisch abgleichen (SCRUM-80).
+      // Der Status „Verletzt“ ohne Datum wirkt nur ab heute; vergangene Termine behalten ihr „Fehlt“ (SCRUM-164).
       .then(async () => {
-        const injured = player.status === 'Verletzt' && player.injuryUntil !== '';
-        const changed = previous ? previous.status !== player.status || previous.injuryUntil !== player.injuryUntil : injured;
+        const changed = previous
+          ? previous.status !== player.status || previous.injuryUntil !== player.injuryUntil || previous.injuredSince !== player.injuredSince
+          : player.status === 'Verletzt';
         if (!changed) return;
+        const wasOpen = isOpenInjury(previous);
+        const open = isOpenInjury(player);
         const events = await this.injector.get(EventsService).whenLoaded();
-        await this.absences.reconcilePlayer(player, events);
+        await this.absences.reconcilePlayer(player, events, wasOpen || open ? { pastBefore: today, keepPastOpenInjury: wasOpen && !open } : {});
       })
       .catch((error) => this.failWrite(error, `„${player.name}“ konnte nicht gespeichert werden.`));
     return {};
@@ -139,6 +163,7 @@ export class SquadService {
     this.unsubscribe?.();
     this.unsubscribe = null; // erlaubt „Erneut versuchen“
     this.load.set('error');
+    this.flushWaiters();
     this.error.set(`Der Kader konnte nicht geladen werden. ${authErrorMessage(errorCode(error))}`);
     this.sync.fail('Laden fehlgeschlagen');
   }

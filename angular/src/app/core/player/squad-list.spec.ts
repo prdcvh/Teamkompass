@@ -1,5 +1,5 @@
 import type { Player } from './player';
-import { filterPlayers, groupByLine, sortPlayers, statusCounts } from './squad-list';
+import { type StatusOf, filterPlayers, groupByLine, sortPlayers, statusCounts } from './squad-list';
 
 function player(overrides: Partial<Player> & { id: string }): Player {
   return {
@@ -9,6 +9,7 @@ function player(overrides: Partial<Player> & { id: string }): Player {
     birthdate: '2012-03-12',
     status: 'Fit',
     injuryUntil: '',
+    injuredSince: '',
     consentStatus: 'pending',
     consentDate: '',
     ...overrides,
@@ -51,7 +52,7 @@ describe('Kaderliste: Filter und Sortierung', () => {
   });
 
   it('zählt Status und gruppiert nach Mannschaftsteil', () => {
-    expect(statusCounts(squad)).toEqual({ Fit: 1, Angeschlagen: 1, Verletzt: 1, Pause: 0 });
+    expect(statusCounts(squad)).toEqual({ Fit: 1, Angeschlagen: 1, Verletzt: 1, Abwesend: 0, Gesperrt: 0, Pause: 0 });
     const custom = player({ id: 'd', positions: ['Libero'] });
     expect(groupByLine([...squad, custom]).map((g) => [g.title, g.players.map((p) => p.id)])).toEqual([
       ['Tor', ['a']],
@@ -59,5 +60,15 @@ describe('Kaderliste: Filter und Sortierung', () => {
       ['Angriff', ['b']],
       ['Weitere', ['d']],
     ]);
+  });
+
+  it('nutzt den wirksamen Status (laufende Abwesenheit) für Filter, Suche, Sortierung und Zähler (SCRUM-164)', () => {
+    // a ist im Profil als „Fit“ gespeichert, hat aber heute eine Abwesenheit; c ist gesperrt.
+    const statusOf: StatusOf = (p) => (p.id === 'a' ? 'Abwesend' : p.id === 'c' ? 'Gesperrt' : p.status);
+    expect(filterPlayers(squad, { ...none, status: 'Fit' }, statusOf)).toEqual([]);
+    expect(filterPlayers(squad, { ...none, status: 'Abwesend' }, statusOf).map((p) => p.id)).toEqual(['a']);
+    expect(filterPlayers(squad, { ...none, query: 'gesperrt' }, statusOf).map((p) => p.id)).toEqual(['c']);
+    expect(statusCounts(squad, statusOf)).toEqual({ Fit: 0, Angeschlagen: 0, Verletzt: 1, Abwesend: 1, Gesperrt: 1, Pause: 0 });
+    expect(sortPlayers(squad, 'status', statusOf).map((p) => p.id)).toEqual(['a', 'c', 'b']);
   });
 });

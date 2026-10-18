@@ -25,11 +25,10 @@
   } @else if (squad.load() !== 'ready') {
     <p class="muted" role="status">Kader wird geladen …</p>
   } @else {
-    <section class="metrics" aria-label="Verfügbarkeit">
-      <div><span class="count">{{ counts().Fit }}</span><span class="label"><span class="dot" data-tone="green"></span>Fit</span></div>
-      <div><span class="count">{{ counts().Angeschlagen }}</span><span class="label"><span class="dot" data-tone="amber"></span>Angeschlagen</span></div>
-      <div><span class="count">{{ counts().Verletzt }}</span><span class="label"><span class="dot" data-tone="red"></span>Verletzt</span></div>
-      <div><span class="count">{{ counts().Pause }}</span><span class="label"><span class="dot" data-tone="neutral"></span>Pause</span></div>
+    <section class="metrics" aria-label="Verfügbarkeit" [style.--metric-count]="metricColumns()">
+      @for (metric of metrics(); track metric.status) {
+        <div><span class="count">{{ metric.count }}</span><span class="label"><span class="dot" [attr.data-tone]="metric.tone"></span>{{ metric.status }}</span></div>
+      }
     </section>
 
     <div class="filters">
@@ -115,7 +114,7 @@
                     <strong>{{ player.name }}</strong>
                     <small>{{ positionText(player) }} · {{ age(player) }} J.@if (injuryNote(player); as note) { · {{ note }}}</small>
                   </span>
-                  <tk-status [label]="player.status" />
+                  <tk-status [label]="statusOf(player)" />
                 </button>
               </li>
             }
@@ -145,7 +144,7 @@
                   <td>{{ positionText(player) }}</td>
                   <td>{{ age(player) }}</td>
                   <td>
-                    <tk-status [label]="player.status" />
+                    <tk-status [label]="statusOf(player)" />
                     @if (injuryNote(player); as note) {
                       <small class="note">{{ note }}</small>
                     }
