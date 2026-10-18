@@ -1,0 +1,26 @@
+<ol class="board" [attr.data-variant]="mobile() ? 'mobile' : 'desktop'">
+  @for (entry of entries(); track entry.player.id; let i = $index) {
+    <li [class.top]="i === 0">
+      <span class="rank">{{ i + 1 }}</span>
+      <span class="avatar" aria-hidden="true">{{ entry.initials }}</span>
+      <span class="who">
+        <a class="player-link" [routerLink]="['/profile', entry.player.id]">{{ entry.player.name }}</a>
+        <span class="muted">{{ entry.events }} {{ entry.events === 1 ? 'Einsatz' : 'Einsätze' }}</span>
+      </span>
+      <svg class="spark" [attr.viewBox]="'0 0 ' + entry.spark.width + ' ' + entry.spark.height" role="img" [attr.aria-label]="'Letzte Noten: ' + entry.spark.label">
+        <line class="base" x1="0" [attr.y1]="entry.spark.height / 2" [attr.x2]="entry.spark.width" [attr.y2]="entry.spark.height / 2" />
+        <path [attr.d]="entry.spark.path" />
+        @if (entry.spark.last; as last) {
+          <circle [attr.cx]="last.x" [attr.cy]="last.y" r="3" />
+        }
+      </svg>
+      <span class="trend" [attr.data-trend]="entry.trend" [attr.title]="entry.trendText">
+        @if (entry.trend) {
+          <span aria-hidden="true">{{ entry.trend === 'besser' ? '↗' : entry.trend === 'schlechter' ? '↘' : '→' }}</span>
+          <span class="tk-sr-only">{{ entry.trendText }}</span>
+        }
+      </span>
+      <strong class="grade" [attr.data-tone]="entry.tone">Ø {{ numberLabel(entry.grade) }}</strong>
+    </li>
+  }
+</ol>

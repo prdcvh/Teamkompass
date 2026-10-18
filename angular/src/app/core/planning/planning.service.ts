@@ -1,10 +1,13 @@
 import { Injectable, type Signal, computed, effect, inject, signal } from '@angular/core';
 import { authErrorMessage, errorCode } from '../auth/auth-errors';
 import { SessionService } from '../auth/session.service';
-import { docFromEvent } from '../events/event';
+import { docFromEvent, eventFromDoc } from '../events/event';
 import { EventsService } from '../events/events.service';
 import { EventsApi } from '../firebase/events.api';
 import { PlanningApi } from '../firebase/planning.api';
+import type { Player } from '../player/player';
+import { SquadService } from '../player/squad.service';
+import { AbsenceSyncService } from '../records/absence-sync.service';
 import { todayIso } from '../shared/dates';
 import { SyncService } from '../shell/sync.service';
 import { type PlanningBreak } from './breaks';
@@ -42,6 +45,8 @@ export class PlanningService {
   private readonly events = inject(EventsService);
   private readonly eventsApi = inject(EventsApi);
   private readonly breaksStore = inject(BreaksStore);
+  private readonly squad = inject(SquadService);
+  private readonly absenceSync = inject(AbsenceSyncService);
 
   /** Stand des Planungsdokuments (für {@link BreaksService}). */
   readonly stored = signal<Readonly<Record<string, unknown>> | null>(null);
@@ -236,7 +241,11 @@ export class PlanningService {
     const save = (items: typeof creates) => chunks(items).map((chunk) => ({ size: chunk.length, run: () => this.eventsApi.saveEventsBatch(chunk) }));
     const steps = [...save(creates), ...save(updates), ...chunks(removes).map((chunk) => ({ size: chunk.length, run: () => this.eventsApi.deleteEventsBatch(chunk) }))];
     const total = steps.reduce((sum, step) => sum + step.size, 0);
+    // Den Kader schon vorher holen (für das Vorbelegen danach): sein Start setzt den Sync-Status zurück und darf
+    // eine Fehlermeldung des Anlegens nicht überdecken.
+    const players = creates.length > 0 ? this.squad.whenLoaded() : Promise.resolve([]);
     let done = 0;
+    let failure: string | null = null;
     try {
       for (const step of steps) {
         await step.run();
@@ -246,9 +255,20 @@ export class PlanningService {
       console.error(error);
       const reason = authErrorMessage(errorCode(error));
       this.sync.fail(`Nicht alle Termine der Serie konnten geändert werden. ${reason}`);
-      return `Es wurden nur ${done} von ${total} Terminänderungen übernommen. ${retryHint} ${reason}`;
+      failure = `Es wurden nur ${done} von ${total} Terminänderungen übernommen. ${retryHint} ${reason}`;
     }
-    return null;
+    // Die Blöcke zum Anlegen kommen zuerst: die ersten `done` neuen Trainings stehen sicher in der Datenbank.
+    await this.prefillAbsences(creates.slice(0, Math.min(done, creates.length)), await players);
+    return failure;
+  }
+
+  /**
+   * Neu angelegte Serien-Trainings: Spieler mit Abwesenheit oder Verletzung an dem Tag gleich als „Fehlt“ vorbelegen
+   * (SCRUM-159/SCRUM-164). Die Abwesenheiten werden je Spieler nur einmal gelesen.
+   */
+  private async prefillAbsences(created: readonly { readonly id: string; readonly data: Readonly<Record<string, unknown>> }[], players: readonly Player[]): Promise<void> {
+    if (created.length === 0) return;
+    await this.absenceSync.reconcileEvents(created.map((entry) => eventFromDoc(entry.id, entry.data)), players, { fresh: true });
   }
 
   /** Ergebnis in Worten, z. B. „2 Trainings wurden angelegt, 3 Termine wurden angepasst.“ */

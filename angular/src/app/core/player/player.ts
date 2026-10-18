@@ -42,6 +42,11 @@ export interface Player {
   readonly status: PlayerStatus;
   /** „Ca. verletzt bis“ (ISO-Datum), nur bei Status „Verletzt“; sonst leer. */
   readonly injuryUntil: string;
+  /**
+   * Seit wann der Status „Verletzt“ gilt (ISO-Datum, beim Setzen des Status automatisch gemerkt); sonst leer.
+   * Ohne „ca. verletzt bis“ belegt der Status ab diesem Tag alle Termine mit „Fehlt“ vor (SCRUM-164).
+   */
+  readonly injuredSince: string;
   readonly consentStatus: ConsentStatus;
   /** „Dokumentiert am“ (ISO-Datum) oder leer. */
   readonly consentDate: string;
@@ -143,8 +148,17 @@ export function validateDraft(draft: PlayerDraft, others: readonly Player[], now
   return errors;
 }
 
+/**
+ * „Verletzt seit“: bleibt der Spieler verletzt, gilt der bisherige Tag weiter; wird er neu auf „Verletzt“ gesetzt
+ * (oder fehlt der Tag bei älteren Daten), gilt heute. Bei jedem anderen Status leer.
+ */
+export function injuredSinceFor(status: PlayerStatus, previous: Pick<Player, 'status' | 'injuredSince'> | null | undefined, today: string): string {
+  if (status !== 'Verletzt') return '';
+  return previous?.status === 'Verletzt' && previous.injuredSince ? previous.injuredSince : today;
+}
+
 /** Entwurf → Spieler. Setzt voraus, dass `validateDraft` keine Fehler gemeldet hat. */
-export function playerFromDraft(draft: PlayerDraft, id: string): Player {
+export function playerFromDraft(draft: PlayerDraft, id: string, previous: Player | null = null, now: Date = new Date()): Player {
   return {
     id,
     name: draft.name.trim(),
@@ -153,6 +167,7 @@ export function playerFromDraft(draft: PlayerDraft, id: string): Player {
     birthdate: draft.birthdate,
     status: draft.status,
     injuryUntil: draft.status === 'Verletzt' ? draft.injuryUntil : '',
+    injuredSince: injuredSinceFor(draft.status, previous, todayIso(now)),
     consentStatus: draft.consentStatus,
     consentDate: draft.consentDate,
   };
@@ -177,6 +192,7 @@ export function playerFromDoc(id: string, data: Readonly<Record<string, unknown>
     birthdate,
     status,
     injuryUntil: text(data['injuryUntil']),
+    injuredSince: status === 'Verletzt' && isIsoDate(text(data['injuredSince'])) ? text(data['injuredSince']) : '',
     consentStatus: consent,
     consentDate: text(data['consentDate']),
   };
@@ -192,6 +208,7 @@ export function docFromPlayer(player: Player): Record<string, unknown> {
     birthdate: player.birthdate,
     status: player.status,
     injuryUntil: player.injuryUntil,
+    injuredSince: player.injuredSince,
     consentStatus: player.consentStatus,
     consentDate: player.consentDate,
   };

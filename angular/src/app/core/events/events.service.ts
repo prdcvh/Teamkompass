@@ -3,6 +3,7 @@ import { authErrorMessage, errorCode } from '../auth/auth-errors';
 import { type EventDraft, type EventErrors, type TeamEvent, docFromEvent, eventFromDoc, eventFromDraft, validateDraft } from './event';
 import { AbsenceSyncService } from '../records/absence-sync.service';
 import { EventsApi } from '../firebase/events.api';
+import { LineupApi } from '../firebase/lineup.api';
 import { PlanningApi } from '../firebase/planning.api';
 import { parseSeriesEventId } from '../planning/series-events';
 import { SessionService } from '../auth/session.service';
@@ -21,6 +22,7 @@ export type EventsLoad = 'idle' | 'loading' | 'ready' | 'error';
 export class EventsService {
   private readonly eventsApi = inject(EventsApi);
   private readonly planningApi = inject(PlanningApi);
+  private readonly lineupApi = inject(LineupApi);
   private readonly session = inject(SessionService);
   private readonly sync = inject(SyncService);
   private readonly absences = inject(AbsenceSyncService);
@@ -122,7 +124,7 @@ export class EventsService {
     return {};
   }
 
-  /** Löscht das Event (inkl. Bewertungen und internen Notizen). Rückgabe: erfolgreich? */
+  /** Löscht das Event (inkl. Bewertungen, internen Notizen und der gespeicherten Aufstellung). Rückgabe: erfolgreich? */
   async remove(id: string): Promise<boolean> {
     if (!this.canEdit()) return false;
     if (!this.sync.isFailed()) this.sync.state.set('syncing');
@@ -132,6 +134,7 @@ export class EventsService {
       const fromSeries = parseSeriesEventId(id);
       if (fromSeries) await this.planningApi.markSkipped(fromSeries.seriesId, fromSeries.date);
       await this.eventsApi.deleteEvent(id);
+      await this.lineupApi.deleteEventLineup(id); // gespeicherte Aufstellung des Spiels (SCRUM-128)
       this.sync.clearError();
       return true;
     } catch (error) {
