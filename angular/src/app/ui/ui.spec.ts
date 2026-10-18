@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Button } from './button/button';
@@ -72,5 +74,21 @@ describe('Dialog', () => {
     (root.querySelector('.close') as HTMLButtonElement).click();
     expect(fixture.componentInstance.closes).toBe(1);
     expect(root.querySelector('h2')?.textContent).toBe('Titel');
+  });
+});
+
+describe('Button: Touch-Ziele (SCRUM-158)', () => {
+  const css = readFileSync(resolve(process.cwd(), 'src/app/ui/button/button.css'), 'utf8');
+  const coarse = css.slice(css.indexOf('@media (pointer: coarse)'));
+
+  it('Desktop bleibt kompakt: sm 32 px, md 40 px', () => {
+    expect(css).toMatch(/:host\(\[data-size='sm'\]\)\s*\{\s*min-height: 32px;/);
+    expect(css).toMatch(/:host\s*\{[^}]*min-height: 40px;/);
+  });
+
+  it('bei Touch-Zeigern haben md und sm mindestens die Touch-Höhe (44 px)', () => {
+    expect(coarse).toContain("data-size='sm'");
+    expect(coarse).toMatch(/min-height: var\(--tk-touch\);/);
+    expect(readFileSync(resolve(process.cwd(), 'src/styles/tokens.css'), 'utf8')).toMatch(/--tk-touch:\s*44px/);
   });
 });
