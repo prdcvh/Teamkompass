@@ -14,6 +14,7 @@ const player = (id: string, name: string, consentStatus: Player['consentStatus']
   birthdate: '2012-02-05',
   status: 'Fit',
   injuryUntil: '',
+  injuredSince: '',
   consentStatus,
   consentDate: '',
 });

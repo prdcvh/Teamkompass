@@ -66,6 +66,9 @@ function seed(): FakeFirebase {
   fake.lineup.lineup = { assignments: { TW: ['p1'], IV: ['p2', 'p3'] }, byEvent: { e2: { assignments: { TW: ['p1'], IV: ['p2', 'p3'] }, savedAt: '2026-10-09T10:00:00.000Z' } } };
   fake.records.playerRecords.set('p1/developmentPlans', new Map([['dp1', { focus: 'Orientierung und Blickverhalten vor der Ballannahme', goal: 'Blick', status: 'In Arbeit', createdAt: '2026-09-01', selfReflection: '' }]]));
   fake.records.playerRecords.set('p1/absences', new Map([['ab1', { kind: 'absence', label: 'Schule', from: '2026-09-01', to: '2026-09-02' }]]));
+  // Laufende Abwesenheiten (SCRUM-164): der Kader zeigt dafür „Gesperrt“ / „Abwesend“ samt eigener Zähler.
+  fake.records.playerRecords.set('p2/absences', new Map([['ab2', { kind: 'absence', label: 'Sperre', from: '2026-01-01', to: '2099-12-31' }]]));
+  fake.records.playerRecords.set('p6/absences', new Map([['ab3', { kind: 'absence', label: 'Klassenfahrt', from: '2026-01-01', to: '2099-12-31' }]]));
   fake.records.playerRecords.set('p1/measurements', new Map([['me1', { date: '2026-07-01', height: '150', weight: '40' }], ['me2', { date: '2026-09-01', height: '152', weight: '41' }]]));
   fake.planning.doc = {
     series: {
