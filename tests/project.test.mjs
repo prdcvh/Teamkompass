@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import test from "node:test";
 import { collectionKey, mapPath, mapValue, parseArgs } from "../scripts/copy-team-lib.mjs";
@@ -8,9 +8,15 @@ const teams = ["team-manager", "u15", "u17"];
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 const hash = (value) => createHash("sha256").update(value).digest("hex");
 
+const teamNameOf = async (team) => (await read(`outputs/${team}/firebase-config.js`)).match(/teamName:\s*"([^"]+)"/)[1];
+
 test("alle Team-Instanzen verwenden dieselbe App-Basis", async () => {
   for (const file of ["app.js", "index.html", "styles.css", "base.css", "mobile.css", "next-level.js", "qr-code.js", "service-worker.js"]) {
-    const hashes = await Promise.all(teams.map(async (team) => hash(await read(`outputs/${team}/${file}`))));
+    // index.html enthaelt den Teamnamen statisch; fuer den Vergleich neutralisieren.
+    const hashes = await Promise.all(teams.map(async (team) => {
+      const content = await read(`outputs/${team}/${file}`);
+      return hash(file === "index.html" ? content.replaceAll(await teamNameOf(team), "{{teamName}}") : content);
+    }));
     assert.equal(new Set(hashes).size, 1, `${file} ist zwischen den Teams divergiert`);
   }
 });
@@ -640,7 +646,7 @@ test("Gelöschte oder verkürzte Abwesenheit setzt automatisch gesetzte „Fehlt
       selectedEventId: "e1"
     };
     const context = { state, persist: () => {}, cloudSaveRating: (...args) => saved.push(args), renderEvents: () => {} };
-    const fns = loadFunctions(source, ["roundGrade", "calculatedGrade", "normalizeRating", "blankRating", "hasRatingData", "formatDate", "isInjuryAbsence", "absenceTitle", "absenceCoversDate", "activeAbsenceOn", "unavailabilityReason", "applyAutoAbsence", "reconcileAbsences", "selectedEvent", "updateRating"], context);
+    const fns = loadFunctions(source, ["roundGrade", "calculatedGrade", "normalizeRating", "blankRating", "hasRatingData", "formatDate", "isInjuryAbsence", "absenceTitle", "absenceCoversDate", "activeAbsenceOn", "isOpenInjury", "unavailabilityReason", "applyAutoAbsence", "reconcileAbsences", "selectedEvent", "updateRating"], context);
     const attendance = () => state.events.map((event) => event.ratings.p1?.attendance || "open").join(",");
 
     fns.reconcileAbsences();
@@ -1094,4 +1100,22 @@ test("Belastungsanzeige im Profil trennt 7-Tage-Wert und Wochenschnitt (SCRUM-13
   assert.match(html, /Belastung letzte 7 Tage/);
   assert.match(html, /Schnitt der 3 Wochen davor/);
   assert.equal(html.includes("Ø Belastung {{ numberLabel(r.load) }}"), false);
+});
+
+test("Vereinslogo-Alt-Text und Teamname in index.html passen zum teamName der firebase-config.js", async () => {
+  const outputs = (await readdir(new URL("../outputs/", import.meta.url), { withFileTypes: true })).filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+  let checked = 0;
+  for (const team of outputs) {
+    let teamName;
+    try { teamName = await teamNameOf(team); } catch { continue; }
+    const html = await read(`outputs/${team}/index.html`);
+    const alts = [...html.matchAll(/<img class="club-logo"[^>]*alt="([^"]*)"/g)].map((match) => match[1]);
+    assert.ok(alts.length >= 2, `${team}: Logo-Bilder nicht gefunden`);
+    for (const alt of alts) assert.equal(alt, `${teamName} Logo`, `${team}: falscher Logo-Alt-Text`);
+    for (const match of html.matchAll(/<(?:strong|span class="welcome-kicker")>(1\. FC Königstein[^<]*)</g)) {
+      assert.equal(match[1], teamName, `${team}: falscher Teamname im HTML`);
+    }
+    checked += 1;
+  }
+  assert.ok(checked >= 3, "zu wenige Team-Ordner geprueft");
 });

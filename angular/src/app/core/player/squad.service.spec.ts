@@ -220,6 +220,54 @@ describe('SquadService', () => {
       expect(firebase.ratings.ratings.get('e1')?.get('p1')?.['attendance']).toBe('open');
     });
 
+    describe('Status „Verletzt“ ohne Datum (SCRUM-164)', () => {
+      beforeEach(() => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(new Date('2026-10-17T10:00:00'));
+      });
+      afterEach(() => vi.useRealTimers());
+
+      it('belegt alle künftigen Termine ab heute vor, vergangene bleiben unberührt', async () => {
+        const squad = await ready();
+        expect(edit(squad, { status: 'Verletzt', injuryUntil: '' })).toEqual({});
+        await vi.waitFor(() => expect(saved()).toEqual(['saveRating:e2:p1']));
+        expect(firebase.ratings.ratings.get('e2')?.get('p1')).toMatchObject({ attendance: 'absent', autoAbsence: true, note: 'Verletzt (bis auf Weiteres)' });
+        expect(firebase.ratings.ratings.get('e1')?.has('p1') ?? false).toBe(false); // 05.10. liegt vor heute
+        expect(firebase.players.players.get('p1')?.['injuredSince']).toBe('2026-10-17');
+      });
+
+      it('lässt von Hand gesetzte Anwesenheit stehen (SCRUM-18)', async () => {
+        const squad = await ready();
+        firebase.ratings.ratings.set('e2', new Map([['p1', { attendance: 'present' }]]));
+        edit(squad, { status: 'Verletzt', injuryUntil: '' });
+        await vi.waitFor(() => expect(firebase.calls).toContain('readRatingDoc:e2:p1'));
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        expect(saved()).toEqual([]);
+        expect(firebase.ratings.ratings.get('e2')?.get('p1')?.['attendance']).toBe('present');
+      });
+
+      it('zurück auf „Fit“: künftiges automatisches „Fehlt“ wird zurückgenommen, vergangenes bleibt dauerhaft', async () => {
+        const squad = await ready();
+        firebase.players.players.set('p1', { name: 'Ali Adler', positions: ['ST'], number: 9, birthdate: '2012-05-05', status: 'Verletzt', injuryUntil: '', injuredSince: '2026-10-01' });
+        firebase.players.emitPlayers();
+        const auto = { attendance: 'absent', autoAbsence: true, note: 'Verletzt (bis auf Weiteres)' };
+        firebase.ratings.ratings.set('e1', new Map([['p1', { ...auto }]]));
+        firebase.ratings.ratings.set('e2', new Map([['p1', { ...auto }]]));
+        edit(squad, { status: 'Fit', injuryUntil: '' });
+        await vi.waitFor(() => expect(saved().sort()).toEqual(['saveRating:e1:p1', 'saveRating:e2:p1']));
+        expect(firebase.ratings.ratings.get('e2')?.get('p1')).toMatchObject({ attendance: 'open', autoAbsence: false, note: '' });
+        expect(firebase.ratings.ratings.get('e1')?.get('p1')).toMatchObject({ attendance: 'absent', autoAbsence: false, note: 'Verletzt (bis auf Weiteres)' });
+        expect(firebase.players.players.get('p1')?.['injuredSince']).toBe('');
+      });
+
+      it('ein neuer Spieler mit „Verletzt“ ohne Datum wird gleich vorbelegt', async () => {
+        const squad = await ready();
+        squad.save({ ...emptyDraft([]), name: 'Neu Neumann', positions: ['IV'], number: '4', birthdate: '2012-01-01', status: 'Verletzt' });
+        await vi.waitFor(() => expect(saved()).toHaveLength(1));
+        expect(saved()[0]).toMatch(/^saveRating:e2:p/);
+      });
+    });
+
     it('fasst Events nicht an, wenn sich Status und „verletzt bis“ nicht ändern', async () => {
       const squad = await ready();
       edit(squad, { name: 'Ali Neu' });

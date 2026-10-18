@@ -1,0 +1,44 @@
+<div class="lineup" [attr.data-variant]="mobile() ? 'mobile' : 'desktop'">
+  <a class="lineup-link" routerLink="/aufstellung" [attr.aria-label]="'Aufstellung öffnen, Formation ' + summary().formation">
+    <div class="pitch" [class.horizontal]="!mobile()" aria-hidden="true">
+      @if (mobile()) {
+        <svg class="marks" viewBox="0 0 100 133" preserveAspectRatio="none">
+          <rect x="3" y="3" width="94" height="127" rx="1" />
+          <line x1="3" y1="66.5" x2="97" y2="66.5" />
+          <circle cx="50" cy="66.5" r="11" />
+          <circle class="spot" cx="50" cy="66.5" r="0.9" />
+          <rect x="23" y="3" width="54" height="22" />
+          <rect x="37" y="3" width="26" height="8" />
+          <rect x="23" y="108" width="54" height="22" />
+          <rect x="37" y="122" width="26" height="8" />
+        </svg>
+      } @else {
+        <svg class="marks" viewBox="0 0 160 100" preserveAspectRatio="none">
+          <rect x="3" y="3" width="154" height="94" rx="1" />
+          <line x1="80" y1="3" x2="80" y2="97" />
+          <circle cx="80" cy="50" r="11" />
+          <circle class="spot" cx="80" cy="50" r="0.9" />
+          <rect x="3" y="23" width="22" height="54" />
+          <rect x="3" y="37" width="8" height="26" />
+          <rect x="135" y="23" width="22" height="54" />
+          <rect x="149" y="37" width="8" height="26" />
+        </svg>
+      }
+      @for (marker of markers(); track marker.id) {
+        <span class="marker" [class.keeper]="marker.keeper" [style.left.%]="marker.left" [style.top.%]="marker.top">
+          <span class="shirt">{{ marker.number }}</span>
+          <span class="name">{{ marker.label }}</span>
+        </span>
+      }
+    </div>
+  </a>
+  <div class="lineup-side">
+    <p class="formation">{{ summary().formation }}</p>
+    <p class="muted">{{ summary().count }} von 11 Spielern auf dem Platz</p>
+    <ul class="lineup-rows">
+      @for (row of summary().rows; track row.label) {
+        <li><span class="zone">{{ row.label }}</span><span>{{ row.names.join(' · ') }}</span></li>
+      }
+    </ul>
+  </div>
+</div>
