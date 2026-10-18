@@ -80,6 +80,17 @@ for (const file of copies) {
     assert.match(strong.reasons[0], /^Starker Wachstumsschub/);
   });
 
+  test(`${file}: Wachstum zaehlt nur Messungen der letzten 90 Tage (SCRUM-157)`, async () => {
+    const { api } = await load(file);
+    const run = (dates) => api.assessLoad({ measurements: [{ date: dates[0], height: 150 }, { date: dates[1], height: 151.5 }], today: TODAY });
+    // Schub vor einem Jahr: kein Hinweis mehr
+    assert.equal(run(["2025-09-01", "2025-10-01"]).tier, "unauffaellig");
+    // juengste Messung ok, aeltere ausserhalb des Fensters: keine zwei Messungen -> kein Hinweis
+    assert.equal(run(["2026-06-01", "2026-10-01"]).tier, "unauffaellig");
+    // beide im Fenster: Hinweis bleibt
+    assert.equal(run(["2026-08-01", "2026-09-01"]).tier, "anpassen");
+  });
+
   test(`${file}: Intensitaet 1/2/3 wird als 3/5/7 gelesen`, async () => {
     const { api } = await load(file);
     assert.deepEqual([1, 2, 3].map((intensity) => api.eventExertion({ intensity })), [3, 5, 7]);

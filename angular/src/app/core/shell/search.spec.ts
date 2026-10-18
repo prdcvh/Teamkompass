@@ -12,6 +12,7 @@ const player = (id: string, name: string, number: number): Player => ({
   birthdate: '2011-01-01',
   status: 'Fit',
   injuryUntil: '',
+  injuredSince: '',
   consentStatus: 'granted',
   consentDate: '',
 });

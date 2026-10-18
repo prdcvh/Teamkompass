@@ -4,6 +4,8 @@ import { provideRouter } from '@angular/router';
 import { LayoutService } from '../../core/shell/layout.service';
 import { SessionService } from '../../core/auth/session.service';
 import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
+import { SquadService } from '../../core/player/squad.service';
+import { SquadAbsencesService } from '../../core/records/squad-absences.service';
 import { Squad } from './squad';
 
 describe('Squad (Kader-Seite)', () => {
@@ -236,6 +238,52 @@ describe('Squad (Kader-Seite)', () => {
       q<HTMLButtonElement>(fixture, 'button.fab')!.click();
       fixture.detectChanges();
       expect(text(q(fixture, 'dialog h2'))).toBe('Spieler anlegen');
+    });
+  });
+
+  describe('Wirksamer Status: laufende Abwesenheit überlagert den gespeicherten Status (SCRUM-164)', () => {
+    async function renderWithAbsences(mobile = false) {
+      const fixture = await render('trainer', mobile);
+      firebase.records.playerRecords.set('p1/absences', new Map([['a1', { kind: 'injury', label: 'Verletzung', detail: 'Bänderriss', from: '2020-01-01', to: '' }]]));
+      firebase.records.playerRecords.set('p2/absences', new Map([['a2', { kind: 'absence', label: 'Sperre', detail: '', from: '2020-01-01', to: '2099-12-31' }]]));
+      // Die Abos laufen schon (leer); neu ausliefern wie Firestore bei einer Änderung.
+      TestBed.inject(SquadService).stop();
+      TestBed.inject(SquadAbsencesService).stop();
+      TestBed.inject(SquadService).start();
+      TestBed.inject(SquadAbsencesService).start();
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(text(q(fixture, '.metrics'))).toContain('Gesperrt');
+      });
+      return fixture;
+    }
+
+    it('Tabelle, Zähler und Filter nutzen den wirksamen Status', async () => {
+      const fixture = await renderWithAbsences();
+      const rows = qa(fixture, 'tbody tr').map(text);
+      expect(rows[0]).toContain('Jonas Keller');
+      expect(rows[0]).toContain('Verletzt');
+      expect(rows[0]).toContain('Ende offen');
+      expect(rows[1]).toContain('Gesperrt');
+      expect(rows[1]).toContain('bis 31.12.2099');
+      expect(qa(fixture, '.metrics > div').map(text)).toEqual(['0Fit', '0Angeschlagen', '2Verletzt', '1Gesperrt', '0Pause']);
+      const status = qa<HTMLSelectElement>(fixture, '.filters select')[1];
+      expect([...status.options].map((option) => option.value)).toEqual(['all', 'Fit', 'Angeschlagen', 'Verletzt', 'Abwesend', 'Gesperrt', 'Pause']);
+      type(status, 'Fit', 'change');
+      fixture.detectChanges();
+      expect(text(q(fixture, '.empty'))).toContain('Kein Spieler passt');
+      type(status, 'Gesperrt', 'change');
+      fixture.detectChanges();
+      expect(qa(fixture, 'tbody tr').map(text)[0]).toContain('Elias Wagner');
+    });
+
+    it('Handy-Karten zeigen den wirksamen Status', async () => {
+      const fixture = await renderWithAbsences(true);
+      const cards = qa(fixture, '.player-card').map(text);
+      expect(cards.find((card) => card.includes('Jonas Keller'))).toContain('Verletzt');
+      expect(cards.find((card) => card.includes('Elias Wagner'))).toContain('Gesperrt');
+      // Fünf Zähler passen am Handy nicht in eine Reihe: zwei Reihen à drei.
+      expect(q<HTMLElement>(fixture, '.metrics')!.style.getPropertyValue('--metric-count')).toBe('3');
     });
   });
 
