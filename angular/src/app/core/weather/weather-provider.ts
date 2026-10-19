@@ -18,6 +18,8 @@ export function openMeteoUrl(coords: Coordinates, date: string): string {
     timezone: WEATHER_TIME_ZONE,
     start_date: date,
     end_date: date,
+    // Am Service Worker vorbei: Ein unter einer älteren CSP installierter Worker würde den Aufruf sonst blockieren (SCRUM-151).
+    'ngsw-bypass': 'true',
   });
   return `${OPEN_METEO_FORECAST_URL}?${params.toString()}`;
 }

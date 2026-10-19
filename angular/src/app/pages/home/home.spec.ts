@@ -47,7 +47,7 @@ describe('Home (Start-Dashboard)', () => {
     const fixture = await render();
     await ready(fixture);
     const stats = [...root(fixture).querySelectorAll('.stat')].map((el) => `${el.querySelector('span')?.textContent} ${el.querySelector('strong')?.textContent}`);
-    expect(stats).toEqual(['Kader 2', 'Fit 1', 'Events 2', 'Teamnote 2', 'Bilanz (S-U-N) 1-0-0', 'Tore 3:1', 'Belastung hoch 1']);
+    expect(stats).toEqual(['Kader 2', 'Fit 1', 'Events 2', 'Teamnote 2', 'Bilanz (S-U-N) 1-0-0', 'Tore 3:1', 'Belastung hoch 0']);
     expect(text(fixture)).toContain('Ali Adler');
     expect(text(fixture)).toContain('Ø 2');
     expect(text(fixture)).toContain('vs. SV Nord');
@@ -109,5 +109,41 @@ describe('Home (Start-Dashboard)', () => {
     expect(root(fixture).querySelector('.stats')).toBeNull();
     expect(firebase.calls).not.toContain('watchPlayers');
     expect(firebase.lineup.lineupWatchers).toBe(0);
+  });
+
+  describe('Pausen-Hinweis (SCRUM-150)', () => {
+    const short = (iso: string) => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.`;
+    const notice = (fixture: { nativeElement: unknown }) => root(fixture).querySelector('[data-testid="break-notice"]')?.textContent?.trim();
+
+    async function withBreak(role: 'trainer' | 'player', start: number, end: number) {
+      const fixture = await render(role);
+      firebase.planning.breaksDoc = { breaks: { b1: { name: 'Herbstferien', startDate: day(start), endDate: day(end) } } };
+      firebase.planning.emitBreaks();
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(notice(fixture)).toBeDefined();
+      });
+      return fixture;
+    }
+
+    it('weist Trainer und Spieler auf eine Pause in der nächsten Woche hin', async () => {
+      for (const role of ['trainer', 'player'] as const) {
+        TestBed.resetTestingModule();
+        const fixture = await withBreak(role, 7, 18);
+        expect(notice(fixture)).toBe(`Ab ${short(day(7))} Herbstferien (bis ${short(day(18))})`);
+      }
+    });
+
+    it('nennt eine laufende Pause und zeigt bei ferner Pause nichts', async () => {
+      const fixture = await withBreak('player', -2, 5);
+      expect(notice(fixture)).toBe(`Herbstferien bis ${short(day(5))}`);
+      TestBed.resetTestingModule();
+      const far = await render('trainer');
+      firebase.planning.breaksDoc = { breaks: { b1: { name: 'Sommerpause', startDate: day(30), endDate: day(60) } } };
+      firebase.planning.emitBreaks();
+      far.detectChanges();
+      await far.whenStable();
+      expect(notice(far)).toBeUndefined();
+    });
   });
 });

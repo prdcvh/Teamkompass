@@ -10,6 +10,8 @@ import { type EventRating, availability, gameStats, gradedEvents, numberLabel, p
 import { gradeLabel } from '../ratings/rating';
 import type { Absence } from '../records/absence';
 import { effectiveStatus } from '../records/availability';
+import type { Measurement } from '../records/measurement';
+import { injuryRisk } from '../analysis/risk';
 
 /** Ersetzt die fünf HTML-Sonderzeichen, damit Text nie als Markup gelesen wird. */
 export function escapeHtml(value: unknown): string {
@@ -21,6 +23,8 @@ export interface ProfileReportInput {
   readonly player: Player;
   readonly items: readonly EventRating[];
   readonly absences: readonly Absence[];
+  /** Körpermessungen (für den Hinweis „Wachstumsschub“); fehlen sie, entfällt dieser Hinweis. */
+  readonly measurements?: readonly Measurement[];
   readonly today: string;
 }
 
@@ -62,6 +66,7 @@ export function profileReportHtml(input: ProfileReportInput): string {
     )
     .join('');
   const status = effectiveStatus(player, input.absences, today);
+  const risk = injuryRisk(player, items, input.absences, input.measurements ?? [], new Date(`${today}T12:00:00`));
   const card = (label: string, value: string) => `<div class="card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
   return `<!doctype html>
 <html lang="de">
@@ -85,6 +90,12 @@ export function profileReportHtml(input: ProfileReportInput): string {
   ${card('Tore + Vorlagen', `${games.goals} + ${games.assists}`)}
   ${card('Min./Spiel', games.minutesPerGame ? String(games.minutesPerGame) : '–')}
   ${card('Spiele', `${games.appearances}/${games.games}`)}
+</section>
+<section class="load-box">
+  <h2>Belastung</h2>
+  <p><strong>${escapeHtml(risk.level)}</strong> · ${escapeHtml(risk.reason)}</p>
+  <table><thead><tr><th>Belastung letzte 7 Tage</th><th>Schnitt der 3 Wochen davor</th><th>Verfügbarkeit</th></tr></thead><tbody><tr><td>${escapeHtml(numberLabel(risk.load))}</td><td>${escapeHtml(numberLabel(risk.baseline))}</td><td>${escapeHtml(risk.availability.label)}${risk.availability.action ? ` – ${escapeHtml(risk.availability.action)}` : ''}</td></tr></tbody></table>
+  <p class="muted">Belastung je Termin = Minuten × Anstrengung (0–10).</p>
 </section>
 <section class="section-grid">
   <div>

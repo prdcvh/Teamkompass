@@ -1,0 +1,16 @@
+<details class="hint">
+  <summary>Schulferien Hessen {{ year }}</summary>
+  @if (holidays; as list) {
+    <ul class="list">
+      @for (holiday of list; track holiday.from) {
+        <li>
+          <strong>{{ holiday.name }}</strong>
+          <span>{{ formatDate(holiday.from) }} bis {{ formatDate(holiday.to) }}</span>
+        </li>
+      }
+    </ul>
+    <p class="note">Nur ein Hinweis, wird nicht automatisch übernommen. Bewegliche Ferientage legen die Schulämter fest und fehlen hier. Quelle: {{ source }}, Stand {{ checked }}.</p>
+  } @else {
+    <p class="note">Ferientermine für {{ year }} noch nicht hinterlegt.</p>
+  }
+</details>

@@ -1,13 +1,14 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
 import { type TeamEvent, eventStart } from '../../core/events/event';
+import { TEAM_HOME_SHORT_NAME, weatherLocation } from '../../core/team-settings/team-settings';
 import { type WeatherSnapshot, WEATHER_ATTRIBUTION, berlinNow, withinHorizon } from '../../core/weather/weather';
-import { weatherKind, weatherSpokenText, weatherSummary } from '../../core/weather/weather-display';
+import { weatherKind, weatherParts, weatherSpokenText } from '../../core/weather/weather-display';
 import { WeatherService } from '../../core/weather/weather.service';
 import { Clothing } from '../clothing/clothing';
 import { Icon, type IconName } from '../icon/icon';
 
 type State =
-  | { readonly kind: 'hidden' | 'no-place' | 'no-time' | 'loading' | 'unavailable' }
+  | { readonly kind: 'hidden' | 'no-time' | 'loading' | 'unavailable' }
   | { readonly kind: 'ok'; readonly snapshot: WeatherSnapshot };
 
 /**
@@ -21,7 +22,9 @@ type State =
     @switch (state().kind) {
       @case ('ok') {
         <span class="line" role="img" [attr.aria-label]="spoken()"
-          ><tk-icon [name]="icon()" /><span aria-hidden="true">{{ summary() }}</span></span
+          ><tk-icon [name]="icon()" /><span aria-hidden="true"
+            >@for (part of parts(); track $index) {@if ($index > 0) { · }<span class="part">{{ part }}</span>}</span
+          >@if (usesHome()) {<span class="home" aria-hidden="true">· {{ homeName }}</span>}</span
         >
       }
       @case ('loading') {
@@ -29,9 +32,6 @@ type State =
       }
       @case ('unavailable') {
         <span class="line muted" role="status">Wetter nicht verfügbar</span>
-      }
-      @case ('no-place') {
-        <span class="line muted">Kein Ort für Wetter</span>
       }
       @case ('no-time') {
         <span class="line muted">Keine Startzeit für Wetter</span>
@@ -57,6 +57,10 @@ export class Weather {
   readonly showClothing = input(false);
 
   private readonly service = inject(WeatherService);
+  protected readonly homeName = TEAM_HOME_SHORT_NAME;
+  /** Ohne gewählten Ort gilt der Standardort des Teams (SCRUM-153). */
+  protected readonly usesHome = computed(() => this.event().locationCoords === null);
+  private readonly coords = computed(() => weatherLocation(this.event().locationCoords));
   protected readonly source = WEATHER_ATTRIBUTION;
   private readonly result = signal<{ readonly key: string; readonly value: WeatherSnapshot | 'error' } | null>(null);
   private token = 0;
@@ -74,14 +78,13 @@ export class Weather {
 
   private readonly key = computed(() => {
     const t = this.target();
-    const c = this.event().locationCoords;
-    return t.relevant && t.iso && c ? `${c.lat}|${c.lon}|${t.iso}` : null;
+    const c = this.coords();
+    return t.relevant && t.iso ? `${c.lat}|${c.lon}|${t.iso}` : null;
   });
 
   protected readonly state = computed<State>(() => {
     const t = this.target();
     if (!t.relevant) return { kind: 'hidden' };
-    if (!this.event().locationCoords) return { kind: 'no-place' };
     if (!t.iso) return { kind: 'no-time' };
     const r = this.result();
     if (r === null || r.key !== this.key()) return { kind: 'loading' };
@@ -98,23 +101,24 @@ export class Weather {
     const [, m, d] = date.split('-');
     return `Am ${Number(d)}.${Number(m)}.`;
   });
-  protected readonly summary = computed(() => {
+  protected readonly parts = computed(() => {
     const s = this.snapshot();
-    return s ? weatherSummary(s) : '';
+    return s ? weatherParts(s) : [];
   });
   protected readonly spoken = computed(() => {
     const s = this.snapshot();
-    return s ? weatherSpokenText(s) : '';
+    if (!s) return '';
+    return this.usesHome() ? `${weatherSpokenText(s)} (Standardort ${TEAM_HOME_SHORT_NAME})` : weatherSpokenText(s);
   });
   protected readonly icon = computed<IconName>(() => `weather-${weatherKind(this.snapshot()?.weatherCode ?? null)}`);
 
   constructor() {
     effect(() => {
       const key = this.key();
-      const coords = this.event().locationCoords;
+      const coords = this.coords();
       const iso = this.target().iso;
       const mine = ++this.token;
-      if (key === null || coords === null || iso === null) return;
+      if (key === null || iso === null) return;
       void this.service.forecast(coords, iso).then((res) => {
         if (mine !== this.token) return;
         this.result.set({ key, value: res.status === 'ok' ? res.snapshot : 'error' });

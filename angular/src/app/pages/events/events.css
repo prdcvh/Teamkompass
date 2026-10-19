@@ -82,6 +82,12 @@ td {
   overflow-wrap: anywhere;
 }
 
+/* Das Datum steht immer in einer Zeile, sonst liest man „18.10.202 / 6“ (SCRUM-152). */
+td.date {
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
 .actions {
   display: flex;
   gap: var(--tk-space-2);
@@ -96,6 +102,9 @@ td {
   border-radius: var(--tk-radius-pill);
   font-size: var(--tk-text-xs);
   font-weight: 600;
+  /* „Training“ nicht in Silben zerlegen (SCRUM-152). */
+  white-space: nowrap;
+  overflow-wrap: normal;
 }
 
 .badge[data-type='Spiel'] {
@@ -137,14 +146,16 @@ td {
 
 .row {
   display: grid;
-  grid-template-columns: 1fr auto;
+  /* minmax(0, …): die Karte darf schmaler als ihr längstes Wort werden, statt unter „Bearbeiten“ zu laufen (SCRUM-155). */
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--tk-space-2);
   align-items: center;
 }
 
 .event-card {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-width: 0;
   gap: var(--tk-space-3);
   align-items: center;
   width: 100%;
@@ -158,14 +169,48 @@ td {
   cursor: pointer;
 }
 
+.card-weather {
+  grid-column: 1 / -1;
+  padding: 0 var(--tk-space-1) var(--tk-space-3);
+  margin-top: calc(-1 * var(--tk-space-2));
+}
+
 .what {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 2px;
   min-width: 0;
 }
 
+/* Schmale Handys: Typ-Schild über den Titel, damit der Titel die Breite neben „Bearbeiten“ bekommt (SCRUM-155). */
+@media (max-width: 479px) {
+  .event-card {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: var(--tk-space-1);
+  }
+
+  .event-card .badge {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: start;
+  }
+
+  .event-card .what {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .event-card .result {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+}
+
 .what strong {
   font-size: var(--tk-text-lg);
+  /* Lange Titel („Abschlusstraining …“) trennen statt unter den Knopf zu laufen (SCRUM-155). */
+  overflow-wrap: break-word;
+  hyphens: auto;
 }
 
 .what small {
@@ -229,4 +274,73 @@ td {
 /* Wetter (SCRUM-98): Quellenlink in der Textfarbe. */
 p.muted a {
   color: inherit;
+}
+
+/* Drei Bereiche der Liste (SCRUM-140) */
+.section {
+  display: grid;
+  gap: var(--tk-space-3);
+}
+
+.sec-head {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.sec-head.static {
+  padding-block: var(--tk-space-2);
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--tk-space-2);
+  width: 100%;
+  min-height: var(--tk-touch);
+  padding: var(--tk-space-2) 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.toggle:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.chev {
+  transition: transform 0.15s;
+}
+
+.chev.open {
+  transform: rotate(90deg);
+}
+
+.count {
+  color: var(--tk-muted);
+  font-weight: 400;
+}
+
+.week-empty {
+  margin: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chev {
+    transition: none;
+  }
+}
+
+/* Kleines Wiederholen-Symbol: das Training stammt aus einer Serie (SCRUM-146). */
+.series-mark {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  margin-left: var(--tk-space-2);
+  vertical-align: -0.1em;
+  color: var(--tk-muted);
 }

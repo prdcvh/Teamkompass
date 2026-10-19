@@ -122,3 +122,69 @@ textarea {
     background: var(--tk-surface);
   }
 }
+
+/* Leseansicht (SCRUM-144) */
+.details {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+dl {
+  display: grid;
+  gap: var(--tk-space-3);
+  margin: 0;
+}
+
+.fact {
+  display: grid;
+  gap: 2px;
+}
+
+dt {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Zeilenumbrüche der Notiz bleiben erhalten; der Text wird nie als HTML ausgewertet. */
+.notes {
+  white-space: pre-wrap;
+}
+
+.edit-pen {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  color: var(--tk-ink);
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.edit-pen:hover {
+  background: var(--tk-line);
+}
+
+.edit-pen:focus-visible {
+  outline: none;
+  box-shadow: var(--tk-focus-ring);
+}
+
+@media (max-width: 720px) {
+  .edit-pen {
+    width: 44px;
+    height: 44px;
+  }
+
+  .details {
+    max-height: 78vh;
+  }
+}

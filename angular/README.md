@@ -1,7 +1,8 @@
 # TeamKompass (Angular)
 
 Angular-Neubau von TeamKompass (Jira-Epic SCRUM-40). Wird getrennt von den Live-Kopien
-(Repo-Root, `outputs/*`) gebaut und ist noch nicht ausgerollt. Testteam: `teamId: U14`.
+(Repo-Root, `outputs/*`) gebaut und bei jedem Merge nach `main` auf https://teamkompass-u14.web.app/
+veröffentlicht (Hosting-Target `u14`). Testteam: `teamId: U14`.
 
 ## Befehle
 

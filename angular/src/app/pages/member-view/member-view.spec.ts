@@ -72,6 +72,7 @@ describe('MemberView (Ansicht für Spieler, Eltern und Medizin)', () => {
       expect(text(fixture)).not.toContain('GEHEIME');
       expect(text(fixture)).not.toContain('Interne Planung');
       expect(text(fixture)).not.toContain('Belastungsindikator');
+      expect(text(fixture)).not.toContain('Schnitt der 3 Wochen davor');
     });
 
     it('liest nur das eigene Dokument und eigene Daten, nie Kader, Notizen, Gegner oder Aufstellung', async () => {
@@ -128,7 +129,8 @@ describe('MemberView (Ansicht für Spieler, Eltern und Medizin)', () => {
     it('zeigt einen Hinweis, wenn kein Spielerprofil verknüpft ist, und lädt nichts', async () => {
       const fixture = await render('player', { playerId: null });
       expect(text(fixture, '.empty')).toContain('kein Spielerprofil verknüpft');
-      expect(firebase.calls.filter((call) => call.startsWith('watch'))).toEqual([]);
+      // Nur der teamweite Pausen-Hinweis (SCRUM-150) wird gelesen, nichts aus Profil oder Bewertungen.
+      expect(firebase.calls.filter((call) => call.startsWith('watch') && call !== 'watchBreaks')).toEqual([]);
     });
 
     it('zeigt ein nicht (mehr) vorhandenes Profil verständlich an', async () => {

@@ -25,8 +25,8 @@ function liveBackupApi(): {
 /** Eine Sicherung so, wie die bisherige App sie schreibt (JSON.stringify(state)): inkl. Startelf, privateNotes und Ergänzungen. */
 const liveBackup = () => ({
   players: [
-    { id: 'p1', name: 'Ali Adler', positions: ['ZM', 'DM'], number: 8, birthdate: '2012-03-12', status: 'Verletzt', injuryUntil: '2026-11-01', consentStatus: 'granted', consentDate: '2026-09-01' },
-    { id: 'p2', name: 'Ben Berg', positions: ['IV'], number: 4, birthdate: '2012-11-06', status: 'Fit', injuryUntil: '', consentStatus: 'pending', consentDate: '' },
+    { id: 'p1', name: 'Ali Adler', positions: ['ZM', 'DM'], number: 8, birthdate: '2012-03-12', status: 'Verletzt', injuryUntil: '2026-11-01', injuredSince: '2026-10-01', consentStatus: 'granted', consentDate: '2026-09-01' },
+    { id: 'p2', name: 'Ben Berg', positions: ['IV'], number: 4, birthdate: '2012-11-06', status: 'Fit', injuryUntil: '', injuredSince: '', consentStatus: 'pending', consentDate: '' },
   ],
   events: [
     {
@@ -141,9 +141,9 @@ describe('Sicherung einspielen: Zusammenfassung und Schreibliste', () => {
 });
 
 describe('Sicherung einspielen: Live-App und Angular gegenseitig', () => {
-  const player = (id: string, name: string): Player => ({ id, name, positions: ['ST'], number: 9, birthdate: '2012-02-05', status: 'Fit', injuryUntil: '', consentStatus: 'granted', consentDate: '' });
+  const player = (id: string, name: string): Player => ({ id, name, positions: ['ST'], number: 9, birthdate: '2012-02-05', status: 'Fit', injuryUntil: '', injuredSince: '', consentStatus: 'granted', consentDate: '' });
   const event = (id: string, title: string): TeamEvent =>
-    ({ id, title, date: '2026-09-01', type: 'Training', intensity: 2, location: '', trainingFocus: 'Umschalten', opponent: '', goalsFor: null, goalsAgainst: null, matchDuration: null, notes: '' }) as TeamEvent;
+    ({ id, title, date: '2026-09-01', type: 'Training', intensity: 2, exertion: 5, location: '', trainingFocus: 'Umschalten', opponent: '', goalsFor: null, goalsAgainst: null, matchDuration: null, notes: '' }) as TeamEvent;
   const angularExport = () =>
     JSON.parse(
       JSON.stringify(

@@ -1,0 +1,10 @@
+/* Ohne Hinweis darf kein leerer Platz (und kein Seitenabstand) entstehen. */
+:host {
+  display: contents;
+}
+
+.break-notice {
+  margin: 0;
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}

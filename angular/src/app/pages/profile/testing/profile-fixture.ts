@@ -61,7 +61,7 @@ export async function renderProfileExtras(role: 'trainer' | 'medical' = 'trainer
     ['ab2', { kind: 'absence', label: 'Urlaub', from: '2026-08-01', to: '2026-08-10' }],
   ]));
   firebase.records.playerRecords.set('p1/measurements', new Map([
-    ['me1', { date: '2026-07-01', height: '150', weight: '40' }],
+    ['me1', { date: '2026-08-01', height: '150', weight: '40' }],
     ['me2', { date: '2026-10-01', height: '155', weight: '43' }],
   ]));
   const navigate = vi.fn().mockResolvedValue(true);

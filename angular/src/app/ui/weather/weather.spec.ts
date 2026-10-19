@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { Component } from '@angular/core';
 import { type TeamEvent } from '../../core/events/event';
-import { weatherDescription, weatherKind, weatherSpokenText, weatherSummary } from '../../core/weather/weather-display';
+import { weatherDescription, weatherKind, weatherParts, weatherSpokenText, weatherSummary } from '../../core/weather/weather-display';
 import { WeatherProvider } from '../../core/weather/weather-provider';
 import { WeatherService } from '../../core/weather/weather.service';
 import { Weather } from './weather';
@@ -25,7 +25,7 @@ function dayResponse(date: string): unknown {
 
 function makeEvent(patch: Partial<TeamEvent> = {}): TeamEvent {
   return {
-    id: 'e1', type: 'Training', title: 'Training', date: '2026-10-17', intensity: 2, location: 'Platz', trainingFocus: '', opponent: '',
+    id: 'e1', type: 'Training', title: 'Training', date: '2026-10-17', intensity: 2, exertion: 5, location: 'Platz', trainingFocus: '', opponent: '',
     goalsFor: null, goalsAgainst: null, matchDuration: null, startTime: '18:00', durationMinutes: 90,
     locationCoords: { lat: 50.18, lon: 8.46, name: 'Königstein' }, notes: '', ...patch,
   };
@@ -40,9 +40,11 @@ class Host {
 class FakeProvider extends WeatherProvider {
   mode: 'ok' | 'fail' | 'pending' = 'ok';
   calls = 0;
+  lastCoords: unknown = null;
   resolve: (v: unknown) => void = () => undefined;
-  async fetchDay(_c: unknown, date: string): Promise<unknown> {
+  async fetchDay(coords: unknown, date: string): Promise<unknown> {
     this.calls++;
+    this.lastCoords = coords;
     if (this.mode === 'fail') throw new Error('offline');
     if (this.mode === 'pending') return new Promise((r) => (this.resolve = () => r(dayResponse(date))));
     return dayResponse(date);
@@ -103,12 +105,21 @@ describe('tk-weather', () => {
     expect(host(f).textContent).toContain('Wetter nicht verfügbar');
   });
 
-  it('zeigt „Kein Ort“ ohne Koordinaten und ruft nichts ab', async () => {
-    const f = await render(makeEvent({ locationCoords: null }));
+  it('nimmt ohne gewählten Ort den Standardort Königstein und sagt das dazu (SCRUM-153)', async () => {
+    const f = await render(makeEvent({ location: 'Kunstrasen - heim', locationCoords: null }));
     await settle(f);
-    expect(host(f).dataset['state']).toBe('no-place');
-    expect(host(f).textContent).toContain('Kein Ort für Wetter');
-    expect(provider.calls).toBe(0);
+    expect(host(f).dataset['state']).toBe('ok');
+    // Der Dienst rundet auf 2 Stellen (Cache pro Gebiet).
+    expect(provider.lastCoords).toMatchObject({ lat: 50.18, lon: 8.47 });
+    expect(host(f).textContent).toContain('Königstein');
+    expect(host(f).querySelector('.line')!.getAttribute('aria-label')).toContain('Standardort Königstein');
+  });
+
+  it('nimmt einen gewählten Ort und zeigt dann keinen Standardort-Hinweis', async () => {
+    const f = await render(makeEvent({ locationCoords: { lat: 50.2, lon: 8.6, name: 'Bad Homburg' } }));
+    await settle(f);
+    expect(provider.lastCoords).toMatchObject({ lat: 50.2, lon: 8.6 });
+    expect(host(f).querySelector('.home')).toBeNull();
   });
 
   it('weist auf die fehlende Startzeit hin und ruft nichts ab', async () => {
@@ -167,5 +178,10 @@ describe('Wetteranzeige-Texte', () => {
   it('lässt fehlende Regenwahrscheinlichkeit weg', () => {
     expect(weatherSummary(snap)).toBe('14 °C');
     expect(weatherSpokenText(snap)).toBe('Wetter: Klar, 14 Grad Celsius');
+  });
+
+  it('teilt die Anzeige in Teile, die beim Umbruch zusammenbleiben (SCRUM-155)', () => {
+    expect(weatherParts({ ...snap, precipitationProbability: 79.6 })).toEqual(['14 °C', '80 % Regen']);
+    expect(weatherSummary({ ...snap, precipitationProbability: 79.6 })).toBe('14 °C · 80 % Regen');
   });
 });

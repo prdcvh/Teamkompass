@@ -15,7 +15,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - uses: actions/setup-node@v7
@@ -26,7 +26,7 @@ jobs:
       - name: Verify application
         run: npm run verify
       # Der Angular-Build (Hosting-Ziel u14) entsteht hier ohne Secret und wird als fertige statische Dateien weitergegeben.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: angular-dist
           path: angular/dist/teamkompass-angular/browser
@@ -36,10 +36,10 @@ jobs:
     needs: verify
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: angular-dist
           path: angular/dist/teamkompass-angular/browser

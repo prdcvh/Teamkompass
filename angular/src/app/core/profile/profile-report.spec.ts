@@ -12,6 +12,7 @@ const player: Player = {
   birthdate: '2012-02-05',
   status: 'Fit',
   injuryUntil: '',
+  injuredSince: '',
   consentStatus: 'granted',
   consentDate: '',
 };

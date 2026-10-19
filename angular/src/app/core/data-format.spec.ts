@@ -20,9 +20,13 @@ describe('Datenformat alte App ↔ Angular', () => {
   it('Spieler', () => {
     const live = {
       id: 'p1', name: 'Ali Adler', positions: ['ZM', 'DM'], number: 8, birthdate: '2012-03-12', status: 'Verletzt',
-      injuryUntil: '2026-11-01', consentStatus: 'granted', consentDate: '2026-09-01',
+      injuryUntil: '2026-11-01', injuredSince: '2026-10-01', consentStatus: 'granted', consentDate: '2026-09-01',
     };
     expect(docFromPlayer(playerFromDoc('p1', live))).toEqual(live);
+    // Ältere Dokumente ohne „verletzt seit“ (SCRUM-164): bleiben lesbar, das Feld wird leer ergänzt.
+    const legacy: Record<string, unknown> = { ...live };
+    delete legacy['injuredSince'];
+    expect(docFromPlayer(playerFromDoc('p1', legacy))).toEqual({ ...legacy, injuredSince: '' });
   });
 
   it('Event: Training und Spiel samt Leerwerten', () => {
@@ -31,7 +35,8 @@ describe('Datenformat alte App ↔ Angular', () => {
       trainingFocus: 'Passspiel', opponent: '', goalsFor: '', goalsAgainst: '', matchDuration: '', notes: 'Hinweis',
     };
     // Neue Felder (SCRUM-95) sind für ältere Dokumente leer; die bestehenden Felder bleiben unverändert.
-    const empty = { startTime: '', durationMinutes: '', locationCoords: null };
+    // Die Anstrengung (SCRUM-137) wird aus der bisherigen Intensität 1/2/3 als 3/5/7 abgeleitet (hier 3 → 7).
+    const empty = { startTime: '', durationMinutes: '', locationCoords: null, exertion: 7 };
     expect(docFromEvent(eventFromDoc('e1', training))).toEqual({ ...training, ...empty });
     const match = { ...training, id: 'e2', type: 'Spiel', trainingFocus: '', opponent: 'SV Nord', goalsFor: 3, goalsAgainst: 1, matchDuration: 70 };
     expect(docFromEvent(eventFromDoc('e2', match))).toEqual({ ...match, ...empty });
@@ -41,7 +46,7 @@ describe('Datenformat alte App ↔ Angular', () => {
 
   it('Event mit Startzeit, Dauer und Koordinaten bleibt unverändert erhalten', () => {
     const doc = {
-      id: 'e3', type: 'Training', title: 'Mittwoch', date: '2026-10-14', intensity: 2, location: 'Platz 1', trainingFocus: 'Umschalten',
+      id: 'e3', type: 'Training', title: 'Mittwoch', date: '2026-10-14', exertion: 5, intensity: 2, location: 'Platz 1', trainingFocus: 'Umschalten',
       opponent: '', goalsFor: '', goalsAgainst: '', matchDuration: '', notes: '',
       startTime: '17:30', durationMinutes: 90, locationCoords: { lat: 50.18, lon: 8.47, name: 'Königstein' },
     };

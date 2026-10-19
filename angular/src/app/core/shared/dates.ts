@@ -28,3 +28,10 @@ export function formatDate(iso: string): string {
   const [year, month, day] = iso.split('-');
   return `${day}.${month}.${year}`;
 }
+
+/** ISO-Datum plus (oder minus) Tage; rechnet in UTC, damit Zeitumstellungen nichts verschieben. */
+export function addDays(iso: string, days: number): string {
+  const date = new Date(`${iso}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}

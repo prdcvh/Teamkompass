@@ -5,6 +5,7 @@ import { EventsApi } from '../firebase/events.api';
 import { LineupApi } from '../firebase/lineup.api';
 import { OpponentsApi } from '../firebase/opponents.api';
 import { PlayerRecordsApi } from '../firebase/player-records.api';
+import { PlanningApi } from '../firebase/planning.api';
 import { PlayersApi } from '../firebase/players.api';
 import { RatingsApi } from '../firebase/ratings.api';
 import { TeamSettingsApi } from '../firebase/team-settings.api';
@@ -15,6 +16,7 @@ import { FakeAuthApi } from './fake-auth.api';
 import { FakeEventsApi } from './fake-events.api';
 import { FakeLineupApi } from './fake-lineup.api';
 import { FakeOpponentsApi } from './fake-opponents.api';
+import { FakePlanningApi } from './fake-planning.api';
 import { FakePlayerRecordsApi } from './fake-player-records.api';
 import { FakePlayersApi } from './fake-players.api';
 import { FakeRatingsApi } from './fake-ratings.api';
@@ -35,6 +37,11 @@ export class FakeFirebase {
   readonly ratings = new FakeRatingsApi(this.calls);
   readonly records = new FakePlayerRecordsApi(this.calls);
   readonly settings = new FakeTeamSettingsApi(this.calls);
+  readonly planning = new FakePlanningApi(this.calls);
+
+  constructor() {
+    this.events.hasRecords = (id) => (this.ratings.ratings.get(id)?.size ?? 0) > 0 || (this.ratings.privateNotes.get(id)?.size ?? 0) > 0;
+  }
 }
 
 /** Stellt die Attrappe für alle Firebase-Zugriffsklassen bereit. */
@@ -51,5 +58,6 @@ export function provideFakeFirebase(fake: FakeFirebase): Provider[] {
     // Seiten zeigen Wetter; Tests sollen nie ins Netz (SCRUM-98).
     { provide: WeatherProvider, useClass: OfflineWeatherProvider },
     { provide: TeamSettingsApi, useValue: fake.settings },
+    { provide: PlanningApi, useValue: fake.planning },
   ];
 }

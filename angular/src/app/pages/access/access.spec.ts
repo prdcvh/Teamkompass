@@ -236,4 +236,26 @@ describe('Access (Zugänge: Spieler und Scouts)', () => {
     await openScouts(fixture);
     expect(text(q(fixture, '.empty'))).toContain('Noch kein Scout-Zugang angelegt.');
   });
+
+  it('verknüpft das Tabpanel in befüllten und leeren Zuständen beider Reiter mit dem aktiven Reiter (SCRUM-103)', async () => {
+    const fixture = await render();
+    const panel = () => q(fixture, '[role="tabpanel"]')!;
+    expect(panel().classList.contains('list')).toBe(true);
+    expect(panel().getAttribute('aria-labelledby')).toBe('access-tab-players');
+    await openScouts(fixture);
+    expect(panel().classList.contains('list')).toBe(true);
+    expect(panel().getAttribute('aria-labelledby')).toBe('access-tab-scouts');
+
+    firebase.access.memberDocs.clear();
+    firebase.access.inviteDocs.clear();
+    await (fixture.componentInstance as unknown as { access: { reload(): Promise<void> } }).access.reload();
+    await flush(fixture);
+    expect(panel().classList.contains('empty')).toBe(true);
+    expect(panel().getAttribute('aria-labelledby')).toBe('access-tab-scouts');
+    q<HTMLButtonElement>(fixture, '#access-tab-players')!.click();
+    await flush(fixture);
+    expect(panel().classList.contains('empty')).toBe(true);
+    expect(panel().getAttribute('aria-labelledby')).toBe('access-tab-players');
+    expect(q(fixture, '#access-tab-players')!.id).toBe('access-tab-players');
+  });
 });

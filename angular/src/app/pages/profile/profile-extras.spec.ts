@@ -8,6 +8,7 @@ import { Profile } from './profile';
 import { clickByText, isMobile, q, qa, root, settle, text, typeInto, renderProfileExtras } from './testing/profile-fixture';
 
 describe('Profile: Zusatzdaten', () => {
+  afterEach(() => vi.useRealTimers());
   let firebase: FakeFirebase;
 
   async function renderExtras(...args: Parameters<typeof renderProfileExtras>) {
@@ -32,13 +33,20 @@ describe('Profile: Zusatzdaten', () => {
     expect(q(fixture, 'tk-profile-extras svg')).not.toBeNull(); // Diagramm nur sichtbar, wenn die Messungen jünger als 12 Monate sind
   });
 
-  it('die laufende Verletzung überlagert den Status und füllt den Belastungsindikator', async () => {
+  it('die laufende Verletzung überlagert den Status und trennt Verfügbarkeit und Belastung', async () => {
+    // Fester Zeitpunkt: der Wachstumshinweis zählt nur Messungen der letzten 90 Tage (SCRUM-157).
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-02T12:00:00') });
     const fixture = await renderExtras();
     expect(text(q(fixture, '.status-line'))).toContain('Verletzt');
-    expect(text(q(fixture, '.risk'))).toContain('Belastungsindikator');
-    expect(text(q(fixture, '.risk'))).toContain('Nicht einsetzen · 85%');
-    expect(text(q(fixture, '.risk'))).toContain('Aktuell verletzt');
-    expect(q(fixture, '.risk')?.getAttribute('data-tier')).toBe('aussetzen');
+    const risk = text(q(fixture, '.risk'));
+    expect(risk).toContain('Belastung letzte 7 Tage');
+    expect(risk).toContain('Schnitt der 3 Wochen davor');
+    expect(risk).not.toContain('%');
+    // Verfügbarkeit steht für sich: „Nicht einsetzen“ kommt nur von der Verletzung, nicht aus der Belastungsstufe.
+    expect(risk).toContain('Verfügbarkeit: Verletzt – Nicht einsetzen');
+    // Die Stufe kommt hier aus dem starken Wachstumsschub der Messwerte (2,5 cm/Monat), nicht aus der Verletzung.
+    expect(risk).toContain('Starker Wachstumsschub');
+    expect(q(fixture, '.risk')?.getAttribute('data-tier')).toBe('anpassen');
   });
 
   it('legt einen Förderplan an und prüft Pflichtfelder', async () => {
@@ -92,11 +100,11 @@ describe('Profile: Zusatzdaten', () => {
 
   it('löscht erst nach Bestätigung', async () => {
     const fixture = await renderExtras();
-    const button = qa<HTMLButtonElement>(fixture, 'tk-profile-extras button').find((entry) => entry.getAttribute('aria-label') === 'Messung löschen: 01.07.2026')!;
+    const button = qa<HTMLButtonElement>(fixture, 'tk-profile-extras button').find((entry) => entry.getAttribute('aria-label') === 'Messung löschen: 01.08.2026')!;
     button.click();
     await settle(fixture);
     expect(firebase.calls.some((call) => call.startsWith('deletePlayerRecord'))).toBe(false);
-    expect(text(q(fixture, 'tk-profile-extras .confirm-actions')?.parentElement)).toContain('die Messung vom 01.07.2026');
+    expect(text(q(fixture, 'tk-profile-extras .confirm-actions')?.parentElement)).toContain('die Messung vom 01.08.2026');
     clickByText(fixture, 'tk-profile-extras .confirm-actions button', 'Endgültig löschen');
     await vi.waitFor(() => expect(firebase.calls).toContain('deletePlayerRecord:p1:measurements:me1'));
   });

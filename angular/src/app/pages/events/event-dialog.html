@@ -1,4 +1,27 @@
 <tk-dialog [open]="open()" [title]="title()" (closed)="closed.emit()">
+  @if (viewing() && canEdit()) {
+    <button tkDialogAction type="button" class="edit-pen" aria-label="Event bearbeiten" (click)="startEdit()">
+      <tk-icon name="edit" />
+    </button>
+  }
+  @if (viewing()) {
+    <div class="details">
+      <dl>
+        @for (row of facts(); track row.label) {
+          <div class="fact">
+            <dt>{{ row.label }}</dt>
+            <dd>{{ row.value }}</dd>
+          </div>
+        }
+        @if (shown()?.notes?.trim()) {
+          <div class="fact">
+            <dt>Notizen</dt>
+            <dd class="notes">{{ shown()?.notes }}</dd>
+          </div>
+        }
+      </dl>
+    </div>
+  } @else {
   <form (submit)="submit($event)" novalidate>
     <div class="field">
       <label class="tk-label">
@@ -47,10 +70,10 @@
         }
       </div>
       <label class="tk-label">
-        Intensität
-        <select class="tk-input" name="intensity" [value]="draft().intensity" (change)="patch({ intensity: +value($event) })">
-          @for (entry of intensities; track entry.value) {
-            <option [value]="entry.value" [selected]="draft().intensity === entry.value">{{ entry.label }}</option>
+        Anstrengung
+        <select class="tk-input" name="exertion" [value]="draft().exertion" (change)="patch({ exertion: +value($event) })">
+          @for (entry of exertions; track entry.value) {
+            <option [value]="entry.value" [selected]="draft().exertion === entry.value">{{ entry.label }}</option>
           }
         </select>
       </label>
@@ -79,7 +102,7 @@
       @if (draft().locationCoords; as coords) {
         <p class="place-chosen">Ort gewählt: <strong>{{ coords.name }}</strong> – Koordinaten gespeichert, das Wetter kann angezeigt werden.</p>
       } @else {
-        <p class="hint">Ohne Auswahl bleibt der Ort nur ein Text (kein Wetter).</p>
+        <p class="hint home-hint">Ohne gewählten Ort zeigt das Wetter den Standardort {{ homeName }}. Für Auswärtsorte „Ort suchen“ nutzen.</p>
       }
       <div class="place-actions">
         <button tkButton type="button" variant="neutral" class="search-place" [disabled]="!canSearch()" (click)="searchPlaces()">
@@ -88,16 +111,7 @@
         @if (draft().locationCoords) {
           <button tkButton type="button" variant="neutral" class="remove-coords" (click)="removeCoords()">Auswahl entfernen</button>
         }
-        @if (canSaveDefault()) {
-          <button tkButton type="button" variant="neutral" class="save-default" (click)="saveAsDefault()">Als Standardort des Teams merken</button>
-        }
-        @if (defaultLocation()) {
-          <button tkButton type="button" variant="neutral" class="clear-default" (click)="clearDefault()">Standardort löschen</button>
-        }
       </div>
-      @if (defaultLocation(); as fallback) {
-        <p class="hint">Standardort des Teams: {{ fallback.coords ? fallback.coords.name : fallback.text }}</p>
-      }
       @if (searchError()) {
         <p class="error search-error" role="alert">{{ searchError() }}</p>
       }
@@ -140,7 +154,7 @@
       @if (draft().type === 'Training') {
         <div class="field">
           <label class="tk-label">
-            Dauer (Minuten, optional)
+            Dauer (Minuten, Standard 90)
             <input
               class="tk-input"
               name="durationMinutes"
@@ -281,8 +295,9 @@
       @if (editing()) {
         <button tkButton type="button" variant="neutral" class="delete" (click)="askDelete()">Event löschen</button>
       }
-      <button tkButton type="button" variant="neutral" (click)="closed.emit()">Abbrechen</button>
+      <button tkButton type="button" variant="neutral" (click)="cancel()">Abbrechen</button>
       <button tkButton type="submit" variant="primary">Speichern</button>
     </menu>
   </form>
+  }
 </tk-dialog>

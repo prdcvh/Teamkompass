@@ -11,17 +11,32 @@
   display: none;
 }
 
+/* Fließtext statt Flexbox: bricht in schmalen Spalten nur zwischen den Teilen um, das Symbol bleibt vorne (SCRUM-155). */
 .line {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  display: inline;
   font-weight: 600;
+  line-height: 1.5;
 }
 
 .line tk-icon {
+  display: inline-block;
   width: 18px;
   height: 18px;
+  margin-right: 6px;
+  vertical-align: -4px;
   color: var(--tk-blue);
+}
+
+.home {
+  margin-left: 6px;
+  color: var(--tk-muted);
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+/* „80 % Regen“ nicht mitten im Wort umbrechen (SCRUM-155). */
+.part {
+  white-space: nowrap;
 }
 
 .line.muted {

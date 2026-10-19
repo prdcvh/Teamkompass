@@ -1,0 +1,168 @@
+:host {
+  display: block;
+}
+
+p {
+  margin: 0;
+}
+
+.muted {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+a:focus-visible {
+  outline: 2px solid var(--tk-red);
+  outline-offset: 2px;
+}
+
+/* Aufstellung: Mini-Spielfeld (am Desktop quer, am Handy hochkant) */
+.lineup {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: var(--tk-space-5);
+  align-items: center;
+}
+
+.lineup[data-variant='mobile'] {
+  grid-template-columns: 1fr;
+}
+
+.lineup-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  border-radius: var(--tk-radius-lg);
+}
+
+.pitch {
+  --grass: #2f7d4f;
+  --grass-alt: #2a7148;
+  position: relative;
+  aspect-ratio: 100 / 133;
+  overflow: hidden;
+  background: repeating-linear-gradient(180deg, var(--grass) 0 10%, var(--grass-alt) 10% 20%);
+  border-radius: var(--tk-radius-lg);
+}
+
+.pitch.horizontal {
+  aspect-ratio: 160 / 100;
+  background: repeating-linear-gradient(90deg, var(--grass) 0 6.25%, var(--grass-alt) 6.25% 12.5%);
+}
+
+:host-context([data-theme='dark']) .pitch {
+  --grass: #1f5a3a;
+  --grass-alt: #1b5033;
+}
+
+@media (prefers-color-scheme: dark) {
+  :host-context(:root:not([data-theme='light'])) .pitch {
+    --grass: #1f5a3a;
+    --grass-alt: #1b5033;
+  }
+}
+
+.marks {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.55);
+}
+
+.marks * {
+  vector-effect: non-scaling-stroke;
+  stroke-width: 1.5px;
+}
+
+.marks .spot {
+  fill: rgba(255, 255, 255, 0.7);
+}
+
+.marker {
+  position: absolute;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  transform: translate(-50%, -30%);
+}
+
+.shirt {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  color: var(--tk-on-red);
+  background: var(--tk-red);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  font-size: var(--tk-text-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.keeper .shirt {
+  color: #241d1f;
+  background: #f2c14e;
+}
+
+.name {
+  max-width: 88px;
+  overflow: hidden;
+  padding: 1px 6px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: var(--tk-radius-pill);
+  font-size: var(--tk-text-xs);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-variant='mobile'] .shirt {
+  width: 26px;
+  height: 26px;
+  font-size: var(--tk-text-xs);
+}
+
+[data-variant='mobile'] .name {
+  max-width: 64px;
+  font-size: 10px;
+}
+
+.lineup-side {
+  display: grid;
+  gap: var(--tk-space-2);
+}
+
+.formation {
+  font-size: 40px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.lineup-rows {
+  display: grid;
+  gap: 6px;
+  margin: var(--tk-space-2) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--tk-text-sm);
+}
+
+.lineup-rows li {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: var(--tk-space-2);
+}
+
+.lineup-rows .zone {
+  color: var(--tk-muted);
+}
+
+[data-variant='mobile'] .lineup-rows {
+  display: none;
+}

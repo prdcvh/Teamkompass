@@ -56,7 +56,8 @@ export function coordsFromPlace(place: GeocodedPlace): LocationCoords {
 }
 
 export function openMeteoGeocodingUrl(query: string, language: string): string {
-  const params = new URLSearchParams({ name: query, count: String(GEOCODING_MAX_RESULTS), language, format: 'json' });
+  // `ngsw-bypass`: am Service Worker vorbei, sonst blockiert ein unter älterer CSP installierter Worker (SCRUM-151).
+  const params = new URLSearchParams({ name: query, count: String(GEOCODING_MAX_RESULTS), language, format: 'json', 'ngsw-bypass': 'true' });
   return `${OPEN_METEO_GEOCODING_URL}?${params.toString()}`;
 }
 

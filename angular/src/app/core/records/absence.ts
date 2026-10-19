@@ -37,7 +37,7 @@ export type AbsenceErrors = Partial<Record<'reason' | 'custom' | 'detail' | 'fro
 
 /**
  * Eine Verletzung ist ein eigener Abwesenheitsgrund: sie setzt den Status auf „Verletzt“ statt nur „Abwesend“ und
- * zählt im Belastungsindikator mit. Einträge von vor dieser Unterscheidung kennen das Feld `kind` noch nicht; dort
+ * zählt in der Verfügbarkeit mit. Einträge von vor dieser Unterscheidung kennen das Feld `kind` noch nicht; dort
  * zählt hilfsweise das Label (Freitext beginnend mit „Verletz…“).
  */
 export function isInjuryAbsence(absence: { kind?: string; label?: string } | null | undefined): boolean {
