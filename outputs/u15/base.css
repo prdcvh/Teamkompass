@@ -264,3 +264,9 @@ canvas[role="img"]:focus-visible {
 #eventsView.events-filter-empty .event-editor { display: none; }
 .event-outside-note { margin: 0 0 8px; padding: 8px 12px; border-radius: 10px; background: rgba(216, 7, 46, 0.08); }
 .event-outside-note[hidden] { display: none; }
+
+/* SCRUM-139: Dialog Belastungsprotokoll */
+.load-report-custom { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.load-report-custom[hidden] { display: none; }
+.checkbox-row { display: flex; align-items: center; gap: 8px; color: var(--ink); }
+.checkbox-row input { width: auto; margin: 0; }
