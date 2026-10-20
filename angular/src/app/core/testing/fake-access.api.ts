@@ -77,7 +77,7 @@ export class FakeAccessApi implements Pick<AccessApi, keyof AccessApi> {
     this.inviteDocs.delete(code);
   }
 
-  async createStaffAccount(email: string, password: string, role: 'trainer' | 'medical'): Promise<string> {
+  async createStaffAccount(email: string, password: string, role: 'trainer' | 'scout' | 'physio'): Promise<string> {
     this.calls.push(`createStaff:${role}:${email}`);
     this.lastStaffPassword = password;
     if (this.createStaffError) throw this.createStaffError;

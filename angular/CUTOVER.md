@@ -11,7 +11,7 @@ Legende: ✅ vorhanden · ≈ anders gelöst (gleicher Zweck) · ❌ fehlt → T
 | Bereich | Live-App | Angular | Stand |
 | --- | --- | --- | --- |
 | Anmeldung | Trainer (E-Mail/Passwort), Passwort vergessen, Spieler-/Eltern-Code | Login-Seite mit beiden Wegen | ✅ |
-| Rollen | Trainer, Spieler, Eltern, Scout | gleich, eigene Ansicht `/ansicht` | ✅ |
+| Rollen | Trainer, Spieler, Eltern, Scout, Medizin (SCRUM-170) | gleich, eigene Ansicht `/ansicht` | ✅ |
 | Passwort ändern | Dialog | Einstellungen | ✅ |
 | Start/Dashboard | Kennzahlen, Formkurve, nächstes Event, Startelf, Schnellaktionen | `/start` (SCRUM-69, SCRUM-93) | ✅ |
 | Kader | Liste, Suche, Positions-/Statusfilter, Sortierung, anlegen/bearbeiten/löschen, Einwilligung | `/kader` | ✅ |
@@ -26,7 +26,7 @@ Legende: ✅ vorhanden · ≈ anders gelöst (gleicher Zweck) · ❌ fehlt → T
 | Gegneranalyse | Gegner erfassen, Profile | `/gegneranalyse` | ✅ |
 | Aufstellung (Board) | Formationen, Bank, Auswechseln, Ziehen mit Maus/Finger | Antippen statt Ziehen | ≈ |
 | Aufstellung **pro Spiel**, „vom letzten Spiel übernehmen“, im Event sichtbar | SCRUM-29 (#159) | nur eine Team-Aufstellung | ❌ SCRUM-122 |
-| Zugänge | Einladungscodes, Trainer-Konto, Scout-Zugang, getrennte Listen, widerrufen | `/zugaenge` (SCRUM-73, SCRUM-92) | ✅ |
+| Zugänge | Einladungscodes, Trainer-Konto, Scout- und Medizin-Zugang, getrennte Listen, widerrufen | `/zugaenge` (SCRUM-73, SCRUM-92) | ✅ |
 | Globale Suche | Strg/⌘+K, Spieler/Events/Gegner | `/suche` | ✅ |
 | Export | JSON, PDF | `/export` | ✅ |
 | **Backup einspielen** | JSON-Import mit Prüfung und Zusammenfassung (SCRUM-28, #158) | Export-Seite: Datei wählen, Prüfung, Zusammenfassung, Bestätigung; gegenseitig mit der Live-App einspielbar | ✅ SCRUM-123 |

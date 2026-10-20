@@ -10,7 +10,7 @@ describe('Opponents (Gegneranalyse)', () => {
   let firebase: FakeFirebase;
   const isMobile = signal(false);
 
-  async function render(role: 'trainer' | 'medical' = 'trainer', mobile = false, suche = '') {
+  async function render(role: 'trainer' | 'physio' = 'trainer', mobile = false, suche = '') {
     isMobile.set(mobile);
     firebase = new FakeFirebase();
     firebase.opponents.opponents.set('o1', {
@@ -148,7 +148,7 @@ describe('Opponents (Gegneranalyse)', () => {
     isMobile.set(false);
     firebase = new FakeFirebase();
     TestBed.configureTestingModule({ providers: [provideRouter([]), ...provideFakeFirebase(firebase), { provide: LayoutService, useValue: { isMobile } }] });
-    TestBed.inject(SessionService).role.set('medical');
+    TestBed.inject(SessionService).role.set('physio');
     const fixture = TestBed.createComponent(Opponents);
     await fixture.whenStable();
     fixture.detectChanges();

@@ -25,7 +25,7 @@ describe('SignOut (Abmelden)', () => {
   const button = (fixture: { nativeElement: unknown }, label: string) =>
     [...root(fixture).querySelectorAll('button')].find((item) => item.textContent?.includes(label)) as HTMLButtonElement;
 
-  it.each<Role>(['trainer', 'medical'])('meldet %s sofort ab', async (role) => {
+  it.each<Role>(['trainer', 'physio'])('meldet %s sofort ab', async (role) => {
     await render(role);
     await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith('/anmelden'));
     expect(signOut).toHaveBeenCalledOnce();

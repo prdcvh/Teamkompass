@@ -19,8 +19,14 @@ gültig. Nach dem Deployment erstellt der Trainer für Spieler und Eltern neue
 - `trainer`: vollständige Verwaltung.
 - `player`: ausschließlich eigenes Profil, Bewertungen und Entwicklungsdaten.
 - `parent`: ausschließlich das verknüpfte Spielerprofil.
-- `medical`: read-only auf Kader, Abwesenheiten und Messhistorie; keine
-  Leistungsbewertungen oder Entwicklungspläne.
+- `physio` (UI „Medizin-Zugang“, SCRUM-170): read-only auf Kader, Status,
+  Abwesenheiten/Verletzungen und Messhistorie; keine Leistungsbewertungen oder
+  Entwicklungspläne.
+- `scout` (UI „Scout-Zugang“, SCRUM-170): read-only nur auf die bereinigte
+  Scout-Sicht `scoutProfiles` (Kompetenzprofil, Notenverlauf, Statistik), die der
+  Trainer-Client schreibt; keine Gesundheitsdaten, Rückmeldungen oder Notizen.
+- `medical`: alte Kennung des bisherigen Scout-Zugangs; gilt seit SCRUM-170 als
+  `scout` (Regeln und Apps), neue Konten werden damit nicht mehr angelegt.
 
 Eine Co-Trainer-Rolle wurde bewusst nicht eingeführt.
 

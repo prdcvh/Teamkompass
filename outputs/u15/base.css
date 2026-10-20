@@ -185,6 +185,11 @@ body.role-scout .development-form {
   display: none !important;
 }
 
+/* Ohne Verfuegbarkeits-Panel nimmt das Kompetenzprofil die ganze Breite ein. */
+body.role-scout .profile-deep-grid {
+  grid-template-columns: 1fr;
+}
+
 /* Einladungscode je Spieler nur fuer den Trainer im Rollen-Modus sichtbar.
    !important, weil die Knopf-Grundregeln in styles.css/mobile.css dieselbe
    Spezifitaet haben und sonst je nach Ladereihenfolge gewinnen wuerden. */

@@ -9,7 +9,7 @@ import { FakeFirebase, provideFakeFirebase } from '../testing/fake-firebase';
 describe('LineupService', () => {
   let firebase: FakeFirebase;
 
-  async function setup(role: 'trainer' | 'medical' | null = 'trainer') {
+  async function setup(role: 'trainer' | 'physio' | null = 'trainer') {
     firebase = new FakeFirebase();
     firebase.players.players.set('p1', { name: 'Ali', positions: ['TW'], number: 1, birthdate: '2012-01-01', status: 'Fit' });
     firebase.players.players.set('p2', { name: 'Ben', positions: ['ST'], number: 9, birthdate: '2012-01-01', status: 'Fit' });
@@ -38,7 +38,7 @@ describe('LineupService', () => {
     lineup.start();
     expect(firebase.lineup.lineupWatchers).toBe(1);
     TestBed.resetTestingModule();
-    const other = await setup('medical');
+    const other = await setup('physio');
     expect(other.load()).toBe('idle');
     expect(firebase.calls).not.toContain('watchLineup');
   });
@@ -54,7 +54,7 @@ describe('LineupService', () => {
   });
 
   it('schreibt für andere Rollen nichts', async () => {
-    const lineup = await setup('medical');
+    const lineup = await setup('physio');
     expect(lineup.save(emptyAssignments())).toBe(false);
     expect(firebase.calls).not.toContain('saveLineup');
   });
@@ -111,7 +111,7 @@ describe('LineupService', () => {
   });
 
   it('schreibt Spiel-Aufstellungen nur für Trainer und nur mit Spiel', async () => {
-    const other = await setup('medical');
+    const other = await setup('physio');
     expect(other.saveForEvent('e1', emptyAssignments())).toBe(false);
     TestBed.resetTestingModule();
     const lineup = await setup();

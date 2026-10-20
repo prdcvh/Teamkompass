@@ -1,8 +1,9 @@
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
-import { type AccessEntry, type InviteRole, type StaffRole, generateInviteCode, expiryFromDays, inviteEntry, memberEntry } from './access';
+import { type AccessEntry, type InviteRole, type StaffRole, generateInviteCode, expiryFromDays, inviteEntry, memberEntry, staffLabel } from './access';
 import { authErrorMessage, errorCode } from '../auth/auth-errors';
 import { AccessApi } from '../firebase/access.api';
 import { SessionService } from '../auth/session.service';
+import { ScoutPublishService } from '../scout/scout-publish.service';
 
 export type AccessLoad = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -18,6 +19,7 @@ export type InviteResult = { ok: true; code: string; expiresAt: Date | null } | 
 export class AccessService {
   private readonly accessApi = inject(AccessApi);
   private readonly session = inject(SessionService);
+  private readonly scoutPublish = inject(ScoutPublishService);
 
   readonly entries = signal<readonly AccessEntry[]>([]);
   readonly load = signal<AccessLoad>('idle');
@@ -88,20 +90,24 @@ export class AccessService {
       return { ok: false, message: `Der Zugang konnte nicht gesperrt werden. ${authErrorMessage(errorCode(error))}` };
     }
     await this.reload();
+    // Letzter Scout gesperrt: die Scout-Sicht wird gelöscht (SCRUM-170).
+    if (entry.role === 'scout') void this.scoutPublish.refreshAccounts();
     return { ok: true };
   }
 
-  /** Legt ein Trainer- oder Medizin-Konto an (Anmeldekonto + Zugang in einem Schritt). Das Passwort wird nicht gemerkt. */
+  /** Legt ein Trainer-, Scout- oder Medizin-Konto an (Anmeldekonto + Zugang in einem Schritt). Das Passwort wird nicht gemerkt. */
   async createStaff(role: StaffRole, email: string, password: string): Promise<ActionResult> {
     if (!this.canWrite()) return { ok: false, message: 'Nur Trainer dürfen Konten anlegen.' };
     try {
       await this.accessApi.createStaffAccount(email.trim(), password, role);
     } catch (error) {
       console.error(error);
-      const label = role === 'medical' ? 'Der Scout-Zugang' : 'Das Trainer-Konto';
+      const label = staffLabel(role);
       return { ok: false, message: `${label} konnte nicht angelegt werden. ${authErrorMessage(errorCode(error))}` };
     }
     if (this.load() === 'ready') await this.reload();
+    // Erster Scout angelegt: die Scout-Sicht wird jetzt aufgebaut (SCRUM-170).
+    if (role === 'scout') void this.scoutPublish.refreshAccounts();
     return { ok: true };
   }
 }

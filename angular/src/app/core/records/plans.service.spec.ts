@@ -7,7 +7,7 @@ import { emptyPlanDraft } from './plan';
 describe('PlansService', () => {
   let firebase: FakeFirebase;
 
-  async function setup(role?: 'trainer' | 'player' | 'medical') {
+  async function setup(role?: 'trainer' | 'player' | 'physio') {
     const context = await setupRecords(role);
     firebase = context.firebase;
     return context;

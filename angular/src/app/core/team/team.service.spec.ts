@@ -6,7 +6,7 @@ import { FakeFirebase, provideFakeFirebase } from '../testing/fake-firebase';
 describe('TeamService', () => {
   let firebase: FakeFirebase;
 
-  function setup(role: 'trainer' | 'medical' | null = 'trainer') {
+  function setup(role: 'trainer' | 'physio' | null = 'trainer') {
     firebase = new FakeFirebase();
     firebase.players.players.set('p1', { name: 'Ali Adler', positions: ['ST'], number: 9, birthdate: '2012-05-05', status: 'Fit' });
     firebase.players.players.set('p2', { name: 'Ben Bauer', positions: ['IV'], number: 4, birthdate: '2012-06-06', status: 'Fit' });
@@ -58,7 +58,7 @@ describe('TeamService', () => {
   });
 
   it('startet für andere Rollen als Trainer nichts', () => {
-    const team = setup('medical');
+    const team = setup('physio');
     team.start();
     expect(team.active()).toBe(false);
     expect(firebase.calls).not.toContain('watchRatings:e1');

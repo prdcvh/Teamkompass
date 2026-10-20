@@ -54,8 +54,8 @@ export class RecordsStateService {
     const role = this.session.role();
     // Spieler und Eltern: nur Dokumente mit der eigenen playerId (so verlangen es die Regeln).
     const ownOnly = role === 'player' || role === 'parent';
-    this.expected.set(role === 'medical' ? 2 : 3);
-    if (role !== 'medical') {
+    this.expected.set(role === 'physio' ? 2 : 3);
+    if (role !== 'physio') {
       this.open(generation, playerId, 'developmentPlans', ownOnly, (docs) => this.plans.set(docs.map((entry) => planFromDoc(entry.id, entry.data, today))));
     }
     this.open(generation, playerId, 'absences', ownOnly, (docs) => this.absences.set(docs.map((entry) => absenceFromDoc(entry.id, entry.data))));

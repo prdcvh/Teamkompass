@@ -4,10 +4,10 @@ import { SessionService } from '../../core/auth/session.service';
 import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
 import { StaffAccount } from './staff-account';
 
-describe('StaffAccount (Trainer-/Medizin-Konto)', () => {
+describe('StaffAccount (Trainer-Konto, Scout- und Medizin-Zugang)', () => {
   let firebase: FakeFirebase;
 
-  async function render(role: 'trainer' | 'medical', session: 'trainer' | 'medical' = 'trainer') {
+  async function render(role: 'trainer' | 'scout' | 'physio', session: 'trainer' | 'physio' = 'trainer') {
     firebase = new FakeFirebase();
     TestBed.configureTestingModule({
       providers: [
@@ -46,12 +46,17 @@ describe('StaffAccount (Trainer-/Medizin-Konto)', () => {
     expect(q<HTMLInputElement>(fixture, 'input[name="password"]')!.autocomplete).toBe('new-password');
     expect(q<HTMLInputElement>(fixture, 'input[name="repeat"]')!.type).toBe('password');
     TestBed.resetTestingModule();
-    fixture = await render('medical');
+    fixture = await render('scout');
     expect(text(q(fixture, 'h1'))).toBe('Scout-Zugang');
+    expect(text(root(fixture))).toContain('Keine Verletzungen, Abwesenheitsgründe, Messwerte oder Notizen');
+    TestBed.resetTestingModule();
+    fixture = await render('physio');
+    expect(text(q(fixture, 'h1'))).toBe('Medizin-Zugang');
+    expect(text(root(fixture))).toContain('Status, Abwesenheiten, Verletzungen und Messwerte');
   });
 
   it('zeigt Nicht-Trainern kein Formular', async () => {
-    const fixture = await render('trainer', 'medical');
+    const fixture = await render('trainer', 'physio');
     expect(q(fixture, 'form')).toBeNull();
     expect(text(root(fixture))).toContain('nur Trainer');
   });
@@ -71,20 +76,34 @@ describe('StaffAccount (Trainer-/Medizin-Konto)', () => {
   });
 
   it('legt das Konto an, meldet Erfolg und leert die Passwörter', async () => {
-    const fixture = await render('medical');
+    const fixture = await render('physio');
     await fill(fixture, 'email', ' arzt@verein.de ');
     await fill(fixture, 'password', 'LangGenug123');
     await fill(fixture, 'repeat', 'LangGenug123');
     await submit(fixture);
     await vi.waitFor(() => {
       fixture.detectChanges();
-      expect(text(q(fixture, '.success'))).toBe('Der Scout-Zugang für arzt@verein.de wurde angelegt.');
+      expect(text(q(fixture, '.success'))).toBe('Der Medizin-Zugang für arzt@verein.de wurde angelegt.');
     });
-    expect(firebase.calls).toContain('createStaff:medical:arzt@verein.de');
+    expect(firebase.calls).toContain('createStaff:physio:arzt@verein.de');
     expect(firebase.access.lastStaffPassword).toBe('LangGenug123');
     expect(q<HTMLInputElement>(fixture, 'input[name="password"]')!.value).toBe('');
     expect(q<HTMLInputElement>(fixture, 'input[name="repeat"]')!.value).toBe('');
     expect(q<HTMLInputElement>(fixture, 'input[name="email"]')!.value).toBe('');
+  });
+
+  it('legt einen Scout-Zugang mit der Rolle „scout“ an (SCRUM-170)', async () => {
+    const fixture = await render('scout');
+    await fill(fixture, 'email', 'scout@verein.de');
+    await fill(fixture, 'password', 'LangGenug123');
+    await fill(fixture, 'repeat', 'LangGenug123');
+    await submit(fixture);
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(text(q(fixture, '.success'))).toBe('Der Scout-Zugang für scout@verein.de wurde angelegt.');
+    });
+    expect(firebase.calls).toContain('createStaff:scout:scout@verein.de');
+    expect(firebase.access.memberDocs.get('staff-uid-1')).toMatchObject({ role: 'scout' });
   });
 
   it('meldet Firebase-Fehler verständlich und behält die Eingabe', async () => {

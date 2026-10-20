@@ -6,7 +6,7 @@ import { FakeFirebase, provideFakeFirebase } from '../testing/fake-firebase';
 describe('AccessService', () => {
   let firebase: FakeFirebase;
 
-  function setup(role: 'trainer' | 'medical' | 'player' | null = 'trainer') {
+  function setup(role: 'trainer' | 'physio' | 'player' | null = 'trainer') {
     firebase = new FakeFirebase();
     firebase.access.memberDocs.set('u1', { role: 'player', playerId: 'p1' });
     firebase.access.memberDocs.set('u2', { role: 'trainer' });
@@ -92,9 +92,13 @@ describe('AccessService', () => {
   it('legt Konten über die zweite App-Instanz an und gibt Fehler verständlich zurück', async () => {
     const access = setup();
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    expect(await access.createStaff('medical', ' arzt@x.de ', 'langgenug1')).toEqual({ ok: true });
-    expect(firebase.calls).toContain('createStaff:medical:arzt@x.de');
-    expect(firebase.access.memberDocs.get('staff-uid-1')).toMatchObject({ role: 'medical' });
+    expect(await access.createStaff('physio', ' arzt@x.de ', 'langgenug1')).toEqual({ ok: true });
+    expect(firebase.calls).toContain('createStaff:physio:arzt@x.de');
+    expect(firebase.access.memberDocs.get('staff-uid-1')).toMatchObject({ role: 'physio' });
+    firebase.access.nextStaffUid = 'staff-uid-2';
+    expect(await access.createStaff('scout', 'scout@x.de', 'langgenug1')).toEqual({ ok: true });
+    expect(firebase.calls).toContain('createStaff:scout:scout@x.de');
+    expect(firebase.access.memberDocs.get('staff-uid-2')).toMatchObject({ role: 'scout' });
 
     firebase.access.createStaffError = { code: 'auth/email-already-in-use' };
     expect(await access.createStaff('trainer', 'a@b.de', 'langgenug1')).toEqual({ ok: false, message: 'Das Trainer-Konto konnte nicht angelegt werden. Diese E-Mail wird bereits verwendet.' });

@@ -5,7 +5,7 @@ import { emptyMeasurementDraft } from './measurement';
 describe('MeasurementsService', () => {
   let firebase: FakeFirebase;
 
-  async function setup(role?: 'trainer' | 'player' | 'medical') {
+  async function setup(role?: 'trainer' | 'player' | 'physio') {
     const context = await setupRecords(role);
     firebase = context.firebase;
     return context;

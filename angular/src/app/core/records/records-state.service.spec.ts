@@ -11,7 +11,7 @@ import { emptyPlanDraft } from './plan';
 describe('RecordsStateService', () => {
   let firebase: FakeFirebase;
 
-  async function setup(role?: 'trainer' | 'player' | 'medical') {
+  async function setup(role?: 'trainer' | 'player' | 'physio') {
     const context = await setupRecords(role);
     firebase = context.firebase;
     return context;
@@ -28,7 +28,7 @@ describe('RecordsStateService', () => {
   });
 
   it('Medizin liest, schreibt aber nichts', async () => {
-    const { state, plans, absences, measurements } = await setup('medical');
+    const { state, plans, absences, measurements } = await setup('physio');
     expect(state.canWrite()).toBe(false);
     expect(plans.savePlan({ ...emptyPlanDraft(), focus: 'a', goal: 'b' }).focus).toContain('Nur Trainer');
     expect(absences.saveAbsence(absenceDraft()).reason).toContain('Nur Trainer');
@@ -94,7 +94,7 @@ describe('RecordsStateService', () => {
   });
 
   it('Medizin liest nur Abwesenheiten und Messwerte, keine Förderpläne', async () => {
-    const { plans, absences } = await setup('medical');
+    const { plans, absences } = await setup('physio');
     expect(firebase.calls.filter((call) => call.startsWith('watchPlayerRecords')).sort()).toEqual([
       'watchPlayerRecords:p1:absences',
       'watchPlayerRecords:p1:measurements',

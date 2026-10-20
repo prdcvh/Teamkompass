@@ -2,7 +2,11 @@ import { inject, provideAppInitializer } from '@angular/core';
 import { bootstrapApplication } from '@angular/platform-browser';
 import { App } from '../app/app';
 import { appConfig } from '../app/app.config';
+import { eventFromDoc } from '../app/core/events/event';
 import { AuthApi } from '../app/core/firebase/auth.api';
+import { playerFromDoc } from '../app/core/player/player';
+import { ratingFromDoc } from '../app/core/ratings/rating';
+import { buildScoutProfiles } from '../app/core/scout/scout-profile';
 import { FakeFirebase, provideFakeFirebase } from '../app/core/testing/fake-firebase';
 import { WeatherProvider } from '../app/core/weather/weather-provider';
 
@@ -34,7 +38,9 @@ function seed(): FakeFirebase {
   const fake = new FakeFirebase();
   fake.access.members.set('e2e-uid', { role: 'trainer', playerId: null });
   fake.access.members.set('e2e-player', { role: 'player', playerId: 'p1' });
-  fake.access.members.set('e2e-medical', { role: 'medical', playerId: null });
+  // Medizin-Zugang und Scout-Zugang (SCRUM-170); „medical“ ist ein bisheriges Scout-Konto und wird zum Scout.
+  fake.access.members.set('e2e-physio', { role: 'physio', playerId: null });
+  fake.access.members.set('e2e-scout', { role: 'scout', playerId: null });
   names.forEach((name, i) => {
     fake.players.players.set(`p${i + 1}`, {
       name, positions: [['TW', 'IV', 'ZM', 'ST', 'LA'][i % 5]], number: i + 1, birthdate: '2012-05-05',
@@ -83,6 +89,11 @@ function seed(): FakeFirebase {
       b2: { name: 'Winterpause mit einem ziemlich langen Namen für die Listenansicht', startDate: '2026-12-21', endDate: '2027-01-09' },
     },
   };
+  // Scout-Sicht (SCRUM-170) so, wie sie der Trainer-Client aus diesen Daten schreiben würde.
+  const players = [...fake.players.players].map(([id, data]) => playerFromDoc(id, data));
+  const events = [...fake.events.events].map(([id, data]) => eventFromDoc(id, data));
+  const ratingsByEvent = new Map([...fake.ratings.ratings].map(([eventId, byPlayer]) => [eventId, new Map([...byPlayer].map(([playerId, data]) => [playerId, ratingFromDoc(data)]))]));
+  for (const [id, doc] of buildScoutProfiles(players, events, ratingsByEvent)) fake.scout.profiles.set(id, JSON.parse(JSON.stringify(doc)) as Record<string, unknown>);
   return fake;
 }
 
@@ -96,12 +107,13 @@ bootstrapApplication(App, {
     // Meldet nach dem Start der Anmeldeprüfung einen angemeldeten Trainer.
     provideAppInitializer(() => {
       inject(AuthApi);
-      // ?as=player | medical | none wählt eine andere Rolle bzw. „nicht angemeldet“ (Anmeldeseite).
+      // ?as=player | physio | scout | medical | none wählt eine andere Rolle bzw. „nicht angemeldet“ (Anmeldeseite).
       const as = new URLSearchParams(location.search).get('as');
       const user =
         as === 'none' ? null
         : as === 'player' ? { uid: 'e2e-player', isAnonymous: true, email: null }
-        : as === 'medical' ? { uid: 'e2e-medical', isAnonymous: false, email: 'scout@example.org' }
+        : as === 'physio' ? { uid: 'e2e-physio', isAnonymous: false, email: 'physio@example.org' }
+        : as === 'scout' || as === 'medical' ? { uid: 'e2e-scout', isAnonymous: false, email: 'scout@example.org' }
         : { uid: 'e2e-uid', isAnonymous: false, email: 'trainer@example.org' };
       setTimeout(() => fake.auth.emit(user), 0);
     }),

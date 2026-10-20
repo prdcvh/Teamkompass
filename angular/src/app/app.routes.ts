@@ -21,7 +21,7 @@ export const routes: Routes = [
     component: Shell,
     canActivate: [authGuard],
     children: [
-      // Die eine Ansicht für Spieler, Eltern und Medizin (Figma 01c/01d); der Trainer wird zur Übersicht geschickt.
+      // Die eine Ansicht für Spieler, Eltern, Medizin und Scouts (Figma 01c/01d); der Trainer wird zur Übersicht geschickt.
       { path: 'ansicht', canActivate: [memberViewGuard], loadComponent: () => import('./pages/member-view/member-view').then((m) => m.MemberView) },
       {
         path: '',
@@ -41,7 +41,8 @@ export const routes: Routes = [
           { path: 'suche', loadComponent: () => import('./pages/search/search').then((m) => m.Search) },
           { path: 'zugaenge', loadComponent: () => import('./pages/access/access').then((m) => m.Access) },
           { path: 'trainer-konto', loadComponent: () => import('./pages/staff-account/staff-account').then((m) => m.StaffAccount), data: { role: 'trainer' } },
-          { path: 'medizin-zugang', loadComponent: () => import('./pages/staff-account/staff-account').then((m) => m.StaffAccount), data: { role: 'medical' } },
+          { path: 'scout-zugang', loadComponent: () => import('./pages/staff-account/staff-account').then((m) => m.StaffAccount), data: { role: 'scout' } },
+          { path: 'medizin-zugang', loadComponent: () => import('./pages/staff-account/staff-account').then((m) => m.StaffAccount), data: { role: 'physio' } },
           { path: 'export', loadComponent: () => import('./pages/export/export').then((m) => m.Export) },
           { path: 'einstellungen', loadComponent: () => import('./pages/settings/settings').then((m) => m.Settings) },
         ],

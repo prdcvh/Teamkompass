@@ -11,7 +11,8 @@ npm ci --ignore-scripts
 npm test
 ```
 
-Aktuell abgedeckt (`roles.test.mjs`): Rollen-Matrix für Trainer, Medizin, Spieler, Eltern,
+Aktuell abgedeckt (`roles.test.mjs`): Rollen-Matrix für Trainer, Medizin (`physio`), Scout (`scout` und die
+alte Kennung `medical`, SCRUM-170: nur `scoutProfiles`, keine Gesundheits- oder Rohdaten), Spieler, Eltern,
 abgelaufene Zugänge und Nicht-Mitglieder – wer welche Pfade lesen/schreiben darf (Spielerprofile,
 Bewertungen, interne Notizen, Förderpläne, Abwesenheiten, Messwerte, Gegner, Aufstellung,
 Mitgliedschaften, Einladungen), inklusive der Listenabfragen mit `playerId`-Filter.

@@ -9,7 +9,7 @@
       @if (tab() === 'players') {
         <button tkButton variant="primary" type="button" [disabled]="squad.load() !== 'ready'" (click)="inviteOpen.set(true)">+ Zugang erzeugen</button>
       } @else {
-        <a tkButton variant="primary" routerLink="/medizin-zugang">+ Scout-Zugang anlegen</a>
+        <a tkButton variant="primary" [routerLink]="createLink()">+ {{ createLabel() }}</a>
       }
     }
   </header>
@@ -18,16 +18,23 @@
     <p class="muted">Die Zugangsverwaltung sehen nur Trainer.</p>
   } @else {
     <div class="tabs" role="tablist" aria-label="Art des Zugangs">
-      <button type="button" role="tab" id="access-tab-players" aria-controls="access-panel" [attr.aria-selected]="tab() === 'players'" [attr.tabindex]="tab() === 'players' ? 0 : -1" [class.on]="tab() === 'players'" (click)="select('players')" (keydown.arrowright)="selectByKey('scouts')" (keydown.arrowleft)="selectByKey('scouts')">Spieler ({{ counts().players }})</button>
-      <button type="button" role="tab" id="access-tab-scouts" aria-controls="access-panel" [attr.aria-selected]="tab() === 'scouts'" [attr.tabindex]="tab() === 'scouts' ? 0 : -1" [class.on]="tab() === 'scouts'" (click)="select('scouts')" (keydown.arrowleft)="selectByKey('players')" (keydown.arrowright)="selectByKey('players')">Scouts ({{ counts().scouts }})</button>
+      <button type="button" role="tab" id="access-tab-players" aria-controls="access-panel" [attr.aria-selected]="tab() === 'players'" [attr.tabindex]="tab() === 'players' ? 0 : -1" [class.on]="tab() === 'players'" (click)="select('players')" (keydown.arrowright)="selectByKey(neighbour(1))" (keydown.arrowleft)="selectByKey(neighbour(-1))">Spieler ({{ counts().players }})</button>
+      <button type="button" role="tab" id="access-tab-scouts" aria-controls="access-panel" [attr.aria-selected]="tab() === 'scouts'" [attr.tabindex]="tab() === 'scouts' ? 0 : -1" [class.on]="tab() === 'scouts'" (click)="select('scouts')" (keydown.arrowright)="selectByKey(neighbour(1))" (keydown.arrowleft)="selectByKey(neighbour(-1))">Scouts ({{ counts().scouts }})</button>
+      <button type="button" role="tab" id="access-tab-physios" aria-controls="access-panel" [attr.aria-selected]="tab() === 'physios'" [attr.tabindex]="tab() === 'physios' ? 0 : -1" [class.on]="tab() === 'physios'" (click)="select('physios')" (keydown.arrowright)="selectByKey(neighbour(1))" (keydown.arrowleft)="selectByKey(neighbour(-1))">Medizin ({{ counts().physios }})</button>
     </div>
 
     @if (tab() === 'players') {
       <p class="muted">
         Einladungscodes für Spieler und Eltern erzeugen (mit Befristung) und bestehende Zugänge sperren. Ein Code gilt wie ein Passwort und wird nur einmal angezeigt.
       </p>
+    } @else if (tab() === 'scouts') {
+      <p class="muted">
+        Scout-Zugänge lesen Kompetenzprofil, Notenverlauf und Statistik – keine Verletzungen, Abwesenheitsgründe, Messwerte oder Notizen. Sie melden sich mit E-Mail und Passwort an.
+      </p>
     } @else {
-      <p class="muted">Scout-Zugänge lesen Spielerstatus, Abwesenheiten und Messwerte, aber keine Noten. Sie melden sich mit E-Mail und Passwort an.</p>
+      <p class="muted">
+        Medizin-Zugänge (z. B. Physio) lesen Status, Abwesenheiten, Verletzungen und Messwerte aller Spieler, aber keine Noten. Sie melden sich mit E-Mail und Passwort an.
+      </p>
     }
 
     @if (access.load() === 'error') {
@@ -44,8 +51,8 @@
             <p>Noch keine Spieler-Zugänge vergeben.</p>
             <button tkButton variant="primary" type="button" [disabled]="squad.load() !== 'ready'" (click)="inviteOpen.set(true)">+ Zugang erzeugen</button>
           } @else {
-            <p>Noch kein Scout-Zugang angelegt.</p>
-            <a tkButton variant="primary" routerLink="/medizin-zugang">+ Scout-Zugang anlegen</a>
+            <p>{{ tab() === 'scouts' ? 'Noch kein Scout-Zugang angelegt.' : 'Noch kein Medizin-Zugang angelegt.' }}</p>
+            <a tkButton variant="primary" [routerLink]="createLink()">+ {{ createLabel() }}</a>
           }
         </div>
       </tk-card>
@@ -73,7 +80,7 @@
     @if (tab() === 'players') {
       <button type="button" class="fab" aria-label="Zugang erzeugen" [disabled]="squad.load() !== 'ready'" (click)="inviteOpen.set(true)"><tk-icon name="plus" /></button>
     } @else {
-      <a class="fab" aria-label="Scout-Zugang anlegen" routerLink="/medizin-zugang"><tk-icon name="plus" /></a>
+      <a class="fab" [attr.aria-label]="createLabel()" [routerLink]="createLink()"><tk-icon name="plus" /></a>
     }
   }
 </section>
@@ -85,7 +92,11 @@
     @if (revoking()?.kind === 'invite') {
       <p>Der noch nicht eingelöste Einladungscode wird ungültig.</p>
     } @else {
-      <p>Die Person muss sich danach mit einem neuen Einladungscode anmelden.</p>
+      @if (revoking()?.role === 'scout' || revoking()?.role === 'physio') {
+        <p>Der Zugang verliert sofort den Zugriff. Für einen neuen Zugang legt ein Trainer ihn neu an.</p>
+      } @else {
+        <p>Die Person muss sich danach mit einem neuen Einladungscode anmelden.</p>
+      }
     }
     @if (revokeError()) {
       <p class="error" role="alert">{{ revokeError() }}</p>

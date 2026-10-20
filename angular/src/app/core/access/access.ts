@@ -1,5 +1,5 @@
 import type { RawDoc } from '../firebase/types';
-import type { Role } from '../auth/role';
+import { type Role, normalizeRole } from '../auth/role';
 
 /**
  * Passwortrichtlinie für neue Trainer- und Medizin-Konten (SCRUM-58): mindestens 12 Zeichen mit Groß- und
@@ -11,7 +11,8 @@ export const MAX_EXPIRY_DAYS = 365;
 
 /** Rollen, für die ein Einladungscode erzeugt werden kann. */
 export type InviteRole = 'player' | 'parent';
-export type StaffRole = 'trainer' | 'medical';
+/** Konten mit E-Mail und Passwort: Trainer, Scout (Leistungsdaten) und Medizin (Gesundheitsdaten), SCRUM-170. */
+export type StaffRole = 'trainer' | 'scout' | 'physio';
 
 export const INVITE_ROLES: readonly { readonly value: InviteRole; readonly label: string }[] = [
   { value: 'player', label: 'Spieler' },
@@ -86,10 +87,13 @@ function dateOf(value: unknown): Date | null {
   return date instanceof Date && !Number.isNaN(date.getTime()) ? date : null;
 }
 
-/** members-Dokument → Eintrag; Trainer-Konten werden hier nicht verwaltet (wie in der Referenz) und ergeben null. */
+/**
+ * members-Dokument → Eintrag; Trainer-Konten werden hier nicht verwaltet (wie in der Referenz) und ergeben null.
+ * Bisherige Scout-Konten mit der alten Kennung „medical“ erscheinen als Scout (SCRUM-170).
+ */
 export function memberEntry(doc: RawDoc): AccessEntry | null {
-  const role = (['player', 'parent', 'medical'] as const).find((value) => value === doc.data['role']);
-  if (!role) return null;
+  const role = normalizeRole(doc.data['role']);
+  if (!role || role === 'trainer') return null;
   return {
     kind: 'member',
     id: doc.id,
@@ -110,8 +114,10 @@ export function roleLabel(role: Role): string {
   switch (role) {
     case 'parent':
       return 'Eltern';
-    case 'medical':
-      return 'Scout (nur lesen)';
+    case 'scout':
+      return 'Scout (Leistungsdaten, keine Gesundheitsdaten)';
+    case 'physio':
+      return 'Medizin (Status, Abwesenheiten, Verletzungen, Messwerte)';
     case 'trainer':
       return 'Trainer';
     default:
@@ -139,4 +145,11 @@ export function sortEntries(entries: readonly AccessEntry[], nameOf: (entry: Acc
   return [...entries].sort(
     (a, b) => order[a.kind] - order[b.kind] || nameOf(a).localeCompare(nameOf(b), 'de') || a.id.localeCompare(b.id),
   );
+}
+
+/** „Der Scout-Zugang“ / „Der Medizin-Zugang“ / „Das Trainer-Konto“ für Meldungen. */
+export function staffLabel(role: StaffRole): string {
+  if (role === 'scout') return 'Der Scout-Zugang';
+  if (role === 'physio') return 'Der Medizin-Zugang';
+  return 'Das Trainer-Konto';
 }

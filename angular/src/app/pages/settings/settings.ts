@@ -24,7 +24,7 @@ export class Settings {
   private readonly account = inject(AccountService);
   /** Nur Konten mit E-Mail und Passwort (Trainer, Medizin) können das Passwort ändern. */
   private readonly session = inject(SessionService);
-  protected readonly canChangePassword = computed(() => ['trainer', 'medical'].includes(this.session.role() ?? ''));
+  protected readonly canChangePassword = computed(() => ['trainer', 'physio', 'scout'].includes(this.session.role() ?? ''));
   protected readonly passwordMin = MIN_PASSWORD_LENGTH;
   protected current = '';
   protected next = '';

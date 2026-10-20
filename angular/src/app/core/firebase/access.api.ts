@@ -1,12 +1,11 @@
 import { Injectable, inject } from '@angular/core';
 import { environment } from '../../../environments/environment';
-import type { Role } from '../auth/role';
+import { normalizeRole } from '../auth/role';
+import type { StaffRole } from '../access/access';
 import { FirebaseConnection } from './firebase-connection';
 import type { InviteRecord, MemberRecord, RawDoc } from './types';
 
-const ROLES: readonly Role[] = ['trainer', 'player', 'parent', 'medical'];
-
-/** Zugänge: Mitglieder (members), Einladungscodes (invites) und Trainer-/Scout-Konten. */
+/** Zugänge: Mitglieder (members), Einladungscodes (invites) und Trainer-, Scout- und Medizin-Konten. */
 @Injectable({ providedIn: 'root' })
 export class AccessApi {
   private readonly connection = inject(FirebaseConnection);
@@ -17,7 +16,8 @@ export class AccessApi {
     const snapshot = await getDoc(doc(db, 'teams', environment.teamId, 'members', uid));
     if (!snapshot.exists()) return null;
     const data = snapshot.data();
-    const role = ROLES.find((value) => value === data['role']);
+    // Bisherige Scout-Konten tragen noch „medical“ und werden hier zu Scouts (SCRUM-170).
+    const role = normalizeRole(data['role']);
     if (!role) return null;
     return { role, playerId: typeof data['playerId'] === 'string' ? data['playerId'] : null };
   }
@@ -30,7 +30,7 @@ export class AccessApi {
     const data = snapshot.data();
     const expires = data['expiresAt'] as { toDate?: () => Date } | null | undefined;
     return {
-      role: ROLES.find((value) => value === data['role']) ?? 'player',
+      role: data['role'] === 'parent' ? 'parent' : 'player',
       playerId: String(data['playerId'] ?? ''),
       expiresAt: expires?.toDate ? expires.toDate() : null,
       expiresAtRaw: data['expiresAt'] ?? null,
@@ -99,13 +99,13 @@ export class AccessApi {
   }
 
   /**
-   * Legt ein Trainer- oder Medizin-Konto an: Anmeldekonto und members-Dokument in einem Schritt.
+   * Legt ein Trainer-, Scout- oder Medizin-Konto an: Anmeldekonto und members-Dokument in einem Schritt.
    * Das Anmeldekonto entsteht über eine zweite, temporäre App-Instanz: `createUserWithEmailAndPassword`
    * meldet sonst die eigene, gerade aktive Trainer-Sitzung ab und als das neue Konto an. Das members-Dokument
    * schreibt die normale Instanz, also weiterhin als der eingeloggte Trainer (so verlangen es die Regeln).
    * Die zweite Instanz wird immer wieder abgemeldet und entfernt. Gibt die UID des neuen Kontos zurück.
    */
-  async createStaffAccount(email: string, password: string, role: 'trainer' | 'medical'): Promise<string> {
+  async createStaffAccount(email: string, password: string, role: StaffRole): Promise<string> {
     const { app, db } = await this.connection.get();
     const [{ deleteApp, initializeApp }, { createUserWithEmailAndPassword, getAuth, signOut }, { doc, serverTimestamp, setDoc }] =
       await Promise.all([import('firebase/app'), import('firebase/auth'), import('firebase/firestore')]);
