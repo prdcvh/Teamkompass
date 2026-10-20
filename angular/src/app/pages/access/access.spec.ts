@@ -4,6 +4,7 @@ import { provideRouter } from '@angular/router';
 import { LayoutService } from '../../core/shell/layout.service';
 import { SessionService } from '../../core/auth/session.service';
 import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
+import { AccessService } from '../../core/access/access.service';
 import { Access } from './access';
 
 describe('Access (Zugänge: Spieler und Scouts)', () => {
@@ -212,8 +213,33 @@ describe('Access (Zugänge: Spieler und Scouts)', () => {
     await openScouts(fixture);
     expect(q(fixture, '#access-tab-scouts')!.getAttribute('aria-selected')).toBe('true');
     expect(q(fixture, '.head button')).toBeNull();
-    expect(q<HTMLAnchorElement>(fixture, '.head a')!.getAttribute('href')).toBe('/medizin-zugang');
+    expect(q<HTMLAnchorElement>(fixture, '.head a')!.getAttribute('href')).toBe('/scout-zugang');
     expect(text(q(fixture, '.head a'))).toBe('+ Scout-Zugang anlegen');
+  });
+
+  it('SCRUM-170: trennt Scout- und Medizin-Zugänge; Alt-Konten „medical“ ohne healthAccess stehen bei den Scouts', async () => {
+    const fixture = await render();
+    firebase.access.memberDocs.set('u4', { role: 'medical', healthAccess: true, email: 'physio@verein.de' });
+    firebase.access.memberDocs.set('u5', { role: 'scout', email: 'scout@verein.de' });
+    await TestBed.inject(AccessService).reload();
+    await openScouts(fixture);
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(text(q(fixture, '#access-tab-medical'))).toBe('Medizin (1)');
+    });
+    expect(text(q(fixture, '#access-tab-scouts'))).toBe('Scouts (2)');
+    expect(text(q(fixture, '.list'))).toContain('arzt@verein.de');
+    expect(text(q(fixture, '.list'))).toContain('scout@verein.de');
+    expect(text(q(fixture, '.list'))).not.toContain('physio@verein.de');
+    expect(text(q(fixture, '.list'))).toContain('Scout (nur lesen)');
+    q<HTMLButtonElement>(fixture, '#access-tab-medical')!.click();
+    await flush(fixture);
+    expect(text(q(fixture, '.list'))).toContain('physio@verein.de');
+    expect(text(q(fixture, '.list'))).toContain('Medizin (nur lesen)');
+    expect(text(q(fixture, '.list'))).not.toContain('arzt@verein.de');
+    expect(q<HTMLAnchorElement>(fixture, '.head a')!.getAttribute('href')).toBe('/medizin-zugang');
+    expect(text(q(fixture, '.head a'))).toBe('+ Medizin-Zugang anlegen');
+    expect(text(root(fixture))).toContain('Status, Abwesenheiten, Verletzungen und Messwerte');
   });
 
   it('wechselt die Reiter auch mit den Pfeiltasten', async () => {

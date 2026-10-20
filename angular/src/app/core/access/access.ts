@@ -1,8 +1,8 @@
 import type { RawDoc } from '../firebase/types';
-import type { Role } from '../auth/role';
+import { type Role, memberRole } from '../auth/role';
 
 /**
- * Passwortrichtlinie für neue Trainer- und Medizin-Konten (SCRUM-58): mindestens 12 Zeichen mit Groß- und
+ * Passwortrichtlinie für neue Trainer-, Scout- und Medizin-Konten (SCRUM-58): mindestens 12 Zeichen mit Groß- und
  * Kleinbuchstaben und einer Ziffer. Die Referenz-App erlaubte früher nur 6 Zeichen.
  */
 export const MIN_PASSWORD_LENGTH = 12;
@@ -11,7 +11,8 @@ export const MAX_EXPIRY_DAYS = 365;
 
 /** Rollen, für die ein Einladungscode erzeugt werden kann. */
 export type InviteRole = 'player' | 'parent';
-export type StaffRole = 'trainer' | 'medical';
+/** Konten mit E-Mail und Passwort: Trainer, Medizin-Zugang (Gesundheitsdaten) und Scout-Zugang (Leistung), SCRUM-170. */
+export type StaffRole = 'trainer' | 'medical' | 'scout';
 
 export const INVITE_ROLES: readonly { readonly value: InviteRole; readonly label: string }[] = [
   { value: 'player', label: 'Spieler' },
@@ -86,10 +87,13 @@ function dateOf(value: unknown): Date | null {
   return date instanceof Date && !Number.isNaN(date.getTime()) ? date : null;
 }
 
-/** members-Dokument → Eintrag; Trainer-Konten werden hier nicht verwaltet (wie in der Referenz) und ergeben null. */
+/**
+ * members-Dokument → Eintrag; Trainer-Konten werden hier nicht verwaltet (wie in der Referenz) und ergeben null.
+ * Alt-Konten „medical“ ohne healthAccess erscheinen als Scout (SCRUM-170, wie in firestore.rules).
+ */
 export function memberEntry(doc: RawDoc): AccessEntry | null {
-  const role = (['player', 'parent', 'medical'] as const).find((value) => value === doc.data['role']);
-  if (!role) return null;
+  const role = memberRole(doc.data);
+  if (!role || role === 'trainer') return null;
   return {
     kind: 'member',
     id: doc.id,
@@ -111,6 +115,8 @@ export function roleLabel(role: Role): string {
     case 'parent':
       return 'Eltern';
     case 'medical':
+      return 'Medizin (nur lesen)';
+    case 'scout':
       return 'Scout (nur lesen)';
     case 'trainer':
       return 'Trainer';
@@ -139,4 +145,11 @@ export function sortEntries(entries: readonly AccessEntry[], nameOf: (entry: Acc
   return [...entries].sort(
     (a, b) => order[a.kind] - order[b.kind] || nameOf(a).localeCompare(nameOf(b), 'de') || a.id.localeCompare(b.id),
   );
+}
+
+/** „Der Scout-Zugang“ / „Der Medizin-Zugang“ / „Das Trainer-Konto“ – für Erfolgs- und Fehlermeldungen. */
+export function staffAccountSubject(role: StaffRole): string {
+  if (role === 'medical') return 'Der Medizin-Zugang';
+  if (role === 'scout') return 'Der Scout-Zugang';
+  return 'Das Trainer-Konto';
 }

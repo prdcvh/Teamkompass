@@ -77,11 +77,11 @@ export class FakeAccessApi implements Pick<AccessApi, keyof AccessApi> {
     this.inviteDocs.delete(code);
   }
 
-  async createStaffAccount(email: string, password: string, role: 'trainer' | 'medical'): Promise<string> {
+  async createStaffAccount(email: string, password: string, role: 'trainer' | 'medical' | 'scout'): Promise<string> {
     this.calls.push(`createStaff:${role}:${email}`);
     this.lastStaffPassword = password;
     if (this.createStaffError) throw this.createStaffError;
-    this.memberDocs.set(this.nextStaffUid, { role, email });
+    this.memberDocs.set(this.nextStaffUid, role === 'medical' ? { role, healthAccess: true, email } : { role, email });
     return this.nextStaffUid;
   }
 }

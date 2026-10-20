@@ -79,6 +79,8 @@ export class PlayersApi {
       // Einladungscodes und Zugänge des Spielers (SCRUM-53): sonst zeigen sie auf einen gelöschten Spieler.
       ...invites.docs.map((entry) => entry.ref),
       ...members.docs.map((entry) => entry.ref),
+      // Bereinigte Scout-Ansicht des Spielers (SCRUM-170).
+      doc(db, ...base, 'scoutProfiles', id),
       doc(db, ...base, 'players', id), // zuletzt: bricht ein Block ab, bleibt der Spieler sichtbar und der Löschversuch wiederholbar
     ];
     for (let offset = 0; offset < refs.length; offset += 450) {

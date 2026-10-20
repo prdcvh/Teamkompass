@@ -182,8 +182,14 @@ body.role-scout #developmentPanel,
 body.role-scout #absencePanel,
 body.role-scout #measurementPanel,
 body.role-scout #squadSort option[value="status"],
-body.role-scout #squadSort option[value="risk"] {
+body.role-scout #squadSort option[value="risk"],
+body.role-scout #moreNavTab {
   display: none !important;
+}
+
+/* Ohne Verfuegbarkeits-Panel nimmt das Kompetenzprofil die ganze Breite ein. */
+body.role-scout .profile-deep-grid {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 /* Einladungscode je Spieler nur fuer den Trainer im Rollen-Modus sichtbar.

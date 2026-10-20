@@ -118,8 +118,12 @@ describe('Datenformat alte App ↔ Angular', () => {
     const timestamp = (iso: string) => ({ toDate: () => new Date(iso) });
     const member = { role: 'parent', playerId: 'p1', claimedInviteCode: 'abc', expiresAt: timestamp('2027-01-01T00:00:00Z'), createdAt: timestamp('2026-10-01T00:00:00Z') };
     expect(memberEntry({ id: 'u1', data: member })).toMatchObject({ kind: 'member', role: 'parent', playerId: 'p1' });
+    // SCRUM-170: Alt-Konten „medical“ ohne healthAccess sind Scouts; der Medizin-Zugang trägt healthAccess: true.
     const scout = { role: 'medical', createdAt: timestamp('2026-10-01T00:00:00Z') };
-    expect(memberEntry({ id: 'u2', data: scout })).toMatchObject({ role: 'medical', email: '' });
+    expect(memberEntry({ id: 'u2', data: scout })).toMatchObject({ role: 'scout', email: '' });
+    const medical = { role: 'medical', healthAccess: true, email: 'physio@x.de', createdAt: timestamp('2026-10-21T00:00:00Z') };
+    expect(memberEntry({ id: 'u4', data: medical })).toMatchObject({ role: 'medical', email: 'physio@x.de' });
+    expect(memberEntry({ id: 'u5', data: { role: 'scout', email: 'scout@x.de' } })).toMatchObject({ role: 'scout', email: 'scout@x.de' });
     expect(memberEntry({ id: 'u3', data: { role: 'trainer' } })).toBeNull();
     const invite = { playerId: 'p1', role: 'player', expiresAt: null, createdAt: timestamp('2026-10-01T00:00:00Z') };
     expect(inviteEntry({ id: 'code1', data: invite })).toMatchObject({ kind: 'invite', role: 'player', playerId: 'p1', expiresAt: null });

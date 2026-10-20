@@ -55,7 +55,7 @@ Struktur unter `src/app/`:
 
 ```
 core/            fachliche Logik und Dienste, nur Fachordner (keine losen Dateien):
-  access/        Zugänge (Einladungscodes, Trainer-/Scout-Konten)
+  access/        Zugänge (Einladungscodes, Trainer-, Scout- und Medizin-Konten)
   analysis/      Teamanalyse und Belastungsindikator
   auth/          Anmeldung, Sitzung, Rollen, Konto, Route-Guards
   device/        Geräte-Einstellungen, lokale Daten, Design
@@ -68,6 +68,7 @@ core/            fachliche Logik und Dienste, nur Fachordner (keine losen Dateie
   profile/       Spielerprofil und Profilbericht
   ratings/       Bewertungen
   records/       Förderpläne, Abwesenheiten, Verfügbarkeit, Messwerte
+  scout/         Bereinigte Scout-Ansicht (scoutProfiles): Abgleich durch den Trainer, Lesen durch Scouts
   shared/        allgemeine Hilfen (Datum)
   shell/         App-Rahmen: Navigation, Layout, Sync-Status, globale Suche
   team/          Team-Kennzahlen

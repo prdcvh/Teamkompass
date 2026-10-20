@@ -214,6 +214,6 @@ export function docFromPlayer(player: Player): Record<string, unknown> {
   };
 }
 
-export function positionText(player: Player): string {
+export function positionText(player: Pick<Player, 'positions'>): string {
   return player.positions.join(', ') || '–';
 }

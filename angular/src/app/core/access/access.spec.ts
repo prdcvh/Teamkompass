@@ -7,7 +7,9 @@ import {
   isExpired,
   memberEntry,
   parseExpiryDays,
+  roleLabel,
   sortEntries,
+  staffAccountSubject,
   validateStaffDraft,
   validityText,
 } from './access';
@@ -61,12 +63,24 @@ describe('Zugangsverwaltung (reine Logik)', () => {
     expect(memberEntry({ id: 'u1', data: { role: 'parent', playerId: 'p1', expiresAt: ts(expiry) } })).toEqual({
       kind: 'member', id: 'u1', role: 'parent', playerId: 'p1', email: '', expiresAt: expiry,
     });
-    expect(memberEntry({ id: 'u2', data: { role: 'medical', email: 'arzt@x.de' } })).toMatchObject({ role: 'medical', playerId: null, email: 'arzt@x.de', expiresAt: null });
+    // SCRUM-170: „medical“ ohne healthAccess (Alt-Konto) ist ein Scout, mit healthAccess ein Medizin-Zugang.
+    expect(memberEntry({ id: 'u2', data: { role: 'medical', email: 'arzt@x.de' } })).toMatchObject({ role: 'scout', playerId: null, email: 'arzt@x.de', expiresAt: null });
+    expect(memberEntry({ id: 'u2b', data: { role: 'medical', healthAccess: true, email: 'physio@x.de' } })).toMatchObject({ role: 'medical', email: 'physio@x.de' });
+    expect(memberEntry({ id: 'u2c', data: { role: 'medical', healthAccess: 'true' } })).toMatchObject({ role: 'scout' });
+    expect(memberEntry({ id: 'u2d', data: { role: 'scout', email: 's@x.de' } })).toMatchObject({ role: 'scout', email: 's@x.de' });
     expect(memberEntry({ id: 'u3', data: { role: 'trainer' } })).toBeNull();
     expect(memberEntry({ id: 'u4', data: {} })).toBeNull();
     expect(inviteEntry({ id: 'c1', data: { role: 'player', playerId: 'p1', expiresAt: null } })).toMatchObject({ kind: 'invite', role: 'player', expiresAt: null });
     expect(inviteEntry({ id: 'c2', data: { role: 'medical', playerId: 'p1' } })).toBeNull();
     expect(inviteEntry({ id: 'c3', data: { role: 'player' } })).toBeNull();
+  });
+
+  it('SCRUM-170: benennt Scout- und Medizin-Zugang eindeutig', () => {
+    expect(roleLabel('scout')).toBe('Scout (nur lesen)');
+    expect(roleLabel('medical')).toBe('Medizin (nur lesen)');
+    expect(staffAccountSubject('scout')).toBe('Der Scout-Zugang');
+    expect(staffAccountSubject('medical')).toBe('Der Medizin-Zugang');
+    expect(staffAccountSubject('trainer')).toBe('Das Trainer-Konto');
   });
 
   it('beschreibt die Gültigkeit', () => {

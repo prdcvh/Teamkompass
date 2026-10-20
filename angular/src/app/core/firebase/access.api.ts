@@ -1,12 +1,12 @@
 import { Injectable, inject } from '@angular/core';
 import { environment } from '../../../environments/environment';
-import type { Role } from '../auth/role';
+import { type Role, memberRole } from '../auth/role';
 import { FirebaseConnection } from './firebase-connection';
 import type { InviteRecord, MemberRecord, RawDoc } from './types';
 
-const ROLES: readonly Role[] = ['trainer', 'player', 'parent', 'medical'];
+const ROLES: readonly Role[] = ['trainer', 'player', 'parent', 'medical', 'scout'];
 
-/** Zugänge: Mitglieder (members), Einladungscodes (invites) und Trainer-/Scout-Konten. */
+/** Zugänge: Mitglieder (members), Einladungscodes (invites) und Trainer-, Scout- und Medizin-Konten. */
 @Injectable({ providedIn: 'root' })
 export class AccessApi {
   private readonly connection = inject(FirebaseConnection);
@@ -17,7 +17,8 @@ export class AccessApi {
     const snapshot = await getDoc(doc(db, 'teams', environment.teamId, 'members', uid));
     if (!snapshot.exists()) return null;
     const data = snapshot.data();
-    const role = ROLES.find((value) => value === data['role']);
+    // Alt-Konten „medical“ ohne healthAccess sind seit SCRUM-170 Scouts (wie in firestore.rules).
+    const role = memberRole(data);
     if (!role) return null;
     return { role, playerId: typeof data['playerId'] === 'string' ? data['playerId'] : null };
   }
@@ -99,13 +100,13 @@ export class AccessApi {
   }
 
   /**
-   * Legt ein Trainer- oder Medizin-Konto an: Anmeldekonto und members-Dokument in einem Schritt.
+   * Legt ein Trainer-, Scout- oder Medizin-Konto an: Anmeldekonto und members-Dokument in einem Schritt.
    * Das Anmeldekonto entsteht über eine zweite, temporäre App-Instanz: `createUserWithEmailAndPassword`
    * meldet sonst die eigene, gerade aktive Trainer-Sitzung ab und als das neue Konto an. Das members-Dokument
    * schreibt die normale Instanz, also weiterhin als der eingeloggte Trainer (so verlangen es die Regeln).
    * Die zweite Instanz wird immer wieder abgemeldet und entfernt. Gibt die UID des neuen Kontos zurück.
    */
-  async createStaffAccount(email: string, password: string, role: 'trainer' | 'medical'): Promise<string> {
+  async createStaffAccount(email: string, password: string, role: 'trainer' | 'medical' | 'scout'): Promise<string> {
     const { app, db } = await this.connection.get();
     const [{ deleteApp, initializeApp }, { createUserWithEmailAndPassword, getAuth, signOut }, { doc, serverTimestamp, setDoc }] =
       await Promise.all([import('firebase/app'), import('firebase/auth'), import('firebase/firestore')]);
@@ -114,7 +115,9 @@ export class AccessApi {
     try {
       const credential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
       const uid = credential.user.uid;
-      await setDoc(doc(db, 'teams', environment.teamId, 'members', uid), { role, email, createdAt: serverTimestamp() });
+      // healthAccess unterscheidet den Medizin-Zugang von Alt-Konten „medical“, die seit SCRUM-170 Scouts sind.
+      const health = role === 'medical' ? { healthAccess: true } : {};
+      await setDoc(doc(db, 'teams', environment.teamId, 'members', uid), { role, ...health, email, createdAt: serverTimestamp() });
       return uid;
     } finally {
       await signOut(secondaryAuth).catch(() => undefined);

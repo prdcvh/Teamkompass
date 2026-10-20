@@ -41,6 +41,7 @@ export const routes: Routes = [
           { path: 'suche', loadComponent: () => import('./pages/search/search').then((m) => m.Search) },
           { path: 'zugaenge', loadComponent: () => import('./pages/access/access').then((m) => m.Access) },
           { path: 'trainer-konto', loadComponent: () => import('./pages/staff-account/staff-account').then((m) => m.StaffAccount), data: { role: 'trainer' } },
+          { path: 'scout-zugang', loadComponent: () => import('./pages/staff-account/staff-account').then((m) => m.StaffAccount), data: { role: 'scout' } },
           { path: 'medizin-zugang', loadComponent: () => import('./pages/staff-account/staff-account').then((m) => m.StaffAccount), data: { role: 'medical' } },
           { path: 'export', loadComponent: () => import('./pages/export/export').then((m) => m.Export) },
           { path: 'einstellungen', loadComponent: () => import('./pages/settings/settings').then((m) => m.Settings) },

@@ -32,7 +32,8 @@ export const ADMIN_ITEMS: readonly NavItem[] = [
   { path: '/suche', label: 'Suche', icon: 'search', hint: 'Spieler, Events, Gegner' },
   { path: '/zugaenge', label: 'Spieler-Zugänge', icon: 'key', hint: 'Einladungscodes verwalten' },
   { path: '/trainer-konto', label: 'Trainer-Konto anlegen', icon: 'user-plus' },
-  { path: '/medizin-zugang', label: 'Scout-Zugang', icon: 'medical' },
+  { path: '/scout-zugang', label: 'Scout-Zugang anlegen', icon: 'user-plus' },
+  { path: '/medizin-zugang', label: 'Medizin-Zugang anlegen', icon: 'medical' },
   { path: '/export', label: 'Daten exportieren', icon: 'download', hint: 'Sicherung als Datei' },
 ];
 

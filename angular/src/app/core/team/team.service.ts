@@ -9,6 +9,7 @@ import { type Rating, ratingFromDoc } from '../ratings/rating';
 import { type Absence, absenceFromDoc } from '../records/absence';
 import { type Measurement, measurementFromDoc } from '../records/measurement';
 import { SessionService } from '../auth/session.service';
+import { ScoutSyncService } from '../scout/scout-sync.service';
 import { SquadService } from '../player/squad.service';
 import { SyncService } from '../shell/sync.service';
 import { type PlayerData, type RatingsByEvent, itemsFor } from './team';
@@ -26,6 +27,7 @@ export class TeamService {
   private readonly sync = inject(SyncService);
   private readonly squad = inject(SquadService);
   private readonly eventsService = inject(EventsService);
+  private readonly scoutSync = inject(ScoutSyncService);
 
   readonly active = signal(false);
   readonly events = computed(() => this.eventsService.events());
@@ -64,6 +66,13 @@ export class TeamService {
         ...this.squad.players().flatMap((player) => [`a:${player.id}`, `m:${player.id}`]),
       ];
       if (this.active()) untracked(() => this.reconcile(wanted));
+    });
+    // Vollständig geladen: die bereinigte Scout-Ansicht nachziehen (SCRUM-170).
+    effect(() => {
+      if (!this.ready()) return;
+      const players = this.squad.players();
+      const ratings = this.ratings();
+      untracked(() => this.scoutSync.update(players, ratings));
     });
     // Ohne Anmeldung (oder ohne Trainerrolle) dürfen keine Teamdaten im Speicher bleiben.
     effect(() => {

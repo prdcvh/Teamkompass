@@ -1,5 +1,5 @@
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
-import { type AccessEntry, type InviteRole, type StaffRole, generateInviteCode, expiryFromDays, inviteEntry, memberEntry } from './access';
+import { type AccessEntry, type InviteRole, type StaffRole, generateInviteCode, expiryFromDays, inviteEntry, memberEntry, staffAccountSubject } from './access';
 import { authErrorMessage, errorCode } from '../auth/auth-errors';
 import { AccessApi } from '../firebase/access.api';
 import { SessionService } from '../auth/session.service';
@@ -91,14 +91,14 @@ export class AccessService {
     return { ok: true };
   }
 
-  /** Legt ein Trainer- oder Medizin-Konto an (Anmeldekonto + Zugang in einem Schritt). Das Passwort wird nicht gemerkt. */
+  /** Legt ein Trainer-, Scout- oder Medizin-Konto an (Anmeldekonto + Zugang in einem Schritt). Das Passwort wird nicht gemerkt. */
   async createStaff(role: StaffRole, email: string, password: string): Promise<ActionResult> {
     if (!this.canWrite()) return { ok: false, message: 'Nur Trainer dürfen Konten anlegen.' };
     try {
       await this.accessApi.createStaffAccount(email.trim(), password, role);
     } catch (error) {
       console.error(error);
-      const label = role === 'medical' ? 'Der Scout-Zugang' : 'Das Trainer-Konto';
+      const label = staffAccountSubject(role);
       return { ok: false, message: `${label} konnte nicht angelegt werden. ${authErrorMessage(errorCode(error))}` };
     }
     if (this.load() === 'ready') await this.reload();
