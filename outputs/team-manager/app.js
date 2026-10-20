@@ -1506,8 +1506,12 @@ function startCloudSync() {
     cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("scoutProfiles"), (snapshot) => {
       cloudCache.scoutProfiles = Object.fromEntries(snapshot.docs.map((docSnap) => [docSnap.id, docSnap.data()]));
       scheduleScoutProfileSync();
-      cloudListenerRecovered("scoutProfiles");
-    }, (error) => cloudListenerFailed("scoutProfiles", error)));
+    }, (error) => {
+      // Hintergrund-Abgleich: ein Fehler (z. B. Regeln noch nicht ausgerollt) darf die Trainer-Ansicht nicht als
+      // "Verbindung unterbrochen" markieren. Ohne gelesenen Stand wird dann einfach nichts abgeglichen.
+      console.warn("Scout-Ansicht konnte nicht gelesen werden", error);
+      cloudCache.scoutProfiles = null;
+    }));
 
     cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("opponents"), (snapshot) => {
       cloudCache.opponents = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
