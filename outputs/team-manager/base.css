@@ -149,6 +149,7 @@ body.role-medical #addPlayerFabMobile,
 body.role-medical #exportBtn,
 body.role-medical #accessManagerPanel,
 body.role-medical #scoutManagerPanel,
+body.role-medical #medicalManagerPanel,
 body.role-medical #trainerManagerPanel,
 body.role-medical #inviteManagerPanel,
 body.role-medical .row-actions,
@@ -157,6 +158,31 @@ body.role-medical .measurement-cell button,
 body.role-medical .development-form,
 body.role-medical #developmentPlanList,
 body.role-medical #analyticsCards {
+  display: none !important;
+}
+
+/* Scout (SCRUM-170): Kompetenzprofil, Notenverlauf und Statistik - keine Gesundheitsbereiche,
+   keine Verwaltung, kein Export. Die Daten dazu laedt die App fuer Scouts gar nicht erst. */
+body.role-scout .nav-tab:not([data-view="squad"]):not([data-view="profiles"]),
+body.role-scout #addPlayerTop,
+body.role-scout #addPlayerFabMobile,
+body.role-scout #exportBtn,
+body.role-scout #importBtn,
+body.role-scout #profilePdfBtn,
+body.role-scout #accessManagerPanel,
+body.role-scout #scoutManagerPanel,
+body.role-scout #medicalManagerPanel,
+body.role-scout #trainerManagerPanel,
+body.role-scout #inviteManagerPanel,
+body.role-scout .row-actions,
+body.role-scout .card-menu,
+body.role-scout .col-health,
+body.role-scout #availabilityPanel,
+body.role-scout #developmentPanel,
+body.role-scout #absencePanel,
+body.role-scout #measurementPanel,
+body.role-scout #squadSort option[value="status"],
+body.role-scout #squadSort option[value="risk"] {
   display: none !important;
 }
 
@@ -174,6 +200,7 @@ body.role-trainer-cloud [data-action="invite"] {
 /* Zugaenge-Panel nur fuer den Trainer im Rollen-Modus sichtbar */
 #accessManagerPanel,
 #scoutManagerPanel,
+#medicalManagerPanel,
 #trainerManagerPanel,
 #inviteManagerPanel {
   display: none;
@@ -181,6 +208,7 @@ body.role-trainer-cloud [data-action="invite"] {
 
 body.role-trainer-cloud #accessManagerPanel,
 body.role-trainer-cloud #scoutManagerPanel,
+body.role-trainer-cloud #medicalManagerPanel,
 body.role-trainer-cloud #trainerManagerPanel,
 body.role-trainer-cloud #inviteManagerPanel {
   display: block;

@@ -1,6 +1,6 @@
 rules_version = '2';
 
-// Datenmodell: teams/{teamId}/{meta,members,invites,players,events,opponents}
+// Datenmodell: teams/{teamId}/{meta,members,invites,players,events,opponents,scoutProfiles}
 // Siehe README/FIREBASE_SETUP.md fuer den Hintergrund. Kernidee:
 // - "members/{uid}" verknuepft eine angemeldete Firebase-Auth-Identitaet mit einer
 //   Rolle ("trainer" oder "player") und - fuer Spieler - der eigenen playerId.
@@ -43,8 +43,22 @@ service cloud.firestore {
         return isTeamMember() && memberDoc().data.role == "trainer";
       }
 
+      // SCRUM-170: Scout und Medizin sind getrennte Rollen.
+      // - "medical" MIT healthAccess == true: Medizin-Zugang (Physio o. ae.) - Status, Abwesenheiten,
+      //   Verletzungen, Messwerte (wie bisher der "Scout-Zugang").
+      // - "scout" sowie "medical" OHNE healthAccess: Scout-Zugang - nur die bereinigte Leistungsansicht
+      //   scoutProfiles (Kompetenzprofil, Notenverlauf, Statistik), keine Gesundheitsdaten.
+      // Alle vor SCRUM-170 angelegten "medical"-Konten haben kein healthAccess-Feld und sind damit ab dem
+      // Deploy automatisch Scouts (PO-Entscheidung vom 20.10.2026) - ohne Datenmigration.
       function isMedical() {
-        return isTeamMember() && memberDoc().data.role == "medical";
+        return isTeamMember() && memberDoc().data.role == "medical" && memberDoc().data.get('healthAccess', false) == true;
+      }
+
+      function isScout() {
+        return isTeamMember() && (
+          memberDoc().data.role == "scout"
+          || (memberDoc().data.role == "medical" && memberDoc().data.get('healthAccess', false) != true)
+        );
       }
 
       function isPlayerFor(playerId) {
@@ -75,7 +89,7 @@ service cloud.firestore {
         // sondern an der kurzen Verzoegerung, bis ein frisch deployter Regelsatz global
         // greift.
         allow create: if
-          (isTrainer() && request.resource.data.role in ["trainer", "medical"])
+          (isTrainer() && request.resource.data.role in ["trainer", "medical", "scout"])
           || (
             isSignedIn() && request.auth.uid == uid
             && request.resource.data.role in ["player", "parent"]
@@ -183,10 +197,19 @@ service cloud.firestore {
 
         // Interne Trainer-Notizen zu einer Bewertung. Bewusst ein eigener Pfad: das
         // Bewertungsdokument darf der Spieler/das Elternteil komplett lesen, dieser Pfad
-        // nie (kein Eintrag fuer player/parent/medical).
+        // nie (kein Eintrag fuer player/parent/medical/scout).
         match /privateNotes/{playerId} {
           allow read, write: if isTrainer();
         }
+      }
+
+      // Scout-Ansicht (SCRUM-170): je Spieler ein bereinigtes Dokument nur mit Name, Nummer, Positionen,
+      // Geburtsdatum und den Teilnoten/Einsatzdaten je Event - ohne Status, Verletzung, Abwesenheitsgrund,
+      // Messwerte, Notizen oder Einwilligungsdaten. Die Trainer-App schreibt und gleicht es ab
+      // (syncScoutProfiles in app.js). Scouts lesen nur diesen Pfad, nie players/ratings/absences/measurements.
+      match /scoutProfiles/{playerId} {
+        allow read: if isTrainer() || isScout();
+        allow write: if isTrainer();
       }
 
       match /opponents/{opponentId} {

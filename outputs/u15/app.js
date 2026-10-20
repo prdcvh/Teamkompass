@@ -1054,11 +1054,11 @@ function scoreToGrade(record) {
   return 6;
 }
 
-// Lokaler Zwischenspeicher fuer den Teamstand. Spieler, Eltern und der Scout-
-// Zugang cachen nichts: sie sehen (medizinisch: alle) personenbezogene Daten von
-// Minderjaehrigen, die nicht auf dem Geraet zurueckbleiben sollen.
+// Lokaler Zwischenspeicher fuer den Teamstand. Spieler, Eltern, Scout- und Medizin-
+// Zugang cachen nichts: sie sehen personenbezogene Daten von Minderjaehrigen, die
+// nicht auf dem Geraet zurueckbleiben sollen.
 function canCacheLocally() {
-  return !["player", "parent", "medical"].includes(currentRole);
+  return !["player", "parent", "medical", "scout"].includes(currentRole);
 }
 
 function writeLocalCache() {
@@ -1152,7 +1152,7 @@ function cloudListenerRecovered(key) {
 //   firestore.rules im Repo-Root.
 // ---------------------------------------------------------------------------
 let currentUser = null;
-let currentRole = null; // "trainer" | "player" | "parent" | "medical" | null
+let currentRole = null; // "trainer" | "player" | "parent" | "medical" | "scout" | null (siehe effectiveMemberRole)
 let currentPlayerId = null;
 let authModule = null;
 let authInstance = null;
@@ -1174,16 +1174,16 @@ let absenceListeners = {};
 let measurementListeners = {};
 let legacyBlobMode = false;
 let legacyCloudSaveTimer = null;
-const cloudCache = { players: [], events: [], ratings: {}, privateNotes: {}, developmentPlans: {}, absences: {}, measurements: {}, opponents: [], lineup: null };
+const cloudCache = { players: [], events: [], ratings: {}, privateNotes: {}, developmentPlans: {}, absences: {}, measurements: {}, opponents: [], lineup: null, scoutProfiles: null, playersLoaded: false, eventsLoaded: false };
 
 function isCloudActive() {
   return Boolean(firestoreDb);
 }
 
-// Spieler, Eltern und der medizinische Zugang lesen nur: Bearbeiten/Loeschen gehoert nicht
+// Spieler, Eltern, Medizin- und Scout-Zugang lesen nur: Bearbeiten/Loeschen gehoert nicht
 // in ihre Oberflaeche (Firestore lehnt die Schreibzugriffe ohnehin ab).
 function canManageRecords() {
-  return !["player", "parent", "medical"].includes(currentRole);
+  return !["player", "parent", "medical", "scout"].includes(currentRole);
 }
 
 function isCloudTrainer() {
@@ -1278,7 +1278,7 @@ async function handleAuthStateChanged(user) {
     // Ohne Anmeldung darf kein Teamstand im Browser bleiben - weder im Speicher noch lokal.
     clearLocalTeamData();
     if (state.players.length || state.events.length) {
-      Object.assign(cloudCache, { players: [], events: [], ratings: {}, privateNotes: {}, developmentPlans: {}, absences: {}, measurements: {}, opponents: [], lineup: null });
+      Object.assign(cloudCache, { players: [], events: [], ratings: {}, privateNotes: {}, developmentPlans: {}, absences: {}, measurements: {}, opponents: [], lineup: null, scoutProfiles: null, playersLoaded: false, eventsLoaded: false });
       state = normalizeState({ players: [], events: [], opponents: [] });
       renderAll();
     }
@@ -1318,7 +1318,8 @@ async function handleAuthStateChanged(user) {
     return;
   }
   const member = memberSnap.data();
-  currentRole = member.role;
+  // Alt-Konten "medical" ohne healthAccess sind seit SCRUM-170 Scouts (gleiche Logik wie firestore.rules).
+  currentRole = effectiveMemberRole(member);
   currentPlayerId = member.playerId || null;
   hideAuthGate();
   applyRoleRestrictions();
@@ -1327,7 +1328,145 @@ async function handleAuthStateChanged(user) {
   document.dispatchEvent(new CustomEvent("teamkompass:cloud-ready"));
 }
 
+// SCOUT-PROJECTION START (reine Funktionen ohne Zugriff auf Seitenzustand, getestet in tests/scout-projection.test.mjs)
+// SCRUM-170: Scouts lesen nie players/ratings/absences/measurements (dort stehen Status, Verletzung,
+// Abwesenheitsgruende in Bewertungsnotizen, Messwerte, Einwilligung). Stattdessen pflegt die Trainer-App
+// je Spieler ein bereinigtes Dokument scoutProfiles/{playerId} - nur mit den hier ausdruecklich
+// aufgezaehlten Feldern (Positivliste, nichts wird "durchgereicht").
+const SCOUT_RATING_FIELDS = ["effort", "technique", "tactics", "comprehension", "minutes", "goals", "assists"];
+
+// Rolle aus dem members-Dokument, wie firestore.rules sie auswertet: "medical" ist nur mit
+// healthAccess === true ein Medizin-Zugang; vor SCRUM-170 angelegte "medical"-Konten sind Scouts.
+function effectiveMemberRole(member) {
+  if (!member || typeof member.role !== "string") return null;
+  if (member.role === "medical" && member.healthAccess !== true) return "scout";
+  return member.role;
+}
+
+// "eingeschraenkt" (dosierte Belastung) und "ausgeschlossen" verraten mehr als die reine Teilnahme -
+// der Scout sieht nur anwesend / nicht dabei / offen.
+function scoutAttendance(attendance) {
+  if (attendance === "present" || attendance === "limited") return "present";
+  if (attendance === "absent" || attendance === "excluded") return "absent";
+  return "open";
+}
+
+// Nur kurze Zahlen-/Textwerte (Teilnoten, Minuten, Tore) - nie Freitext.
+function scoutValue(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.length <= 10) return value;
+  return "";
+}
+
+function scoutRating(rating) {
+  const clean = { attendance: scoutAttendance(rating?.attendance) };
+  SCOUT_RATING_FIELDS.forEach((field) => { clean[field] = scoutValue(rating?.[field]); });
+  return clean;
+}
+
+function scoutProfileFor(player, events) {
+  const ratings = {};
+  (events || []).forEach((event) => {
+    const rating = event?.ratings?.[player.id];
+    if (!rating || typeof event.id !== "string") return;
+    const clean = scoutRating(rating);
+    if (clean.attendance !== "open" || SCOUT_RATING_FIELDS.some((field) => clean[field] !== "")) ratings[event.id] = clean;
+  });
+  const positions = Array.isArray(player.positions) ? player.positions.filter((item) => typeof item === "string").slice(0, 12) : [];
+  return {
+    playerId: player.id,
+    name: typeof player.name === "string" ? player.name : "",
+    number: scoutValue(player.number),
+    positions,
+    birthdate: typeof player.birthdate === "string" ? player.birthdate.slice(0, 10) : "",
+    ratings
+  };
+}
+
+function buildScoutProfiles(players, events) {
+  const profiles = {};
+  (players || []).forEach((player) => {
+    if (player && typeof player.id === "string" && player.id) profiles[player.id] = scoutProfileFor(player, events);
+  });
+  return profiles;
+}
+
+function stableJson(value) {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  if (value && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(",")}}`;
+  return JSON.stringify(value ?? null);
+}
+
+// Was muss geschrieben/geloescht werden, damit scoutProfiles dem Soll-Stand entspricht?
+function scoutProfileWrites(expected, existing) {
+  const set = Object.entries(expected).filter(([id, profile]) => !existing?.[id] || stableJson(existing[id]) !== stableJson(profile));
+  const remove = Object.keys(existing || {}).filter((id) => !expected[id]);
+  return { set, remove };
+}
+
+// Scout-Seite: baut aus den bereinigten Profilen Spieler und Bewertungen je Event. Bewusst ohne Status,
+// Verletzung, Einwilligung und Notiz - diese Felder gibt es im Scout-Zustand gar nicht.
+function scoutStateFromProfiles(profiles) {
+  const players = [];
+  const ratingsByEvent = {};
+  Object.entries(profiles || {}).forEach(([id, profile]) => {
+    players.push({ id, name: profile.name || "", number: profile.number ?? "", positions: Array.isArray(profile.positions) ? profile.positions : [], birthdate: profile.birthdate || "", status: "" });
+    Object.entries(profile.ratings || {}).forEach(([eventId, rating]) => {
+      ratingsByEvent[eventId] ||= {};
+      ratingsByEvent[eventId][id] = scoutRating(rating);
+    });
+  });
+  return { players, ratingsByEvent };
+}
+// SCOUT-PROJECTION END
+
+// Trainer-Seite: gleicht scoutProfiles mit dem Cloud-Stand ab (neu, geaendert, geloescht). Laeuft erst,
+// wenn Spieler, alle Bewertungen und die bestehenden Scout-Profile geladen sind - sonst wuerde ein
+// halb geladener Stand kurz unvollstaendige Profile schreiben. Bestehende Daten werden so beim ersten
+// Oeffnen der Trainer-App nach dem Update automatisch nachgezogen.
+let scoutSyncTimer = null;
+let scoutSyncRunning = false;
+
+function scheduleScoutProfileSync() {
+  if (!isCloudTrainer()) return;
+  clearTimeout(scoutSyncTimer);
+  scoutSyncTimer = setTimeout(syncScoutProfiles, 1500);
+}
+
+function scoutSyncReady() {
+  return cloudCache.playersLoaded && cloudCache.eventsLoaded && cloudCache.scoutProfiles !== null
+    && cloudCache.events.every((event) => cloudCache.ratings[event.id] !== undefined);
+}
+
+async function syncScoutProfiles() {
+  if (!isCloudTrainer() || legacyBlobMode || !scoutSyncReady()) return;
+  if (scoutSyncRunning) { scheduleScoutProfileSync(); return; }
+  scoutSyncRunning = true;
+  try {
+    const events = cloudCache.events.map((event) => ({ id: event.id, ratings: cloudCache.ratings[event.id] || {} }));
+    const players = cloudCache.players.map(normalizePlayer);
+    const { set, remove } = scoutProfileWrites(buildScoutProfiles(players, events), cloudCache.scoutProfiles);
+    const writes = [
+      ...set.map(([id, profile]) => (batch) => batch.set(teamDoc("scoutProfiles", id), profile)),
+      ...remove.map((id) => (batch) => batch.delete(teamDoc("scoutProfiles", id)))
+    ];
+    for (let offset = 0; offset < writes.length; offset += 450) {
+      const batch = firestoreModule.writeBatch(firestoreDb);
+      writes.slice(offset, offset + 450).forEach((write) => write(batch));
+      await batch.commit();
+    }
+  } catch (error) {
+    console.warn("Scout-Ansicht konnte nicht abgeglichen werden", error);
+  } finally {
+    scoutSyncRunning = false;
+  }
+}
+
 function startCloudSync() {
+  clearTimeout(scoutSyncTimer);
+  cloudCache.scoutProfiles = null;
+  cloudCache.playersLoaded = false;
+  cloudCache.eventsLoaded = false;
   cloudCache.players = [];
   cloudCache.events = [];
   cloudCache.ratings = {};
@@ -1341,6 +1480,7 @@ function startCloudSync() {
   // Event-Metadaten (Titel/Datum/Ergebnis, keine Noten) sind fuer alle Teammitglieder lesbar.
   cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("events"), (snapshot) => {
     cloudCache.events = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+    cloudCache.eventsLoaded = true;
     const eventIds = cloudCache.events.map((event) => event.id);
     if (currentRole === "trainer") {
       syncRatingListeners(eventIds);
@@ -1354,12 +1494,20 @@ function startCloudSync() {
   if (currentRole === "trainer") {
     cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("players"), (snapshot) => {
       cloudCache.players = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+      cloudCache.playersLoaded = true;
       syncPlanListeners(cloudCache.players.map((player) => player.id));
       syncAbsenceListeners(cloudCache.players.map((player) => player.id));
       syncMeasurementListeners(cloudCache.players.map((player) => player.id));
       rebuildStateFromCloudCache();
       cloudListenerRecovered("players");
     }, (error) => cloudListenerFailed("players", error)));
+
+    // Bestehende Scout-Profile, damit syncScoutProfiles nur Abweichungen schreibt (SCRUM-170).
+    cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("scoutProfiles"), (snapshot) => {
+      cloudCache.scoutProfiles = Object.fromEntries(snapshot.docs.map((docSnap) => [docSnap.id, docSnap.data()]));
+      scheduleScoutProfileSync();
+      cloudListenerRecovered("scoutProfiles");
+    }, (error) => cloudListenerFailed("scoutProfiles", error)));
 
     cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("opponents"), (snapshot) => {
       cloudCache.opponents = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
@@ -1410,6 +1558,16 @@ function startCloudSync() {
       rebuildStateFromCloudCache();
       cloudListenerRecovered("medical players");
     }, (error) => cloudListenerFailed("medical players", error)));
+  } else if (currentRole === "scout") {
+    // Scout (SCRUM-170): ausschliesslich die bereinigte Ansicht - keine players-, ratings-, absences-
+    // oder measurements-Abfragen (Firestore wuerde sie ohnehin ablehnen).
+    cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("scoutProfiles"), (snapshot) => {
+      const scoutState = scoutStateFromProfiles(Object.fromEntries(snapshot.docs.map((docSnap) => [docSnap.id, docSnap.data()])));
+      cloudCache.players = scoutState.players;
+      cloudCache.ratings = scoutState.ratingsByEvent;
+      rebuildStateFromCloudCache();
+      cloudListenerRecovered("scout profiles");
+    }, (error) => cloudListenerFailed("scout profiles", error)));
   }
 }
 
@@ -1561,6 +1719,7 @@ function syncMeasurementListeners(playerIds) {
 }
 
 function stopCloudSync() {
+  clearTimeout(scoutSyncTimer);
   cloudUnsubscribers.forEach((unsubscribe) => unsubscribe());
   cloudUnsubscribers = [];
   Object.values(ratingListeners).forEach((unsubscribe) => unsubscribe());
@@ -1588,6 +1747,7 @@ function rebuildStateFromCloudCache() {
     selectedEventId: state.selectedEventId
   });
   writeLocalCache();
+  scheduleScoutProfileSync();
   // Sobald einmal echte Spieler in der neuen Struktur angekommen sind, macht die
   // Migration aus dem alten Blob-Dokument keinen Sinn mehr - im Gegenteil, sie wuerde
   // neuere Aenderungen wieder mit dem laengst veralteten alten Dokument ueberschreiben.
@@ -1630,6 +1790,7 @@ async function cloudDeletePlayer(playerId) {
     // bestehen, der auf einen nicht mehr vorhandenen Spieler zeigt.
     const accessSnapshots = await Promise.all(["invites", "members"].map((name) => firestoreModule.getDocs(firestoreModule.query(teamCollection(name), firestoreModule.where("playerId", "==", playerId)))));
     refs.push(...accessSnapshots.flatMap((snapshot) => snapshot.docs.map((docSnap) => docSnap.ref)));
+    refs.push(teamDoc("scoutProfiles", playerId));
     refs.push(teamDoc("players", playerId));
     await commitDeleteRefs(refs);
     cloudWriteSucceeded();
@@ -1809,18 +1970,23 @@ function applyRoleRestrictions() {
   document.body.classList.toggle("role-player", currentRole === "player");
   document.body.classList.toggle("role-parent", currentRole === "parent");
   document.body.classList.toggle("role-medical", currentRole === "medical");
+  document.body.classList.toggle("role-scout", currentRole === "scout");
+  // Scouts suchen/sortieren nicht nach Status oder Belastung (SCRUM-170).
+  $("#searchInput").placeholder = currentRole === "scout" ? "Name, Position" : "Name, Position, Status";
+  if (currentRole === "scout" && ["status", "risk"].includes($("#squadSort").value)) $("#squadSort").value = "number";
   document.body.classList.toggle("role-trainer-cloud", isCloudTrainer());
   $("#signOutBtn").hidden = !isCloudActive();
   $("#migrateDataBtn").hidden = !isCloudTrainer();
   $("#importBtn").hidden = !canManageRecords() || (isCloudActive() && !legacyBlobMode && !isCloudTrainer());
   $("#addTrainerBtn").hidden = !isCloudTrainer();
   $("#addMedicalBtn").hidden = !isCloudTrainer();
-  $("#changePasswordBtn").hidden = !(isCloudActive() && ["trainer", "medical"].includes(currentRole));
+  $("#addScoutBtn").hidden = !isCloudTrainer();
+  $("#changePasswordBtn").hidden = !(isCloudActive() && ["trainer", "medical", "scout"].includes(currentRole));
   if (["player", "parent"].includes(currentRole)) {
     $("#mobileViewSelect").innerHTML = '<option value="profiles">Profile</option>';
     $("#profilePlayer").disabled = true;
     setView("profiles");
-  } else if (currentRole === "medical") {
+  } else if (["medical", "scout"].includes(currentRole)) {
     $("#mobileViewSelect").innerHTML = '<option value="squad">Kader</option><option value="profiles">Profile</option>';
     $("#profilePlayer").disabled = false;
     setView("squad");
@@ -2033,9 +2199,18 @@ async function createTrainerAccount() {
   return createStaffAccount("trainer");
 }
 
+// Medizin-Zugang (Physio o. ae.): Status, Abwesenheiten, Verletzungen, Messwerte. healthAccess: true
+// unterscheidet ihn von vor SCRUM-170 angelegten "medical"-Konten, die seitdem Scouts sind.
 async function createMedicalAccount() {
   return createStaffAccount("medical");
 }
+
+// Scout-Zugang: Kompetenzprofil, Notenverlauf, Statistik - keine Gesundheitsdaten (SCRUM-170).
+async function createScoutAccount() {
+  return createStaffAccount("scout");
+}
+
+const STAFF_ACCOUNT_LABELS = { trainer: "Trainer-Konto", medical: "Medizin-Zugang", scout: "Scout-Zugang" };
 
 const MIN_STAFF_PASSWORD_LENGTH = 12;
 
@@ -2089,8 +2264,8 @@ function askStaffCredentials(label) {
 
 async function createStaffAccount(role) {
   if (!isCloudTrainer()) return;
-  const label = role === "medical" ? "Scout-Zugang" : "Trainer-Konto";
-  const credentials = await askStaffCredentials(role === "medical" ? "Scout-Zugang" : "Trainer-Konto");
+  const label = STAFF_ACCOUNT_LABELS[role] || "Trainer-Konto";
+  const credentials = await askStaffCredentials(label);
   if (!credentials) return;
   const trimmedEmail = credentials.email;
   const password = credentials.password;
@@ -2111,11 +2286,12 @@ async function createStaffAccount(role) {
     // eigenen, bereits als Trainer erkannten Identitaet - siehe firestore.rules.
     await firestoreModule.setDoc(teamDoc("members", newUid), {
       role,
+      ...(role === "medical" ? { healthAccess: true } : {}),
       email: trimmedEmail,
       createdAt: firestoreModule.serverTimestamp()
     });
     renderAccessManager();
-    alert(`${role === "medical" ? "Scout-Zugang" : "Trainer-Konto"} für ${trimmedEmail} wurde angelegt.`);
+    alert(`${label} für ${trimmedEmail} wurde angelegt.`);
   } catch (error) {
     console.error(error);
     alert(`${label} konnte nicht angelegt werden. ${authErrorMessage(error)}`);
@@ -2293,6 +2469,7 @@ async function renderAccessManager() {
   if (!isCloudTrainer()) return;
   const list = $("#accessManagerList");
   const scoutList = $("#scoutManagerList");
+  const medicalList = $("#medicalManagerList");
   const trainerList = $("#trainerManagerList");
   const inviteList = $("#inviteManagerList");
   if (!list) return;
@@ -2312,16 +2489,19 @@ async function renderAccessManager() {
         title = data.email || "Trainer-Konto";
         const created = data.createdAt?.toDate ? `angelegt am ${formatDate(localIsoDate(data.createdAt.toDate()))}` : "";
         detail = ["Trainer · Vollzugriff", created, data.email ? "" : `Kennung …${docSnap.id.slice(-6)}`].filter(Boolean).join(" · ");
-      } else if (data.role === "medical") {
+      } else if (effectiveMemberRole(data) === "medical") {
+        title = data.email || "Medizin-Zugang";
+        detail = `Medizin · nur lesen · ${accessValidityText(expiresAtDate, now)}`;
+      } else if (effectiveMemberRole(data) === "scout") {
         title = data.email || "Scout-Zugang";
-        detail = `Scout · Read-only · ${accessValidityText(expiresAtDate, now)}`;
+        detail = `Scout · nur lesen · ${accessValidityText(expiresAtDate, now)}`;
       } else {
         title = player?.name || data.playerId;
         detail = `${formatInviteRole(data.role)} · ${accessValidityText(expiresAtDate, now)}`;
       }
       const action = isSelf
         ? `<span class="access-self">Das bist du</span>`
-        : `<button class="ghost-button" data-action="revoke-access" data-uid="${escapeHtml(docSnap.id)}" data-role="${escapeHtml(data.role || "")}" type="button">Zugang sperren</button>`;
+        : `<button class="ghost-button" data-action="revoke-access" data-uid="${escapeHtml(docSnap.id)}" data-role="${escapeHtml(effectiveMemberRole(data) || "")}" type="button">Zugang sperren</button>`;
       return `
         <div class="access-row">
           <div><strong>${escapeHtml(title)}</strong><span class="muted">${escapeHtml(detail)}</span></div>
@@ -2329,15 +2509,18 @@ async function renderAccessManager() {
         </div>
       `;
     };
-    // Spieler (inkl. Eltern), Scouts und Trainer werden getrennt verwaltet (SCRUM-92, SCRUM-30).
+    // Spieler (inkl. Eltern), Scouts, Medizin und Trainer werden getrennt verwaltet (SCRUM-92, SCRUM-30, SCRUM-170).
     const playerDocs = snapshot.docs.filter((docSnap) => ["player", "parent"].includes(docSnap.data().role));
-    const scoutDocs = snapshot.docs.filter((docSnap) => docSnap.data().role === "medical");
+    const scoutDocs = snapshot.docs.filter((docSnap) => effectiveMemberRole(docSnap.data()) === "scout");
+    const medicalDocs = snapshot.docs.filter((docSnap) => effectiveMemberRole(docSnap.data()) === "medical");
     const trainerDocs = snapshot.docs.filter((docSnap) => docSnap.data().role === "trainer");
     list.innerHTML = playerDocs.map(row).join("") || `<p class="muted">Noch keine Spieler-Zugaenge vergeben.</p>`;
     if (scoutList) scoutList.innerHTML = scoutDocs.map(row).join("") || `<p class="muted">Noch kein Scout-Zugang angelegt.</p>`;
+    if (medicalList) medicalList.innerHTML = medicalDocs.map(row).join("") || `<p class="muted">Noch kein Medizin-Zugang angelegt.</p>`;
     if (trainerList) trainerList.innerHTML = trainerDocs.map(row).join("") || `<p class="muted">Keine Trainer-Konten gefunden.</p>`;
     setCount("#playerAccessCount", playerDocs.length);
     setCount("#scoutAccessCount", scoutDocs.length);
+    setCount("#medicalAccessCount", medicalDocs.length);
     setCount("#trainerAccessCount", trainerDocs.length);
   } catch (error) {
     console.error(error);
@@ -2401,6 +2584,8 @@ async function revokeAccess(uid, role) {
   const question = role === "trainer"
     ? "Dieses Trainer-Konto wirklich sperren? Es verliert sofort den Vollzugriff und kommt nur mit einem neu angelegten Trainer-Konto wieder hinein."
     : role === "medical"
+      ? "Medizin-Zugang wirklich sperren? Er verliert sofort den Zugriff."
+      : role === "scout"
       ? "Scout-Zugang wirklich sperren? Er verliert sofort den Zugriff."
       : "Zugang wirklich sperren? Der Spieler muesste sich danach mit einem neuen Code anmelden.";
   if (!confirm(question)) return;
@@ -2460,7 +2645,7 @@ async function migrateLegacyBlobToCollections() {
 // per CSS aus - diese Liste ist die Sperre fuer alle Wege (Suche, Schnellzugriffe, Auswahl).
 function allowedViews() {
   if (["player", "parent"].includes(currentRole)) return ["profiles"];
-  if (currentRole === "medical") return ["squad", "profiles"];
+  if (["medical", "scout"].includes(currentRole)) return ["squad", "profiles"];
   return Object.keys(views);
 }
 
@@ -3585,33 +3770,36 @@ function sortedSquad(players) {
 function renderSquad() {
   const query = $("#searchInput").value.trim().toLowerCase();
   const position = $("#positionFilter").value;
+  // Scouts (SCRUM-170): keine Status-, Belastungs- oder Messwert-Spalten und keine Suche nach Status.
+  const scout = currentRole === "scout";
+  document.querySelectorAll("#squadView .col-health").forEach((cell) => { cell.hidden = scout; });
   const players = sortedSquad(state.players.filter((player) => {
     const positions = parsePositions(player.positions || player.position);
-    const matchesQuery = [player.name, positionText(player), playerEffectiveStatus(player), String(player.number)].join(" ").toLowerCase().includes(query);
+    const matchesQuery = [player.name, positionText(player), scout ? "" : playerEffectiveStatus(player), String(player.number)].join(" ").toLowerCase().includes(query);
     const matchesPosition = position === "all" || positions.includes(position);
     return matchesQuery && matchesPosition;
   }));
   $("#playerTable").innerHTML = players.map((player) => {
     const effectiveStatus = playerEffectiveStatus(player);
     const statusClass = effectiveStatus === "Verletzt" || effectiveStatus === "Gesperrt" ? "danger" : effectiveStatus === "Angeschlagen" || effectiveStatus === "Abwesend" ? "warning" : "";
-    const risk = playerInjuryRisk(player.id);
-    const lastMeasurement = latestMeasurement(player.id);
-    const missingMeasurement = measurementMissingThisQuarter(player.id);
+    const risk = scout ? null : playerInjuryRisk(player.id);
+    const lastMeasurement = scout ? null : latestMeasurement(player.id);
+    const missingMeasurement = scout ? false : measurementMissingThisQuarter(player.id);
     return `
       <tr>
         <td data-label="Spieler"><div class="player-cell"><span class="number-badge">${player.number}</span><strong>${escapeHtml(player.name)}</strong>${consentChipHtml(player)}</div></td>
         <td data-label="Positionen">${positionChips(player)}</td>
         <td data-label="Geburtsdatum">${formatDate(player.birthdate)}</td>
-        <td data-label="Status"><span class="status-pill ${statusClass}">${escapeHtml(effectiveStatus)}</span></td>
+        ${scout ? "" : `<td data-label="Status"><span class="status-pill ${statusClass}">${escapeHtml(effectiveStatus)}</span></td>`}
         <td data-label="Events">${playerAttendanceCount(player.id)}</td>
         <td data-label="Note">${gradeLabel(playerAverageGrade(player.id))}</td>
-        <td data-label="Belastung"><span class="risk-pill ${risk.tier}" title="${escapeHtml(risk.action)} (${escapeHtml(risk.reason)})">${risk.level}</span></td>
+        ${scout ? "" : `<td data-label="Belastung"><span class="risk-pill ${risk.tier}" title="${escapeHtml(risk.action)} (${escapeHtml(risk.reason)})">${risk.level}</span></td>
         <td data-label="Messwerte" class="measurement-cell">
           ${missingMeasurement
             ? `<span class="status-pill warning">Messwerte fehlen</span>`
             : `<span class="muted">${formatDate(lastMeasurement.date)} · ${lastMeasurement.height || "–"} cm / ${lastMeasurement.weight || "–"} kg</span>`}
           <button class="ghost-button" data-action="add-measurement" data-id="${player.id}" type="button">Messung hinzufügen</button>
-        </td>
+        </td>`}
         <td class="row-actions" data-label="Aktionen">
           <button class="ghost-button" data-action="profile" data-id="${player.id}">Profil</button>
           <button class="ghost-button" data-action="edit" data-id="${player.id}">Bearbeiten</button>
@@ -3624,17 +3812,17 @@ function renderSquad() {
   $("#playerCardsMobile").innerHTML = players.map((player) => {
     const effectiveStatus = playerEffectiveStatus(player);
     const statusClass = effectiveStatus === "Verletzt" || effectiveStatus === "Gesperrt" ? "danger" : effectiveStatus === "Angeschlagen" || effectiveStatus === "Abwesend" ? "warning" : "";
-    const risk = playerInjuryRisk(player.id);
+    const risk = scout ? null : playerInjuryRisk(player.id);
     return `
       <article class="player-card-mobile">
         <div class="player-card-mobile-top">
           <span class="number-badge">${player.number}</span>
           <strong>${escapeHtml(player.name)}</strong>
-          <span class="status-pill ${statusClass}">${escapeHtml(effectiveStatus)}</span>
+          ${scout ? "" : `<span class="status-pill ${statusClass}">${escapeHtml(effectiveStatus)}</span>`}
         </div>
         <div class="player-card-mobile-meta">
           ${positionChips(player)}
-          <span class="risk-pill ${risk.tier}" title="${escapeHtml(risk.action)} (${escapeHtml(risk.reason)})">${risk.level}</span>
+          ${scout ? "" : `<span class="risk-pill ${risk.tier}" title="${escapeHtml(risk.action)} (${escapeHtml(risk.reason)})">${risk.level}</span>`}
           <span class="player-card-mobile-grade">${gradeLabel(playerAverageGrade(player.id))}</span>
         </div>
         <div class="player-card-mobile-actions">
@@ -4639,6 +4827,22 @@ function consentChipHtml(player) {
 
 function renderProfileHeader(player, ratings) {
   const average = playerAverageGrade(player?.id);
+  if (currentRole === "scout") {
+    $("#profileHeader").innerHTML = player ? `
+      <div class="profile-card">
+        <div class="profile-number">${escapeHtml(String(player.number ?? ""))}</div>
+        <div>
+          <strong>${escapeHtml(player.name)}</strong>
+          <span>${escapeHtml(positionText(player))} · ${formatDate(player.birthdate)} · ${ageFromBirthdate(player.birthdate) ?? "-"} Jahre</span>
+        </div>
+        <div class="profile-grade">
+          <span>Ø Note</span>
+          <strong>${gradeLabel(average)}</strong>
+        </div>
+      </div>
+    ` : `<p class="muted">Noch kein Spieler vorhanden.</p>`;
+    return;
+  }
   const risk = player ? playerInjuryRisk(player.id) : null;
   const effectiveStatus = player ? playerEffectiveStatus(player) : null;
   $("#profileHeader").innerHTML = player ? `
@@ -4700,6 +4904,7 @@ function renderProfileDeepAnalysis(playerId, ratings) {
       <div class="analysis-bar"><span style="width:${gradeToPercent(item.value)}%"></span></div>
     </article>
   `).join("");
+  if (currentRole === "scout") { $("#profileAvailabilityBars").innerHTML = ""; return; }
   $("#profileAvailabilityBars").innerHTML = profileAvailability(playerId).map((item) => `
     <article class="analysis-bar-row">
       <div><strong>${item.label}</strong><span>${item.display}</span></div>
@@ -4715,7 +4920,8 @@ function renderAnalyticsCards(playerId, ratings = playerRatings(playerId)) {
   const last = ratings.at(-1)?.rating.grade;
   const previous = ratings.at(-2)?.rating.grade;
   const trend = last && previous ? Number(previous) - Number(last) : null;
-  const risk = playerInjuryRisk(playerId);
+  const scout = currentRole === "scout";
+  const risk = scout ? null : playerInjuryRisk(playerId);
   const recentIntensity = ratings.slice(-3).map((item) => eventExertion(item.event));
   const avgIntensity = recentIntensity.length ? roundGrade(recentIntensity.reduce((sum, value) => sum + Number(value), 0) / recentIntensity.length) : null;
   const development = bestDevelopment(ratings);
@@ -4728,7 +4934,7 @@ function renderAnalyticsCards(playerId, ratings = playerRatings(playerId)) {
     ["Bewertete Events", ratings.length],
     ["Teilnahmen", playerAttendanceCount(playerId)],
     ["Trend", trend === null ? "-" : `${trend > 0 ? "+" : ""}${roundGrade(trend)}`],
-    ["Belastung", risk.level],
+    ...(scout ? [] : [["Belastung", risk.level]]),
     ["Ø Anstrengung zuletzt", avgIntensity ? avgIntensity.toFixed(1).replace(".", ",") : "-"],
     ["Entwicklung Saison", development === null ? "-" : `${development > 0 ? "+" : ""}${gradeLabel(development)}`],
     ["Bestes Event", bestEvent ? `${gradeLabel(bestEvent.rating.grade)} · ${escapeHtml(bestEvent.event.type)}` : "-"],
@@ -4742,6 +4948,8 @@ function renderAnalyticsCards(playerId, ratings = playerRatings(playerId)) {
 }
 
 function downloadProfilePdf() {
+  // Das Profil-PDF enthaelt Belastung/Verfuegbarkeit - fuer Scouts gibt es keinen Export (SCRUM-170).
+  if (currentRole === "scout") return;
   const playerId = $("#profilePlayer").value || state.players[0]?.id;
   const player = state.players.find((item) => item.id === playerId);
   if (!player) return;
@@ -5174,6 +5382,7 @@ function drawBarChart(canvas, rows, title, color) {
 }
 
 function exportData() {
+  if (!canManageRecords()) return;
   if (!confirmDespiteRevokedConsent(state.players, "Der Export")) return;
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
   const link = document.createElement("a");
@@ -5896,13 +6105,14 @@ on("#signOutBtn", "click", handleSignOut);
 on("#migrateDataBtn", "click", migrateLegacyBlobToCollections);
 on("#addTrainerBtn", "click", createTrainerAccount);
 on("#addMedicalBtn", "click", createMedicalAccount);
+on("#addScoutBtn", "click", createScoutAccount);
 on("#absenceFrom", "change", () => { $("#absenceTo").min = $("#absenceFrom").value; });
 on("#trainerResetBtn", "click", handlePasswordReset);
 on("#changePasswordBtn", "click", openPasswordDialog);
 on("#passwordForm", "submit", handlePasswordChange);
 on("#closePasswordDialogBtn", "click", () => $("#passwordDialog").close());
 on("#cancelPasswordDialogBtn", "click", () => $("#passwordDialog").close());
-["#accessManagerList", "#scoutManagerList", "#trainerManagerList"].forEach((selector) => on(selector, "click", (event) => {
+["#accessManagerList", "#scoutManagerList", "#medicalManagerList", "#trainerManagerList"].forEach((selector) => on(selector, "click", (event) => {
   const button = event.target.closest("button[data-action='revoke-access']");
   if (!button) return;
   revokeAccess(button.dataset.uid, button.dataset.role);
@@ -5914,7 +6124,10 @@ on("#inviteManagerList", "click", (event) => {
   if (button.dataset.action === "revoke-invite") revokeInvite(button.dataset.code);
 });
 on("#scoutManagerPanel", "click", (event) => {
-  if (event.target.closest("button[data-action='add-scout']")) createMedicalAccount();
+  if (event.target.closest("button[data-action='add-scout']")) createScoutAccount();
+});
+on("#medicalManagerPanel", "click", (event) => {
+  if (event.target.closest("button[data-action='add-medical']")) createMedicalAccount();
 });
 on("#trainerManagerPanel", "click", (event) => {
   if (event.target.closest("button[data-action='add-trainer']")) createTrainerAccount();

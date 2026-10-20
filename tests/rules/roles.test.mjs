@@ -27,7 +27,11 @@ beforeEach(async () => {
     const db = ctx.firestore();
     const members = {
       coach: { role: "trainer" },
-      medic: { role: "medical" },
+      // SCRUM-170: Medizin-Zugang = "medical" mit healthAccess; Scout = "scout" oder Alt-Konto "medical" ohne healthAccess.
+      medic: { role: "medical", healthAccess: true },
+      scout: { role: "scout" },
+      legacyscout: { role: "medical" },
+      oldscout: { role: "scout", expiresAt: past() },
       pl1: { role: "player", playerId: "p1", expiresAt: null },
       parent1: { role: "parent", playerId: "p1", expiresAt: null },
       pl2: { role: "player", playerId: "p2", expiresAt: null },
@@ -42,6 +46,7 @@ beforeEach(async () => {
       await setDoc(doc(db, t(`players/${id}/measurements/m1`)), { playerId: id, value: 1 });
       await setDoc(doc(db, t(`events/e1/ratings/${id}`)), { playerId: id, effort: 2 });
       await setDoc(doc(db, t(`events/e1/privateNotes/${id}`)), { note: "intern" });
+      await setDoc(doc(db, t(`scoutProfiles/${id}`)), { playerId: id, name: id, ratings: { e1: { attendance: "present", effort: 2 } } });
     }
     await setDoc(doc(db, t("events/e1")), { title: "Training" });
     await setDoc(doc(db, t("opponents/o1")), { name: "Gegner" });
@@ -84,6 +89,50 @@ test("Medizin: Spieler, Abwesenheiten und Messwerte lesbar; keine Noten, Notizen
   await assertFails(setDoc(doc(as("medic"), t("players/p9")), { name: "x" }));
 });
 
+// SCRUM-170: Scouts sehen keine Gesundheitsdaten - weder Spielerdokumente (Status, Verletzung, Einwilligung),
+// noch Abwesenheiten (Gruende), Messwerte, Bewertungsdokumente (Notiz enthaelt ggf. den Abwesenheitsgrund),
+// interne Notizen oder Foerderplaene. Sie lesen nur die bereinigte scoutProfiles-Ansicht und die Events.
+test("Scout: nur scoutProfiles und Events lesbar; keine Spieler-, Gesundheits-, Noten- oder Notizdokumente; nichts schreibbar", async () => {
+  for (const uid of ["scout", "legacyscout"]) {
+    for (const path of ["scoutProfiles/p1", "scoutProfiles/p2", "events/e1", "meta/breaks"]) await canRead(uid, path);
+    await assertSucceeds(getDocs(collection(as(uid), t("scoutProfiles"))));
+    for (const path of ["players/p1", "players/p2", "players/p1/absences/a1", "players/p2/measurements/m1", "events/e1/ratings/p1", "events/e1/privateNotes/p1", "players/p1/developmentPlans/f1", "opponents/o1", "meta/lineup", "meta/settings", "meta/planning", "meta/operations", "appState/current", "members/pl1"]) await cannotRead(uid, path);
+    const db = as(uid);
+    await assertFails(getDocs(collection(db, t("players"))));
+    await assertFails(getDocs(collection(db, t("players/p1/absences"))));
+    await assertFails(getDocs(query(collection(db, t("players/p1/absences")), where("playerId", "==", "p1"))));
+    await assertFails(getDocs(query(collection(db, t("players/p1/measurements")), where("playerId", "==", "p1"))));
+    await assertFails(getDocs(collection(db, t("events/e1/ratings"))));
+    await assertFails(getDocs(collection(db, t("members"))));
+    await assertFails(getDocs(collection(db, t("invites"))));
+    await assertFails(setDoc(doc(db, t("scoutProfiles/p1")), { playerId: "p1", name: "hack" }));
+    await assertFails(deleteDoc(doc(db, t("scoutProfiles/p1"))));
+    await assertFails(setDoc(doc(db, t("scoutProfiles/p9")), { playerId: "p9" }));
+    await assertFails(setDoc(doc(db, t("members/neu-x")), { role: "scout" }));
+    await assertFails(setDoc(doc(db, t(`members/${uid}`)), { role: "medical", healthAccess: true }));
+    await assertFails(updateDoc(doc(db, t(`members/${uid}`)), { healthAccess: true }));
+  }
+  await canRead("scout", "members/scout");
+  await canRead("legacyscout", "members/legacyscout");
+});
+
+test("Medizin-Zugang (medical + healthAccess) liest wie bisher Spieler, Abwesenheiten, Messwerte - aber nicht die Scout-Ansicht", async () => {
+  for (const path of ["players/p1", "players/p1/absences/a1", "players/p1/measurements/m1"]) await canRead("medic", path);
+  await assertSucceeds(getDocs(collection(as("medic"), t("players"))));
+  await assertSucceeds(getDocs(collection(as("medic"), t("players/p2/absences"))));
+  await cannotRead("medic", "scoutProfiles/p1");
+  await assertFails(setDoc(doc(as("medic"), t("scoutProfiles/p1")), { playerId: "p1" }));
+});
+
+test("Scout-Ansicht: Trainer liest und schreibt; Spieler, Eltern, abgelaufene Scouts und Fremde lesen nicht", async () => {
+  await canRead("coach", "scoutProfiles/p1");
+  await assertSucceeds(getDocs(collection(as("coach"), t("scoutProfiles"))));
+  await assertSucceeds(setDoc(doc(as("coach"), t("scoutProfiles/p3")), { playerId: "p3", name: "neu", ratings: {} }));
+  await assertSucceeds(deleteDoc(doc(as("coach"), t("scoutProfiles/p3"))));
+  for (const uid of ["pl1", "parent1", "oldscout", null, "fremd"]) await cannotRead(uid, "scoutProfiles/p1");
+  await cannotRead("oldscout", "events/e1");
+});
+
 test("Spieler und Eltern: nur das eigene Profil samt Noten, Plänen, Abwesenheiten, Messwerten; nie fremde Daten oder interne Notizen", async () => {
   for (const uid of ["pl1", "parent1"]) {
     for (const path of ["players/p1", "events/e1/ratings/p1", "players/p1/developmentPlans/f1", "players/p1/absences/a1", "players/p1/measurements/m1", "events/e1"]) await canRead(uid, path);
@@ -115,7 +164,7 @@ test("Spieler dürfen nur die Selbstreflexion des eigenen Förderplans ändern (
 });
 
 test("Spieler, Eltern und Medizin können keine Bewertungen, Spieler, Events oder Gegner schreiben oder löschen", async () => {
-  for (const uid of ["pl1", "parent1", "medic"]) {
+  for (const uid of ["pl1", "parent1", "medic", "scout", "legacyscout"]) {
     const db = as(uid);
     await assertFails(setDoc(doc(db, t("events/e1/ratings/p1")), { playerId: "p1", effort: 1 }));
     await assertFails(setDoc(doc(db, t("players/p1")), { name: "hack" }));
@@ -135,12 +184,12 @@ test("Spieler, Eltern und Medizin können keine Bewertungen, Spieler, Events ode
 // SCRUM-150: Pausen liegen in einem eigenen Dokument, das jedes aktive Teammitglied lesen darf (Hinweis
 // "Winterpause bis 10.01."), die Serien in meta/planning aber nicht.
 test("Pausen (meta/breaks): jedes aktive Teammitglied liest sie, die Serien (meta/planning) nur der Trainer", async () => {
-  for (const uid of ["coach", "pl1", "pl2", "parent1", "medic", "futurepl"]) {
+  for (const uid of ["coach", "pl1", "pl2", "parent1", "medic", "scout", "legacyscout", "futurepl"]) {
     await canRead(uid, "meta/breaks");
     const snap = await getDoc(doc(as(uid), t("meta/breaks")));
     assert.deepEqual(Object.keys(snap.data().breaks), ["b1"]);
   }
-  for (const uid of ["pl1", "pl2", "parent1", "medic", "futurepl"]) await cannotRead(uid, "meta/planning");
+  for (const uid of ["pl1", "pl2", "parent1", "medic", "scout", "legacyscout", "futurepl"]) await cannotRead(uid, "meta/planning");
   for (const uid of [null, "fremd", "oldpl"]) await cannotRead(uid, "meta/breaks");
 });
 
@@ -164,8 +213,15 @@ test("Abgelaufene Zugänge sehen nichts mehr, befristete noch gültige schon", a
   await canRead("futurepl", "players/p1");
 });
 
-test("Mitgliedschaften: nur Trainer legen Trainer-/Medizin-Konten an; niemand ändert Rollen", async () => {
-  await assertSucceeds(setDoc(doc(as("coach"), t("members/neu-medic")), { role: "medical" }));
+test("Mitgliedschaften: nur Trainer legen Trainer-/Medizin-/Scout-Konten an; niemand ändert Rollen", async () => {
+  await assertSucceeds(setDoc(doc(as("coach"), t("members/neu-medic")), { role: "medical", healthAccess: true }));
+  await assertSucceeds(setDoc(doc(as("coach"), t("members/neu-scout")), { role: "scout" }));
+  await assertFails(setDoc(doc(as("fremd"), t("members/fremd")), { role: "scout" }));
+  await assertFails(setDoc(doc(as("pl1"), t("members/pl1-scout")), { role: "scout" }));
+  await assertFails(updateDoc(doc(as("coach"), t("members/legacyscout")), { healthAccess: true }));
+  await assertFails(updateDoc(doc(as("medic"), t("members/medic")), { role: "trainer" }));
+  await assertSucceeds(deleteDoc(doc(as("coach"), t("members/scout"))));
+  await cannotRead("scout", "scoutProfiles/p1");
   await assertFails(setDoc(doc(as("pl1"), t("members/selfmade")), { role: "trainer" }));
   await assertFails(setDoc(doc(as("fremd"), t("members/fremd")), { role: "trainer" }));
   await assertFails(setDoc(doc(as("fremd"), t("members/fremd")), { role: "medical" }));

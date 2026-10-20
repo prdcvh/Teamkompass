@@ -186,7 +186,7 @@ test("Abmelden entfernt den lokalen Teamstand; Nicht-Trainer-Rollen cachen nicht
     assert.match(app, /function clearLocalTeamData\(\) \{\s*\[storageKey, legacyStorageKey, cacheStampKey\]/, `${team}: Loeschfunktion fehlt`);
     assert.match(app, /async function handleSignOut\(\) \{[\s\S]*?signOut\(authInstance\);\s*clearLocalTeamData\(\);[\s\S]*?location\.reload\(\);/, `${team}: Abmelden leert den Cache nicht`);
     assert.match(app, /if \(!user\) \{[\s\S]{0,200}clearLocalTeamData\(\);/, `${team}: fehlende Anmeldung raeumt den Cache nicht auf`);
-    assert.match(app, /\["player", "parent", "medical"\]\.includes\(currentRole\)/, `${team}: Nicht-Trainer-Rollen duerfen nicht cachen`);
+    assert.match(app, /\["player", "parent", "medical", "scout"\]\.includes\(currentRole\)/, `${team}: Nicht-Trainer-Rollen duerfen nicht cachen`);
     assert.equal((app.match(/localStorage\.setItem\(storageKey/g) || []).length, 2, `${team}: ungeschuetzter Schreibzugriff auf den Cache`);
   }
 });
@@ -993,10 +993,16 @@ test("Spieler- und Scout-Zugänge werden getrennt verwaltet (SCRUM-92)", async (
     const app = await read(`outputs/${team}/app.js`);
     const render = app.slice(app.indexOf("async function renderAccessManager"), app.indexOf("async function revokeAccess"));
     assert.match(render, /\["player", "parent"\]\.includes\(docSnap\.data\(\)\.role\)/);
-    assert.match(render, /docSnap\.data\(\)\.role === "medical"/);
+    // SCRUM-170: Scout und Medizin getrennt, Alt-Konten "medical" ohne healthAccess zaehlen als Scout.
+    assert.match(render, /effectiveMemberRole\(docSnap\.data\(\)\) === "scout"/);
+    assert.match(render, /effectiveMemberRole\(docSnap\.data\(\)\) === "medical"/);
+    assert.match(html, /id="medicalManagerList"/);
+    assert.match(html, /data-action="add-medical"/);
     const css = await read(`outputs/${team}/base.css`);
     assert.match(css, /body\.role-medical #scoutManagerPanel/);
     assert.match(css, /body\.role-trainer-cloud #scoutManagerPanel/);
+    assert.match(css, /body\.role-trainer-cloud #medicalManagerPanel/);
+    assert.match(css, /body\.role-scout #medicalManagerPanel/);
   }
 });
 
