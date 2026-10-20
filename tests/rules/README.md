@@ -11,10 +11,11 @@ npm ci --ignore-scripts
 npm test
 ```
 
-Aktuell abgedeckt (`roles.test.mjs`): Rollen-Matrix für Trainer, Medizin, Spieler, Eltern,
+Aktuell abgedeckt (`roles.test.mjs`): Rollen-Matrix für Trainer, Medizin (mit `healthAccess`), Scout (inkl. Alt-Konten
+`medical` ohne `healthAccess`, SCRUM-170), Spieler, Eltern,
 abgelaufene Zugänge und Nicht-Mitglieder – wer welche Pfade lesen/schreiben darf (Spielerprofile,
 Bewertungen, interne Notizen, Förderpläne, Abwesenheiten, Messwerte, Gegner, Aufstellung,
-Mitgliedschaften, Einladungen), inklusive der Listenabfragen mit `playerId`-Filter.
+Mitgliedschaften, Einladungen, bereinigte Scout-Ansicht `scoutProfiles`), inklusive der Listenabfragen mit `playerId`-Filter.
 
 `invite-claim.test.mjs`: Einmalverbrauch von Einladungscodes (SCRUM-77) – gültiger Erst-Claim, zweiter Claim,
 fehlender/abgelaufener Code, falscher Spieler/Rolle, parallele Claims und die unveränderten Trainer-Wege.
