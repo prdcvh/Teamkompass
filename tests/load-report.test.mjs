@@ -153,7 +153,10 @@ for (const file of copies) {
     assert.match(withHtml, /Verletzt/);
     assert.ok(withHealth.wellness);
     assert.equal(withHealth.assessment.availability.label, "Verletzt");
-    assert.ok(withHealth.assessment.reasons.includes("Rückkehr nach Verletzung"));
+    // Rueckkehr nach einer beendeten Verletzung (ohne laufenden Status) fliesst in die Stufe ein.
+    const returned = build(api, { events, absences, includeHealth: true });
+    assert.ok(returned.assessment.reasons.includes("Rückkehr nach Verletzung"));
+    assert.ok(!build(api, { events, absences, includeHealth: false }).assessment.reasons.includes("Rückkehr nach Verletzung"));
     assert.match(withHtml, /Gesundheitsdaten/);
 
     const without = build(api, { player: injured, events, absences, includeHealth: false });

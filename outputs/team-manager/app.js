@@ -1827,7 +1827,8 @@ function applyRoleRestrictions() {
   } else {
     $("#profilePlayer").disabled = false;
     renderAccessManager();
-  }  syncLoadReportButton();
+  }
+  syncLoadReportButton();
 }
 
 async function handleTrainerLogin(event) {
@@ -2810,7 +2811,8 @@ function buildLoadReport({ player, playerId, events = [], absences = [], measure
   }));
   const ended = (list) => list.filter((item) => item.to && item.to < asOf).map((item) => item.to).sort();
   const injuryEnds = includeHealth ? ended(absences.filter(lrIsInjury)) : [];
-  if (includeHealth && player?.injuryUntil && player.injuryUntil < asOf) injuryEnds.push(player.injuryUntil);
+  // Wie in der App (computePlayerInjuryRisk): "ca. verletzt bis" zaehlt immer mit, auch wenn es noch bevorsteht.
+  if (includeHealth && player?.injuryUntil) injuryEnds.push(player.injuryUntil);
   injuryEnds.sort();
   const otherEnds = includeHealth ? ended(absences.filter((item) => !lrIsInjury(item))) : [];
   const coversAsOf = (item) => item.from && item.from <= asOf && (item.to ? asOf <= item.to : lrIsInjury(item));
@@ -2839,7 +2841,7 @@ function buildLoadReport({ player, playerId, events = [], absences = [], measure
       if (includeHealth && rating.attendance === "absent") {
         const absence = absenceOn(event.date);
         if (absence) reason = lrAbsenceText(absence);
-        else if (player?.status === "Verletzt" && (!player.injuryUntil || event.date <= player.injuryUntil)) reason = "Verletzt";
+        else if (player?.status === "Verletzt" && (!player.injuredSince || event.date >= player.injuredSince) && (!player.injuryUntil || event.date <= player.injuryUntil)) reason = "Verletzt";
       }
       return {
         date: event.date,
@@ -3030,7 +3032,8 @@ function loadReportHtml(report, { logoUrl = "" } = {}) {
   tr { break-inside: avoid; }
   .chart { border: 1px solid #e4dcde; border-radius: 8px; padding: 6px; }
   footer { margin-top: 24px; padding: 10px 12px; border-radius: 8px; background: #fff7f9; color: #70686b; font-size: 11px; }
-  @media (max-width: 600px) { body { margin: 14px; } header img { width: 52px; height: 52px; } th, td { padding: 4px; } }
+  .table-wrap { overflow-x: auto; }
+  @media (max-width: 600px) { body { margin: 14px; } header img { width: 52px; height: 52px; } table { font-size: 11px; } th, td { padding: 4px 3px; } th { font-size: 9px; } }
   @media print { body { margin: 14mm; } h2 { break-after: avoid; } }
 </style>
 </head>
@@ -3061,10 +3064,12 @@ ${report.includeHealth ? "" : `<p class="muted">Ohne Verletzungs- und Befindensd
 <h2>Wochenverlauf</h2>
 <div class="chart">${report.weeks.some((week) => week.load > 0) ? loadReportChartSvg(report.weeks) : `<p class="muted">Keine Belastung im Zeitraum eingetragen.</p>`}</div>
 <h2>Termine im Zeitraum</h2>
+<div class="table-wrap">
 <table>
-  <thead><tr><th>Datum</th><th>Art</th><th>Teilnahme</th><th>Minuten</th><th>Anstrengung (Trainer)</th>${selfHead}<th>Belastung</th></tr></thead>
+  <thead><tr><th>Datum</th><th>Art</th><th>Teilnahme</th><th>Minuten</th><th>Anstrengung<br>(Trainer)</th>${selfHead}<th>Belastung</th></tr></thead>
   <tbody>${rows || `<tr><td colspan="${report.hasSelfExertion ? 7 : 6}">Keine Termine im Zeitraum.</td></tr>`}</tbody>
 </table>
+</div>
 <h2>Risikomarker im Zeitraum</h2>
 <h3>Wachstum</h3>
 <ul>${growth}</ul>

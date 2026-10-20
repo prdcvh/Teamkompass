@@ -1,0 +1,23 @@
+:host {
+  display: contents;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: var(--tk-space-2);
+  font-weight: 600;
+}
+
+.check input {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+}
+
+@media (max-width: 720px) {
+  .open {
+    width: 100%;
+    min-height: var(--tk-touch);
+  }
+}

@@ -20,18 +20,21 @@ import { effectiveStatus } from '../../core/records/availability';
 import { MeasurementsService } from '../../core/records/measurements.service';
 import { RecordsStateService } from '../../core/records/records-state.service';
 import { injuryRisk } from '../../core/analysis/risk';
+import { canCreateLoadReport } from '../../core/analysis/load-report';
+import { SessionService } from '../../core/auth/session.service';
 import { gradeLabel } from '../../core/ratings/rating';
 import { SquadService } from '../../core/player/squad.service';
 import { SyncService } from '../../core/shell/sync.service';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 import { Status } from '../../ui/status/status';
+import { LoadReportAction } from './load-report-action';
 import { ProfileExtras } from './profile-extras';
 
 /** Spielerprofil (Figma: Profil Desktop/Handy): Kopfbereich, Notenverlauf, Kompetenzprofil, Verfügbarkeit, Statistik, Eventhistorie. */
 @Component({
   selector: 'app-profile',
-  imports: [Button, Card, Status, ProfileExtras],
+  imports: [Button, Card, Status, ProfileExtras, LoadReportAction],
   templateUrl: './profile.html',
   // Reihenfolge = Kaskade (die Handy-Regeln überschreiben Kopf und Auswertung).
   styleUrls: ['./profile.css', './profile-stats.css', './profile-mobile.css', './profile-risk.css', '../../ui/chart/chart.css'],
@@ -45,6 +48,7 @@ export class Profile implements OnInit {
   protected readonly records = inject(RecordsStateService);
   private readonly measurements = inject(MeasurementsService);
   protected readonly sync = inject(SyncService);
+  private readonly session = inject(SessionService);
   protected readonly mobile = inject(LayoutService).isMobile;
 
   private readonly routeId = toSignal(this.route.paramMap.pipe(map((params) => params.get('id') ?? '')), { initialValue: '' });
@@ -78,6 +82,12 @@ export class Profile implements OnInit {
     const player = this.player();
     if (!player || !this.records.ready() || this.profile.loading()) return null;
     return injuryRisk(player, this.profile.items(), this.records.absences(), this.measurements.measurements());
+  });
+
+  /** Belastungsprotokoll (SCRUM-139): erst wenn auch Abwesenheiten und Messwerte geladen sind. */
+  protected readonly reportAllowed = computed(() => {
+    const player = this.player();
+    return !!player && this.records.ready() && canCreateLoadReport(this.session.role(), this.session.playerId(), player.id);
   });
 
   protected readonly cards = computed(() => {
