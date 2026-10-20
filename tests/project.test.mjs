@@ -29,11 +29,12 @@ test("Einladungstokens sind stark und werden atomar verbraucht", async () => {
   assert.match(rules, /getAfter\([\s\S]*claimedInviteCode == code/);
 });
 
-test("Eltern und medizinische Leserechte sind getrennt; Co-Trainer ist nicht eingeführt", async () => {
+test("Eltern-, Medizin- und Scout-Leserechte sind getrennt; Co-Trainer ist nicht eingeführt", async () => {
   const app = await read("outputs/team-manager/app.js");
   const rules = await read("firestore.rules");
   assert.match(rules, /\["player", "parent"\]/);
-  assert.match(rules, /function isMedical\(\)/);
+  assert.match(rules, /function isPhysio\(\)/);
+  assert.match(rules, /function isScout\(\)/);
   assert.doesNotMatch(`${app}\n${rules}`, /role\s*[:=]\s*["']co.?trainer["']/i);
 });
 
@@ -146,7 +147,7 @@ test("Handy- und Desktop-Stylesheet sind sauber getrennt", async () => {
   // Rollenrechte sind Verhalten, kein Layout: sie muessen in base.css stehen,
   // sonst greifen sie je nach Bildschirmbreite nicht.
   const base = await read("outputs/team-manager/base.css");
-  for (const rule of ["body.role-player", "body.role-parent", "body.role-medical", "body.role-trainer-cloud", "body.auth-locked"]) {
+  for (const rule of ["body.role-player", "body.role-parent", "body.role-physio", "body.role-scout", "body.role-trainer-cloud", "body.auth-locked"]) {
     assert.ok(base.includes(rule), `${rule} fehlt in base.css`);
     assert.ok(!desktop.includes(rule), `${rule} steht noch in styles.css`);
   }
@@ -186,7 +187,8 @@ test("Abmelden entfernt den lokalen Teamstand; Nicht-Trainer-Rollen cachen nicht
     assert.match(app, /function clearLocalTeamData\(\) \{\s*\[storageKey, legacyStorageKey, cacheStampKey\]/, `${team}: Loeschfunktion fehlt`);
     assert.match(app, /async function handleSignOut\(\) \{[\s\S]*?signOut\(authInstance\);\s*clearLocalTeamData\(\);[\s\S]*?location\.reload\(\);/, `${team}: Abmelden leert den Cache nicht`);
     assert.match(app, /if \(!user\) \{[\s\S]{0,200}clearLocalTeamData\(\);/, `${team}: fehlende Anmeldung raeumt den Cache nicht auf`);
-    assert.match(app, /\["player", "parent", "medical"\]\.includes\(currentRole\)/, `${team}: Nicht-Trainer-Rollen duerfen nicht cachen`);
+    assert.match(app, /const READ_ONLY_ROLES = \["player", "parent", "physio", "scout"\];/, `${team}: Nicht-Trainer-Rollen duerfen nicht cachen`);
+    assert.match(app, /function canCacheLocally\(\) \{\s*return !READ_ONLY_ROLES\.includes\(currentRole\);/, `${team}: Cache-Sperre fehlt`);
     assert.equal((app.match(/localStorage\.setItem\(storageKey/g) || []).length, 2, `${team}: ungeschuetzter Schreibzugriff auf den Cache`);
   }
 });
@@ -240,7 +242,8 @@ test("Ansichten sind je Rolle gesperrt (setView) und die Suche zeigt nur erlaubt
     const allowedFor = (role) => new Function("currentRole", "views", `${app.slice(start, end)}; return allowedViews();`)(role, { dashboard: 1, squad: 1, events: 1, profiles: 1, opponents: 1, teamAnalysis: 1 });
     assert.deepEqual(allowedFor("player"), ["profiles"]);
     assert.deepEqual(allowedFor("parent"), ["profiles"]);
-    assert.deepEqual(allowedFor("medical"), ["squad", "profiles"]);
+    assert.deepEqual(allowedFor("physio"), ["squad", "profiles"]);
+    assert.deepEqual(allowedFor("scout"), ["profiles"]);
     assert.equal(allowedFor("trainer").length, 6);
     assert.match(app, /function setView\(viewName\) \{\s*if \(!allowedViews\(\)\.includes\(viewName\)\) return;/, `${team}: setView prueft die Rolle nicht`);
     assert.match(app, /openEvent: \(eventId\) => \{\s*if \(!allowedViews\(\)\.includes\("events"\)\) return;/, `${team}: openEvent prueft die Rolle nicht`);
@@ -967,7 +970,7 @@ test("Der Suchdialog hat einen eigenen zugänglichen Namen (SCRUM-89)", async ()
   }
 });
 
-test("Der Begriff „Medizinischer Lesezugang“ ist nirgends mehr sichtbar, die Rolle „medical“ bleibt (SCRUM-91)", async () => {
+test("Der Begriff „Medizinischer Lesezugang“ ist nirgends mehr sichtbar; „medical“ gilt seit SCRUM-170 als Scout (SCRUM-91)", async () => {
   const files = [
     ...teams.flatMap((team) => [`outputs/${team}/app.js`, `outputs/${team}/index.html`]),
     "angular/src/app/core/shell/navigation.ts",
@@ -980,8 +983,12 @@ test("Der Begriff „Medizinischer Lesezugang“ ist nirgends mehr sichtbar, die
     const text = await read(file);
     assert.doesNotMatch(text, /medizinische[rnm]? Lesezugang/i, `${file}: alter Begriff sichtbar`);
   }
-  for (const team of teams) assert.match(await read(`outputs/${team}/app.js`), /Scout-Zugang/);
-  assert.match(await read("firestore.rules"), /role == "medical"/);
+  for (const team of teams) {
+    assert.match(await read(`outputs/${team}/app.js`), /Scout-Zugang/);
+    assert.match(await read(`outputs/${team}/app.js`), /Medizin-Zugang/);
+  }
+  assert.match(await read("firestore.rules"), /role in \["scout", "medical"\]/);
+  assert.match(await read("firestore.rules"), /role == "physio"/);
 });
 
 test("Spieler- und Scout-Zugänge werden getrennt verwaltet (SCRUM-92)", async () => {
@@ -993,10 +1000,13 @@ test("Spieler- und Scout-Zugänge werden getrennt verwaltet (SCRUM-92)", async (
     const app = await read(`outputs/${team}/app.js`);
     const render = app.slice(app.indexOf("async function renderAccessManager"), app.indexOf("async function revokeAccess"));
     assert.match(render, /\["player", "parent"\]\.includes\(docSnap\.data\(\)\.role\)/);
-    assert.match(render, /docSnap\.data\(\)\.role === "medical"/);
+    assert.match(render, /normalizeRole\(docSnap\.data\(\)\.role\) === "scout"/);
+    assert.match(render, /docSnap\.data\(\)\.role === "physio"/);
     const css = await read(`outputs/${team}/base.css`);
-    assert.match(css, /body\.role-medical #scoutManagerPanel/);
+    assert.match(css, /body\.role-physio #scoutManagerPanel/);
+    assert.match(css, /body\.role-scout #scoutManagerPanel/);
     assert.match(css, /body\.role-trainer-cloud #scoutManagerPanel/);
+    assert.match(css, /body\.role-trainer-cloud #physioManagerPanel/);
   }
 });
 

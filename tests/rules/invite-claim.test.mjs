@@ -81,12 +81,13 @@ test("parallele Claims: hoechstens einer gelingt", async () => {
   assert.equal(results.filter((r) => r.status === "fulfilled").length, 1);
 });
 
-test("Trainer legt Trainer-/Medizin-Konto weiter ohne Code an", async () => {
+test("Trainer legt Trainer-, Scout- und Medizin-Konto weiter ohne Code an", async () => {
   await env.withSecurityRulesDisabled(async (ctx) => {
     await setDoc(doc(ctx.firestore(), `teams/${TEAM}/members/coach`), { role: "trainer", createdAt: Timestamp.now() });
   });
   const db = env.authenticatedContext("coach").firestore();
-  await assertSucceeds(setDoc(doc(db, `teams/${TEAM}/members/med1`), { role: "medical", createdAt: Timestamp.now() }));
+  await assertSucceeds(setDoc(doc(db, `teams/${TEAM}/members/med1`), { role: "physio", createdAt: Timestamp.now() }));
+  await assertSucceeds(setDoc(doc(db, `teams/${TEAM}/members/scout1`), { role: "scout", createdAt: Timestamp.now() }));
 });
 
 test("Trainer darf Codes weiter anlegen und loeschen", async () => {

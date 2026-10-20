@@ -144,7 +144,8 @@
                 <button class="ghost-button" id="privacyBtn" type="button">Datenschutz &amp; lokale Daten</button>
                 <button class="ghost-button" id="migrateDataBtn" type="button" hidden>Alte Daten migrieren</button>
                 <button class="ghost-button" id="addTrainerBtn" type="button" hidden>Trainer-Konto anlegen</button>
-                <button class="ghost-button" id="addMedicalBtn" type="button" hidden>Scout-Zugang anlegen</button>
+                <button class="ghost-button" id="addScoutBtn" type="button" hidden>Scout-Zugang anlegen</button>
+                <button class="ghost-button" id="addPhysioBtn" type="button" hidden>Medizin-Zugang anlegen</button>
                 <button class="ghost-button" id="changePasswordBtn" type="button" hidden>Passwort ändern</button>
                 <button class="ghost-button" id="signOutBtn" type="button" hidden>Abmelden</button>
               </div>
@@ -255,7 +256,14 @@
           <details class="control-disclosure" id="scoutManagerPanel">
             <summary>Scout-Zugänge verwalten <span id="scoutAccessCount" class="muted"></span></summary>
             <div class="access-manager" id="scoutManagerList"></div>
+            <p class="muted">Scouts sehen Kompetenzprofil, Notenverlauf und Statistik – keine Verletzungen, Abwesenheitsgründe, Messwerte oder Notizen.</p>
             <button class="ghost-button" data-action="add-scout" type="button">Scout-Zugang anlegen</button>
+          </details>
+          <details class="control-disclosure" id="physioManagerPanel">
+            <summary>Medizin-Zugänge verwalten <span id="physioAccessCount" class="muted"></span></summary>
+            <div class="access-manager" id="physioManagerList"></div>
+            <p class="muted">Medizin-Zugänge (z.&nbsp;B. Physio) sehen Status, Abwesenheiten, Verletzungen und Messwerte aller Spieler – keine Noten.</p>
+            <button class="ghost-button" data-action="add-physio" type="button">Medizin-Zugang anlegen</button>
           </details>
           <details class="control-disclosure" id="trainerManagerPanel">
             <summary>Trainer-Konten verwalten <span id="trainerAccessCount" class="muted"></span></summary>
@@ -429,7 +437,7 @@
               </div>
               <div class="analysis-bars" id="profileSkillBars"></div>
             </section>
-            <section class="panel">
+            <section class="panel" id="profileAvailabilityPanel">
               <div class="panel-head">
                 <h2>Verfügbarkeit</h2>
                 <span class="muted">Anwesenheit und Belastung</span>
@@ -437,7 +445,7 @@
               <div class="analysis-bars" id="profileAvailabilityBars"></div>
             </section>
           </div>
-          <details class="control-disclosure development-panel" open>
+          <details class="control-disclosure development-panel" id="developmentPanel" open>
             <summary>Förderplan</summary>
             <div class="disclosure-body">
               <span class="muted">individuelle Ziele, Maßnahmen und Status</span>
@@ -466,7 +474,7 @@
               <div class="development-list" id="developmentPlanList"></div>
             </div>
           </details>
-          <details class="control-disclosure development-panel" open>
+          <details class="control-disclosure development-panel" id="absencePanel" open>
             <summary>Abwesenheiten &amp; Verletzungen</summary>
             <div class="disclosure-body">
               <span class="muted">Verletzung, Urlaub, Sperre & Co. - Events in diesem Zeitraum werden automatisch auf "Fehlt" gesetzt, der Status zeigt "Abwesend" (bei "Verletzung" den Grund "Verletzt", bei "Sperre" "Gesperrt")</span>
