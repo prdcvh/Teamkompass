@@ -1388,8 +1388,11 @@ function startCloudSync() {
     // Bereits veroeffentlichte Scout-Sicht: Grundlage fuer den Abgleich in publishScoutProfiles().
     cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("scoutProfiles"), (snapshot) => {
       scoutPublish.published = new Map(snapshot.docs.map((docSnap) => [docSnap.id, docSnap.data()]));
+      // Nur nach dem ersten Laden abgleichen, sonst bei Aenderungen der Quelldaten: zwei gleichzeitig geoeffnete
+      // Trainer-Clients koennen sich so nicht endlos gegenseitig ueberschreiben.
+      const firstLoad = !scoutPublish.publishedLoaded;
       scoutPublish.publishedLoaded = true;
-      scheduleScoutPublish();
+      if (firstLoad) scheduleScoutPublish();
       cloudListenerRecovered("scout profiles");
     }, (error) => cloudListenerFailed("scout profiles", error)));
 
