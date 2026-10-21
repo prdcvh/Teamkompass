@@ -217,6 +217,8 @@ export class AuthService {
       this.session.role.set(member.role);
       this.session.playerId.set(member.playerId);
       this.session.displayName.set(displayNameFor(member.role, user.email));
+      this.session.uid.set(user.uid);
+      this.session.email.set(user.email);
       this.error.set('');
       this.markStatus('ready');
     } catch (error) {

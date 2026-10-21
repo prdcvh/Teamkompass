@@ -3,6 +3,7 @@ import { AccessApi } from '../firebase/access.api';
 import { AuthApi } from '../firebase/auth.api';
 import { EventsApi } from '../firebase/events.api';
 import { LineupApi } from '../firebase/lineup.api';
+import { NotificationsApi } from '../firebase/notifications.api';
 import { OpponentsApi } from '../firebase/opponents.api';
 import { PlayerRecordsApi } from '../firebase/player-records.api';
 import { PlanningApi } from '../firebase/planning.api';
@@ -16,6 +17,7 @@ import { FakeAccessApi } from './fake-access.api';
 import { FakeAuthApi } from './fake-auth.api';
 import { FakeEventsApi } from './fake-events.api';
 import { FakeLineupApi } from './fake-lineup.api';
+import { FakeNotificationsApi } from './fake-notifications.api';
 import { FakeOpponentsApi } from './fake-opponents.api';
 import { FakePlanningApi } from './fake-planning.api';
 import { FakePlayerRecordsApi } from './fake-player-records.api';
@@ -39,7 +41,8 @@ export class FakeFirebase {
   readonly ratings = new FakeRatingsApi(this.calls);
   readonly records = new FakePlayerRecordsApi(this.calls);
   readonly settings = new FakeTeamSettingsApi(this.calls);
-  readonly planning = new FakePlanningApi(this.calls);
+  readonly notifications = new FakeNotificationsApi(this.calls);
+  readonly planning =new FakePlanningApi(this.calls);
   readonly scout = new FakeScoutApi(this.calls);
 
   constructor() {
@@ -61,6 +64,7 @@ export function provideFakeFirebase(fake: FakeFirebase): Provider[] {
     // Seiten zeigen Wetter; Tests sollen nie ins Netz (SCRUM-98).
     { provide: WeatherProvider, useClass: OfflineWeatherProvider },
     { provide: TeamSettingsApi, useValue: fake.settings },
+    { provide: NotificationsApi, useValue: fake.notifications },
     { provide: PlanningApi, useValue: fake.planning },
     { provide: ScoutApi, useValue: fake.scout },
   ];

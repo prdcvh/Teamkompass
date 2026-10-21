@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
 import { AccountService } from '../../core/auth/account.service';
 import { MIN_PASSWORD_LENGTH } from '../../core/access/access';
@@ -6,6 +6,7 @@ import { SessionService } from '../../core/auth/session.service';
 import { RETENTION_OPTIONS } from '../../core/device/workspace';
 import { ThemeService } from '../../core/device/theme.service';
 import { WorkspaceService } from '../../core/device/workspace.service';
+import { NotificationsService } from '../../core/notifications/notifications.service';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 import { Dialog } from '../../ui/dialog/dialog';
@@ -32,9 +33,24 @@ export class Settings {
   protected readonly passwordBusy = signal(false);
   protected readonly passwordError = signal('');
   protected readonly passwordChanged = signal(false);
+  /** E-Mail-Erinnerung an offene Bewertungen (Cloud, je Konto; SCRUM-100). */
+  protected readonly notifications = inject(NotificationsService);
   protected readonly retentionOptions = RETENTION_OPTIONS;
   protected readonly confirmClear = signal(false);
   protected readonly cleared = signal(false);
+
+  constructor() {
+    effect(() => {
+      // untracked: ein Ladefehler darf den Effekt nicht in eine Wiederhol-Schleife schicken (Neuladen per Knopf).
+      if (this.notifications.available()) untracked(() => void this.notifications.start());
+    });
+  }
+
+  protected toggleReminders(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    // Der Schalter folgt dem gespeicherten Stand: bei einem Fehler springt er zurück.
+    void this.notifications.setEmailReminders(input.checked).then(() => (input.checked = this.notifications.emailReminders()));
+  }
 
   protected setRetention(event: Event): void {
     this.workspace.setRetention(Number((event.target as HTMLSelectElement).value));

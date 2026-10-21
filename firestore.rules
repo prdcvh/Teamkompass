@@ -258,6 +258,19 @@ service cloud.firestore {
         allow read, write: if isTrainer();
       }
 
+      // Benachrichtigungs-Einstellungen je Konto (SCRUM-100): E-Mail-Erinnerung an offene Bewertungen (Opt-in).
+      // Nur der Trainer selbst darf sein eigenes Dokument lesen und schreiben (Dokument-ID = eigene uid). Das Dokument
+      // enthaelt ausschliesslich das Feld "emailReminders" (bool); die E-Mail-Adresse wird nie gespeichert. Der spaetere
+      // Erinnerungsdienst (Admin-SDK) umgeht die Regeln. Pfad bewusst teams/{teamId}/notifications/{uid}: ein Pfad
+      // teams/.../meta/notifications/{uid} waere kein gueltiger Dokumentpfad (gerade Segmentanzahl).
+      match /notifications/{uid} {
+        allow read: if isTrainer() && request.auth.uid == uid;
+        allow create, update: if isTrainer() && request.auth.uid == uid
+          && request.resource.data.keys().hasOnly(['emailReminders'])
+          && request.resource.data.emailReminders is bool;
+        allow delete: if isTrainer() && request.auth.uid == uid;
+      }
+
       // Altes Einzeldokument aus dem Single-Blob-Modell - nur fuer die einmalige
       // Migration in die neue Struktur, danach kann es geloescht werden.
       match /appState/current {

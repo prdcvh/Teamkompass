@@ -267,3 +267,30 @@ test("Scout-Sicht: nur Trainer schreiben, nur erlaubte Felder, Spieler/Eltern/Fr
     await assertFails(getDocs(collection(as(uid), t("scoutProfiles"))));
   }
 });
+
+test("E-Mail-Erinnerung (SCRUM-100): nur der Trainer selbst liest/schreibt sein notifications-Dokument, nur emailReminders (bool)", async () => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), t("members/coach2")), { role: "trainer" });
+    await setDoc(doc(ctx.firestore(), t("notifications/coach")), { emailReminders: true });
+  });
+  const mine = doc(as("coach"), t("notifications/coach"));
+  await assertSucceeds(getDoc(mine));
+  await assertSucceeds(setDoc(mine, { emailReminders: false }));
+  await assertSucceeds(setDoc(mine, { emailReminders: true }, { merge: true }));
+  // Nur das eine Feld, nur bool; keine E-Mail-Adresse im Dokument.
+  await assertFails(setDoc(mine, { emailReminders: "ja" }));
+  await assertFails(setDoc(mine, { emailReminders: true, email: "coach@example.test" }));
+  await assertFails(setDoc(mine, { other: 1 }));
+  // Ein anderer Trainer, andere Rollen, Abgelaufene und Fremde kommen weder lesend noch schreibend heran.
+  for (const uid of ["coach2", "medic", "scout", "legacyScout", "pl1", "parent1", "oldpl", "fremd", null]) {
+    await assertFails(getDoc(doc(as(uid), t("notifications/coach"))));
+    await assertFails(setDoc(doc(as(uid), t("notifications/coach")), { emailReminders: true }));
+    await assertFails(deleteDoc(doc(as(uid), t("notifications/coach"))));
+  }
+  // Auch das eigene Dokument eines Nicht-Trainers bleibt gesperrt.
+  for (const uid of ["medic", "pl1", "scout"]) {
+    await assertFails(setDoc(doc(as(uid), t(`notifications/${uid}`)), { emailReminders: true }));
+    await assertFails(getDoc(doc(as(uid), t(`notifications/${uid}`))));
+  }
+  await assertSucceeds(deleteDoc(mine));
+});
