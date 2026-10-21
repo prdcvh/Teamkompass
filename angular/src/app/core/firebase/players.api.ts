@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { environment } from '../../../environments/environment';
+import { PlayerStatsMode } from '../team/player-stats-mode';
 import { FirebaseConnection } from './firebase-connection';
 import type { RawDoc, SnapshotMeta } from './types';
 
@@ -10,6 +11,7 @@ const PLAYER_SUBCOLLECTIONS = ['developmentPlans', 'absences', 'measurements'] a
 @Injectable({ providedIn: 'root' })
 export class PlayersApi {
   private readonly connection = inject(FirebaseConnection);
+  private readonly statsMode = inject(PlayerStatsMode);
 
   /**
    * Echtzeit-Abo auf alle Spieler des Teams. Die Regeln erlauben Lesen für Trainer und Medizin
@@ -60,7 +62,7 @@ export class PlayersApi {
     await setDoc(doc(db, 'teams', environment.teamId, 'players', id), data, { merge: true });
   }
 
-  /** Löscht den Spieler samt Unterdaten, Bewertungen und internen Notizen in allen Events (in Blöcken, Limit 500 je Schreibvorgang). */
+  /** Löscht den Spieler samt Unterdaten, Bewertungen, internen Notizen in allen Events und Zusammenfassung (in Blöcken, Limit 500 je Schreibvorgang). */
   async deletePlayer(id: string): Promise<void> {
     const { db } = await this.connection.get();
     const { collection, doc, getDocs, query, where, writeBatch } = await import('firebase/firestore');
@@ -79,6 +81,8 @@ export class PlayersApi {
       // Einladungscodes und Zugänge des Spielers (SCRUM-53): sonst zeigen sie auf einen gelöschten Spieler.
       ...invites.docs.map((entry) => entry.ref),
       ...members.docs.map((entry) => entry.ref),
+      // Zusammenfassung des Spielers (SCRUM-201) – nur, wenn die Regeln die Sammlung kennen.
+      ...((await this.statsMode.writesSummary()) ? [doc(db, ...base, 'playerStats', id)] : []),
       doc(db, ...base, 'players', id), // zuletzt: bricht ein Block ab, bleibt der Spieler sichtbar und der Löschversuch wiederholbar
     ];
     for (let offset = 0; offset < refs.length; offset += 450) {

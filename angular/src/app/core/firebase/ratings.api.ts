@@ -1,5 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { environment } from '../../../environments/environment';
+import { PlayerStatsMode } from '../team/player-stats-mode';
+import { hasStatsSource, statsUpdate } from '../team/player-stats';
 import { FirebaseConnection } from './firebase-connection';
 import type { RawDoc, SnapshotMeta } from './types';
 
@@ -7,6 +9,7 @@ import type { RawDoc, SnapshotMeta } from './types';
 @Injectable({ providedIn: 'root' })
 export class RatingsApi {
   private readonly connection = inject(FirebaseConnection);
+  private readonly statsMode = inject(PlayerStatsMode);
 
   /** Echtzeit-Abo auf die Bewertungen eines Events (Dokument je Spieler). Lesen dürfen Trainer und der jeweilige Spieler. */
   async watchRatings(
@@ -75,11 +78,22 @@ export class RatingsApi {
     return snapshot.exists() ? snapshot.data() : null;
   }
 
-  /** Schreibt die Bewertung eines Spielers (merge, mit `playerId` für die Regeln und Abfragen der Spieleransicht). */
+  /**
+   * Schreibt die Bewertung eines Spielers (merge, mit `playerId` für die Regeln und Abfragen der Spieleransicht) und im
+   * selben atomaren Schreibvorgang den Eintrag dieses Events in der Zusammenfassung des Spielers (SCRUM-201) – so kann
+   * die Zusammenfassung nie von der Bewertung abweichen. `data` muss alle Felder einer Bewertung enthalten (siehe
+   * `docFromRating`), sonst ließe sich der Eintrag nicht sicher bilden. Kennen die Regeln die Zusammenfassung noch nicht,
+   * wird nur die Bewertung geschrieben (wie bisher), damit das Speichern nicht scheitert.
+   */
   async saveRating(eventId: string, playerId: string, data: Readonly<Record<string, unknown>>): Promise<void> {
+    if (!hasStatsSource(data)) throw new Error('saveRating: unvollständige Bewertung, Zusammenfassung kann nicht gebildet werden.');
+    const withSummary = await this.statsMode.writesSummary();
     const { db } = await this.connection.get();
-    const { doc, setDoc } = await import('firebase/firestore');
-    await setDoc(doc(db, 'teams', environment.teamId, 'events', eventId, 'ratings', playerId), { ...data, playerId }, { merge: true });
+    const { doc, writeBatch } = await import('firebase/firestore');
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'teams', environment.teamId, 'events', eventId, 'ratings', playerId), { ...data, playerId }, { merge: true });
+    if (withSummary) batch.set(doc(db, 'teams', environment.teamId, 'playerStats', playerId), statsUpdate(playerId, eventId, data), { merge: true });
+    await batch.commit();
   }
 
   /** Schreibt die interne Notiz. Sie liegt bewusst getrennt von der Bewertung, die Spieler und Eltern lesen dürfen. */

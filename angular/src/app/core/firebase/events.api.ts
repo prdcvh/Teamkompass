@@ -1,5 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { environment } from '../../../environments/environment';
+import { PLAYER_STATS_VERSION } from '../team/player-stats';
+import { PlayerStatsMode } from '../team/player-stats-mode';
 import { FirebaseConnection } from './firebase-connection';
 import type { RawDoc, SnapshotMeta } from './types';
 
@@ -7,6 +9,7 @@ import type { RawDoc, SnapshotMeta } from './types';
 @Injectable({ providedIn: 'root' })
 export class EventsApi {
   private readonly connection = inject(FirebaseConnection);
+  private readonly statsMode = inject(PlayerStatsMode);
 
   /**
    * Echtzeit-Abo auf die Events des Teams (nur Metadaten: Bewertungen und interne Notizen liegen in
@@ -87,23 +90,41 @@ export class EventsApi {
     await batch.commit();
   }
 
-  /** Löscht das Event samt Bewertungen und internen Notizen (in Blöcken, Limit 500 je Schreibvorgang). */
+  /**
+   * Löscht das Event samt Bewertungen und internen Notizen (in Blöcken, Limit 500 je Schreibvorgang). Der Eintrag des
+   * Events in der Zusammenfassung jedes bewerteten Spielers geht im selben Block wie seine Bewertung mit (SCRUM-201).
+   */
   async deleteEvent(id: string): Promise<void> {
     const { db } = await this.connection.get();
-    const { collection, doc, getDocs, writeBatch } = await import('firebase/firestore');
+    const { collection, deleteField, doc, getDocs, writeBatch } = await import('firebase/firestore');
     const base = ['teams', environment.teamId, 'events', id] as const;
-    const [ratings, privateNotes] = await Promise.all([
+    const [ratings, privateNotes, withSummary] = await Promise.all([
       getDocs(collection(db, ...base, 'ratings')),
       getDocs(collection(db, ...base, 'privateNotes')),
+      this.statsMode.writesSummary(),
     ]);
-    const refs = [
-      ...ratings.docs.map((entry) => entry.ref),
-      ...privateNotes.docs.map((entry) => entry.ref),
-      doc(db, ...base), // zuletzt: bricht ein Block ab, bleibt das Event sichtbar und der Löschversuch wiederholbar
+    type Op = (batch: ReturnType<typeof writeBatch>) => void;
+    const remove = (ref: Parameters<ReturnType<typeof writeBatch>['delete']>[0]): Op => (batch) => batch.delete(ref);
+    const ops: Op[] = [
+      ...ratings.docs.flatMap((entry): Op[] => [
+        remove(entry.ref),
+        ...(withSummary
+          ? [
+              (batch: ReturnType<typeof writeBatch>) =>
+                batch.set(
+                  doc(db, 'teams', environment.teamId, 'playerStats', entry.id),
+                  { playerId: entry.id, version: PLAYER_STATS_VERSION, events: { [id]: deleteField() } },
+                  { merge: true },
+                ),
+            ]
+          : []),
+      ]),
+      ...privateNotes.docs.map((entry) => remove(entry.ref)),
+      remove(doc(db, ...base)), // zuletzt: bricht ein Block ab, bleibt das Event sichtbar und der Löschversuch wiederholbar
     ];
-    for (let offset = 0; offset < refs.length; offset += 450) {
+    for (let offset = 0; offset < ops.length; offset += 450) {
       const batch = writeBatch(db);
-      refs.slice(offset, offset + 450).forEach((ref) => batch.delete(ref));
+      ops.slice(offset, offset + 450).forEach((op) => op(batch));
       await batch.commit();
     }
   }
