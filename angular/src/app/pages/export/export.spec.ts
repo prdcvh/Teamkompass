@@ -22,6 +22,9 @@ describe('Export (Daten exportieren)', () => {
     firebase.players.players.set('p1', { name: 'Ali Adler', positions: ['ST'], number: 9, birthdate: '2012-02-05', status: 'Fit', consentStatus: 'granted' });
     firebase.players.players.set('p2', { name: '<b>Ben</b>', positions: ['IV'], number: 4, birthdate: '2012-11-06', status: 'Fit', consentStatus: consent2 });
     firebase.events.events.set('e1', { type: 'Spiel', title: 'Spiel gegen Eppstein', date: '2026-09-01', goalsFor: 3, goalsAgainst: 1, intensity: 3 });
+    // SCRUM-199: Die Eventliste lädt sonst nur die laufende Saison; Export/Sicherung müssen trotzdem alle Saisons enthalten.
+    firebase.events.filterByDate = true;
+    firebase.events.events.set('alt', { type: 'Training', title: 'Training alte Saison', date: '2001-05-01', intensity: 1 });
     firebase.ratings.ratings.set('e1', new Map([['p1', { attendance: 'present', effort: 2, technique: 2, tactics: 2, comprehension: 2, playerId: 'p1' }]]));
     firebase.opponents.opponents.set('o1', { name: 'SG Eppstein', formation: '4-4-2', style: 'Pressing', updatedAt: '2026-10-01' });
     firebase.records.playerRecords.set('p1/developmentPlans', new Map([['f1', { focus: 'Kopfball', goal: 'Mehr Kopfballtore', status: 'Offen' }]]));
@@ -72,12 +75,24 @@ describe('Export (Daten exportieren)', () => {
     const data = JSON.parse(saved[0].text);
     expect(data.app).toBe('TeamKompass');
     expect(data.players.map((p: { name: string }) => p.name)).toEqual(['Ali Adler', '<b>Ben</b>']);
-    expect(data.events[0].ratings.p1.attendance).toBe('present');
+    expect(data.events.find((e: { title: string }) => e.title === 'Spiel gegen Eppstein').ratings.p1.attendance).toBe('present');
     expect(data.developmentPlans.p1[0].focus).toBe('Kopfball');
     expect(data.opponents[0].name).toBe('SG Eppstein');
     expect(TestBed.inject(WorkspaceService).activity()[0].action).toBe('Teamdaten als JSON exportiert');
     await settle(fixture);
     expect(root(fixture).textContent).toContain('Die Sicherung wurde heruntergeladen.');
+  });
+
+  it('SCRUM-199: die Sicherung enthält auch Events aus älteren Saisons', async () => {
+    const fixture = await render();
+    expect(firebase.events.lastFromDate).toBeNull();
+    byText(fixture, 'Sicherung herunterladen')!.click();
+    await vi.waitFor(() => expect(saved).toHaveLength(1));
+    const titles = JSON.parse(saved[0].text).events.map((e: { title: string }) => e.title);
+    expect(titles).toContain('Training alte Saison');
+    expect(titles).toContain('Spiel gegen Eppstein');
+    fixture.destroy();
+    await vi.waitFor(() => expect(firebase.events.lastFromDate).toMatch(/^\d{4}-07-01$/));
   });
 
   it('warnt vor dem Export, wenn eine Einwilligung widerrufen ist, und exportiert erst nach Bestätigung', async () => {

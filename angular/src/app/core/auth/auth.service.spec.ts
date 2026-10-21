@@ -256,6 +256,37 @@ describe('AuthService', () => {
     expect(localStorage.getItem(`${TEAM_DATA_PREFIX}players`)).toBeNull();
   });
 
+  it('SCRUM-199: Abmelden leert den lokalen Firestore-Speicher, bevor es weitergeht', async () => {
+    firebase.access.members.set('uid-1', { role: 'trainer', playerId: null });
+    auth.start(0);
+    await auth.signInTrainer('coach@verein.de', 'x');
+    await vi.waitFor(() => expect(auth.status()).toBe('ready'));
+    const before = firebase.auth.cacheClears;
+    await auth.signOut();
+    expect(firebase.auth.cacheClears).toBeGreaterThan(before);
+    expect(firebase.calls.lastIndexOf('clearLocalCache')).toBeGreaterThan(firebase.calls.lastIndexOf('signOut'));
+  });
+
+  it('SCRUM-199: ohne Anmeldung (z. B. Abmeldung in anderem Tab) wird der Speicher ebenfalls geleert', async () => {
+    auth.start(0);
+    firebase.auth.emit(null);
+    await auth.whenResolved();
+    await vi.waitFor(() => expect(firebase.auth.cacheClears).toBe(1));
+  });
+
+  it('SCRUM-199: ein Fehler beim Leeren hält das Abmelden nicht auf', async () => {
+    firebase.access.members.set('uid-1', { role: 'trainer', playerId: null });
+    firebase.auth.clearLocalCache = async () => {
+      throw new Error('indexeddb gesperrt');
+    };
+    auth.start(0);
+    await auth.signInTrainer('coach@verein.de', 'x');
+    await vi.waitFor(() => expect(auth.status()).toBe('ready'));
+    await auth.signOut();
+    expect(auth.status()).toBe('signedOut');
+    expect(session.role()).toBeNull();
+  });
+
   it('bildet Anzeigenamen je Rolle', () => {
     expect(displayNameFor('trainer', 'coach@verein.de')).toBe('coach');
     expect(displayNameFor('player', null)).toBe('Spieler');
