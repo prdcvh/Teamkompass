@@ -35,3 +35,27 @@ export function sectionEvents(events: readonly TeamEvent[], sort: EventSort, tod
     sort === 'chronological' ? (newestFirst ? sortEvents(list, 'chronological').reverse() : sortEvents(list, 'chronological')) : sortEvents(list, sort);
   return { past: order(past, true), week: order(week, false), later: order(later, false) };
 }
+
+export interface EventMonth {
+  readonly label: string;
+  readonly events: readonly TeamEvent[];
+}
+
+/** „Oktober 2026“; ohne gültiges Datum „Ohne Datum“. */
+export function monthLabel(iso: string): string {
+  if (!isIsoDate(iso)) return 'Ohne Datum';
+  const label = new Date(`${iso}T00:00:00Z`).toLocaleDateString('de-DE', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+/** Gruppiert die (bereits sortierten) Events nach Monat, Reihenfolge bleibt erhalten. */
+export function groupByMonth(events: readonly TeamEvent[]): EventMonth[] {
+  const months: { label: string; events: TeamEvent[] }[] = [];
+  for (const event of events) {
+    const label = monthLabel(event.date);
+    const last = months[months.length - 1];
+    if (last?.label === label) last.events.push(event);
+    else months.push({ label, events: [event] });
+  }
+  return months;
+}

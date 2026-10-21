@@ -621,6 +621,12 @@ menu {
   font-size: 0.85rem;
 }
 
+/* Hinweistext unter einem Formularfeld (z. B. Event-Notiz, SCRUM-203): normal statt fett wie das Label. */
+.field-hint {
+  font-weight: 400;
+  letter-spacing: normal;
+}
+
 .pitch {
   position: relative;
   min-height: 520px;
@@ -2259,3 +2265,7 @@ menu {
 .event-card .rsvp-counts {
   font-size: 0.8rem;
 }
+
+.opponent-games { margin: 6px 0 0; padding-left: 18px; }
+#eventOpponentPlan .opponent-detail-grid { margin-bottom: 10px; }
+@media (max-width: 640px) { #eventOpponentPlan .opponent-detail-grid { grid-template-columns: 1fr; } }

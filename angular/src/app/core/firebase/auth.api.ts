@@ -58,4 +58,9 @@ export class AuthApi {
     const { signOut } = await import('firebase/auth');
     await signOut(auth);
   }
+
+  /** Leert den lokalen Firestore-Speicher des Browsers (Datenschutz beim Abmelden, SCRUM-199). Rückgabe: konnte geleert werden? */
+  clearLocalCache(): Promise<boolean> {
+    return this.connection.clearLocalCache();
+  }
 }

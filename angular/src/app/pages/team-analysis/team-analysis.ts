@@ -41,7 +41,7 @@ export class TeamAnalysis implements OnInit {
   protected readonly isTrainer = computed(() => this.session.role() === 'trainer');
 
   protected readonly stats = computed(() => teamStats(this.team.events(), this.team.ratingsByEvent(), todayIso()));
-  private readonly focus = computed(() => trainingFocusCounts(this.team.events()));
+  private readonly focus = computed(() => trainingFocusCounts(this.team.events(), todayIso()));
   private readonly quarters = computed(() => birthQuarterCounts(this.team.data().map((entry) => entry.player)));
   private readonly coverage = computed(() => positionCoverage(this.team.data().map((entry) => entry.player)));
   protected readonly thin = computed(() => thinPositions(this.coverage()));

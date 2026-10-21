@@ -4,6 +4,7 @@ import { environment } from '../../../environments/environment';
 import { ADMIN_ITEMS, PRIVACY_ITEM, SIDEBAR_ITEMS } from '../../core/shell/navigation';
 import { SessionService } from '../../core/auth/session.service';
 import { ThemeService } from '../../core/device/theme.service';
+import { seasonStartYear } from '../../core/shared/season';
 import { Icon } from '../../ui/icon/icon';
 
 /** Desktop-Navigation (Figma „Sidebar“, 240 px). */
@@ -27,6 +28,6 @@ export class Sidebar {
 
 /** Saison beginnt im Juli: Oktober 2026 → „2026 / 27“, März 2027 → „2026 / 27“. */
 export function seasonLabel(date: Date): string {
-  const start = date.getMonth() >= 6 ? date.getFullYear() : date.getFullYear() - 1;
+  const start = seasonStartYear(date);
   return `${start} / ${String(start + 1).slice(2)}`;
 }
