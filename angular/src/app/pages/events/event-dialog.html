@@ -207,6 +207,13 @@
         </select>
       </label>
     } @else {
+      <label class="tk-label">
+        Punkte vergeben
+        <select class="tk-input" name="pointsEnabled" [value]="draft().pointsEnabled ? 'yes' : 'no'" (change)="patch({ pointsEnabled: value($event) === 'yes' })">
+          <option value="yes" [selected]="draft().pointsEnabled">Ja – Spieler sammeln Punkte</option>
+          <option value="no" [selected]="!draft().pointsEnabled">Nein – Spiel zählt nicht</option>
+        </select>
+      </label>
       <div class="grid">
         @if (profiles().length > 0) {
           <div class="field">

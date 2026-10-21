@@ -130,6 +130,30 @@
         }
       </section>
 
+      @if (pointsVisible()) {
+        <h2 class="section-title">Trainingspunkte</h2>
+        <tk-card>
+          <section class="points" aria-label="Trainingspunkte (nur für Trainer sichtbar)">
+            <p class="points-total"><strong>{{ pointsTotal() }}</strong> Punkte gesamt <small class="muted">· nur für Trainer sichtbar</small></p>
+            @if (pointsRows().length === 0) {
+              <div class="empty"><p>Noch keine Events, für die Punkte vergeben werden.</p></div>
+            } @else {
+              <ul class="points-history">
+                @for (row of pointsRows(); track row.event.id) {
+                  <li>
+                    <div>
+                      <strong>{{ row.event.title }}</strong>
+                      <small>{{ formatDate(row.event.date) }} · {{ row.event.type }} · Summe {{ row.total }}</small>
+                    </div>
+                    <span class="badge" [attr.aria-label]="row.points + ' Punkte'">{{ row.points }}</span>
+                  </li>
+                }
+              </ul>
+            }
+          </section>
+        </tk-card>
+      }
+
       <h2 class="section-title">Eventhistorie</h2>
       <tk-card>
         @if (history().length === 0) {

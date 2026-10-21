@@ -15,6 +15,7 @@ import {
   skillAverages,
   trendChart,
 } from '../../core/profile/profile';
+import { pointsHistory, totalPoints } from '../../core/points/points';
 import { ProfileService } from '../../core/profile/profile.service';
 import { effectiveStatus } from '../../core/records/availability';
 import { MeasurementsService } from '../../core/records/measurements.service';
@@ -68,6 +69,11 @@ export class Profile implements OnInit {
   protected readonly skills = computed(() => skillAverages(this.graded()));
   protected readonly attendance = computed(() => availability(this.profile.items(), this.today));
   protected readonly chart = computed(() => trendChart(this.graded()));
+  /** Trainingspunkte (SCRUM-104) sieht nur der Trainer. Verlauf neueste zuerst, wie die Eventhistorie. */
+  protected readonly pointsVisible = computed(() => this.session.role() === 'trainer');
+  private readonly pointsAll = computed(() => pointsHistory(this.profile.pointItems()));
+  protected readonly pointsTotal = computed(() => totalPoints(this.profile.pointItems()));
+  protected readonly pointsRows = computed(() => [...this.pointsAll()].reverse());
   protected readonly ready = computed(() => this.squad.load() === 'ready' && !this.profile.loading());
   protected readonly failed = computed(() => this.squad.load() === 'error' || this.profile.error() !== '');
   protected readonly errorText = computed(() => this.profile.error() || this.squad.error());

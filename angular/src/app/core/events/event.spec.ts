@@ -297,4 +297,21 @@ describe('event (Logik)', () => {
       expect(ids(oldest.later)).toEqual(['mon', 'far']);
     });
   });
+
+  describe('Punkte vergeben (SCRUM-104)', () => {
+    it('Spiele speichern und lesen die Auswahl; fehlende Angabe = nein; Training schreibt kein Feld', () => {
+      expect(docFromEvent(eventFromDraft(draft({ type: 'Spiel', pointsEnabled: true }), 'e1'))).toMatchObject({ pointsEnabled: true });
+      expect(docFromEvent(eventFromDraft(draft({ type: 'Spiel', pointsEnabled: false }), 'e1'))).toMatchObject({ pointsEnabled: false });
+      expect(docFromEvent(eventFromDraft(draft({ type: 'Training', pointsEnabled: true }), 'e1'))).not.toHaveProperty('pointsEnabled');
+      expect(eventFromDoc('x', { type: 'Spiel', title: 'a', date: '2026-10-10', pointsEnabled: true }).pointsEnabled).toBe(true);
+      expect(eventFromDoc('x', { type: 'Spiel', title: 'a', date: '2026-10-10' }).pointsEnabled).toBe(false);
+      expect(eventFromDoc('x', { type: 'Training', title: 'a', date: '2026-10-10', pointsEnabled: true })).not.toHaveProperty('pointsEnabled');
+    });
+
+    it('neue Spiele starten mit „ja“, Bearbeiten übernimmt den gespeicherten Wert', () => {
+      expect(emptyDraft('2026-10-10').pointsEnabled).toBe(true);
+      expect(draftFromEvent(event({ type: 'Spiel', pointsEnabled: false })).pointsEnabled).toBe(false);
+      expect(draftFromEvent(event({ type: 'Spiel', pointsEnabled: true })).pointsEnabled).toBe(true);
+    });
+  });
 });

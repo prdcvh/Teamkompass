@@ -3,6 +3,7 @@ import { authErrorMessage, errorCode } from '../auth/auth-errors';
 import { EventsService } from '../events/events.service';
 import { RatingsApi } from '../firebase/ratings.api';
 import type { RawDoc, SnapshotMeta } from '../firebase/types';
+import { countsPoints, normalizePoints } from '../points/points';
 import { MAX_NOTE_LENGTH, type Rating, type RatingField, BLANK_RATING, applyChange, docFromRating, ratingFromDoc } from './rating';
 import { SessionService } from '../auth/session.service';
 import { SyncService } from '../shell/sync.service';
@@ -25,11 +26,18 @@ export class RatingsService {
   readonly eventId = signal<string | null>(null);
   readonly ratings = signal<ReadonlyMap<string, Rating>>(new Map());
   readonly notes = signal<ReadonlyMap<string, string>>(new Map());
+  /** Trainingspunkte je Spieler (SCRUM-104), unabhängig davon, ob das Event sie zählt. Nur Trainer bekommen sie geladen. */
+  readonly points = signal<ReadonlyMap<string, number>>(new Map());
   readonly load = signal<RatingsLoad>('idle');
   readonly error = signal('');
   readonly canWrite = computed(() => this.session.role() === 'trainer');
   readonly event = computed(() => this.events.events().find((entry) => entry.id === this.eventId()) ?? null);
   /** Spieldauer in Minuten (Obergrenze für die Einsatzminuten); bei Trainings ohne Bedeutung. */
+  /** Vergibt dieses Event Punkte? Training immer, Spiel nur mit „Punkte vergeben: ja“. */
+  readonly pointsActive = computed(() => {
+    const event = this.event();
+    return event !== null && countsPoints(event);
+  });
   readonly matchDuration = computed(() => this.event()?.matchDuration ?? 90);
 
   private unsubscribers: (() => void)[] = [];
@@ -45,6 +53,10 @@ export class RatingsService {
 
   ratingFor(playerId: string): Rating {
     return this.ratings().get(playerId) ?? BLANK_RATING;
+  }
+
+  pointsFor(playerId: string): number {
+    return this.points().get(playerId) ?? 0;
   }
 
   noteFor(playerId: string): string {
@@ -79,6 +91,7 @@ export class RatingsService {
         (onData, onError) => this.ratingsApi.watchPrivateNotes(eventId, onData, onError),
         (docs) => {
           this.notes.set(new Map(docs.map((entry) => [entry.id, typeof entry.data['note'] === 'string' ? entry.data['note'] : ''])));
+          this.points.set(new Map(docs.map((entry) => [entry.id, normalizePoints(entry.data['points'])])));
           finish('notes');
         },
       );
@@ -92,6 +105,7 @@ export class RatingsService {
     this.eventId.set(null);
     this.ratings.set(new Map());
     this.notes.set(new Map());
+    this.points.set(new Map());
     this.load.set('idle');
     this.error.set('');
   }
@@ -126,6 +140,25 @@ export class RatingsService {
       .savePrivateNote(eventId, playerId, note)
       .then(() => this.sync.clearError())
       .catch((error) => this.failWrite(error, 'Interne Notiz konnte nicht gespeichert werden.'));
+    return true;
+  }
+
+  /**
+   * Trägt die Punkte eines Spielers ein (Text aus dem Formular; leer, negativ oder ungültig = 0). Geschrieben wird nur,
+   * wenn dieses Event Punkte vergibt und sich der Wert ändert; bereits gespeicherte Punkte eines Spiels auf „nein“
+   * bleiben unangetastet.
+   */
+  setPoints(playerId: string, value: string): boolean {
+    const eventId = this.eventId();
+    if (!eventId || !this.canWrite() || this.load() !== 'ready' || !this.pointsActive()) return false;
+    const points = normalizePoints(value);
+    if (points === this.pointsFor(playerId)) return false;
+    this.points.update((map) => new Map(map).set(playerId, points));
+    this.markSyncing();
+    void this.ratingsApi
+      .savePoints(eventId, playerId, points)
+      .then(() => this.sync.clearError())
+      .catch((error) => this.failWrite(error, 'Punkte konnten nicht gespeichert werden.'));
     return true;
   }
 

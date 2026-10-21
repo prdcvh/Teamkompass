@@ -133,6 +133,12 @@
               </div>
             }
 
+            @if (ratings.pointsActive()) {
+              <label class="field"><span class="label">Punkte</span>
+                <input class="tk-input" type="number" inputmode="numeric" min="0" step="1" placeholder="0" [attr.aria-label]="'Punkte: ' + player.name" [value]="pointsText(player)" (change)="setPoints(player, $event)" />
+              </label>
+            }
+
             @if (isGame()) {
               <div class="numbers">
                 <label class="field"><span class="label">Minuten</span>
@@ -167,6 +173,9 @@
                 <th scope="col" class="col-total">Gesamt&shy;note</th>
                 @for (field of gradeFields; track field) {
                   <th scope="col" class="col-grade" [attr.title]="gradeLabels[field]">{{ gradeHeaders[field] }}</th>
+                }
+                @if (ratings.pointsActive()) {
+                  <th scope="col" class="col-count" title="Trainingspunkte (nur für Trainer sichtbar)">Punkte</th>
                 }
                 @if (isGame()) {
                   <th scope="col" class="col-count">Min.</th>
@@ -205,6 +214,9 @@
                         }
                       </select>
                     </td>
+                  }
+                  @if (ratings.pointsActive()) {
+                    <td><input class="tk-input small" type="number" min="0" step="1" placeholder="0" [attr.aria-label]="'Punkte: ' + player.name" [value]="pointsText(player)" (change)="setPoints(player, $event)" /></td>
                   }
                   @if (isGame()) {
                     <td><input class="tk-input small" type="number" min="0" [max]="ratings.matchDuration()" [attr.aria-label]="'Minuten: ' + player.name" [value]="ratings.ratingFor(player.id).minutes ?? ''" (change)="set(player, 'minutes', valueOf($event))" /></td>
