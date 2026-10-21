@@ -248,6 +248,26 @@ service cloud.firestore {
         allow delete: if isTrainer();
       }
 
+      // Zusammenfassung je Spieler (SCRUM-201, nur Angular): je Event Anwesenheit, Teilnoten, Minuten, Tore und
+      // Vorlagen - dieselben Werte wie in den Bewertungen, ohne Rueckmeldung und interne Notizen. Der Trainer-Client
+      // schreibt sie im selben Schreibvorgang wie jede Bewertung mit. Nur Trainer lesen und schreiben; Spieler, Eltern,
+      // Medizin und Scouts haben keinen Zugriff (Spieler lesen ihre eigenen Bewertungen weiter direkt).
+      // hasOnly/Typen sichern das Format ab, damit kein weiteres Feld (z.B. Notizen) hineinrutscht.
+      match /playerStats/{playerId} {
+        allow read: if isTrainer();
+        allow create, update: if isTrainer()
+          && request.resource.data.keys().hasOnly(['playerId', 'version', 'events'])
+          && request.resource.data.playerId == playerId
+          && request.resource.data.version is int
+          && request.resource.data.events is map;
+        allow delete: if isTrainer();
+      }
+
+      // Kennzeichen "Zusammenfassungen sind eingerichtet" (Version, Zeitpunkt der Neuberechnung) - nur Trainer.
+      match /meta/playerStats {
+        allow read, write: if isTrainer();
+      }
+
       match /opponents/{opponentId} {
         allow read, write: if isTrainer();
       }

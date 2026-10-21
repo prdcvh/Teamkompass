@@ -227,4 +227,47 @@ describe('Settings (Einstellungen & Datenschutz)', () => {
       expect(root(fixture).querySelector('[role="alert"]')?.textContent).toContain('aktuelle Passwort ist falsch');
     });
   });
+
+  describe('Kennzahlen-Zusammenfassung (SCRUM-201)', () => {
+    const card = (fixture: { nativeElement: unknown }) => root(fixture).querySelector('#kennzahlen-zusammenfassung');
+
+    it('nur für Trainer sichtbar', async () => {
+      expect(card(await render('player'))).toBeNull();
+      TestBed.resetTestingModule();
+      expect(card(await render('physio'))).toBeNull();
+    });
+
+    it('nicht eingerichtet: Neu berechnen richtet ein und meldet das Prüfergebnis', async () => {
+      const fixture = await render('trainer');
+      firebase.events.events.set('e1', { type: 'Training', title: 'Training', date: '2026-10-01' });
+      firebase.ratings.ratings.set('e1', new Map([['p1', { attendance: 'present', effort: 2, technique: 2, tactics: 2, comprehension: 2, playerId: 'p1' }]]));
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(card(fixture)?.textContent).toContain('Noch nicht eingerichtet');
+      });
+      const buttons = () => [...card(fixture)!.querySelectorAll('button')].map((entry) => entry.textContent?.trim());
+      expect(buttons()).toEqual(['Neu berechnen']);
+      const button = [...card(fixture)!.querySelectorAll('button')].find((entry) => entry.textContent?.includes('Neu berechnen')) as HTMLButtonElement;
+      button.click();
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(card(fixture)?.querySelector('[data-testid="stats-result"]')?.textContent).toContain('stimmt mit allen 1 Bewertungen überein (1 Spieler)');
+      });
+      expect(card(fixture)?.querySelector('[data-testid="stats-state"]')?.textContent).toContain('Eingerichtet');
+      expect(buttons()).toEqual(['Neu berechnen', 'Prüfen']);
+    });
+
+    it('fehlende Freigabe in der Cloud: Hinweis statt Knöpfe', async () => {
+      firebase = new FakeFirebase();
+      firebase.playerStats.markerError = { code: 'permission-denied' };
+      await TestBed.configureTestingModule({ imports: [Settings], providers: [...provideFakeFirebase(firebase)] }).compileComponents();
+      TestBed.inject(SessionService).role.set('trainer');
+      const fixture = TestBed.createComponent(Settings);
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(card(fixture)?.textContent).toContain('Die Freigabe in der Cloud fehlt noch');
+      });
+      expect(card(fixture)?.querySelector('button')).toBeNull();
+    });
+  });
 });

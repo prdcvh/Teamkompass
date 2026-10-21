@@ -24,3 +24,8 @@ fehlender/abgelaufener Code, falscher Spieler/Rolle, parallele Claims und die un
 antworten nur für den eigenen Spieler, nur mit erlaubten Feldern (Zusage/Absage, Grund bis 200 Zeichen nur bei
 Absage, eigene Rolle, Server-Zeitstempel) und nur für bestehende Events; lesen dürfen nur Trainer und der eigene
 Spieler bzw. die eigenen Eltern, löschen nur der Trainer.
+
+`player-stats.test.mjs`: Zusammenfassung je Spieler (SCRUM-201) unter `playerStats/{playerId}` und das Kennzeichen
+`meta/playerStats` – nur Trainer lesen/schreiben/löschen (Spieler und Eltern auch die eigene nicht, Medizin, Scouts,
+abgelaufene Zugänge und Nicht-Mitglieder gar nicht), Format-Prüfung (nur `playerId`, `version`, `events`), Bewertung und
+Zusammenfassung in einem Schreibvorgang, und dass ein `merge` den Eintrag eines Events vollständig ersetzt bzw. löscht.
