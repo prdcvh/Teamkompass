@@ -130,7 +130,7 @@
             „Neu berechnen“ liest einmal alle Bewertungen und baut die Zusammenfassung neu auf. Bitte währenddessen nicht bewerten.
             „Prüfen“ vergleicht die Zusammenfassung mit einer Neuberechnung und ändert nichts.
           </p>
-          <div class="row">
+          <div class="actions">
             <button tkButton variant="primary" type="button" [disabled]="stats.busy() !== 'idle'" (click)="stats.rebuild()">
               {{ stats.busy() === 'rebuilding' ? 'Wird berechnet …' : 'Neu berechnen' }}
             </button>
