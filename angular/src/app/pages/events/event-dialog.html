@@ -313,10 +313,14 @@
           placeholder="Schwerpunkt, Besonderheiten"
           [value]="draft().notes"
           [attr.aria-invalid]="errors().notes ? 'true' : null"
-          [attr.aria-describedby]="errors().notes ? 'err-notes' : null"
+          [attr.aria-describedby]="errors().notes ? 'notes-hint err-notes' : 'notes-hint'"
           (input)="patch({ notes: value($event) })"
         ></textarea>
       </label>
+      <p class="hint notes-hint" id="notes-hint">
+        Für alle Teammitglieder sichtbar (Spieler, Eltern, Medizin-Zugang) – bitte keine Gesundheitsangaben (z.&nbsp;B.
+        Verletzungen, Krankheiten) eintragen. Dafür gibt es Abwesenheiten und die „Interne Notiz (nur Trainer)“ bei der Bewertung.
+      </p>
       @if (errors().notes) {
         <span class="error" id="err-notes" role="alert">{{ errors().notes }}</span>
       }

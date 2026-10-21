@@ -388,7 +388,7 @@
           <label>Eigene Tore <input id="eventGoalsFor" type="number" min="0" max="99" value="0" /></label>
           <label>Gegentore <input id="eventGoalsAgainst" type="number" min="0" max="99" value="0" /></label>
         </div>
-        <label>Notiz <textarea id="eventNotes" rows="3" placeholder="Schwerpunkt, Ergebnis, Belastung, Besonderheiten"></textarea></label>
+        <label>Notiz <textarea id="eventNotes" rows="3" placeholder="Schwerpunkt, Ergebnis, Belastung, Besonderheiten" aria-describedby="eventNotesHint"></textarea><small class="muted field-hint" id="eventNotesHint">Für alle Teammitglieder sichtbar – bitte keine Gesundheitsangaben (z. B. Verletzungen, Krankheiten) eintragen.</small></label>
         <menu>
           <button class="ghost-button" type="button" id="cancelEventDialogBtn">Abbrechen</button>
           <button class="primary-button" type="submit">Event speichern</button>

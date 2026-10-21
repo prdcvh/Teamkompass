@@ -11,15 +11,19 @@ export class EventsApi {
   /**
    * Echtzeit-Abo auf die Events des Teams (nur Metadaten: Bewertungen und interne Notizen liegen in
    * Unterkollektionen). Lesen dürfen alle Teammitglieder; ein Fehler kommt über `onError`.
+   * Mit `fromDate` (ISO-Datum) nur Events ab diesem Tag (Firestore zählt jeden gelesenen Datensatz, SCRUM-199);
+   * ohne `fromDate` alle Events aller Saisons.
    */
   async watchEvents(
     onData: (docs: RawDoc[], meta: SnapshotMeta) => void,
     onError: (error: unknown) => void,
+    fromDate: string | null = null,
   ): Promise<() => void> {
     const { db } = await this.connection.get();
-    const { collection, onSnapshot } = await import('firebase/firestore');
+    const { collection, onSnapshot, query, where } = await import('firebase/firestore');
+    const events = collection(db, 'teams', environment.teamId, 'events');
     return onSnapshot(
-      collection(db, 'teams', environment.teamId, 'events'),
+      fromDate ? query(events, where('date', '>=', fromDate)) : events,
       { includeMetadataChanges: true },
       (snapshot) =>
         onData(

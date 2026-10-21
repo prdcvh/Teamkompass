@@ -621,6 +621,12 @@ menu {
   font-size: 0.85rem;
 }
 
+/* Hinweistext unter einem Formularfeld (z. B. Event-Notiz, SCRUM-203): normal statt fett wie das Label. */
+.field-hint {
+  font-weight: 400;
+  letter-spacing: normal;
+}
+
 .pitch {
   position: relative;
   min-height: 520px;

@@ -7,16 +7,22 @@ import { LineupApi } from '../firebase/lineup.api';
 import { PlanningApi } from '../firebase/planning.api';
 import { parseSeriesEventId } from '../planning/series-events';
 import { SessionService } from '../auth/session.service';
+import { seasonStartIso } from '../shared/season';
 import { SquadService } from '../player/squad.service';
 import { SyncService } from '../shell/sync.service';
 
 export type EventsLoad = 'idle' | 'loading' | 'ready' | 'error';
+
+/** season: nur Events ab Beginn der laufenden Saison (Standard, spart Lesezugriffe); all: alle Saisons. */
+export type EventsScope = 'season' | 'all';
 
 /**
  * Events des Teams: hält die Events im Speicher, folgt der Datenbank in Echtzeit und schreibt
  * Änderungen. Schreiben darf nur der Trainer (die Regeln erzwingen es zusätzlich serverseitig).
  * Beim Abmelden werden Abo und Daten sofort verworfen. Den Sync-Status teilt sich der Dienst mit
  * dem Kader; er setzt ihn nicht zurück, weil das den Kader-Zustand überschreiben würde.
+ * Standardmäßig werden nur Events ab Saisonbeginn (1. Juli) geladen, weil Firestore jeden gelesenen Datensatz zählt
+ * (SCRUM-199); ältere Saisons und alles für Export/Sicherung holt {@link showAllSeasons}.
  */
 @Injectable({ providedIn: 'root' })
 export class EventsService {
@@ -34,6 +40,10 @@ export class EventsService {
   readonly canWrite = computed(() => this.session.role() === 'trainer');
   readonly canEdit = computed(() => this.canWrite() && this.load() === 'ready');
 
+  readonly scope = signal<EventsScope>('season');
+  /** Erster Tag der laufenden Saison, festgehalten beim (Neu-)Start des Abos. */
+  readonly seasonStart = signal(seasonStartIso());
+
   private unsubscribe: (() => void) | null = null;
   private waiters: (() => void)[] = [];
   /** Erhöht bei jedem start/stop, damit ein spät eintreffendes Abo eines alten Laufs verworfen wird. */
@@ -42,7 +52,10 @@ export class EventsService {
   constructor() {
     // Ohne Anmeldung dürfen keine Teamdaten im Speicher bleiben.
     effect(() => {
-      if (this.session.role() === null) this.stop();
+      if (this.session.role() === null) {
+        this.scope.set('season');
+        this.stop();
+      }
     });
   }
 
@@ -52,6 +65,7 @@ export class EventsService {
     const generation = ++this.generation;
     this.load.set('loading');
     this.error.set('');
+    this.seasonStart.set(seasonStartIso());
     this.eventsApi
       .watchEvents(
         (docs, meta) => {
@@ -65,6 +79,7 @@ export class EventsService {
           if (generation !== this.generation) return;
           this.failLoad(error);
         },
+        this.scope() === 'all' ? null : this.seasonStart(),
       )
       .then((unsubscribe) => {
         // Wurde inzwischen gestoppt oder ist das Abo schon fehlgeschlagen, wird es sofort wieder beendet.
@@ -74,6 +89,27 @@ export class EventsService {
       .catch((error) => {
         if (generation === this.generation) this.failLoad(error);
       });
+  }
+
+  /** Lädt zusätzlich alle älteren Saisons (Saison-Auswahl, Export/Sicherung). Die Liste bleibt dabei stehen. */
+  showAllSeasons(): void {
+    this.switchScope('all');
+  }
+
+  /** Zurück zur laufenden Saison (spart Lesezugriffe, wenn die älteren nicht mehr gebraucht werden). */
+  showCurrentSeason(): void {
+    this.switchScope('season');
+  }
+
+  private switchScope(scope: EventsScope): void {
+    if (this.scope() === scope) return;
+    this.scope.set(scope);
+    if (!this.unsubscribe && this.load() !== 'loading') return; // läuft noch nicht: gilt beim nächsten Start
+    this.generation += 1;
+    this.unsubscribe?.();
+    this.unsubscribe = null;
+    this.load.set('idle');
+    this.start();
   }
 
   stop(): void {
@@ -112,6 +148,8 @@ export class EventsService {
     const id = draft.id ?? `e${crypto.randomUUID()}`;
     const event = eventFromDraft(draft, id);
     const previous = this.events().find((entry) => entry.id === id);
+    // Ein Event vor dem Saisonbeginn würde sonst gleich nach dem Speichern aus der Liste verschwinden.
+    if (event.date < this.seasonStart()) this.showAllSeasons();
     if (!this.sync.isFailed()) this.sync.state.set('syncing');
     // Serien-Training (SCRUM-147): Wird es einzeln geändert, merken wir das; die Serie überschreibt es dann nie mehr.
     const edited = previous !== undefined && parseSeriesEventId(id) !== null && JSON.stringify(docFromEvent(previous)) !== JSON.stringify(docFromEvent(event));
