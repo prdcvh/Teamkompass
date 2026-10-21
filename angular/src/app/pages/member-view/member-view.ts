@@ -5,6 +5,7 @@ import { formatDate } from '../../core/events/event';
 import { LayoutService } from '../../core/shell/layout.service';
 import { ageFromBirthdate, todayIso } from '../../core/shared/dates';
 import { type Player, positionText } from '../../core/player/player';
+import { canCreateLoadReport } from '../../core/analysis/load-report';
 import { type EventRating, availability, gradeToPercent, gradedEvents, numberLabel, profileFigures, skillAverages, trendChart } from '../../core/profile/profile';
 import { ProfileService } from '../../core/profile/profile.service';
 import { gradeLabel } from '../../core/ratings/rating';
@@ -19,6 +20,7 @@ import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 import { InstallHint } from '../../ui/install-hint/install-hint';
 import { Status } from '../../ui/status/status';
+import { LoadReportAction } from '../profile/load-report-action';
 import { ProfileExtras } from '../profile/profile-extras';
 
 /**
@@ -36,7 +38,7 @@ import { ProfileExtras } from '../profile/profile-extras';
  */
 @Component({
   selector: 'app-member-view',
-  imports: [RouterLink, Button, Card, InstallHint, Status, ProfileExtras, BreakNotice],
+  imports: [RouterLink, Button, Card, InstallHint, Status, ProfileExtras, BreakNotice, LoadReportAction],
   templateUrl: './member-view.html',
   styleUrls: ['../profile/profile.css', './member-view.css', '../../ui/chart/chart.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -127,6 +129,11 @@ export class MemberView implements OnInit {
   });
   protected readonly loaded = computed(() => (this.scout() ? this.scoutView.load() === 'ready' : this.squad.load() === 'ready'));
   protected readonly ready = computed(() => this.loaded() && (this.picks() || !this.profile.loading()));
+  /** Belastungsprotokoll (SCRUM-139): nur der Spieler selbst, erst wenn Abwesenheiten und Messwerte geladen sind. */
+  protected readonly reportAllowed = computed(() => {
+    const player = this.player();
+    return !!player && this.records.ready() && canCreateLoadReport(this.role(), this.session.playerId(), player.id);
+  });
   protected readonly failed = computed(() =>
     this.scout() ? this.scoutView.load() === 'error' : this.squad.load() === 'error' || (!this.physio() && this.profile.error() !== ''),
   );

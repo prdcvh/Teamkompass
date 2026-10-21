@@ -416,6 +416,7 @@
                 <div class="panel-actions">
                   <select id="profilePlayer" aria-label="Spieler auswählen"></select>
                   <button class="ghost-button" id="profilePdfBtn" type="button">PDF herunterladen</button>
+                  <button class="ghost-button" id="loadReportBtn" type="button">Belastungsprotokoll (PDF)</button>
                 </div>
               </div>
               <div id="profileHeader"></div>
@@ -644,6 +645,35 @@
         </section>
       </main>
     </div>
+
+    <dialog id="loadReportDialog">
+      <form class="player-form" id="loadReportForm" method="dialog" novalidate>
+        <div class="dialog-head">
+          <h2>Belastungsprotokoll (PDF)</h2>
+          <button class="icon-button" type="button" id="closeLoadReportBtn" aria-label="Schließen">×</button>
+        </div>
+        <p class="muted">Für <strong id="loadReportPlayerName"></strong>. Es öffnet sich eine druckfertige Seite; dort „Drucken → Als PDF speichern“ wählen.</p>
+        <label>Zeitraum
+          <select id="loadReportPeriod">
+            <option value="4">Letzte 4 Wochen</option>
+            <option value="8">Letzte 8 Wochen</option>
+            <option value="12">Letzte 12 Wochen</option>
+            <option value="custom">Eigener Zeitraum</option>
+          </select>
+        </label>
+        <div class="load-report-custom" id="loadReportCustom" hidden>
+          <label>Von <input id="loadReportFrom" type="date" /></label>
+          <label>Bis <input id="loadReportTo" type="date" /></label>
+        </div>
+        <label class="checkbox-row"><input id="loadReportHealth" type="checkbox" checked /> Verletzungs- und Befindensdaten einschließen</label>
+        <p class="muted">Ohne Häkchen enthält das Protokoll nur die Belastung (z. B. für einen Stützpunkt): keine Verletzungen, keine Abwesenheitsgründe, keine Verfügbarkeit.</p>
+        <p class="auth-gate-error" id="loadReportError" role="alert"></p>
+        <menu>
+          <button class="ghost-button" type="button" id="cancelLoadReportBtn">Abbrechen</button>
+          <button class="primary-button" type="submit">Protokoll erstellen</button>
+        </menu>
+      </form>
+    </dialog>
 
     <dialog id="playerDialog">
       <form class="player-form" id="playerForm">

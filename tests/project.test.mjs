@@ -79,6 +79,10 @@ test("Druckbericht trennt das neue Fenster von der App (SCRUM-62)", async () => 
     const start = app.indexOf('const report = window.open("", "_blank");');
     assert.notEqual(start, -1, `${file}: Druckbericht nicht gefunden`);
     assert.match(app.slice(start, start + 400), /report\.opener = null;/, `${file}: Bericht behaelt Zugriff auf die App (opener)`);
+    // Jeder weitere Druckbericht (z. B. Belastungsprotokoll, SCRUM-139) ebenso.
+    for (const match of app.matchAll(/const (\w+) = window\.open\("", "_blank"\);/g)) {
+      assert.ok(app.slice(match.index, match.index + 600).includes(`${match[1]}.opener = null;`), `${file}: ${match[1]} behaelt Zugriff auf die App (opener)`);
+    }
   }
 });
 
