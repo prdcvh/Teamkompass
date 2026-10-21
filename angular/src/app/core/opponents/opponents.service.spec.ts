@@ -8,7 +8,7 @@ import { FakeFirebase, provideFakeFirebase } from '../testing/fake-firebase';
 describe('OpponentsService', () => {
   let firebase: FakeFirebase;
 
-  function setup(role: 'trainer' | 'medical' | 'player' | null = 'trainer') {
+  function setup(role: 'trainer' | 'physio' | 'player' | null = 'trainer') {
     firebase = new FakeFirebase();
     firebase.opponents.opponents.set('o1', { name: 'JSG Taunus', formation: '4-3-3', style: 'Pressing', updatedAt: '2026-10-01' });
     TestBed.configureTestingModule({ providers: [...provideFakeFirebase(firebase)] });
@@ -80,7 +80,7 @@ describe('OpponentsService', () => {
   });
 
   it('erlaubt anderen Rollen kein Schreiben', async () => {
-    const opponents = setup('medical');
+    const opponents = setup('physio');
     expect(opponents.save(draft()).name).toContain('Nur Trainer');
     expect(await opponents.remove('o1')).toBe(false);
     expect(firebase.calls).toEqual([]);

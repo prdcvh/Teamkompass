@@ -59,7 +59,8 @@ describe('Guards', () => {
     ['trainer', true],
     ['player', false],
     ['parent', false],
-    ['medical', false],
+    ['physio', false],
+    ['scout', false],
     [null, false],
   ])('trainerGuard für %s: %s', (role, allowed) => {
     TestBed.inject(SessionService).role.set(role);
@@ -71,7 +72,8 @@ describe('Guards', () => {
   it.each<[Role | null, string | true]>([
     ['player', true],
     ['parent', true],
-    ['medical', true],
+    ['physio', true],
+    ['scout', true],
     ['trainer', '/start'],
     [null, '/start'],
   ])('memberViewGuard (/ansicht) für %s: %s', (role, expected) => {

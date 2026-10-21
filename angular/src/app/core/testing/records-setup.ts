@@ -12,7 +12,7 @@ import { FakeFirebase, provideFakeFirebase } from './fake-firebase';
  * Test-Aufbau für die Zusatzdaten eines Spielers (Förderpläne, Abwesenheiten, Messwerte): ein Spieler p1 mit je einem
  * Eintrag, drei Events (e2 schon bewertet), Kader und Profil geladen, Zusatzdaten für p1 gestartet und bereit.
  */
-export async function setupRecords(role: 'trainer' | 'player' | 'medical' = 'trainer') {
+export async function setupRecords(role: 'trainer' | 'player' | 'physio' = 'trainer') {
   const firebase = new FakeFirebase();
   firebase.players.players.set('p1', { name: 'Jonas Keller', positions: ['TW'], number: 1, birthdate: '2012-05-05', status: 'Fit' });
   firebase.events.events.set('e1', { type: 'Training', title: 'Training Mo', date: '2026-10-05' });

@@ -11,7 +11,7 @@ describe('Settings (Einstellungen & Datenschutz)', () => {
 
   let firebase: FakeFirebase;
 
-  async function render(role: 'trainer' | 'medical' | 'player' | null = null) {
+  async function render(role: 'trainer' | 'physio' | 'player' | null = null) {
     firebase = new FakeFirebase();
     await TestBed.configureTestingModule({ imports: [Settings], providers: [...provideFakeFirebase(firebase)] }).compileComponents();
     if (role) TestBed.inject(SessionService).role.set(role);
@@ -111,7 +111,7 @@ describe('Settings (Einstellungen & Datenschutz)', () => {
     });
 
     it('ändert das Passwort und leert die Felder', async () => {
-      const fixture = await render('medical');
+      const fixture = await render('physio');
       fixture.detectChanges();
       fill(fixture, 'current', 'AltesPasswort1');
       fill(fixture, 'next', 'NeuesPasswort1');

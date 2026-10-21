@@ -1054,11 +1054,14 @@ function scoreToGrade(record) {
   return 6;
 }
 
-// Lokaler Zwischenspeicher fuer den Teamstand. Spieler, Eltern und der Scout-
-// Zugang cachen nichts: sie sehen (medizinisch: alle) personenbezogene Daten von
-// Minderjaehrigen, die nicht auf dem Geraet zurueckbleiben sollen.
+// Rollen ohne Schreibrecht und ohne lokalen Zwischenspeicher (SCRUM-170: Medizin = "physio", Scout = "scout").
+const READ_ONLY_ROLES = ["player", "parent", "physio", "scout"];
+
+// Lokaler Zwischenspeicher fuer den Teamstand. Spieler, Eltern, Scout- und Medizin-
+// Zugang cachen nichts: sie sehen personenbezogene Daten von Minderjaehrigen (Medizin:
+// Gesundheitsdaten aller Spieler), die nicht auf dem Geraet zurueckbleiben sollen.
 function canCacheLocally() {
-  return !["player", "parent", "medical"].includes(currentRole);
+  return !READ_ONLY_ROLES.includes(currentRole);
 }
 
 function writeLocalCache() {
@@ -1152,7 +1155,7 @@ function cloudListenerRecovered(key) {
 //   firestore.rules im Repo-Root.
 // ---------------------------------------------------------------------------
 let currentUser = null;
-let currentRole = null; // "trainer" | "player" | "parent" | "medical" | null
+let currentRole = null; // "trainer" | "player" | "parent" | "physio" | "scout" | null (siehe normalizeRole)
 let currentPlayerId = null;
 let authModule = null;
 let authInstance = null;
@@ -1180,10 +1183,19 @@ function isCloudActive() {
   return Boolean(firestoreDb);
 }
 
-// Spieler, Eltern und der medizinische Zugang lesen nur: Bearbeiten/Loeschen gehoert nicht
+// Spieler, Eltern, Medizin und Scouts lesen nur: Bearbeiten/Loeschen gehoert nicht
 // in ihre Oberflaeche (Firestore lehnt die Schreibzugriffe ohnehin ab).
+// Scout und Medizin sind getrennte Rollen (SCRUM-170, siehe firestore.rules):
+// - "physio" = Medizin-Zugang: Status, Abwesenheiten, Verletzungen, Messwerte aller Spieler.
+// - "scout" = Scout-Zugang: nur die bereinigte Scout-Sicht (scoutProfiles), keine Gesundheitsdaten.
+// "medical" ist die alte Kennung des bisherigen Scout-Zugangs; nach Entscheidung des PO werden diese
+// Konten Scout-Konten. Die Regeln behandeln "medical" deshalb wie "scout", die App ebenso.
+function normalizeRole(role) {
+  return role === "medical" ? "scout" : role;
+}
+
 function canManageRecords() {
-  return !["player", "parent", "medical"].includes(currentRole);
+  return !READ_ONLY_ROLES.includes(currentRole);
 }
 
 function isCloudTrainer() {
@@ -1318,7 +1330,7 @@ async function handleAuthStateChanged(user) {
     return;
   }
   const member = memberSnap.data();
-  currentRole = member.role;
+  currentRole = normalizeRole(member.role);
   currentPlayerId = member.playerId || null;
   hideAuthGate();
   applyRoleRestrictions();
@@ -1338,9 +1350,20 @@ function startCloudSync() {
   cloudCache.opponents = [];
   cloudCache.lineup = null;
 
-  // Event-Metadaten (Titel/Datum/Ergebnis, keine Noten) sind fuer alle Teammitglieder lesbar.
+  // Scouts lesen ausschliesslich die bereinigte Scout-Sicht - keine Events, Spieler oder Bewertungen.
+  if (currentRole === "scout") {
+    cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("scoutProfiles"), (snapshot) => {
+      applyScoutProfilesToCache(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })));
+      rebuildStateFromCloudCache();
+      cloudListenerRecovered("scout profiles");
+    }, (error) => cloudListenerFailed("scout profiles", error)));
+    return;
+  }
+
+  // Event-Metadaten (Titel/Datum/Ergebnis, keine Noten) sind fuer Trainer, Medizin, Spieler und Eltern lesbar.
   cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("events"), (snapshot) => {
     cloudCache.events = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+    scoutPublish.eventsLoaded = true;
     const eventIds = cloudCache.events.map((event) => event.id);
     if (currentRole === "trainer") {
       syncRatingListeners(eventIds);
@@ -1354,12 +1377,24 @@ function startCloudSync() {
   if (currentRole === "trainer") {
     cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("players"), (snapshot) => {
       cloudCache.players = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+      scoutPublish.playersLoaded = true;
       syncPlanListeners(cloudCache.players.map((player) => player.id));
       syncAbsenceListeners(cloudCache.players.map((player) => player.id));
       syncMeasurementListeners(cloudCache.players.map((player) => player.id));
       rebuildStateFromCloudCache();
       cloudListenerRecovered("players");
     }, (error) => cloudListenerFailed("players", error)));
+
+    // Bereits veroeffentlichte Scout-Sicht: Grundlage fuer den Abgleich in publishScoutProfiles().
+    cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("scoutProfiles"), (snapshot) => {
+      scoutPublish.published = new Map(snapshot.docs.map((docSnap) => [docSnap.id, docSnap.data()]));
+      // Nur nach dem ersten Laden abgleichen, sonst bei Aenderungen der Quelldaten: zwei gleichzeitig geoeffnete
+      // Trainer-Clients koennen sich so nicht endlos gegenseitig ueberschreiben.
+      const firstLoad = !scoutPublish.publishedLoaded;
+      scoutPublish.publishedLoaded = true;
+      if (firstLoad) scheduleScoutPublish();
+      cloudListenerRecovered("scout profiles");
+    }, (error) => cloudListenerFailed("scout profiles", error)));
 
     cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("opponents"), (snapshot) => {
       cloudCache.opponents = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
@@ -1402,14 +1437,14 @@ function startCloudSync() {
       rebuildStateFromCloudCache();
       cloudListenerRecovered("measurements");
     }, (error) => cloudListenerFailed("measurements", error)));
-  } else if (currentRole === "medical") {
+  } else if (currentRole === "physio") {
     cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("players"), (snapshot) => {
       cloudCache.players = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
       syncAbsenceListeners(cloudCache.players.map((player) => player.id));
       syncMeasurementListeners(cloudCache.players.map((player) => player.id));
       rebuildStateFromCloudCache();
-      cloudListenerRecovered("medical players");
-    }, (error) => cloudListenerFailed("medical players", error)));
+      cloudListenerRecovered("physio players");
+    }, (error) => cloudListenerFailed("physio players", error)));
   }
 }
 
@@ -1560,7 +1595,206 @@ function syncMeasurementListeners(playerIds) {
   });
 }
 
+// SCOUT-SICHT START (SCRUM-170; reine Funktionen getestet in tests/scout-profile.test.mjs)
+// Scouts duerfen keine Gesundheitsdaten sehen - auch nicht ueber direkte Firestore-Abfragen. Spieler- und
+// Bewertungsdokumente enthalten aber Status/"Verletzt bis" bzw. Rueckmeldungen, in denen die Abwesenheits-
+// Automatik den Grund ablegt ("Verletzt", "Urlaub" ...). Deshalb lesen Scouts sie gar nicht, sondern nur
+// teams/{teamId}/scoutProfiles/{playerId}: eine bereinigte Kopie, die der Trainer-Client schreibt. Sie
+// enthaelt nur Name, Nummer, Positionen, Geburtsdatum und je Termin Datum/Art/Titel (Spiel: Gegner,
+// Ergebnis, Spieldauer), die Anwesenheit ohne Grund ("Teilweise" zaehlt als anwesend), die vier Teilnoten,
+// Minuten, Tore und Vorlagen. Keine Rueckmeldungen, Notizen, Status, Abwesenheiten, Messwerte, Foerderplaene.
+// Spieler mit widerrufener Einwilligung (SCRUM-51) erscheinen dort nicht. Gleiches Format wie
+// angular/src/app/core/scout/scout-profile.ts.
+const SCOUT_PROFILE_VERSION = 1;
+const SCOUT_ATTENDANCE = { present: "present", limited: "present", absent: "absent", excluded: "excluded" };
+const SCOUT_GRADE_FIELDS = ["effort", "technique", "tactics", "comprehension"];
+
+function scoutNumberOrNull(value) {
+  if (value === "" || value === null || value === undefined) return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function scoutEntryFor(event, rating) {
+  if (!event?.id || !rating) return null;
+  const attendance = SCOUT_ATTENDANCE[rating.attendance] || "open";
+  const grades = Object.fromEntries(SCOUT_GRADE_FIELDS.map((field) => [field, scoutNumberOrNull(rating[field])]));
+  const isGame = event.type === "Spiel";
+  const entry = {
+    eventId: String(event.id),
+    date: String(event.date || ""),
+    type: String(event.type || ""),
+    title: String(event.title || ""),
+    attendance
+  };
+  if (isGame) {
+    entry.opponent = String(event.opponent || "");
+    entry.goalsFor = scoutNumberOrNull(event.goalsFor);
+    entry.goalsAgainst = scoutNumberOrNull(event.goalsAgainst);
+    entry.matchDuration = scoutNumberOrNull(event.matchDuration);
+  }
+  // "Fehlt" und "Nicht im Kader": nur die Tatsache (fuer Einsatzquote/Teilnahmen), nie der Grund, keine Werte.
+  if (attendance === "absent" || attendance === "excluded") return entry;
+  const values = { ...grades, minutes: scoutNumberOrNull(rating.minutes), goals: scoutNumberOrNull(rating.goals), assists: scoutNumberOrNull(rating.assists) };
+  // Noch offen und ohne jeden Wert: kein Eintrag.
+  if (attendance === "open" && Object.values(values).every((value) => value === null)) return null;
+  return { ...entry, ...values };
+}
+
+// Map playerId -> Dokument fuer teams/{teamId}/scoutProfiles/{playerId}.
+function buildScoutProfiles(players, events) {
+  const sortedEvents = [...(events || [])]
+    .filter((event) => event?.id)
+    .sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")) || String(a.id).localeCompare(String(b.id)));
+  const profiles = new Map();
+  (players || []).forEach((player) => {
+    if (!player?.id || player.consentStatus === "revoked") return;
+    profiles.set(String(player.id), {
+      playerId: String(player.id),
+      name: String(player.name || ""),
+      number: scoutNumberOrNull(player.number),
+      positions: Array.isArray(player.positions) ? player.positions.map(String) : [],
+      birthdate: String(player.birthdate || ""),
+      version: SCOUT_PROFILE_VERSION,
+      entries: sortedEvents.map((event) => scoutEntryFor(event, event.ratings?.[player.id])).filter(Boolean)
+    });
+  });
+  return profiles;
+}
+
+// Vergleich unabhaengig von der Reihenfolge der Felder (Firestore liefert Maps nicht in Schreibreihenfolge).
+function scoutStableJson(value) {
+  if (Array.isArray(value)) return `[${value.map(scoutStableJson).join(",")}]`;
+  if (value && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${scoutStableJson(value[key])}`).join(",")}}`;
+  return JSON.stringify(value ?? null);
+}
+
+// Noetige Schreibvorgaenge, damit die veroeffentlichte Scout-Sicht (published) dem Soll (wanted) entspricht.
+function scoutProfileChanges(published, wanted) {
+  const changes = [];
+  wanted.forEach((data, id) => {
+    if (!published.has(id) || scoutStableJson(published.get(id)) !== scoutStableJson(data)) changes.push({ type: "set", id, data });
+  });
+  published.forEach((_, id) => {
+    if (!wanted.has(id)) changes.push({ type: "delete", id });
+  });
+  return changes;
+}
+
+// Scout-Ansicht: aus den Scout-Dokumenten den (bereinigten) Teamstand fuer die Profilansicht bauen.
+function scoutCacheFromProfiles(docs) {
+  const players = [];
+  const events = new Map();
+  const ratings = {};
+  (docs || []).forEach((doc) => {
+    const playerId = String(doc?.playerId || doc?.id || "");
+    if (!playerId) return;
+    players.push({
+      id: playerId,
+      name: String(doc.name || ""),
+      number: scoutNumberOrNull(doc.number) ?? "",
+      positions: Array.isArray(doc.positions) ? doc.positions.map(String) : [],
+      birthdate: String(doc.birthdate || ""),
+      // Kein Status in der Scout-Sicht: lokal leer, damit ausgeblendete Ansichten nichts Falsches annehmen.
+      status: ""
+    });
+    (Array.isArray(doc.entries) ? doc.entries : []).forEach((entry) => {
+      if (!entry?.eventId) return;
+      const eventId = String(entry.eventId);
+      if (!events.has(eventId)) {
+        events.set(eventId, {
+          id: eventId,
+          date: String(entry.date || ""),
+          type: String(entry.type || ""),
+          title: String(entry.title || ""),
+          opponent: String(entry.opponent || ""),
+          goalsFor: entry.goalsFor ?? "",
+          goalsAgainst: entry.goalsAgainst ?? "",
+          matchDuration: entry.matchDuration ?? ""
+        });
+      }
+      ratings[eventId] ||= {};
+      ratings[eventId][playerId] = {
+        attendance: SCOUT_ATTENDANCE[entry.attendance] || "open",
+        ...Object.fromEntries(SCOUT_GRADE_FIELDS.map((field) => [field, entry[field] ?? ""])),
+        minutes: entry.minutes ?? "",
+        goals: entry.goals ?? "",
+        assists: entry.assists ?? "",
+        note: ""
+      };
+    });
+  });
+  return { players, events: [...events.values()], ratings };
+}
+// SCOUT-SICHT ENDE
+
+function applyScoutProfilesToCache(docs) {
+  const scoutCache = scoutCacheFromProfiles(docs);
+  cloudCache.players = scoutCache.players;
+  cloudCache.events = scoutCache.events;
+  cloudCache.ratings = scoutCache.ratings;
+}
+
+// Trainer-Client pflegt die Scout-Sicht: sobald Spieler, Events, alle Bewertungen, die bisherige Scout-Sicht
+// und die Zahl der Scout-Zugaenge geladen sind, wird nach jeder Aenderung (gebuendelt) abgeglichen. Gibt es
+// keinen Scout-Zugang (mehr), wird die Scout-Sicht geloescht - ohne Scout keine Kopie der Daten.
+const scoutPublish = { timer: null, running: false, again: false, published: new Map(), publishedLoaded: false, playersLoaded: false, eventsLoaded: false, scoutAccounts: null };
+
+function resetScoutPublish() {
+  clearTimeout(scoutPublish.timer);
+  Object.assign(scoutPublish, { timer: null, again: false, published: new Map(), publishedLoaded: false, playersLoaded: false, eventsLoaded: false, scoutAccounts: null });
+}
+
+function setScoutAccountCount(count) {
+  scoutPublish.scoutAccounts = count;
+  scheduleScoutPublish();
+}
+
+function scoutPublishReady() {
+  return scoutPublish.playersLoaded && scoutPublish.eventsLoaded && scoutPublish.publishedLoaded
+    && scoutPublish.scoutAccounts !== null
+    && cloudCache.events.every((event) => cloudCache.ratings[event.id]);
+}
+
+function scheduleScoutPublish() {
+  if (!isCloudTrainer()) return;
+  clearTimeout(scoutPublish.timer);
+  scoutPublish.timer = setTimeout(publishScoutProfiles, 1500);
+}
+
+async function publishScoutProfiles() {
+  if (!isCloudTrainer() || !scoutPublishReady()) return;
+  if (scoutPublish.running) {
+    scoutPublish.again = true;
+    return;
+  }
+  const wanted = scoutPublish.scoutAccounts > 0 ? buildScoutProfiles(state.players, state.events) : new Map();
+  const changes = scoutProfileChanges(scoutPublish.published, wanted);
+  if (!changes.length) return;
+  scoutPublish.running = true;
+  try {
+    for (let offset = 0; offset < changes.length; offset += 400) {
+      const batch = firestoreModule.writeBatch(firestoreDb);
+      changes.slice(offset, offset + 400).forEach((change) => {
+        if (change.type === "set") batch.set(teamDoc("scoutProfiles", change.id), change.data);
+        else batch.delete(teamDoc("scoutProfiles", change.id));
+      });
+      await batch.commit();
+    }
+  } catch (error) {
+    // Kein alert: der Trainer kann nichts tun, der naechste Abgleich versucht es erneut.
+    console.error("Scout-Sicht konnte nicht aktualisiert werden", error);
+  } finally {
+    scoutPublish.running = false;
+    if (scoutPublish.again) {
+      scoutPublish.again = false;
+      scheduleScoutPublish();
+    }
+  }
+}
+
 function stopCloudSync() {
+  resetScoutPublish();
   cloudUnsubscribers.forEach((unsubscribe) => unsubscribe());
   cloudUnsubscribers = [];
   Object.values(ratingListeners).forEach((unsubscribe) => unsubscribe());
@@ -1594,6 +1828,7 @@ function rebuildStateFromCloudCache() {
   // Den Button dann ausblenden schuetzt vor einem versehentlichen erneuten Klick.
   if (isCloudTrainer()) {
     $("#migrateDataBtn").hidden = state.players.length > 0;
+    scheduleScoutPublish();
   }
   // SCRUM-35: Beim Start feuern >160 Listener nacheinander. Statt jedes Mal alle Ansichten
   // zu rendern, werden die Snapshots gebuendelt und nur die sichtbare Ansicht gezeichnet.
@@ -1630,6 +1865,7 @@ async function cloudDeletePlayer(playerId) {
     // bestehen, der auf einen nicht mehr vorhandenen Spieler zeigt.
     const accessSnapshots = await Promise.all(["invites", "members"].map((name) => firestoreModule.getDocs(firestoreModule.query(teamCollection(name), firestoreModule.where("playerId", "==", playerId)))));
     refs.push(...accessSnapshots.flatMap((snapshot) => snapshot.docs.map((docSnap) => docSnap.ref)));
+    refs.push(teamDoc("scoutProfiles", playerId));
     refs.push(teamDoc("players", playerId));
     await commitDeleteRefs(refs);
     cloudWriteSucceeded();
@@ -1808,22 +2044,28 @@ function hideAuthGate() {
 function applyRoleRestrictions() {
   document.body.classList.toggle("role-player", currentRole === "player");
   document.body.classList.toggle("role-parent", currentRole === "parent");
-  document.body.classList.toggle("role-medical", currentRole === "medical");
+  document.body.classList.toggle("role-physio", currentRole === "physio");
+  document.body.classList.toggle("role-scout", currentRole === "scout");
   document.body.classList.toggle("role-trainer-cloud", isCloudTrainer());
   $("#signOutBtn").hidden = !isCloudActive();
   $("#migrateDataBtn").hidden = !isCloudTrainer();
   $("#importBtn").hidden = !canManageRecords() || (isCloudActive() && !legacyBlobMode && !isCloudTrainer());
   $("#addTrainerBtn").hidden = !isCloudTrainer();
-  $("#addMedicalBtn").hidden = !isCloudTrainer();
-  $("#changePasswordBtn").hidden = !(isCloudActive() && ["trainer", "medical"].includes(currentRole));
+  $("#addScoutBtn").hidden = !isCloudTrainer();
+  $("#addPhysioBtn").hidden = !isCloudTrainer();
+  $("#changePasswordBtn").hidden = !(isCloudActive() && ["trainer", "physio", "scout"].includes(currentRole));
   if (["player", "parent"].includes(currentRole)) {
     $("#mobileViewSelect").innerHTML = '<option value="profiles">Profile</option>';
     $("#profilePlayer").disabled = true;
     setView("profiles");
-  } else if (currentRole === "medical") {
+  } else if (currentRole === "physio") {
     $("#mobileViewSelect").innerHTML = '<option value="squad">Kader</option><option value="profiles">Profile</option>';
     $("#profilePlayer").disabled = false;
     setView("squad");
+  } else if (currentRole === "scout") {
+    $("#mobileViewSelect").innerHTML = '<option value="profiles">Profile</option>';
+    $("#profilePlayer").disabled = false;
+    setView("profiles");
   } else {
     $("#profilePlayer").disabled = false;
     renderAccessManager();
@@ -1865,7 +2107,7 @@ async function handlePasswordReset() {
   $("#authGateStatus").textContent = "Wenn zu dieser E-Mail-Adresse ein Konto existiert, ist eine Nachricht mit einem Link zum Zurücksetzen unterwegs. Bitte auch den Spam-Ordner prüfen.";
 }
 
-// Passwort aendern (Trainer/Medizin): das aktuelle Passwort wird erneut bestaetigt (SCRUM-31).
+// Passwort aendern (Trainer/Medizin/Scout): das aktuelle Passwort wird erneut bestaetigt (SCRUM-31).
 function openPasswordDialog() {
   const form = $("#passwordForm");
   form.reset();
@@ -2034,13 +2276,24 @@ async function createTrainerAccount() {
   return createStaffAccount("trainer");
 }
 
-async function createMedicalAccount() {
-  return createStaffAccount("medical");
+async function createScoutAccount() {
+  return createStaffAccount("scout");
+}
+
+async function createPhysioAccount() {
+  return createStaffAccount("physio");
+}
+
+// Bezeichnung je Konto-Art in Dialogen und Meldungen (SCRUM-170: Scout und Medizin getrennt).
+function staffRoleLabel(role) {
+  if (role === "scout") return "Scout-Zugang";
+  if (role === "physio") return "Medizin-Zugang";
+  return "Trainer-Konto";
 }
 
 const MIN_STAFF_PASSWORD_LENGTH = 12;
 
-// Passwortrichtlinie fuer neue Trainer-/Medizin-Konten (SCRUM-58). Liefert die Meldung oder "".
+// Passwortrichtlinie fuer neue Trainer-, Scout- und Medizin-Konten (SCRUM-58). Liefert die Meldung oder "".
 function staffPasswordProblem(password) {
   if (password.length < MIN_STAFF_PASSWORD_LENGTH) return "Das Passwort muss mindestens 12 Zeichen haben.";
   if (password.length > 128) return "Das Passwort darf höchstens 128 Zeichen haben.";
@@ -2090,8 +2343,9 @@ function askStaffCredentials(label) {
 
 async function createStaffAccount(role) {
   if (!isCloudTrainer()) return;
-  const label = role === "medical" ? "Scout-Zugang" : "Trainer-Konto";
-  const credentials = await askStaffCredentials(role === "medical" ? "Scout-Zugang" : "Trainer-Konto");
+  if (!["trainer", "scout", "physio"].includes(role)) return;
+  const label = staffRoleLabel(role);
+  const credentials = await askStaffCredentials(label);
   if (!credentials) return;
   const trimmedEmail = credentials.email;
   const password = credentials.password;
@@ -2116,7 +2370,7 @@ async function createStaffAccount(role) {
       createdAt: firestoreModule.serverTimestamp()
     });
     renderAccessManager();
-    alert(`${role === "medical" ? "Scout-Zugang" : "Trainer-Konto"} für ${trimmedEmail} wurde angelegt.`);
+    alert(`${label} für ${trimmedEmail} wurde angelegt.`);
   } catch (error) {
     console.error(error);
     alert(`${label} konnte nicht angelegt werden. ${authErrorMessage(error)}`);
@@ -2294,6 +2548,7 @@ async function renderAccessManager() {
   if (!isCloudTrainer()) return;
   const list = $("#accessManagerList");
   const scoutList = $("#scoutManagerList");
+  const physioList = $("#physioManagerList");
   const trainerList = $("#trainerManagerList");
   const inviteList = $("#inviteManagerList");
   if (!list) return;
@@ -2313,9 +2568,12 @@ async function renderAccessManager() {
         title = data.email || "Trainer-Konto";
         const created = data.createdAt?.toDate ? `angelegt am ${formatDate(localIsoDate(data.createdAt.toDate()))}` : "";
         detail = ["Trainer · Vollzugriff", created, data.email ? "" : `Kennung …${docSnap.id.slice(-6)}`].filter(Boolean).join(" · ");
-      } else if (data.role === "medical") {
+      } else if (normalizeRole(data.role) === "scout") {
         title = data.email || "Scout-Zugang";
-        detail = `Scout · Read-only · ${accessValidityText(expiresAtDate, now)}`;
+        detail = `Scout · nur Leistungsdaten, keine Gesundheitsdaten · ${accessValidityText(expiresAtDate, now)}`;
+      } else if (data.role === "physio") {
+        title = data.email || "Medizin-Zugang";
+        detail = `Medizin · Status, Abwesenheiten, Verletzungen, Messwerte · ${accessValidityText(expiresAtDate, now)}`;
       } else {
         title = player?.name || data.playerId;
         detail = `${formatInviteRole(data.role)} · ${accessValidityText(expiresAtDate, now)}`;
@@ -2330,15 +2588,20 @@ async function renderAccessManager() {
         </div>
       `;
     };
-    // Spieler (inkl. Eltern), Scouts und Trainer werden getrennt verwaltet (SCRUM-92, SCRUM-30).
+    // Spieler (inkl. Eltern), Scouts, Medizin und Trainer werden getrennt verwaltet (SCRUM-92, SCRUM-30, SCRUM-170).
     const playerDocs = snapshot.docs.filter((docSnap) => ["player", "parent"].includes(docSnap.data().role));
-    const scoutDocs = snapshot.docs.filter((docSnap) => docSnap.data().role === "medical");
+    const scoutDocs = snapshot.docs.filter((docSnap) => normalizeRole(docSnap.data().role) === "scout");
+    const physioDocs = snapshot.docs.filter((docSnap) => docSnap.data().role === "physio");
     const trainerDocs = snapshot.docs.filter((docSnap) => docSnap.data().role === "trainer");
+    // Die Scout-Sicht wird nur gepflegt, solange es mindestens einen Scout-Zugang gibt.
+    setScoutAccountCount(scoutDocs.length);
     list.innerHTML = playerDocs.map(row).join("") || `<p class="muted">Noch keine Spieler-Zugaenge vergeben.</p>`;
     if (scoutList) scoutList.innerHTML = scoutDocs.map(row).join("") || `<p class="muted">Noch kein Scout-Zugang angelegt.</p>`;
+    if (physioList) physioList.innerHTML = physioDocs.map(row).join("") || `<p class="muted">Noch kein Medizin-Zugang angelegt.</p>`;
     if (trainerList) trainerList.innerHTML = trainerDocs.map(row).join("") || `<p class="muted">Keine Trainer-Konten gefunden.</p>`;
     setCount("#playerAccessCount", playerDocs.length);
     setCount("#scoutAccessCount", scoutDocs.length);
+    setCount("#physioAccessCount", physioDocs.length);
     setCount("#trainerAccessCount", trainerDocs.length);
   } catch (error) {
     console.error(error);
@@ -2401,9 +2664,11 @@ async function revokeAccess(uid, role) {
   }
   const question = role === "trainer"
     ? "Dieses Trainer-Konto wirklich sperren? Es verliert sofort den Vollzugriff und kommt nur mit einem neu angelegten Trainer-Konto wieder hinein."
-    : role === "medical"
+    : normalizeRole(role) === "scout"
       ? "Scout-Zugang wirklich sperren? Er verliert sofort den Zugriff."
-      : "Zugang wirklich sperren? Der Spieler muesste sich danach mit einem neuen Code anmelden.";
+      : role === "physio"
+        ? "Medizin-Zugang wirklich sperren? Er verliert sofort den Zugriff auf Status, Abwesenheiten, Verletzungen und Messwerte."
+        : "Zugang wirklich sperren? Der Spieler muesste sich danach mit einem neuen Code anmelden.";
   if (!confirm(question)) return;
   try {
     await firestoreModule.deleteDoc(teamDoc("members", uid));
@@ -2461,7 +2726,8 @@ async function migrateLegacyBlobToCollections() {
 // per CSS aus - diese Liste ist die Sperre fuer alle Wege (Suche, Schnellzugriffe, Auswahl).
 function allowedViews() {
   if (["player", "parent"].includes(currentRole)) return ["profiles"];
-  if (currentRole === "medical") return ["squad", "profiles"];
+  if (currentRole === "physio") return ["squad", "profiles"];
+  if (currentRole === "scout") return ["profiles"];
   return Object.keys(views);
 }
 
@@ -5022,6 +5288,10 @@ function consentChipHtml(player) {
 }
 
 function renderProfileHeader(player, ratings) {
+  if (currentRole === "scout") {
+    renderScoutProfileHeader(player);
+    return;
+  }
   const average = playerAverageGrade(player?.id);
   const risk = player ? playerInjuryRisk(player.id) : null;
   const effectiveStatus = player ? playerEffectiveStatus(player) : null;
@@ -5055,6 +5325,24 @@ function renderProfileHeader(player, ratings) {
   ` : `<p class="muted">Noch kein Spieler vorhanden.</p>`;
 }
 
+// Scout-Ansicht (SCRUM-170): ohne Status, Einwilligung, Belastung und Verfuegbarkeit.
+function renderScoutProfileHeader(player) {
+  $("#profileHeader").innerHTML = player ? `
+    <div class="profile-card">
+      <div class="profile-number">${escapeHtml(player.number)}</div>
+      <div>
+        <strong>${escapeHtml(player.name)}</strong>
+        <span>${escapeHtml(positionText(player))} · ${formatDate(player.birthdate)} · ${ageFromBirthdate(player.birthdate) ?? "-"} Jahre</span>
+        <small class="muted">Scout-Ansicht: Kompetenzprofil, Notenverlauf und Statistik.</small>
+      </div>
+      <div class="profile-grade">
+        <span>Ø Note</span>
+        <strong>${gradeLabel(playerAverageGrade(player.id))}</strong>
+      </div>
+    </div>
+  ` : `<p class="muted">Noch keine Spieler für die Scout-Ansicht freigegeben.</p>`;
+}
+
 function renderProfileChart(player, ratings) {
   drawGradeTrendChart(
     $("#trendChart"),
@@ -5069,8 +5357,8 @@ function renderProfileHistory(ratings) {
     <article class="record-item">
       <div>
         <strong>${escapeHtml(event.title)}</strong>
-        <small>${escapeHtml(event.date)} · ${escapeHtml(event.type)}${gameResult(event) ? ` · ${gameResult(event).goalsFor}:${gameResult(event).goalsAgainst}` : ""} · Anstrengung ${exertionLabel(eventExertion(event))} · Note ${rating.grade}</small>
-        <p class="muted">${escapeHtml(rating.note || event.notes || "Keine Notiz")}</p>
+        <small>${escapeHtml(event.date)} · ${escapeHtml(event.type)}${gameResult(event) ? ` · ${gameResult(event).goalsFor}:${gameResult(event).goalsAgainst}` : ""}${currentRole === "scout" ? "" : ` · Anstrengung ${exertionLabel(eventExertion(event))}`} · Note ${rating.grade}</small>
+        ${currentRole === "scout" ? "" : `<p class="muted">${escapeHtml(rating.note || event.notes || "Keine Notiz")}</p>`}
       </div>
       <span class="grade-badge">${rating.grade}</span>
     </article>
@@ -5122,10 +5410,14 @@ function renderAnalyticsCards(playerId, ratings = playerRatings(playerId)) {
     ["Min./Spiel", gameStats.minutesPerGame || "-"],
     ["Min./Scorerpunkt", gameStats.minutesPerScorer ?? "-"]
   ];
-  $("#analyticsCards").innerHTML = cards.map(([label, value]) => `<article class="insight-card"><span class="muted">${label}</span><strong>${value}</strong></article>`).join("");
+  // Scouts sehen keine Belastung (SCRUM-170); die Scout-Sicht enthaelt dafuer auch keine Daten.
+  const visibleCards = currentRole === "scout" ? cards.filter(([label]) => !["Belastung", "Ø Anstrengung zuletzt"].includes(label)) : cards;
+  $("#analyticsCards").innerHTML = visibleCards.map(([label, value]) => `<article class="insight-card"><span class="muted">${label}</span><strong>${value}</strong></article>`).join("");
 }
 
 function downloadProfilePdf() {
+  // Das PDF enthaelt Belastung und Verfuegbarkeit - nicht fuer Scouts (SCRUM-170).
+  if (currentRole === "scout") return;
   const playerId = $("#profilePlayer").value || state.players[0]?.id;
   const player = state.players.find((item) => item.id === playerId);
   if (!player) return;
@@ -5640,6 +5932,7 @@ function drawBarChart(canvas, rows, title, color) {
 }
 
 function exportData() {
+  if (currentRole === "scout") return;
   if (!confirmDespiteRevokedConsent(state.players, "Der Export")) return;
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
   const link = document.createElement("a");
@@ -6366,14 +6659,15 @@ on("#playerLoginForm", "submit", handlePlayerLogin);
 on("#signOutBtn", "click", handleSignOut);
 on("#migrateDataBtn", "click", migrateLegacyBlobToCollections);
 on("#addTrainerBtn", "click", createTrainerAccount);
-on("#addMedicalBtn", "click", createMedicalAccount);
+on("#addScoutBtn", "click", createScoutAccount);
+on("#addPhysioBtn", "click", createPhysioAccount);
 on("#absenceFrom", "change", () => { $("#absenceTo").min = $("#absenceFrom").value; });
 on("#trainerResetBtn", "click", handlePasswordReset);
 on("#changePasswordBtn", "click", openPasswordDialog);
 on("#passwordForm", "submit", handlePasswordChange);
 on("#closePasswordDialogBtn", "click", () => $("#passwordDialog").close());
 on("#cancelPasswordDialogBtn", "click", () => $("#passwordDialog").close());
-["#accessManagerList", "#scoutManagerList", "#trainerManagerList"].forEach((selector) => on(selector, "click", (event) => {
+["#accessManagerList", "#scoutManagerList", "#physioManagerList", "#trainerManagerList"].forEach((selector) => on(selector, "click", (event) => {
   const button = event.target.closest("button[data-action='revoke-access']");
   if (!button) return;
   revokeAccess(button.dataset.uid, button.dataset.role);
@@ -6385,7 +6679,10 @@ on("#inviteManagerList", "click", (event) => {
   if (button.dataset.action === "revoke-invite") revokeInvite(button.dataset.code);
 });
 on("#scoutManagerPanel", "click", (event) => {
-  if (event.target.closest("button[data-action='add-scout']")) createMedicalAccount();
+  if (event.target.closest("button[data-action='add-scout']")) createScoutAccount();
+});
+on("#physioManagerPanel", "click", (event) => {
+  if (event.target.closest("button[data-action='add-physio']")) createPhysioAccount();
 });
 on("#trainerManagerPanel", "click", (event) => {
   if (event.target.closest("button[data-action='add-trainer']")) createTrainerAccount();

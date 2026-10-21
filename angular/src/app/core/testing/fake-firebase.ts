@@ -8,6 +8,7 @@ import { PlayerRecordsApi } from '../firebase/player-records.api';
 import { PlanningApi } from '../firebase/planning.api';
 import { PlayersApi } from '../firebase/players.api';
 import { RatingsApi } from '../firebase/ratings.api';
+import { ScoutApi } from '../firebase/scout.api';
 import { TeamSettingsApi } from '../firebase/team-settings.api';
 import { WeatherProvider } from '../weather/weather-provider';
 import { OfflineWeatherProvider } from './fake-weather.provider';
@@ -20,6 +21,7 @@ import { FakePlanningApi } from './fake-planning.api';
 import { FakePlayerRecordsApi } from './fake-player-records.api';
 import { FakePlayersApi } from './fake-players.api';
 import { FakeRatingsApi } from './fake-ratings.api';
+import { FakeScoutApi } from './fake-scout.api';
 import { FakeTeamSettingsApi } from './fake-team-settings.api';
 
 /**
@@ -38,6 +40,7 @@ export class FakeFirebase {
   readonly records = new FakePlayerRecordsApi(this.calls);
   readonly settings = new FakeTeamSettingsApi(this.calls);
   readonly planning = new FakePlanningApi(this.calls);
+  readonly scout = new FakeScoutApi(this.calls);
 
   constructor() {
     this.events.hasRecords = (id) => (this.ratings.ratings.get(id)?.size ?? 0) > 0 || (this.ratings.privateNotes.get(id)?.size ?? 0) > 0;
@@ -59,5 +62,6 @@ export function provideFakeFirebase(fake: FakeFirebase): Provider[] {
     { provide: WeatherProvider, useClass: OfflineWeatherProvider },
     { provide: TeamSettingsApi, useValue: fake.settings },
     { provide: PlanningApi, useValue: fake.planning },
+    { provide: ScoutApi, useValue: fake.scout },
   ];
 }

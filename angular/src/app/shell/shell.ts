@@ -4,6 +4,7 @@ import { LayoutService } from '../core/shell/layout.service';
 import { MORE_GROUPS, PRIVACY_ITEM } from '../core/shell/navigation';
 import { showsNavigation } from '../core/auth/role';
 import { SessionService } from '../core/auth/session.service';
+import { ScoutPublishService } from '../core/scout/scout-publish.service';
 import { MoreSheet } from './more-sheet/more-sheet';
 import { Sidebar } from './sidebar/sidebar';
 import { TabBar } from './tab-bar/tab-bar';
@@ -11,7 +12,7 @@ import { TabBar } from './tab-bar/tab-bar';
 /**
  * Rahmen um alle Seiten. Es gibt genau ein Router-Outlet: Desktop ergänzt eine Sidebar, Handy
  * eine Tab-Leiste mit „Mehr“-Sheet. So bleibt die Seite beim Wechsel der Variante bestehen.
- * Spieler, Eltern und Medizin haben keine Navigation (nur ihre eine Ansicht, Figma 01c/01d).
+ * Spieler, Eltern, Medizin und Scouts haben keine Navigation (nur ihre eine Ansicht, Figma 01c/01d).
  */
 @Component({
   selector: 'tk-shell',
@@ -27,6 +28,11 @@ export class Shell {
   private readonly layout = inject(LayoutService);
 
   protected readonly moreOpen = signal(false);
+
+  constructor() {
+    // Hält als Trainer die Scout-Sicht aktuell (SCRUM-170); für andere Rollen tut der Dienst nichts.
+    inject(ScoutPublishService);
+  }
 
   protected readonly variant = computed<'desktop' | 'mobile' | 'focused'>(() => {
     if (!showsNavigation(this.session.role())) return 'focused';

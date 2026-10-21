@@ -9,7 +9,7 @@ import { FakeFirebase, provideFakeFirebase } from '../testing/fake-firebase';
 describe('EventsService', () => {
   let firebase: FakeFirebase;
 
-  function setup(role: 'trainer' | 'medical' | 'player' | null = 'trainer') {
+  function setup(role: 'trainer' | 'physio' | 'player' | null = 'trainer') {
     firebase = new FakeFirebase();
     firebase.events.events.set('e1', { type: 'Training', title: 'Training Mo', date: '2026-10-05', intensity: 2 });
     TestBed.configureTestingModule({ providers: [...provideFakeFirebase(firebase)] });
@@ -83,7 +83,7 @@ describe('EventsService', () => {
   });
 
   it('erlaubt anderen Rollen kein Schreiben', async () => {
-    const events = setup('medical');
+    const events = setup('physio');
     events.start();
     await vi.waitFor(() => expect(events.load()).toBe('ready'));
     expect(events.canWrite()).toBe(false);

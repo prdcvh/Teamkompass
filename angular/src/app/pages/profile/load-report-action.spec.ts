@@ -44,10 +44,12 @@ describe('LoadReportAction (Belastungsprotokoll)', () => {
   const root = (fixture: { nativeElement: unknown }) => fixture.nativeElement as HTMLElement;
   const openButton = (fixture: { nativeElement: unknown }) => root(fixture).querySelector<HTMLButtonElement>('button.open');
 
-  it('ist für Eltern, Medizin und fremde Spieler nicht da', async () => {
+  it('ist für Eltern, Medizin, Scouts und fremde Spieler nicht da', async () => {
     expect(openButton(await render('parent', 'p1'))).toBeNull();
     TestBed.resetTestingModule();
-    expect(openButton(await render('medical'))).toBeNull();
+    expect(openButton(await render('physio'))).toBeNull();
+    TestBed.resetTestingModule();
+    expect(openButton(await render('scout'))).toBeNull();
     TestBed.resetTestingModule();
     expect(openButton(await render('player', 'p2'))).toBeNull();
   });

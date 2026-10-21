@@ -14,7 +14,7 @@ describe('Events (Events-Seite)', () => {
   /** Feste Uhr: Montag, 5.10.2026, 09:00 Berlin → Woche bis 11.10.; Training Montag + Heimspiel diese Woche, September vergangen. */
   const CLOCK = new Date('2026-10-05T07:00:00Z');
 
-  async function render(role: 'trainer' | 'medical' = 'trainer', mobile = false) {
+  async function render(role: 'trainer' | 'physio' = 'trainer', mobile = false) {
     isMobile.set(mobile);
     firebase = new FakeFirebase();
     firebase.events.events.set('e1', { type: 'Training', title: 'Training Montag', date: '2026-10-05', intensity: 2, location: 'Kunstrasen', notes: 'Erste Zeile\n<b>zweite</b> Zeile' });
@@ -295,7 +295,7 @@ describe('Events (Events-Seite)', () => {
 
   describe('Rollen', () => {
     it('Medizin sieht die Liste, aber keine Schreib-Schaltflächen', async () => {
-      const fixture = await render('medical');
+      const fixture = await render('physio');
       openAll(fixture);
       expect(qa(fixture, 'tbody tr')).toHaveLength(3);
       expect(q(fixture, '.head button')).toBeNull();
@@ -319,7 +319,7 @@ describe('Events (Events-Seite)', () => {
     });
 
     it('zeigt für Medizin weder Anlegen noch Bearbeiten', async () => {
-      const fixture = await render('medical', true);
+      const fixture = await render('physio', true);
       expect(q(fixture, '.fab')).toBeNull();
       expect(qa(fixture, '.row button').map(text)).toEqual(['Anschauen', 'Anschauen']); // nur „Diese Woche“ ist offen
     });

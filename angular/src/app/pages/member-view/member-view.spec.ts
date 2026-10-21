@@ -5,6 +5,10 @@ import { LayoutService } from '../../core/shell/layout.service';
 import type { Role } from '../../core/auth/role';
 import { SessionService } from '../../core/auth/session.service';
 import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
+import { eventFromDoc } from '../../core/events/event';
+import { playerFromDoc } from '../../core/player/player';
+import { ratingFromDoc } from '../../core/ratings/rating';
+import { buildScoutProfiles } from '../../core/scout/scout-profile';
 import { MemberView } from './member-view';
 
 describe('MemberView (Ansicht für Spieler, Eltern und Medizin)', () => {
@@ -153,9 +157,9 @@ describe('MemberView (Ansicht für Spieler, Eltern und Medizin)', () => {
 
   describe('Medizin', () => {
     it('sieht Spieler mit Status, Abwesenheiten und Messwerten – ohne Noten, Bewertungen und Förderpläne', async () => {
-      const fixture = await render('medical', { playerId: null });
+      const fixture = await render('physio', { playerId: null });
       await settled(fixture, () => expect(text(fixture)).toContain('Schule'));
-      expect(text(fixture, 'h1')).toBe('Scout-Ansicht');
+      expect(text(fixture, 'h1')).toBe('Medizin-Ansicht');
       expect(text(fixture, '.who strong')).toBe('Jonas Keller');
       expect(root(fixture).querySelector('.grade')).toBeNull();
       expect(root(fixture).querySelector('.chart')).toBeNull();
@@ -170,7 +174,7 @@ describe('MemberView (Ansicht für Spieler, Eltern und Medizin)', () => {
     });
 
     it('wechselt den Spieler über die Auswahl', async () => {
-      const fixture = await render('medical', { playerId: null });
+      const fixture = await render('physio', { playerId: null });
       await settled(fixture, () => expect(text(fixture)).toContain('Schule'));
       const select = root(fixture).querySelector('select') as HTMLSelectElement;
       select.value = 'p2';
@@ -179,6 +183,53 @@ describe('MemberView (Ansicht für Spieler, Eltern und Medizin)', () => {
       expect(text(fixture, '.who strong')).toBe('Elias Wagner');
       expect(text(fixture)).toContain('Verletzt');
       expect(text(fixture)).not.toContain('Schule');
+    });
+  });
+
+  // SCRUM-170: Scouts sehen Kompetenzprofil, Notenverlauf und Statistik – aus der bereinigten Scout-Sicht, ohne
+  // Gesundheitsdaten, Abwesenheitsgründe, Rückmeldungen oder Notizen, und sie lesen keine Rohdaten.
+  describe('Scout', () => {
+    const publishScoutView = (fake: FakeFirebase) => {
+      const players = [...fake.players.players].map(([id, data]) => playerFromDoc(id, data));
+      const events = [...fake.events.events].map(([id, data]) => eventFromDoc(id, data));
+      const ratings = new Map([...fake.ratings.ratings].map(([eventId, byPlayer]) => [eventId, new Map([...byPlayer].map(([playerId, data]) => [playerId, ratingFromDoc(data)]))]));
+      for (const [id, doc] of buildScoutProfiles(players, events, ratings)) fake.scout.profiles.set(id, JSON.parse(JSON.stringify(doc)) as Record<string, unknown>);
+    };
+
+    it('sieht Noten, Kompetenzprofil und Statistik, aber keine Gesundheitsdaten, Rückmeldungen oder Notizen', async () => {
+      const fixture = await render('scout', { playerId: null, mutate: publishScoutView });
+      await settled(fixture, () => expect(text(fixture)).toContain('Kompetenzprofil'));
+      expect(text(fixture, 'h1')).toBe('Scout-Ansicht');
+      expect(text(fixture, '.who strong')).toBe('Jonas Keller');
+      expect(text(fixture, '.grade')).toContain('2,0');
+      expect(root(fixture).querySelector('.chart')).not.toBeNull();
+      expect(text(fixture)).toContain('Einsatzquote');
+      expect(text(fixture)).toContain('Heimspiel');
+      for (const hidden of ['Fit', 'Verletzt', 'Schule', 'Zerrung', 'Starkes Spiel', 'GEHEIME', 'Interne Planung', 'Orientierung', 'Verfügbarkeit', '01.07.2026', 'Messwerte', 'Abwesenheiten']) {
+        expect(text(fixture)).not.toContain(hidden);
+      }
+      expect(root(fixture).querySelector('tk-profile-extras')).toBeNull();
+      expect(root(fixture).querySelector('tk-status')).toBeNull();
+      // Nur die Scout-Sicht wird gelesen – keine Spieler-, Event-, Bewertungs- oder Gesundheitsdokumente.
+      const reads = firebase.calls.filter((call) => call.startsWith('watch') || call.startsWith('read'));
+      expect(reads.filter((call) => call !== 'watchScoutProfiles' && !call.startsWith('watchBreaks'))).toEqual([]);
+    });
+
+    it('wechselt den Spieler, ohne dessen Verletzung zu zeigen', async () => {
+      const fixture = await render('scout', { playerId: null, mutate: publishScoutView });
+      await settled(fixture, () => expect(text(fixture)).toContain('Kompetenzprofil'));
+      const select = root(fixture).querySelector('select') as HTMLSelectElement;
+      select.value = 'p2';
+      select.dispatchEvent(new Event('change'));
+      await settled(fixture, () => expect(text(fixture, '.who strong')).toBe('Elias Wagner'));
+      expect(text(fixture)).not.toContain('Verletzt');
+      expect(text(fixture)).not.toContain('Nur für Elias');
+      expect(text(fixture, '.grade')).toContain('5,0');
+    });
+
+    it('zeigt einen Hinweis, solange der Trainer noch keine Scout-Sicht veröffentlicht hat', async () => {
+      const fixture = await render('scout', { playerId: null });
+      expect(text(fixture, '.empty')).toContain('Noch keine Spieler für die Scout-Ansicht freigegeben.');
     });
   });
 });

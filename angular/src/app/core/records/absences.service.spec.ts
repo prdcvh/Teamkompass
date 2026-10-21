@@ -6,7 +6,7 @@ import { emptyAbsenceDraft } from './absence';
 describe('AbsencesService (SCRUM-18)', () => {
   let firebase: FakeFirebase;
 
-  async function setup(role?: 'trainer' | 'player' | 'medical') {
+  async function setup(role?: 'trainer' | 'player' | 'physio') {
     const context = await setupRecords(role);
     firebase = context.firebase;
     return context;

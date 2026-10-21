@@ -121,7 +121,7 @@ describe('Shell (in der App)', () => {
     ]);
   });
 
-  it.each<Role>(['player', 'parent', 'medical'])('zeigt %s keine Navigation', async (role) => {
+  it.each<Role>(['player', 'parent', 'physio', 'scout'])('zeigt %s keine Navigation', async (role) => {
     const root = el(await render(role));
     expect(root.querySelector('tk-sidebar')).toBeNull();
     expect(root.querySelector('tk-tab-bar')).toBeNull();

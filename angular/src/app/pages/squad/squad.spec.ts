@@ -12,7 +12,7 @@ describe('Squad (Kader-Seite)', () => {
   let firebase: FakeFirebase;
   const isMobile = signal(false);
 
-  async function render(role: 'trainer' | 'medical' = 'trainer', mobile = false) {
+  async function render(role: 'trainer' | 'physio' = 'trainer', mobile = false) {
     isMobile.set(mobile);
     firebase = new FakeFirebase();
     firebase.players.players.set('p1', { name: 'Jonas Keller', positions: ['TW'], number: 1, birthdate: '2012-05-05', status: 'Fit' });
@@ -289,7 +289,7 @@ describe('Squad (Kader-Seite)', () => {
 
   describe('nur Lesen (Medizin)', () => {
     it.each([false, true])('zeigt keine Schreibfunktionen (Handy: %s)', async (mobile) => {
-      const fixture = await render('medical', mobile);
+      const fixture = await render('physio', mobile);
       expect(qa(fixture, mobile ? '.player-card' : 'tbody tr')).toHaveLength(3);
       for (const selector of ['button.fab', '.access-card', 'tk-player-dialog', 'tbody tr button', '.head button']) {
         expect(q(fixture, selector), selector).toBeNull();

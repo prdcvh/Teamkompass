@@ -50,7 +50,7 @@ export async function renderProfile(options: { mobile?: boolean; id?: string; wi
   return { fixture, firebase, navigate };
 }
 
-export async function renderProfileExtras(role: 'trainer' | 'medical' = 'trainer') {
+export async function renderProfileExtras(role: 'trainer' | 'physio' = 'trainer') {
   isMobile.set(false);
   const firebase = new FakeFirebase();
   firebase.players.players.set('p1', { name: 'Jonas Keller', positions: ['TW'], number: 1, birthdate: '2012-05-05', status: 'Fit', consentStatus: 'granted' });

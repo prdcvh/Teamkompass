@@ -8,7 +8,7 @@ import { FakeFirebase, provideFakeFirebase } from '../testing/fake-firebase';
 describe('RatingsService', () => {
   let firebase: FakeFirebase;
 
-  async function setup(role: 'trainer' | 'medical' | 'player' | null = 'trainer') {
+  async function setup(role: 'trainer' | 'physio' | 'player' | null = 'trainer') {
     firebase = new FakeFirebase();
     firebase.events.events.set('e1', { type: 'Spiel', title: 'Heimspiel', date: '2026-10-10', matchDuration: 70 });
     firebase.ratings.ratings.set('e1', new Map([['p1', { attendance: 'present', effort: 2, technique: 2, tactics: 2, comprehension: 2, grade: 2, minutes: 70, goals: '', assists: '', note: 'Gut', playerId: 'p1' }]]));
@@ -47,7 +47,7 @@ describe('RatingsService', () => {
   });
 
   it('fragt interne Notizen für Nicht-Trainer gar nicht erst ab', async () => {
-    const ratings = await setup('medical');
+    const ratings = await setup('physio');
     ratings.start('e1');
     await vi.waitFor(() => expect(ratings.load()).toBe('ready'));
     expect(firebase.calls.some((call) => call.startsWith('watchPrivateNotes'))).toBe(false);

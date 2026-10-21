@@ -6,17 +6,19 @@ import { SessionService } from '../../core/auth/session.service';
 import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
 import { Access } from './access';
 
-describe('Access (Zugänge: Spieler und Scouts)', () => {
+describe('Access (Zugänge: Spieler, Scouts und Medizin)', () => {
   let firebase: FakeFirebase;
   const isMobile = signal(false);
 
-  async function render(role: 'trainer' | 'medical' = 'trainer', mobile = false) {
+  async function render(role: 'trainer' | 'physio' = 'trainer', mobile = false) {
     isMobile.set(mobile);
     firebase = new FakeFirebase();
     firebase.players.players.set('p1', { name: 'Anna Beispiel', positions: ['ZM'], number: 8, birthdate: '2012-03-12', status: 'Fit' });
     firebase.players.players.set('p2', { name: 'Ben Widerruf', positions: ['ST'], number: 9, birthdate: '2012-05-01', status: 'Fit', consentStatus: 'revoked' });
     firebase.access.memberDocs.set('u1', { role: 'player', playerId: 'p1', expiresAt: { toDate: () => new Date('2020-01-01T00:00:00Z') } });
-    firebase.access.memberDocs.set('u2', { role: 'medical', email: 'arzt@verein.de' });
+    // Bisheriger Scout-Zugang mit der alten Kennung „medical“ (wird seit SCRUM-170 als Scout geführt).
+    firebase.access.memberDocs.set('u2', { role: 'medical', email: 'scout@verein.de' });
+    firebase.access.memberDocs.set('u4', { role: 'physio', email: 'arzt@verein.de' });
     firebase.access.memberDocs.set('u3', { role: 'trainer', email: 'coach@verein.de' });
     firebase.access.inviteDocs.set('abcdef0123456789abcdef0123456789abcdef0123456789', { role: 'parent', playerId: 'p2', expiresAt: null });
     TestBed.configureTestingModule({ providers: [provideRouter([]), ...provideFakeFirebase(firebase), { provide: LayoutService, useValue: { isMobile } }] });
@@ -53,6 +55,10 @@ describe('Access (Zugänge: Spieler und Scouts)', () => {
     q<HTMLButtonElement>(fixture, '#access-tab-scouts')!.click();
     await flush(fixture);
   };
+  const openPhysios = async (fixture: Awaited<ReturnType<typeof render>>) => {
+    q<HTMLButtonElement>(fixture, '#access-tab-physios')!.click();
+    await flush(fixture);
+  };
 
   it('listet Einladungen und Zugänge ohne Trainer-Konten und ohne den vollen Code', async () => {
     const fixture = await render();
@@ -64,21 +70,27 @@ describe('Access (Zugänge: Spieler und Scouts)', () => {
     expect(rows[0]).toContain('Code …456789');
     expect(rows[0]).toContain('Unbegrenzt gültig');
     expect(rows.some((row) => row.includes('Anna Beispiel') && row.includes('Abgelaufen seit 01.01.2020'))).toBe(true);
-    expect(rows.some((row) => row.includes('arzt@verein.de'))).toBe(false);
+    expect(rows.some((row) => row.includes('arzt@verein.de') || row.includes('scout@verein.de'))).toBe(false);
     expect(text(q(fixture, '#access-tab-players'))).toBe('Spieler (2)');
     expect(text(q(fixture, '#access-tab-scouts'))).toBe('Scouts (1)');
+    expect(text(q(fixture, '#access-tab-physios'))).toBe('Medizin (1)');
     await openScouts(fixture);
     const scouts = qa(fixture, 'article.row').map(text);
     expect(scouts).toHaveLength(1);
-    expect(scouts[0]).toContain('arzt@verein.de');
-    expect(scouts[0]).toContain('Scout (nur lesen)');
+    expect(scouts[0]).toContain('scout@verein.de');
+    expect(scouts[0]).toContain('Scout (Leistungsdaten, keine Gesundheitsdaten)');
     expect(text(q(fixture, '.meta'))).toBe('1 Zugang');
+    await openPhysios(fixture);
+    const physios = qa(fixture, 'article.row').map(text);
+    expect(physios).toHaveLength(1);
+    expect(physios[0]).toContain('arzt@verein.de');
+    expect(physios[0]).toContain('Medizin (Status, Abwesenheiten, Verletzungen, Messwerte)');
     expect(text(root(fixture))).not.toContain('coach@verein.de');
     expect(text(root(fixture))).not.toContain('abcdef0123456789abcdef0123456789');
   });
 
   it('zeigt Nicht-Trainern nur einen Hinweis und lädt nichts', async () => {
-    const fixture = await render('medical');
+    const fixture = await render('physio');
     expect(text(root(fixture))).toContain('nur Trainer');
     expect(firebase.calls).not.toContain('readMembers');
     expect(q(fixture, 'tk-invite-dialog')).toBeNull();
@@ -148,9 +160,10 @@ describe('Access (Zugänge: Spieler und Scouts)', () => {
     const fixture = await render();
     const rowOf = (name: string) => qa<HTMLElement>(fixture, 'article.row').find((row) => text(row).includes(name))!;
     await openScouts(fixture);
-    rowOf('arzt@verein.de').querySelector<HTMLButtonElement>('button')!.click();
+    rowOf('scout@verein.de').querySelector<HTMLButtonElement>('button')!.click();
     await flush(fixture);
     expect(qa(fixture, 'tk-dialog h2').map(text)).toContain('Zugang sperren?');
+    expect(qa(fixture, 'tk-dialog').map(text).join(' ')).toContain('verliert sofort den Zugriff');
     expect(firebase.access.memberDocs.has('u2')).toBe(true);
     qa<HTMLButtonElement>(fixture, '.confirm-actions button').find((button) => text(button) === 'Sperren')!.click();
     await vi.waitFor(() => expect(firebase.access.memberDocs.has('u2')).toBe(false));
@@ -212,8 +225,21 @@ describe('Access (Zugänge: Spieler und Scouts)', () => {
     await openScouts(fixture);
     expect(q(fixture, '#access-tab-scouts')!.getAttribute('aria-selected')).toBe('true');
     expect(q(fixture, '.head button')).toBeNull();
-    expect(q<HTMLAnchorElement>(fixture, '.head a')!.getAttribute('href')).toBe('/medizin-zugang');
+    expect(q<HTMLAnchorElement>(fixture, '.head a')!.getAttribute('href')).toBe('/scout-zugang');
     expect(text(q(fixture, '.head a'))).toBe('+ Scout-Zugang anlegen');
+  });
+
+  it('führt im Reiter Medizin zum Anlegen eines Medizin-Zugangs (SCRUM-170)', async () => {
+    const fixture = await render();
+    await openPhysios(fixture);
+    expect(q(fixture, '#access-tab-physios')!.getAttribute('aria-selected')).toBe('true');
+    expect(q<HTMLAnchorElement>(fixture, '.head a')!.getAttribute('href')).toBe('/medizin-zugang');
+    expect(text(q(fixture, '.head a'))).toBe('+ Medizin-Zugang anlegen');
+    expect(text(root(fixture))).toContain('Status, Abwesenheiten, Verletzungen und Messwerte');
+    firebase.access.memberDocs.delete('u4');
+    await (fixture.componentInstance as unknown as { access: { reload(): Promise<void> } }).access.reload();
+    await flush(fixture);
+    expect(text(q(fixture, '.empty'))).toContain('Noch kein Medizin-Zugang angelegt.');
   });
 
   it('wechselt die Reiter auch mit den Pfeiltasten', async () => {
@@ -221,6 +247,15 @@ describe('Access (Zugänge: Spieler und Scouts)', () => {
     q(fixture, '#access-tab-players')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
     await flush(fixture);
     expect(q(fixture, '#access-tab-scouts')!.getAttribute('aria-selected')).toBe('true');
+    q(fixture, '#access-tab-scouts')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
+    await flush(fixture);
+    expect(q(fixture, '#access-tab-physios')!.getAttribute('aria-selected')).toBe('true');
+    q(fixture, '#access-tab-physios')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
+    await flush(fixture);
+    expect(q(fixture, '#access-tab-players')!.getAttribute('aria-selected')).toBe('true');
+    q(fixture, '#access-tab-players')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft' }));
+    await flush(fixture);
+    expect(q(fixture, '#access-tab-physios')!.getAttribute('aria-selected')).toBe('true');
   });
 
   it('zeigt im leeren Reiter einen Hinweis mit passendem Button', async () => {

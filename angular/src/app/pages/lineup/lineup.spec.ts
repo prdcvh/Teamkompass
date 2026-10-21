@@ -27,7 +27,7 @@ describe('Lineup (Aufstellung)', () => {
     ['bank', 'Ben Bank', 12, ['ST', 'IV'], 4],
   ];
 
-  async function render(role: 'trainer' | 'medical' = 'trainer', mobile = false, stored: Record<string, unknown> | null = null, games: [string, number][] = []) {
+  async function render(role: 'trainer' | 'physio' = 'trainer', mobile = false, stored: Record<string, unknown> | null = null, games: [string, number][] = []) {
     isMobile.set(mobile);
     firebase = new FakeFirebase();
     for (const [id, name, number, positions] of squad) {
@@ -168,7 +168,7 @@ describe('Lineup (Aufstellung)', () => {
   });
 
   it('zeigt Nicht-Trainern nur einen Hinweis und lädt nichts', async () => {
-    const fixture = await render('medical');
+    const fixture = await render('physio');
     fixture.detectChanges();
     expect(text(root(fixture))).toContain('nur Trainer');
     expect(q(fixture, '.pitch')).toBeNull();

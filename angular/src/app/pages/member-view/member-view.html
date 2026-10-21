@@ -6,7 +6,7 @@
       <p class="intro">{{ intro() }}</p>
     </div>
     <a tkButton size="sm" class="sign-out" routerLink="/abmelden">Abmelden</a>
-    @if (medical() && players().length > 0) {
+    @if (picks() && players().length > 0) {
       <label class="picker">
         <span class="tk-sr-only">Spieler wählen</span>
         <select class="tk-input" [value]="player()?.id" (change)="choose($event)">
@@ -35,10 +35,10 @@
       <p>{{ errorText() }}</p>
       <button tkButton type="button" (click)="retry()">Erneut versuchen</button>
     </div>
-  } @else if (squad.load() !== 'ready') {
+  } @else if (!loaded()) {
     <p class="muted" role="status">Profil wird geladen …</p>
   } @else if (!player()) {
-    <tk-card><div class="empty"><p>{{ medical() ? 'Noch kein Spieler im Kader.' : 'Das verknüpfte Spielerprofil wurde nicht gefunden. Bitte wende dich an den Trainer.' }}</p></div></tk-card>
+    <tk-card><div class="empty"><p>{{ scout() ? 'Noch keine Spieler für die Scout-Ansicht freigegeben.' : physio() ? 'Noch kein Spieler im Kader.' : 'Das verknüpfte Spielerprofil wurde nicht gefunden. Bitte wende dich an den Trainer.' }}</p></div></tk-card>
   } @else if (!ready()) {
     <p class="muted" role="status">Bewertungen werden geladen …</p>
   } @else {
@@ -49,9 +49,11 @@
           <div class="who">
             <strong>{{ p.name }}</strong>
             <span>{{ positionText(p) }} · {{ formatDate(p.birthdate) }} · {{ age(p.birthdate) }} Jahre</span>
-            <span class="status-line"><tk-status [label]="status()" />{{ injury() }}</span>
+            @if (!scout()) {
+              <span class="status-line"><tk-status [label]="status()" />{{ injury() }}</span>
+            }
           </div>
-          @if (!medical()) {
+          @if (!physio()) {
             <div class="grade">
               <span>Ø Note</span>
               <strong>{{ gradeLabel(figures().average) }}</strong>
@@ -65,7 +67,7 @@
         }
       </tk-card>
 
-      @if (!medical()) {
+      @if (!physio()) {
         <section class="columns">
           <tk-card>
             <h2>Notenverlauf</h2>
@@ -102,15 +104,17 @@
                 </li>
               }
             </ul>
-            <h2>Verfügbarkeit</h2>
-            <ul class="bars">
-              @for (row of attendance(); track row.label) {
-                <li>
-                  <div><strong>{{ row.label }}</strong><span>{{ row.display }}</span></div>
-                  <div class="bar muted-bar" role="img" [attr.aria-label]="row.label + ' ' + row.display"><span [style.width.%]="row.percent"></span></div>
-                </li>
-              }
-            </ul>
+            @if (!scout()) {
+              <h2>Verfügbarkeit</h2>
+              <ul class="bars">
+                @for (row of attendance(); track row.label) {
+                  <li>
+                    <div><strong>{{ row.label }}</strong><span>{{ row.display }}</span></div>
+                    <div class="bar muted-bar" role="img" [attr.aria-label]="row.label + ' ' + row.display"><span [style.width.%]="row.percent"></span></div>
+                  </li>
+                }
+              </ul>
+            }
           </tk-card>
         </section>
 
@@ -134,7 +138,9 @@
                     <small>
                       {{ formatDate(entry.event.date) }} · {{ entry.event.type }}@if (entry.event.goalsFor !== null && entry.event.goalsAgainst !== null) { · {{ entry.event.goalsFor }}:{{ entry.event.goalsAgainst }}} · Note {{ gradeLabel(entry.grade) }}
                     </small>
-                    <p class="muted">{{ entry.rating.note || 'Keine Rückmeldung' }}</p>
+                    @if (!scout()) {
+                      <p class="muted">{{ entry.rating.note || 'Keine Rückmeldung' }}</p>
+                    }
                   </div>
                   <span class="badge">{{ gradeLabel(entry.grade) }}</span>
                 </li>
@@ -144,7 +150,9 @@
         </tk-card>
       }
 
-      <tk-profile-extras [editable]="false" [showPlans]="!medical()" />
+      @if (!scout()) {
+        <tk-profile-extras [editable]="false" [showPlans]="!physio()" />
+      }
     }
   }
 </section>

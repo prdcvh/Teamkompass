@@ -230,9 +230,17 @@ describe('AuthService', () => {
       await auth.signInTrainer('coach@verein.de', 'x');
       await auth.signOut();
       expect(auth.status()).toBe('signedOut');
-      firebase.access.members.set('uid-1', { role: 'medical', playerId: null });
+      firebase.access.members.set('uid-1', { role: 'physio', playerId: null });
       await auth.signInTrainer('coach@verein.de', 'x');
-      expect(session.role()).toBe('medical');
+      expect(session.role()).toBe('physio');
+    });
+
+    it('SCRUM-170: bisherige Scout-Konten („medical“) werden zu Scouts, nicht zu Medizin', async () => {
+      firebase.access.members.set('uid-1', { role: 'scout', playerId: null });
+      auth.start(0);
+      await auth.signInTrainer('scout@verein.de', 'x');
+      expect(session.role()).toBe('scout');
+      expect(session.displayName()).toBe('scout');
     });
   });
 
@@ -252,7 +260,8 @@ describe('AuthService', () => {
     expect(displayNameFor('trainer', 'coach@verein.de')).toBe('coach');
     expect(displayNameFor('player', null)).toBe('Spieler');
     expect(displayNameFor('parent', null)).toBe('Eltern');
-    expect(displayNameFor('medical', null)).toBe('Scout');
+    expect(displayNameFor('physio', null)).toBe('Medizin');
+    expect(displayNameFor('scout', null)).toBe('Scout');
     expect(soon.getTime()).toBeGreaterThan(Date.now());
   });
 });

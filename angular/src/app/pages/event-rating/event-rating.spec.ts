@@ -11,7 +11,7 @@ describe('EventRating (Event bewerten)', () => {
   let firebase: FakeFirebase;
   const isMobile = signal(false);
 
-  async function render(options: { mobile?: boolean; eventId?: string; game?: boolean; consent?: string; lineup?: boolean; role?: 'trainer' | 'medical' } = {}) {
+  async function render(options: { mobile?: boolean; eventId?: string; game?: boolean; consent?: string; lineup?: boolean; role?: 'trainer' | 'physio' } = {}) {
     const { mobile = false, eventId = 'e1', game = true, consent, lineup = false, role = 'trainer' } = options;
     isMobile.set(mobile);
     firebase = new FakeFirebase();
@@ -82,7 +82,7 @@ describe('EventRating (Event bewerten)', () => {
     });
 
     it('zeigt Nicht-Trainern nichts und lädt die Aufstellung nicht', async () => {
-      const medical = await render({ lineup: true, role: 'medical' });
+      const medical = await render({ lineup: true, role: 'physio' });
       expect(q(medical, '.lineup')).toBeNull();
       expect(firebase.calls).not.toContain('watchLineup');
     });

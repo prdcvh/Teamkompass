@@ -9,7 +9,7 @@ import { FakeFirebase, provideFakeFirebase } from '../testing/fake-firebase';
 describe('SquadService', () => {
   let firebase: FakeFirebase;
 
-  function setup(role: 'trainer' | 'medical' | 'player' | 'parent' | null = 'trainer') {
+  function setup(role: 'trainer' | 'physio' | 'player' | 'parent' | null = 'trainer') {
     firebase = new FakeFirebase();
     firebase.players.players.set('p1', { name: 'Ali Adler', positions: ['ST'], number: 9, birthdate: '2012-05-05', status: 'Fit' });
     TestBed.configureTestingModule({ providers: [...provideFakeFirebase(firebase)] });
@@ -131,7 +131,7 @@ describe('SquadService', () => {
     expect(squad.players()).toHaveLength(0);
   });
 
-  it.each(['medical', 'player'] as const)('Rolle %s darf nichts schreiben', async (role) => {
+  it.each(['physio', 'player'] as const)('Rolle %s darf nichts schreiben', async (role) => {
     const squad = setup(role);
     squad.start();
     await vi.waitFor(() => expect(squad.load()).toBe('ready'));

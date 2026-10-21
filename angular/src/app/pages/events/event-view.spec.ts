@@ -11,7 +11,7 @@ import { Events } from './events';
 describe('Events: Anschauen und Bearbeiten über den Stift', () => {
   let firebase: FakeFirebase;
 
-  async function render(role: 'trainer' | 'medical' = 'trainer') {
+  async function render(role: 'trainer' | 'physio' = 'trainer') {
     firebase = new FakeFirebase();
     firebase.events.events.set('e1', { type: 'Training', title: 'Training Montag', date: '2026-10-05', intensity: 2, location: 'Kunstrasen', notes: 'Erste Zeile\n<b>zweite</b> Zeile' });
     TestBed.configureTestingModule({
@@ -101,7 +101,7 @@ describe('Events: Anschauen und Bearbeiten über den Stift', () => {
     });
 
     it('Medizin bekommt beim Anschauen nur die Leseansicht, ohne Stift (SCRUM-144)', async () => {
-      const fixture = await render('medical');
+      const fixture = await render('physio');
       qa<HTMLButtonElement>(fixture, 'tbody tr button')[0].click();
       await flush(fixture);
       const dialog = q<HTMLElement>(fixture, 'tk-event-dialog')!;

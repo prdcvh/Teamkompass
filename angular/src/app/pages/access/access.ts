@@ -11,11 +11,23 @@ import { Dialog } from '../../ui/dialog/dialog';
 import { Icon } from '../../ui/icon/icon';
 import { InviteDialog } from './invite-dialog';
 
-export type AccessTab = 'players' | 'scouts';
+export type AccessTab = 'players' | 'scouts' | 'physios';
+
+/** Reiter in Reihenfolge (Pfeiltasten wechseln reihum). */
+export const ACCESS_TABS: readonly AccessTab[] = ['players', 'scouts', 'physios'];
+
+/** Zu welchem Reiter ein Zugang gehört. */
+export function tabOf(entry: AccessEntry): AccessTab {
+  if (entry.role === 'scout') return 'scouts';
+  if (entry.role === 'physio') return 'physios';
+  return 'players';
+}
 
 /**
- * Zugangsverwaltung (nur Trainer), getrennt in zwei Reiter: „Spieler“ (Spieler und Eltern: Einladungscodes erzeugen,
- * befristen, sperren) und „Scouts“ (Lesezugänge mit E-Mail und Passwort; angelegt über eine eigene Seite).
+ * Zugangsverwaltung (nur Trainer), getrennt in drei Reiter: „Spieler“ (Spieler und Eltern: Einladungscodes erzeugen,
+ * befristen, sperren), „Scouts“ (Leistungsdaten, keine Gesundheitsdaten) und „Medizin“ (Status, Abwesenheiten,
+ * Verletzungen, Messwerte). Scout- und Medizin-Zugänge melden sich mit E-Mail und Passwort an und werden über eigene
+ * Seiten angelegt (SCRUM-170).
  */
 @Component({
   selector: 'app-access',
@@ -48,11 +60,21 @@ export class Access implements OnInit {
     })),
   );
 
-  protected readonly tabRows = computed(() => this.rows().filter((row) => (row.entry.role === 'medical') === (this.tab() === 'scouts')));
+  protected readonly tabRows = computed(() => this.rows().filter((row) => tabOf(row.entry) === this.tab()));
   protected readonly counts = computed(() => ({
-    players: this.rows().filter((row) => row.entry.role !== 'medical').length,
-    scouts: this.rows().filter((row) => row.entry.role === 'medical').length,
+    players: this.rows().filter((row) => tabOf(row.entry) === 'players').length,
+    scouts: this.rows().filter((row) => tabOf(row.entry) === 'scouts').length,
+    physios: this.rows().filter((row) => tabOf(row.entry) === 'physios').length,
   }));
+  /** Anlegen-Seite des aktuellen Staff-Reiters. */
+  protected readonly createLink = computed(() => (this.tab() === 'physios' ? '/medizin-zugang' : '/scout-zugang'));
+  protected readonly createLabel = computed(() => (this.tab() === 'physios' ? 'Medizin-Zugang anlegen' : 'Scout-Zugang anlegen'));
+
+  /** Nachbar-Reiter für die Pfeiltasten. */
+  protected neighbour(step: 1 | -1): AccessTab {
+    const index = ACCESS_TABS.indexOf(this.tab());
+    return ACCESS_TABS[(index + step + ACCESS_TABS.length) % ACCESS_TABS.length];
+  }
 
   protected select(tab: AccessTab): void {
     this.tab.set(tab);
@@ -70,7 +92,8 @@ export class Access implements OnInit {
   }
 
   private nameOf(entry: AccessEntry): string {
-    if (entry.role === 'medical') return entry.email || 'Scout-Zugang';
+    if (entry.role === 'scout') return entry.email || 'Scout-Zugang';
+    if (entry.role === 'physio') return entry.email || 'Medizin-Zugang';
     return this.squad.players().find((player) => player.id === entry.playerId)?.name ?? entry.playerId ?? 'Unbekannter Spieler';
   }
 
