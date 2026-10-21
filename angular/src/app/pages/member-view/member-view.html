@@ -58,6 +58,11 @@
             </div>
           }
         </div>
+        @if (reportAllowed()) {
+          <div class="report-actions">
+            <tk-load-report-action [player]="p" [items]="profile.items()" [absences]="records.absences()" [measurements]="records.measurementList()" />
+          </div>
+        }
       </tk-card>
 
       @if (!medical()) {

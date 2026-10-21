@@ -119,3 +119,10 @@ h2 {
   color: var(--tk-ink);
   font-size: 32px;
 }
+
+/* SCRUM-139: Belastungsprotokoll (PDF) im Kopfbereich. */
+.report-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--tk-space-3);
+}

@@ -1828,6 +1828,7 @@ function applyRoleRestrictions() {
     $("#profilePlayer").disabled = false;
     renderAccessManager();
   }
+  syncLoadReportButton();
 }
 
 async function handleTrainerLogin(event) {
@@ -2702,6 +2703,388 @@ function assessLoad({ sessions = [], measurements = [], lastInjuryEnd = null, la
   };
 }
 // --- LOAD-ASSESSMENT END ---
+
+// --- LOAD-REPORT START (SCRUM-139) ---
+// Belastungsprotokoll als druckfertige Seite (Drucken -> Als PDF speichern), typischerweise fuer den Physio.
+// Reine Datenzusammenstellung (buildLoadReport) + HTML (loadReportHtml), getestet in tests/load-report.test.mjs.
+// Ohne "Verletzungs- und Befindensdaten einschliessen" gelangen keine Verletzungen, Abwesenheitsgruende,
+// Verfuegbarkeit oder Befindensangaben in den Bericht; auch die Stufe wird dann ohne diese Daten gerechnet.
+// Jeder Nutzertext wird maskiert (SCRUM-13).
+const LOAD_REPORT_PERIODS = { 4: 28, 8: 56, 12: 84 };
+const LOAD_REPORT_MAX_DAYS = 366;
+const LOAD_REPORT_ATTENDANCE = { present: "anwesend", limited: "eingeschränkt", absent: "gefehlt", excluded: "nicht im Kader" };
+// Befindensfragen (kommen mit SCRUM-138 als rating.wellness = { fatigue, sleep, soreness, stress }, je 1-5).
+const LOAD_REPORT_WELLNESS = [["fatigue", "Müdigkeit"], ["sleep", "Schlaf"], ["soreness", "Muskelkater"], ["stress", "Stress"]];
+
+function lrIso(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function lrDate(iso) {
+  return new Date(`${iso}T00:00:00`);
+}
+
+function lrAddDays(iso, days) {
+  const date = lrDate(iso);
+  date.setDate(date.getDate() + days);
+  return lrIso(date);
+}
+
+function lrDays(fromIso, toIso) {
+  return Math.round((lrDate(toIso).getTime() - lrDate(fromIso).getTime()) / 86400000);
+}
+
+function lrDateText(iso) {
+  if (!iso) return "-";
+  const [year, month, day] = iso.split("-");
+  return `${day}.${month}.${year}`;
+}
+
+function lrNumber(value, digits = 0) {
+  const factor = 10 ** digits;
+  return (Math.round(Number(value) * factor) / factor).toFixed(digits).replace(".", ",");
+}
+
+function lrIsInjury(absence) {
+  if (absence?.kind) return absence.kind === "injury";
+  return /^verletz/i.test((absence?.label || "").trim());
+}
+
+function lrAbsenceText(absence) {
+  const detail = (absence?.detail || "").trim();
+  return detail ? `${absence.label} · ${detail}` : absence?.label || "";
+}
+
+function lrValidIso(value) {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(lrDate(value).getTime());
+}
+
+// Zeitraum: 4 (Standard), 8, 12 Wochen bis heute oder ein eigener Zeitraum (von/bis, hoechstens bis heute).
+function loadReportRange({ period = "4", from = "", to = "", today }) {
+  if (period !== "custom") {
+    const days = LOAD_REPORT_PERIODS[period] || LOAD_REPORT_PERIODS[4];
+    return { from: lrAddDays(today, -(days - 1)), to: today };
+  }
+  if (!lrValidIso(from) || !lrValidIso(to)) return { error: "Bitte Beginn und Ende des Zeitraums angeben." };
+  if (from > to) return { error: "Der Beginn liegt nach dem Ende des Zeitraums." };
+  if (from > today) return { error: "Der Zeitraum liegt in der Zukunft." };
+  const end = to > today ? today : to;
+  if (lrDays(from, end) + 1 > LOAD_REPORT_MAX_DAYS) return { error: "Der Zeitraum darf höchstens ein Jahr lang sein." };
+  return { from, to: end };
+}
+
+function lrWellnessOf(rating) {
+  const raw = rating?.wellness;
+  if (!raw || typeof raw !== "object") return null;
+  const values = {};
+  let any = false;
+  LOAD_REPORT_WELLNESS.forEach(([key]) => {
+    const value = Number(raw[key]);
+    if (raw[key] !== "" && raw[key] != null && Number.isFinite(value)) {
+      values[key] = value;
+      any = true;
+    }
+  });
+  return any ? values : null;
+}
+
+function lrSelfExertion(rating) {
+  const raw = rating?.selfExertion;
+  const value = Number(raw);
+  return raw !== "" && raw != null && Number.isFinite(value) && value >= 0 && value <= 10 ? Math.round(value) : null;
+}
+
+// player: { name, number, status, injuryUntil }; events: alle Termine (mit ratings je Spieler-Id);
+// absences/measurements: die des Spielers. today: JJJJ-MM-TT.
+function buildLoadReport({ player, playerId, events = [], absences = [], measurements = [], includeHealth = false, from, to, today, teamName = "", createdBy = "" }) {
+  const asOf = to < today ? to : today;
+  const asOfDate = lrDate(asOf);
+  const own = (event) => event?.ratings?.[playerId];
+  const participated = (rating) => rating?.attendance === "present" || rating?.attendance === "limited";
+  const pastEvents = events.filter((event) => lrValidIso(event?.date) && event.date <= asOf);
+
+  // Stufe zum Ende des Zeitraums. Ohne Haekchen ohne Verletzungen/Abwesenheiten/Status gerechnet.
+  const sessions = pastEvents.filter((event) => participated(own(event))).map((event) => ({
+    date: lrDate(event.date),
+    load: sessionLoadValue(event, own(event)),
+    exertion: eventExertion(event)
+  }));
+  const ended = (list) => list.filter((item) => item.to && item.to < asOf).map((item) => item.to).sort();
+  const injuryEnds = includeHealth ? ended(absences.filter(lrIsInjury)) : [];
+  // Wie in der App (computePlayerInjuryRisk): "ca. verletzt bis" zaehlt immer mit, auch wenn es noch bevorsteht.
+  if (includeHealth && player?.injuryUntil) injuryEnds.push(player.injuryUntil);
+  injuryEnds.sort();
+  const otherEnds = includeHealth ? ended(absences.filter((item) => !lrIsInjury(item))) : [];
+  const coversAsOf = (item) => item.from && item.from <= asOf && (item.to ? asOf <= item.to : lrIsInjury(item));
+  const assessment = assessLoad({
+    sessions,
+    measurements: [...measurements].filter((item) => lrValidIso(item?.date) && item.date <= asOf).sort((a, b) => a.date.localeCompare(b.date)),
+    lastInjuryEnd: injuryEnds.at(-1) || null,
+    lastAbsenceEnd: otherEnds.at(-1) || null,
+    status: includeHealth ? player?.status : "Fit",
+    injuredNow: includeHealth && absences.some((item) => lrIsInjury(item) && coversAsOf(item)),
+    today: asOfDate
+  });
+
+  // Terminliste im Zeitraum (nur vergangene Termine mit eingetragener Teilnahme).
+  const absenceOn = (date) => {
+    const active = absences.filter((item) => item.from && item.from <= date && (item.to ? date <= item.to : lrIsInjury(item)));
+    return active.find(lrIsInjury) || active[0] || null;
+  };
+  const rows = pastEvents
+    .filter((event) => event.date >= from && LOAD_REPORT_ATTENDANCE[own(event)?.attendance])
+    .sort((a, b) => a.date.localeCompare(b.date) || String(a.title || "").localeCompare(String(b.title || "")))
+    .map((event) => {
+      const rating = own(event);
+      const took = participated(rating);
+      let reason = "";
+      if (includeHealth && rating.attendance === "absent") {
+        const absence = absenceOn(event.date);
+        if (absence) reason = lrAbsenceText(absence);
+        else if (player?.status === "Verletzt" && (!player.injuredSince || event.date >= player.injuredSince) && (!player.injuryUntil || event.date <= player.injuryUntil)) reason = "Verletzt";
+      }
+      return {
+        date: event.date,
+        type: event.type === "Spiel" ? "Spiel" : "Training",
+        title: String(event.title || ""),
+        attendance: LOAD_REPORT_ATTENDANCE[rating.attendance],
+        reason,
+        minutes: took ? Math.round(sessionMinutes(event, rating)) : null,
+        exertion: took ? eventExertion(event) : null,
+        load: took ? Math.round(sessionLoadValue(event, rating)) : null,
+        selfExertion: took ? lrSelfExertion(rating) : null,
+        wellness: includeHealth ? lrWellnessOf(rating) : null
+      };
+    });
+
+  // Wochenverlauf: Wochen rueckwaerts ab dem Ende des Zeitraums; die erste Woche kann kuerzer sein.
+  const weeks = [];
+  for (let end = asOf; end >= from; end = lrAddDays(end, -7)) {
+    const start = lrAddDays(end, -6) < from ? from : lrAddDays(end, -6);
+    const inWeek = rows.filter((row) => row.load !== null && row.date >= start && row.date <= end);
+    weeks.unshift({ from: start, to: end, load: inWeek.reduce((sum, row) => sum + row.load, 0), sessions: inWeek.length });
+  }
+
+  // Erholungs-Hinweise: zwei sehr harte Einheiten (Anstrengung >= 7) innerhalb von 48 Stunden,
+  // und Wochen mit mindestens dem 1,5-fachen des Schnitts der 3 Wochen davor (nur mit genug Vorlauf).
+  const recovery = [];
+  const hard = rows.filter((row) => row.exertion !== null && row.exertion >= 7);
+  hard.forEach((row, index) => {
+    if (index > 0 && lrDays(hard[index - 1].date, row.date) <= 2) recovery.push(`Zwei sehr harte Einheiten innerhalb von 48 Stunden (${lrDateText(hard[index - 1].date)} und ${lrDateText(row.date)})`);
+  });
+  const weekLoadBefore = (endIso) => {
+    const start = lrAddDays(endIso, -6);
+    return pastEvents
+      .filter((event) => event.date >= start && event.date <= endIso && participated(own(event)))
+      .reduce((sum, event) => sum + sessionLoadValue(event, own(event)), 0);
+  };
+  weeks.forEach((week) => {
+    if (week.load <= 0 || lrDays(week.from, week.to) < 6) return;
+    const previous = [1, 2, 3].map((n) => weekLoadBefore(lrAddDays(week.to, -7 * n)));
+    if (previous.filter((value) => value > 0).length < 2) return;
+    const baseline = (previous[0] + previous[1] + previous[2]) / 3;
+    if (baseline > 0 && week.load / baseline >= 1.5) {
+      recovery.push(`Belastungsspitze in der Woche ${lrDateText(week.from)}–${lrDateText(week.to)} (${lrNumber(week.load / baseline, 1)}-fach des Schnitts der 3 Wochen davor)`);
+    }
+  });
+
+  // Wachstum: cm pro Monat zwischen zwei Messungen, deren spaetere im Zeitraum liegt.
+  const sortedMeasurements = [...measurements]
+    .filter((item) => lrValidIso(item?.date) && item.date <= asOf && Number(item.height) > 0)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const growth = [];
+  sortedMeasurements.forEach((item, index) => {
+    if (index === 0 || item.date < from) return;
+    const prev = sortedMeasurements[index - 1];
+    const months = lrDays(prev.date, item.date) / 30;
+    if (months <= 0) return;
+    const perMonth = (Number(item.height) - Number(prev.height)) / months;
+    growth.push({ from: prev.date, to: item.date, fromHeight: Number(prev.height), toHeight: Number(item.height), perMonth: Math.round(perMonth * 10) / 10 });
+  });
+
+  // Rueckkehr nach Verletzung/Abwesenheit: Eintraege, die den Zeitraum beruehren (nur mit Haekchen).
+  const returns = includeHealth
+    ? absences
+      .filter((item) => item.from && item.from <= asOf && (!item.to || item.to >= from))
+      .sort((a, b) => a.from.localeCompare(b.from))
+      .map((item) => ({
+        kind: lrIsInjury(item) ? "Verletzung" : "Abwesenheit",
+        text: lrAbsenceText(item),
+        from: item.from,
+        to: item.to || "",
+        returned: Boolean(item.to && item.to >= from && item.to < asOf)
+      }))
+    : [];
+  if (includeHealth && player?.status === "Verletzt" && player.injuryUntil && player.injuryUntil >= from && !returns.some((item) => item.kind === "Verletzung" && item.to === player.injuryUntil)) {
+    returns.push({ kind: "Verletzung", text: "Verletzt (laut Spielerstatus)", from: "", to: player.injuryUntil, returned: player.injuryUntil < asOf });
+  }
+
+  const wellnessRows = rows.filter((row) => row.wellness);
+  return {
+    teamName,
+    playerName: String(player?.name || ""),
+    playerNumber: player?.number ?? "",
+    from,
+    to: asOf,
+    created: today,
+    createdBy,
+    includeHealth,
+    assessment: {
+      level: assessment.level,
+      tier: assessment.tier,
+      action: assessment.action,
+      reasons: assessment.reasons,
+      load: Math.round(assessment.load),
+      baseline: Math.round(assessment.baseline),
+      availability: includeHealth ? assessment.availability : null
+    },
+    weeks,
+    rows,
+    totals: {
+      sessions: rows.filter((row) => row.load !== null).length,
+      minutes: rows.reduce((sum, row) => sum + (row.minutes || 0), 0),
+      load: rows.reduce((sum, row) => sum + (row.load || 0), 0),
+      missed: rows.filter((row) => row.attendance === "gefehlt").length
+    },
+    hasSelfExertion: rows.some((row) => row.selfExertion !== null),
+    wellness: wellnessRows.length ? wellnessRows.map((row) => ({ date: row.date, ...row.wellness })) : null,
+    markers: { growth, returns, recovery }
+  };
+}
+
+function loadReportChartSvg(weeks) {
+  const width = 720;
+  const height = 220;
+  const left = 56;
+  const bottom = 34;
+  const top = 18;
+  const max = Math.max(1, ...weeks.map((week) => week.load));
+  const slot = (width - left - 12) / Math.max(1, weeks.length);
+  const barWidth = Math.min(48, slot * 0.6);
+  const y = (value) => top + (height - top - bottom) * (1 - value / max);
+  const grid = [0, 0.5, 1].map((share) => {
+    const value = Math.round(max * share);
+    return `<line x1="${left}" x2="${width - 12}" y1="${y(value)}" y2="${y(value)}" stroke="#e4dcde" /><text x="${left - 8}" y="${y(value) + 4}" text-anchor="end" font-size="11" fill="#70686b">${value}</text>`;
+  }).join("");
+  const bars = weeks.map((week, index) => {
+    const x = left + slot * index + (slot - barWidth) / 2;
+    const barTop = y(week.load);
+    return `<rect x="${x}" y="${barTop}" width="${barWidth}" height="${Math.max(0, height - bottom - barTop)}" rx="3" fill="#d8072e"><title>${lrDateText(week.from)}–${lrDateText(week.to)}: ${week.load}</title></rect>`
+      + `<text x="${x + barWidth / 2}" y="${height - bottom + 14}" text-anchor="middle" font-size="10" fill="#70686b">${lrDateText(week.from).slice(0, 6)}</text>`
+      + (week.load ? `<text x="${x + barWidth / 2}" y="${barTop - 4}" text-anchor="middle" font-size="10" fill="#241d1f">${week.load}</text>` : "");
+  }).join("");
+  return `<svg viewBox="0 0 ${width} ${height}" width="100%" role="img" aria-label="Belastung pro Woche">${grid}${bars}<text x="${left}" y="${height - 4}" font-size="10" fill="#70686b">Woche ab</text></svg>`;
+}
+
+function loadReportHtml(report, { logoUrl = "" } = {}) {
+  const e = escapeHtml;
+  const a = report.assessment;
+  const reasons = a.reasons.length ? a.reasons.map((reason) => `<li>${e(reason)}</li>`).join("") : "<li>Keine auffälligen Belastungsfaktoren</li>";
+  const selfHead = report.hasSelfExertion ? "<th>Eigene Angabe</th>" : "";
+  const rows = report.rows.map((row) => `<tr>
+      <td>${lrDateText(row.date)}</td>
+      <td>${e(row.type)}${row.title ? `<br><span class="muted">${e(row.title)}</span>` : ""}</td>
+      <td>${e(row.attendance)}${row.reason ? `<br><span class="muted">${e(row.reason)}</span>` : ""}</td>
+      <td>${row.minutes ?? "–"}</td>
+      <td>${row.exertion ?? "–"}</td>
+      ${report.hasSelfExertion ? `<td>${row.selfExertion ?? "–"}</td>` : ""}
+      <td>${row.load ?? "–"}</td>
+    </tr>`).join("");
+  const growth = report.markers.growth.length
+    ? report.markers.growth.map((item) => `<li>${lrDateText(item.from)} → ${lrDateText(item.to)}: ${lrNumber(item.fromHeight, 1)} → ${lrNumber(item.toHeight, 1)} cm (${lrNumber(item.perMonth, 1)} cm/Monat)${item.perMonth >= 1.2 ? " – starker Wachstumsschub" : item.perMonth >= 0.6 ? " – Wachstumsschub" : ""}</li>`).join("")
+    : "<li>Keine Messungen im Zeitraum.</li>";
+  const returns = report.includeHealth
+    ? `<h3>Verletzungen und Abwesenheiten</h3><ul>${report.markers.returns.length
+      ? report.markers.returns.map((item) => `<li><strong>${e(item.kind)}:</strong> ${e(item.text)} (${item.from ? lrDateText(item.from) : "?"} – ${item.to ? lrDateText(item.to) : "offen"})${item.returned ? ` · Rückkehr ab ${lrDateText(lrAddDays(item.to, 1))}` : ""}</li>`).join("")
+      : "<li>Keine Einträge im Zeitraum.</li>"}</ul>`
+    : "";
+  const recovery = report.markers.recovery.length ? report.markers.recovery.map((text) => `<li>${e(text)}</li>`).join("") : "<li>Keine Hinweise im Zeitraum.</li>";
+  const wellness = report.wellness
+    ? `<h2>Befinden (Selbsteinschätzung)</h2><table><thead><tr><th>Datum</th>${LOAD_REPORT_WELLNESS.map(([, label]) => `<th>${label}</th>`).join("")}</tr></thead><tbody>${report.wellness.map((item) => `<tr><td>${lrDateText(item.date)}</td>${LOAD_REPORT_WELLNESS.map(([key]) => `<td>${item[key] ?? "–"}</td>`).join("")}</tr>`).join("")}</tbody></table>`
+    : "";
+  const availability = a.availability
+    ? `<div class="card"><span>Verfügbarkeit</span><strong>${e(a.availability.label)}</strong>${a.availability.action ? `<small>${e(a.availability.action)}</small>` : ""}</div>`
+    : "";
+  return `<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Belastungsprotokoll ${e(report.playerName)}</title>
+<style>
+  body { margin: 28px; color: #241d1f; font-family: Arial, Helvetica, sans-serif; font-size: 13px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 4px solid #d8072e; padding-bottom: 14px; }
+  header img { width: 72px; height: 72px; object-fit: contain; }
+  h1 { margin: 0 0 4px; font-size: 26px; }
+  h2 { margin: 24px 0 8px; font-size: 16px; }
+  h3 { margin: 14px 0 6px; font-size: 13px; }
+  ul { margin: 4px 0; padding-left: 18px; }
+  .muted { color: #70686b; }
+  .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 4px 16px; margin-top: 12px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 10px; }
+  .card { border: 1px solid #e4dcde; border-radius: 8px; padding: 10px; }
+  .card span { display: block; color: #70686b; font-size: 11px; }
+  .card strong { display: block; margin-top: 4px; color: #a90624; font-size: 19px; }
+  .card small { display: block; margin-top: 4px; color: #70686b; }
+  table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 12px; }
+  th, td { border-bottom: 1px solid #e4dcde; padding: 6px; text-align: left; vertical-align: top; }
+  th { color: #70686b; text-transform: uppercase; font-size: 10px; }
+  tr { break-inside: avoid; }
+  .chart { border: 1px solid #e4dcde; border-radius: 8px; padding: 6px; }
+  footer { margin-top: 24px; padding: 10px 12px; border-radius: 8px; background: #fff7f9; color: #70686b; font-size: 11px; }
+  .table-wrap { overflow-x: auto; }
+  @media (max-width: 600px) { body { margin: 14px; } header img { width: 52px; height: 52px; } table { font-size: 11px; } th, td { padding: 4px 3px; } th { font-size: 9px; } }
+  @media print { body { margin: 14mm; } h2 { break-after: avoid; } }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <p class="muted">${e(report.teamName)} · Belastungsprotokoll</p>
+    <h1>${e(report.playerName)}</h1>
+    <div class="meta">
+      ${report.playerNumber !== "" ? `<span><span class="muted">Rückennummer:</span> ${e(report.playerNumber)}</span>` : ""}
+      <span><span class="muted">Zeitraum:</span> ${lrDateText(report.from)} – ${lrDateText(report.to)}</span>
+      <span><span class="muted">Erstellt am:</span> ${lrDateText(report.created)}</span>
+      <span><span class="muted">Erstellt von:</span> ${e(report.createdBy || "-")}</span>
+    </div>
+  </div>
+  ${logoUrl ? `<img src="${e(logoUrl)}" alt="Vereinslogo" />` : ""}
+</header>
+<h2>Zusammenfassung (Stand ${lrDateText(report.to)})</h2>
+<section class="cards">
+  <div class="card"><span>Stufe</span><strong>${e(a.level)}</strong><small>${e(a.action)}</small></div>
+  ${availability}
+  <div class="card"><span>Belastung letzte 7 Tage</span><strong>${a.load}</strong><small>Schnitt der 3 Wochen davor: ${a.baseline}</small></div>
+  <div class="card"><span>Im Zeitraum</span><strong>${report.totals.sessions} Einheiten</strong><small>${report.totals.minutes} Minuten · Belastung ${report.totals.load}${report.totals.missed ? ` · ${report.totals.missed}× gefehlt` : ""}</small></div>
+</section>
+<h3>Gründe für die Stufe</h3>
+<ul>${reasons}</ul>
+${report.includeHealth ? "" : `<p class="muted">Ohne Verletzungs- und Befindensdaten erstellt: Stufe ohne Verletzungen und Abwesenheiten gerechnet, Verfügbarkeit nicht angegeben.</p>`}
+<h2>Wochenverlauf</h2>
+<div class="chart">${report.weeks.some((week) => week.load > 0) ? loadReportChartSvg(report.weeks) : `<p class="muted">Keine Belastung im Zeitraum eingetragen.</p>`}</div>
+<h2>Termine im Zeitraum</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Datum</th><th>Art</th><th>Teilnahme</th><th>Minuten</th><th>Anstrengung<br>(Trainer)</th>${selfHead}<th>Belastung</th></tr></thead>
+  <tbody>${rows || `<tr><td colspan="${report.hasSelfExertion ? 7 : 6}">Keine Termine im Zeitraum.</td></tr>`}</tbody>
+</table>
+</div>
+<h2>Risikomarker im Zeitraum</h2>
+<h3>Wachstum</h3>
+<ul>${growth}</ul>
+${returns}
+<h3>Erholungs-Hinweise</h3>
+<ul>${recovery}</ul>
+${wellness}
+<footer>
+  <p>Belastung je Termin = Minuten × Anstrengung (0–10, angelehnt an die Borg-CR10-Skala). Die Werte beruhen auf Einschätzungen des Trainers${report.hasSelfExertion || report.wellness ? " und Selbsteinschätzungen des Spielers" : ""} und sind keine medizinische Diagnose.</p>
+  ${report.includeHealth ? "<p><strong>Vertraulich:</strong> Dieses Protokoll enthält Gesundheitsdaten eines Minderjährigen. Nur an die vorgesehene Stelle weitergeben, nicht öffentlich teilen und nach Gebrauch löschen.</p>" : "<p><strong>Vertraulich:</strong> Personenbezogene Daten eines Minderjährigen. Nur an die vorgesehene Stelle weitergeben.</p>"}
+</footer>
+</body>
+</html>`;
+}
+// --- LOAD-REPORT END ---
 
 function playerInjuryRisk(playerId) {
   return renderPassMemo("risk", playerId, () => computePlayerInjuryRisk(playerId));
@@ -4199,6 +4582,7 @@ function updateSelectedEventMeta(field, value) {
 
 function drawProfile() {
   const playerId = $("#profilePlayer").value || state.players[0]?.id;
+  syncLoadReportButton();
   const player = state.players.find((item) => item.id === playerId);
   const ratings = playerRatings(playerId).sort((a, b) => new Date(a.event.date) - new Date(b.event.date));
   renderProfileHeader(player, ratings);
@@ -4861,6 +5245,88 @@ function downloadProfilePdf() {
   report.document.close();
   report.focus();
   setTimeout(() => report.print(), 300);
+}
+
+// Belastungsprotokoll (SCRUM-139): Trainer (und der lokale Modus ohne Anmeldung) fuer jeden Spieler, ein
+// Spieler nur fuer sich selbst (PO-Entscheidung 20.10.2026). Eltern, Scout-/Medizin-Zugang und jede andere
+// Rolle nicht - deshalb eine Positivliste statt einer Sperrliste.
+function canCreateLoadReport(playerId) {
+  if (currentRole === null || currentRole === "trainer") return true;
+  return currentRole === "player" && Boolean(currentPlayerId) && playerId === currentPlayerId;
+}
+
+function loadReportAuthor(player) {
+  if (currentRole === "player") return `${player.name} (Spieler, selbst erstellt)`;
+  return currentUser?.email ? `Trainer (${currentUser.email})` : "Trainer";
+}
+
+function syncLoadReportButton() {
+  const button = $("#loadReportBtn");
+  if (!button) return;
+  const playerId = $("#profilePlayer")?.value || state.players[0]?.id;
+  button.hidden = !playerId || !canCreateLoadReport(playerId);
+}
+
+function syncLoadReportPeriod() {
+  const custom = $("#loadReportPeriod").value === "custom";
+  $("#loadReportCustom").hidden = !custom;
+  $("#loadReportError").textContent = "";
+}
+
+function openLoadReportDialog() {
+  const playerId = $("#profilePlayer").value || state.players[0]?.id;
+  const player = state.players.find((item) => item.id === playerId);
+  if (!player || !canCreateLoadReport(playerId)) return;
+  const today = localIsoDate();
+  $("#loadReportPlayerName").textContent = player.name;
+  $("#loadReportPeriod").value = "4";
+  $("#loadReportFrom").value = loadReportRange({ period: "4", today }).from;
+  $("#loadReportTo").value = today;
+  $("#loadReportFrom").max = today;
+  $("#loadReportTo").max = today;
+  $("#loadReportHealth").checked = true;
+  syncLoadReportPeriod();
+  $("#loadReportDialog").showModal();
+}
+
+function createLoadReport(event) {
+  event.preventDefault();
+  const playerId = $("#profilePlayer").value || state.players[0]?.id;
+  const player = state.players.find((item) => item.id === playerId);
+  if (!player || !canCreateLoadReport(playerId)) return;
+  const today = localIsoDate();
+  const range = loadReportRange({ period: $("#loadReportPeriod").value, from: $("#loadReportFrom").value, to: $("#loadReportTo").value, today });
+  if (range.error) {
+    $("#loadReportError").textContent = range.error;
+    return;
+  }
+  if (!confirmDespiteRevokedConsent([player], "Belastungsprotokoll erstellen")) return;
+  const report = buildLoadReport({
+    player,
+    playerId,
+    events: state.events,
+    absences: state.absences?.[playerId] || [],
+    measurements: playerMeasurements(playerId),
+    includeHealth: $("#loadReportHealth").checked,
+    from: range.from,
+    to: range.to,
+    today,
+    teamName: window.TEAMKOMPASS_CONFIG?.teamName || "TeamKompass",
+    createdBy: loadReportAuthor(player)
+  });
+  const html = loadReportHtml(report, { logoUrl: new URL("./assets/club-logo.png", window.location.href).href });
+  const reportWindow = window.open("", "_blank");
+  if (!reportWindow) {
+    $("#loadReportError").textContent = "Das neue Fenster wurde blockiert. Bitte Pop-ups für diese Seite erlauben.";
+    return;
+  }
+  // Wie beim Profil-PDF: der Bericht darf nicht auf die App zurueckgreifen (SCRUM-62).
+  reportWindow.opener = null;
+  reportWindow.document.write(html);
+  reportWindow.document.close();
+  reportWindow.focus();
+  $("#loadReportDialog").close();
+  setTimeout(() => reportWindow.print(), 300);
 }
 
 function profilePerformanceSvg(ratings) {
@@ -5723,6 +6189,11 @@ on("#profilePlayer", "change", () => {
   drawProfile();
 });
 on("#profilePdfBtn", "click", downloadProfilePdf);
+on("#loadReportBtn", "click", openLoadReportDialog);
+on("#loadReportPeriod", "change", syncLoadReportPeriod);
+on("#loadReportForm", "submit", createLoadReport);
+on("#closeLoadReportBtn", "click", () => $("#loadReportDialog").close());
+on("#cancelLoadReportBtn", "click", () => $("#loadReportDialog").close());
 on("#developmentPlanForm", "submit", saveDevelopmentPlan);
 on("#cancelDevelopmentPlanBtn", "click", resetDevelopmentPlanForm);
 on("#absenceForm", "submit", saveAbsence);
