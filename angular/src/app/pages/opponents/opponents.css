@@ -178,3 +178,4 @@ summary {
     min-height: var(--tk-touch);
   }
 }
+.games { margin: 6px 0 0; padding-left: 18px; }

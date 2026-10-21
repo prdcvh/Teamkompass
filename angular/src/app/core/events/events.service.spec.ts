@@ -3,6 +3,8 @@ import { emptyDraft } from './event';
 import { EventsService } from './events.service';
 import { SessionService } from '../auth/session.service';
 import { SquadService } from '../player/squad.service';
+import { seasonStartIso } from '../shared/season';
+import { todayIso } from '../shared/dates';
 import { SyncService } from '../shell/sync.service';
 import { FakeFirebase, provideFakeFirebase } from '../testing/fake-firebase';
 
@@ -28,6 +30,65 @@ describe('EventsService', () => {
     firebase.events.events.set('e2', { type: 'Spiel', title: 'Derby', date: '2026-10-10' });
     firebase.events.emitEvents();
     expect(events.events()).toHaveLength(2);
+  });
+
+  describe('nur die laufende Saison (SCRUM-199)', () => {
+    const season = seasonStartIso();
+
+    function setupSeasons() {
+      const events = setup();
+      firebase.events.events.clear();
+      firebase.events.filterByDate = true;
+      firebase.events.events.set('alt', { type: 'Training', title: 'Training Vorsaison', date: '2000-05-10' });
+      firebase.events.events.set('neu', { type: 'Training', title: 'Training heute', date: todayIso() });
+      return events;
+    }
+
+    it('abonniert standardmäßig nur Events ab Saisonbeginn (Abfrage mit Datumsfilter)', async () => {
+      const events = setupSeasons();
+      events.start();
+      await vi.waitFor(() => expect(events.load()).toBe('ready'));
+      expect(firebase.events.lastFromDate).toBe(season);
+      expect(firebase.calls).toContain(`watchEvents:from:${season}`);
+      expect(events.events().map((e) => e.title)).toEqual(['Training heute']);
+    });
+
+    it('lädt ältere Saisons auf Wunsch nach, ohne die Liste zu leeren, und geht wieder zurück', async () => {
+      const events = setupSeasons();
+      events.start();
+      await vi.waitFor(() => expect(events.load()).toBe('ready'));
+      events.showAllSeasons();
+      await vi.waitFor(() => expect(events.load()).toBe('ready'));
+      expect(firebase.events.lastFromDate).toBeNull();
+      expect(events.events()).toHaveLength(2);
+      expect(firebase.events.eventWatchers).toBe(1);
+      events.showCurrentSeason();
+      await vi.waitFor(() => expect(events.load()).toBe('ready'));
+      expect(events.events().map((e) => e.title)).toEqual(['Training heute']);
+      expect(firebase.events.eventWatchers).toBe(1);
+    });
+
+    it('merkt sich „alle Saisons“ auch vor dem Start (Export) und setzt es beim Abmelden zurück', async () => {
+      const events = setupSeasons();
+      events.showAllSeasons();
+      events.start();
+      await vi.waitFor(() => expect(events.load()).toBe('ready'));
+      expect(firebase.events.lastFromDate).toBeNull();
+      expect(events.events()).toHaveLength(2);
+      TestBed.inject(SessionService).role.set(null);
+      TestBed.tick();
+      expect(events.scope()).toBe('season');
+      expect(events.events()).toEqual([]);
+    });
+
+    it('lädt alle Saisons, wenn ein Event vor Saisonbeginn gespeichert wird (sonst verschwände es sofort)', async () => {
+      const events = setupSeasons();
+      events.start();
+      await vi.waitFor(() => expect(events.load()).toBe('ready'));
+      events.save(draft({ date: '2000-01-01', title: 'Nachtrag' }));
+      expect(events.scope()).toBe('all');
+      await vi.waitFor(() => expect(events.events().some((e) => e.title === 'Nachtrag')).toBe(true));
+    });
   });
 
   it('startet nur ein Abo, auch bei mehrfachem Aufruf', async () => {

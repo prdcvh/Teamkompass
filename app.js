@@ -2105,14 +2105,16 @@ function drawPositionCoverageChart() {
   drawBarChart($("#positionCoverageChart"), rows, "Positionsabdeckung", chartPalette().green);
 }
 
+// SCRUM-163: nur bereits stattgefundene Trainings (Datum heute oder frueher) zaehlen.
 function trainingFocusCounts() {
   const counts = {
     "Eigener Ballbesitz": 0,
     "Gegnerischer Ballbesitz": 0,
     Umschalten: 0
   };
+  const today = localIsoDate();
   state.events
-    .filter((event) => event.type === "Training")
+    .filter((event) => event.type === "Training" && event.date <= today)
     .forEach((event) => {
       const focus = event.trainingFocus || "Eigener Ballbesitz";
       counts[focus] = (counts[focus] || 0) + 1;

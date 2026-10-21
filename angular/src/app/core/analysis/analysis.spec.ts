@@ -119,7 +119,17 @@ describe('Teamanalyse', () => {
       event('c', { trainingFocus: 'Umschalten' }),
       event('d', { type: 'Spiel', trainingFocus: '' }),
     ];
-    expect(trainingFocusCounts(events)).toEqual({ 'Eigener Ballbesitz': 2, 'Gegnerischer Ballbesitz': 0, Umschalten: 1 });
+    expect(trainingFocusCounts(events, '2026-10-01')).toEqual({ 'Eigener Ballbesitz': 2, 'Gegnerischer Ballbesitz': 0, Umschalten: 1 });
+  });
+
+  it('Trainingsfokus: vergangene und heutige Trainings zählen, kommende nicht (SCRUM-163)', () => {
+    const events = [
+      event('vorgestern', { date: '2026-09-29', trainingFocus: 'Umschalten' }),
+      event('heute', { date: '2026-10-01', trainingFocus: '' }),
+      event('morgen', { date: '2026-10-02' }),
+      event('spiel-vergangen', { type: 'Spiel', date: '2026-09-28', trainingFocus: '' }),
+    ];
+    expect(trainingFocusCounts(events, '2026-10-01')).toEqual({ 'Eigener Ballbesitz': 1, 'Gegnerischer Ballbesitz': 0, Umschalten: 1 });
   });
 
   it('Teamverlauf: nur Events mit Note, älteste zuerst, Typ bleibt erhalten', () => {

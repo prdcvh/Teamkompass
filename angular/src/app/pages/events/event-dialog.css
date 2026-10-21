@@ -188,3 +188,7 @@ dd {
     max-height: 78vh;
   }
 }
+
+.opponent-plan { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--tk-line, rgba(128, 128, 128, 0.3)); }
+.opponent-plan h3 { margin: 0 0 4px; font-size: 1rem; }
+.plan-meta { margin: 0 0 8px; opacity: 0.8; font-size: 0.9rem; }

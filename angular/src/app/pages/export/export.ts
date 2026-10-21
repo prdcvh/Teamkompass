@@ -1,6 +1,7 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { environment } from '../../../environments/environment';
 import { type Backup, MAX_BACKUP_BYTES, type CurrentIds, backupOperations, overwriteCount, parseBackup, summarizeBackup, summaryLines, validateBackup } from '../../core/export/backup-import';
+import { EventsService } from '../../core/events/events.service';
 import { buildExport, exportFileName, revokedPlayers } from '../../core/export/export';
 import { BackupApi } from '../../core/firebase/backup.api';
 import { FileOutput } from '../../core/export/file-output';
@@ -38,8 +39,9 @@ interface PendingImport {
   styleUrl: './export.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class Export implements OnInit {
+export class Export implements OnInit, OnDestroy {
   private readonly team = inject(TeamService);
+  private readonly eventsService = inject(EventsService);
   private readonly opponents = inject(OpponentsService);
   private readonly playerRecordsApi = inject(PlayerRecordsApi);
   private readonly files = inject(FileOutput);
@@ -73,9 +75,15 @@ export class Export implements OnInit {
 
   ngOnInit(): void {
     if (this.isTrainer()) {
+      // Sicherung und Export enthalten alle Saisons, nicht nur die laufende (SCRUM-199).
+      this.eventsService.showAllSeasons();
       this.team.start();
       this.opponents.start();
     }
+  }
+
+  ngOnDestroy(): void {
+    if (this.isTrainer()) this.eventsService.showCurrentSeason();
   }
 
   protected retry(): void {

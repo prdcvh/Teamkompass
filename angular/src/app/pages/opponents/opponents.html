@@ -54,6 +54,9 @@
                   <div class="who">
                     <span class="badge">{{ opponent.style }}</span>
                     <strong>{{ opponent.name }}</strong>
+                    @if (records().get(opponent.id); as record) {
+                      <small>{{ recordText(record) }}</small>
+                    }
                     <small>@if (opponent.formation) { Formation {{ opponent.formation }} · }aktualisiert {{ formatDate(opponent.updatedAt) }}</small>
                   </div>
                   <div class="actions">
@@ -62,7 +65,7 @@
                   </div>
                 </div>
                 @if (detailsOf(opponent); as details) {
-                  @if (details.length > 0) {
+                  @if (details.length > 0 || (records().get(opponent.id)?.games?.length ?? 0) > 0) {
                     <details>
                       <summary>Details anzeigen</summary>
                       <div class="detail-grid">
@@ -71,6 +74,18 @@
                             <span>{{ detail.label }}</span>
                             <p>{{ detail.value }}</p>
                           </section>
+                        }
+                        @if (records().get(opponent.id); as record) {
+                          @if (record.games.length > 0) {
+                            <section>
+                              <span>Bisherige Spiele</span>
+                              <ul class="games">
+                                @for (game of record.games; track game.eventId) {
+                                  <li>{{ formatDate(game.date) }} · {{ game.goalsFor }}:{{ game.goalsAgainst }} ({{ game.outcome }})</li>
+                                }
+                              </ul>
+                            </section>
+                          }
                         }
                       </div>
                     </details>

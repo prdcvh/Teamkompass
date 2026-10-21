@@ -338,6 +338,7 @@
                   <button class="ghost-button danger" id="deleteEventBtn" type="button">Event löschen</button>
                 </div>
               </div>
+              <div class="event-lineup" id="eventOpponentPlan" hidden></div>
               <div class="event-lineup" id="eventLineup" hidden></div>
               <div class="rating-toolbar">
                 <label>
@@ -775,13 +776,14 @@
               <option value="Umschalten">Umschalten</option>
             </select>
           </label>
+          <label>Gegnerprofil <select id="eventOpponentSelect"><option value="">Kein Profil (Freitext)</option></select></label>
           <label>Gegner <input id="eventOpponent" maxlength="50" placeholder="nur bei Spielen" /></label>
           <label>Spieldauer <input id="eventMatchDuration" type="number" min="1" max="150" value="90" /></label>
           <label>Dauer (Min.) <input id="eventTrainingDuration" type="number" min="1" max="300" value="90" /></label>
           <label>Eigene Tore <input id="eventGoalsFor" type="number" min="0" max="99" /></label>
           <label>Gegentore <input id="eventGoalsAgainst" type="number" min="0" max="99" /></label>
         </div>
-        <label>Notiz <textarea id="eventNotes" rows="3" placeholder="Schwerpunkt, Ergebnis, Belastung, Besonderheiten"></textarea></label>
+        <label>Notiz <textarea id="eventNotes" rows="3" placeholder="Schwerpunkt, Ergebnis, Belastung, Besonderheiten" aria-describedby="eventNotesHint"></textarea><small class="muted field-hint" id="eventNotesHint">Für alle Teammitglieder sichtbar (Spieler, Eltern, Medizin-Zugang) – bitte keine Gesundheitsangaben (z. B. Verletzungen, Krankheiten) eintragen. Dafür gibt es Abwesenheiten und die „Interne Notiz (nur Trainer)“ bei der Bewertung.</small></label>
         <menu>
           <button class="ghost-button" type="button" id="cancelEventDialogBtn">Abbrechen</button>
           <button class="primary-button" type="submit" id="eventSubmitBtn">Event speichern</button>
