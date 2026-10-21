@@ -62,6 +62,14 @@ export interface InjuryRisk {
   readonly availability: LoadAvailability;
 }
 
+/**
+ * Wie weit die Belastungsampel zurückschaut: Messungen der letzten 90 Tage, beendete Verletzungen bis 21 Tage zurück.
+ * Die Übersichten laden Abwesenheiten/Messwerte nur in diesem Fenster (SCRUM-200) – wer die Werte ändert, ändert
+ * damit auch die Abfragen.
+ */
+export const MEASUREMENT_WINDOW_DAYS = 90;
+export const ABSENCE_LOOKBACK_DAYS = 21;
+
 const localMidnight = (iso: string) => new Date(`${iso}T00:00:00`);
 const daysBetween = (earlier: Date, later: Date) => (later.getTime() - earlier.getTime()) / 86400000;
 
@@ -129,7 +137,7 @@ export function injuryRisk(
   }
 
   // Wachstumsschub aus den letzten beiden Körpermessungen – nur Messungen der letzten ca. 3 Monate (90 Tage) zählen (SCRUM-157).
-  const sorted = sortedMeasurements(measurements).filter((item) => daysBetween(localMidnight(item.date), today) <= 90);
+  const sorted = sortedMeasurements(measurements).filter((item) => daysBetween(localMidnight(item.date), today) <= MEASUREMENT_WINDOW_DAYS);
   if (sorted.length >= 2) {
     const [prev, last] = sorted.slice(-2);
     const months = daysBetween(localMidnight(prev.date), localMidnight(last.date)) / 30;
@@ -145,7 +153,7 @@ export function injuryRisk(
   const lastInjuryEnd = endedInjuries.sort().at(-1);
   if (lastInjuryEnd) {
     const daysSinceReturn = daysBetween(localMidnight(lastInjuryEnd), today);
-    if (daysSinceReturn >= 0 && daysSinceReturn <= 21) hints.push({ label: 'Rückkehr nach Verletzung', weight: 1 });
+    if (daysSinceReturn >= 0 && daysSinceReturn <= ABSENCE_LOOKBACK_DAYS) hints.push({ label: 'Rückkehr nach Verletzung', weight: 1 });
   }
   // Abwesenheiten ohne Verletzung (Urlaub, Klassenfahrt) wiegen beim Wiedereinstieg leichter: nur ein Hinweistext.
   const lastEndedAbsence = absences

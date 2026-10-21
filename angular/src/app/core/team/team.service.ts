@@ -4,10 +4,11 @@ import { EventsService } from '../events/events.service';
 import { PlayerRecordsApi } from '../firebase/player-records.api';
 import { RatingsApi } from '../firebase/ratings.api';
 import type { RawDoc, SnapshotMeta } from '../firebase/types';
-import { todayIso } from '../shared/dates';
+import { addDays, todayIso } from '../shared/dates';
 import { type Rating, ratingFromDoc } from '../ratings/rating';
-import { type Absence, absenceFromDoc } from '../records/absence';
+import { MEASUREMENT_WINDOW_DAYS } from '../analysis/risk';
 import { type Measurement, measurementFromDoc } from '../records/measurement';
+import { SquadAbsencesService } from '../records/squad-absences.service';
 import { SessionService } from '../auth/session.service';
 import { SquadService } from '../player/squad.service';
 import { SyncService } from '../shell/sync.service';
@@ -17,6 +18,10 @@ import { type PlayerData, type RatingsByEvent, itemsFor } from './team';
  * Daten für die Teamauswertung (Start-Dashboard): Bewertungen aller Spieler je Event sowie Abwesenheiten und
  * Messwerte je Spieler. Nur der Trainer darf all das lesen. Die Abos folgen Kader und Eventliste (neue
  * Spieler/Events werden abonniert, entfernte beendet); beim Abmelden werden Abos und Daten sofort verworfen.
+ *
+ * Abwesenheiten und Messwerte sind hier nur das Fenster, das die Übersichten brauchen (SCRUM-200): aktuelle
+ * Abwesenheiten kommen vom {@link SquadAbsencesService} (ein gemeinsames Abo mit der Kaderliste), Messwerte der letzten
+ * {@link MEASUREMENT_WINDOW_DAYS} Tage von hier. Die volle Historie liest das Spielerprofil bzw. der Export.
  */
 @Injectable({ providedIn: 'root' })
 export class TeamService {
@@ -26,20 +31,21 @@ export class TeamService {
   private readonly sync = inject(SyncService);
   private readonly squad = inject(SquadService);
   private readonly eventsService = inject(EventsService);
+  private readonly squadAbsences = inject(SquadAbsencesService);
 
   readonly active = signal(false);
   readonly events = computed(() => this.eventsService.events());
   /** Bewertungen aller Spieler je Event (nur lesen). */
   readonly ratingsByEvent = computed<RatingsByEvent>(() => this.ratings());
-  readonly error = signal('');
+  private readonly ownError = signal('');
+  readonly error = computed(() => this.ownError() || (this.active() && this.squadAbsences.error() ? this.message(this.squadAbsences.error()) : ''));
   private readonly ratings = signal<RatingsByEvent>(new Map());
-  private readonly absences = signal<ReadonlyMap<string, readonly Absence[]>>(new Map());
   private readonly measurements = signal<ReadonlyMap<string, readonly Measurement[]>>(new Map());
   /** Abos, auf deren erste Antwort noch gewartet wird. */
   private readonly waiting = signal(0);
 
   readonly loading = computed(
-    () => this.active() && !this.error() && (this.squad.load() !== 'ready' || this.eventsService.load() !== 'ready' || this.waiting() > 0),
+    () => this.active() && !this.error() && (this.squad.load() !== 'ready' || this.eventsService.load() !== 'ready' || this.waiting() > 0 || this.squadAbsences.waiting() > 0),
   );
   readonly ready = computed(() => this.active() && !this.loading() && !this.error() && this.squad.load() === 'ready');
   /** Je Spieler: alle Events mit seiner Bewertung, Abwesenheiten, Messwerte. */
@@ -47,7 +53,7 @@ export class TeamService {
     this.squad.players().map((player) => ({
       player,
       items: itemsFor(player.id, this.eventsService.events(), this.ratings()),
-      absences: this.absences().get(player.id) ?? [],
+      absences: this.squadAbsences.byPlayer().get(player.id) ?? [],
       measurements: this.measurements().get(player.id) ?? [],
     })),
   );
@@ -61,7 +67,7 @@ export class TeamService {
     effect(() => {
       const wanted = [
         ...this.eventsService.events().map((event) => `r:${event.id}`),
-        ...this.squad.players().flatMap((player) => [`a:${player.id}`, `m:${player.id}`]),
+        ...this.squad.players().flatMap((player) => [`m:${player.id}`]),
       ];
       if (this.active()) untracked(() => this.reconcile(wanted));
     });
@@ -77,6 +83,7 @@ export class TeamService {
     this.active.set(true);
     this.squad.start();
     this.eventsService.start();
+    this.squadAbsences.start();
   }
 
   stop(): void {
@@ -87,14 +94,14 @@ export class TeamService {
     this.pending.clear();
     this.active.set(false);
     this.ratings.set(new Map());
-    this.absences.set(new Map());
     this.measurements.set(new Map());
     this.waiting.set(0);
-    this.error.set('');
+    this.ownError.set('');
   }
 
   retry(): void {
     this.stop();
+    this.squadAbsences.retry();
     this.start();
   }
 
@@ -120,20 +127,18 @@ export class TeamService {
     this.pending.delete(key);
     const id = key.slice(2);
     if (key.startsWith('r:')) this.ratings.update((map) => without(map, id));
-    else if (key.startsWith('a:')) this.absences.update((map) => without(map, id));
     else this.measurements.update((map) => without(map, id));
   }
 
   private open(key: string, generation: number): void {
     const id = key.slice(2);
     const today = todayIso();
+    const since = addDays(today, -MEASUREMENT_WINDOW_DAYS);
     const onData = (docs: RawDoc[], meta: SnapshotMeta) => {
       if (generation !== this.generation) return;
       if (key.startsWith('r:')) {
         const byPlayer = new Map<string, Rating>(docs.map((entry) => [entry.id, ratingFromDoc(entry.data)]));
         this.ratings.update((map) => new Map(map).set(id, byPlayer));
-      } else if (key.startsWith('a:')) {
-        this.absences.update((map) => new Map(map).set(id, docs.map((entry) => absenceFromDoc(entry.id, entry.data))));
       } else {
         this.measurements.update((map) => new Map(map).set(id, docs.map((entry) => measurementFromDoc(entry.id, entry.data, today))));
       }
@@ -147,11 +152,11 @@ export class TeamService {
     const subscribe =
       key.startsWith('r:')
         ? this.ratingsApi.watchRatings(id, onData, onError)
-        : this.playerRecordsApi.watchPlayerRecords(id, key.startsWith('a:') ? 'absences' : 'measurements', onData, onError);
+        : this.playerRecordsApi.watchRecentMeasurements(id, since, onData, onError);
     subscribe
       .then((unsubscribe) => {
         this.opening.delete(key);
-        if (generation !== this.generation || this.error()) unsubscribe();
+        if (generation !== this.generation || this.ownError()) unsubscribe();
         else this.unsubscribers.set(key, unsubscribe);
       })
       .catch((error) => {
@@ -162,8 +167,12 @@ export class TeamService {
 
   private fail(error: unknown): void {
     console.error(error);
-    this.error.set(`Die Teamauswertung konnte nicht geladen werden. ${authErrorMessage(errorCode(error))}`);
+    this.ownError.set(this.message(error));
     this.sync.fail('Laden fehlgeschlagen');
+  }
+
+  private message(error: unknown): string {
+    return `Die Teamauswertung konnte nicht geladen werden. ${authErrorMessage(errorCode(error))}`;
   }
 }
 

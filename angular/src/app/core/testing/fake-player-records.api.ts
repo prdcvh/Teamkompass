@@ -16,7 +16,12 @@ export class FakePlayerRecordsApi implements Pick<PlayerRecordsApi, keyof Player
 
   private emitRecords(key: string): void {
     const docs = [...(this.playerRecords.get(key) ?? new Map())].map(([id, data]) => ({ id, data }));
-    this.recordListeners.get(key)?.onData(docs, { fromCache: false, hasPendingWrites: false });
+    for (const listenerKey of [key, `${key}#recent`]) {
+      const listener = this.recordListeners.get(listenerKey);
+      if (!listener) continue;
+      if (listenerKey === key) this.docsDelivered += docs.length;
+      listener.onData(docs, { fromCache: false, hasPendingWrites: false });
+    }
   }
 
   async watchPlayerRecords(
@@ -39,6 +44,44 @@ export class FakePlayerRecordsApi implements Pick<PlayerRecordsApi, keyof Player
     };
   }
 
+  /** Wie viele Dokumente die Abos bisher ausgeliefert haben (Firestore rechnet jedes ausgelieferte Dokument als Lesezugriff). */
+  docsDelivered = 0;
+
+  async watchRecentAbsences(playerId: string, since: string, onData: (docs: RawDoc[], meta: SnapshotMeta) => void, onError: (error: unknown) => void): Promise<() => void> {
+    this.calls.push(`watchRecentAbsences:${playerId}`);
+    // Spiegelt die Abfrage or(to >= since, to == ''): Einträge ohne Feld `to` kommen nicht vor.
+    return this.watchFiltered(playerId, 'absences', (data) => typeof data['to'] === 'string' && (data['to'] === '' || data['to'] >= since), onData, onError);
+  }
+
+  async watchRecentMeasurements(playerId: string, since: string, onData: (docs: RawDoc[], meta: SnapshotMeta) => void, onError: (error: unknown) => void): Promise<() => void> {
+    this.calls.push(`watchRecentMeasurements:${playerId}`);
+    return this.watchFiltered(playerId, 'measurements', (data) => typeof data['date'] === 'string' && data['date'] >= since, onData, onError);
+  }
+
+  private async watchFiltered(
+    playerId: string,
+    name: string,
+    keep: (data: Record<string, unknown>) => boolean,
+    onData: (docs: RawDoc[], meta: SnapshotMeta) => void,
+    onError: (error: unknown) => void,
+  ): Promise<() => void> {
+    if (this.watchPlayerRecordsError) throw this.watchPlayerRecordsError;
+    this.recordWatchers += 1;
+    const key = `${playerId}/${name}`;
+    const listenerKey = `${key}#recent`;
+    const emit = (docs: RawDoc[], meta: SnapshotMeta) => {
+      const kept = docs.filter((entry) => keep(entry.data));
+      this.docsDelivered += kept.length;
+      onData(kept, meta);
+    };
+    this.recordListeners.set(listenerKey, { onData: emit, onError });
+    this.emitRecords(key);
+    return () => {
+      this.recordWatchers -= 1;
+      this.recordListeners.delete(listenerKey);
+    };
+  }
+
   readPlayerRecordsError: unknown = null;
 
   async readPlayerRecords(playerId: string, name: string): Promise<RawDoc[]> {
@@ -49,6 +92,7 @@ export class FakePlayerRecordsApi implements Pick<PlayerRecordsApi, keyof Player
 
   failPlayerRecords(playerId: string, name: string, error: unknown): void {
     this.recordListeners.get(`${playerId}/${name}`)?.onError(error);
+    this.recordListeners.get(`${playerId}/${name}#recent`)?.onError(error);
   }
 
   async savePlayerRecord(playerId: string, name: string, id: string, data: Readonly<Record<string, unknown>>): Promise<void> {
