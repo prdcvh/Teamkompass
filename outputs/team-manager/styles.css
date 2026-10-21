@@ -2259,9 +2259,3 @@ menu {
 .event-card .rsvp-counts {
   font-size: 0.8rem;
 }
-
-@media (max-width: 560px) {
-  .rsvp-item {
-    grid-template-columns: 1fr;
-  }
-}

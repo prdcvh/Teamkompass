@@ -1375,10 +1375,9 @@ function startCloudSync() {
       syncPrivateNoteListeners(eventIds);
       syncResponseListeners(rsvpListenerEventIds(cloudCache.events, localIsoDate(), RSVP_TRAINER_LOOKBACK_DAYS));
     }
-    else if (["player", "parent"].includes(currentRole) && currentPlayerId) {
-      syncPlayerRatingListeners(eventIds);
-      syncResponseListeners(rsvpListenerEventIds(cloudCache.events, localIsoDate(), 0));
-    }
+    else if (["player", "parent"].includes(currentRole) && currentPlayerId) syncPlayerRatingListeners(eventIds);
+    // Spieler/Eltern: nur die eigene Rueckmeldung zu kommenden Terminen (SCRUM-175).
+    if (["player", "parent"].includes(currentRole) && currentPlayerId) syncResponseListeners(rsvpListenerEventIds(cloudCache.events, localIsoDate(), 0));
     rebuildStateFromCloudCache();
     cloudListenerRecovered("events");
   }, (error) => cloudListenerFailed("events", error)));
@@ -4532,39 +4531,6 @@ function eventCardsHtml(events) {
   }).join("");
 }
 
-// Zu-/Absagen gibt es nur im Rollen-Modus mit Anmeldung (dort koennen Spieler/Eltern antworten).
-function showsRsvp() {
-  return isCloudTrainer();
-}
-
-function rsvpCountsText(counts) {
-  return `${counts.yes} zugesagt · ${counts.no} abgesagt · ${counts.open} offen`;
-}
-
-function rsvpBadgeHtml(event, playerId) {
-  if (!showsRsvp()) return "";
-  const status = rsvpStatus(event, playerId);
-  if (status === "open") return `<span class="rsvp-badge rsvp-open">Keine Rückmeldung</span>`;
-  const response = event.responses[playerId];
-  const reason = status === "no" ? rsvpReason(response.reason) : "";
-  const label = status === "yes" ? "Zugesagt" : "Abgesagt";
-  const by = response.by === "parent" ? " (Eltern)" : "";
-  return `<span class="rsvp-badge rsvp-${status}">${label}${by}${reason ? `: ${escapeHtml(reason)}` : ""}</span>`;
-}
-
-function renderRsvpSummary(event) {
-  const box = $("#eventRsvpSummary");
-  if (!box) return;
-  if (!event || !showsRsvp()) {
-    box.hidden = true;
-    box.innerHTML = "";
-    return;
-  }
-  const counts = rsvpCounts(event, state.players);
-  box.hidden = false;
-  box.innerHTML = `<strong>Rückmeldungen:</strong> <span class="rsvp-badge rsvp-yes">${counts.yes} zugesagt</span> <span class="rsvp-badge rsvp-no">${counts.no} abgesagt</span> <span class="rsvp-badge rsvp-open">${counts.open} offen</span>`;
-}
-
 function renderEvents() {
   syncEventSelect();
   const events = filteredEvents();
@@ -5140,6 +5106,39 @@ function deleteDevelopmentPlan(planId) {
   persist();
   cloudDeleteDevelopmentPlan(playerId, planId);
   drawProfile();
+}
+
+// Zu-/Absagen gibt es nur im Rollen-Modus mit Anmeldung (dort koennen Spieler/Eltern antworten).
+function showsRsvp() {
+  return isCloudTrainer();
+}
+
+function rsvpCountsText(counts) {
+  return `${counts.yes} zugesagt · ${counts.no} abgesagt · ${counts.open} offen`;
+}
+
+function rsvpBadgeHtml(event, playerId) {
+  if (!showsRsvp()) return "";
+  const status = rsvpStatus(event, playerId);
+  if (status === "open") return `<span class="rsvp-badge rsvp-open">Offen</span>`;
+  const response = event.responses[playerId];
+  const reason = status === "no" ? rsvpReason(response.reason) : "";
+  const label = status === "yes" ? "Zugesagt" : "Abgesagt";
+  const by = response.by === "parent" ? " (Eltern)" : "";
+  return `<span class="rsvp-badge rsvp-${status}">${label}${by}${reason ? `: ${escapeHtml(reason)}` : ""}</span>`;
+}
+
+function renderRsvpSummary(event) {
+  const box = $("#eventRsvpSummary");
+  if (!box) return;
+  if (!event || !showsRsvp()) {
+    box.hidden = true;
+    box.innerHTML = "";
+    return;
+  }
+  const counts = rsvpCounts(event, state.players);
+  box.hidden = false;
+  box.innerHTML = `<strong>Rückmeldungen:</strong> <span class="rsvp-badge rsvp-yes">${counts.yes} zugesagt</span> <span class="rsvp-badge rsvp-no">${counts.no} abgesagt</span> <span class="rsvp-badge rsvp-open">${counts.open} offen</span>`;
 }
 
 // Zu-/Absagen fuer Spieler und Eltern (SCRUM-175): naechste Termine mit Zusagen/Absagen und optionalem Grund.
