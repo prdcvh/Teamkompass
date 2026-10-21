@@ -2177,3 +2177,91 @@ menu {
   display: grid;
   gap: 2px;
 }
+
+/* Zu-/Absagen (SCRUM-175): Spieler/Eltern sehen die naechsten Termine, der Trainer die Rueckmeldungen. */
+.rsvp-panel {
+  margin-bottom: 18px;
+}
+
+.rsvp-list {
+  display: grid;
+  gap: 12px;
+}
+
+.rsvp-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px 14px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.rsvp-info {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rsvp-form {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+}
+
+.rsvp-form label {
+  display: grid;
+  gap: 4px;
+  font-size: 0.85rem;
+}
+
+.rsvp-form .button-row button {
+  min-height: 44px;
+}
+
+.rsvp-form button[aria-pressed="true"] {
+  outline: 3px solid currentColor;
+  outline-offset: 2px;
+}
+
+.rsvp-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 0;
+}
+
+.player-cell {
+  flex-wrap: wrap;
+}
+
+.rsvp-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: var(--ink);
+  background: var(--soft-amber);
+  font-size: 0.78rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.rsvp-badge.rsvp-yes {
+  background: var(--soft-green);
+}
+
+.rsvp-badge.rsvp-no {
+  background: var(--soft-danger);
+}
+
+.event-card .rsvp-counts {
+  font-size: 0.8rem;
+}
+
+@media (max-width: 560px) {
+  .rsvp-item {
+    grid-template-columns: 1fr;
+  }
+}

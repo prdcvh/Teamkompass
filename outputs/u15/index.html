@@ -332,6 +332,7 @@
                 <div>
                   <h2 id="eventEditorTitle">Event bewerten</h2>
                   <span class="muted" id="eventEditorMeta">Training oder Spiel auswählen</span>
+                  <p class="rsvp-summary" id="eventRsvpSummary" hidden></p>
                 </div>
                 <div class="button-row">
                   <button class="ghost-button" id="editEventBtn" type="button">Event bearbeiten</button>
@@ -409,6 +410,13 @@
         </section>
 
         <section class="view" id="profilesView">
+          <section class="panel rsvp-panel" id="rsvpPanel" hidden>
+            <div class="panel-head">
+              <h2>Nächste Termine</h2>
+              <span class="muted">Bitte zu- oder absagen</span>
+            </div>
+            <div class="rsvp-list" id="rsvpList"></div>
+          </section>
           <div class="profile-layout">
             <section class="panel profile-summary">
               <div class="panel-head">

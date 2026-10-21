@@ -19,3 +19,8 @@ Mitgliedschaften, Einladungen), inklusive der Listenabfragen mit `playerId`-Filt
 
 `invite-claim.test.mjs`: Einmalverbrauch von Einladungscodes (SCRUM-77) – gültiger Erst-Claim, zweiter Claim,
 fehlender/abgelaufener Code, falscher Spieler/Rolle, parallele Claims und die unveränderten Trainer-Wege.
+
+`rsvp.test.mjs`: Zu-/Absagen (SCRUM-175) unter `events/{eventId}/responses/{playerId}` – Spieler und Eltern
+antworten nur für den eigenen Spieler, nur mit erlaubten Feldern (Zusage/Absage, Grund bis 200 Zeichen nur bei
+Absage, eigene Rolle, Server-Zeitstempel) und nur für bestehende Events; lesen dürfen nur Trainer und der eigene
+Spieler bzw. die eigenen Eltern, löschen nur der Trainer.
