@@ -9,14 +9,12 @@ import {
   eventFromDoc,
   eventFromDraft,
   filterEvents,
-  groupByMonth,
   plannedMinutes,
-  monthLabel,
   resultText,
   sortEvents,
   validateDraft,
 } from './event';
-import { endOfWeek, sectionEvents } from './event-sections';
+import { endOfWeek, groupByMonth, monthLabel, sectionEvents } from './event-sections';
 
 describe('event (Logik)', () => {
   const draft = (overrides: Partial<EventDraft> = {}): EventDraft => ({ ...emptyDraft('2026-10-06'), title: 'Training Dienstag', ...overrides });
