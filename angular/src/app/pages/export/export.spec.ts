@@ -64,6 +64,17 @@ describe('Export (Daten exportieren)', () => {
     fixture.detectChanges();
   };
 
+  it('nimmt die volle Abwesenheits- und Messhistorie in die Sicherung auf, auch ältere Einträge (SCRUM-200)', async () => {
+    const fixture = await render();
+    firebase.records.playerRecords.set('p1/absences', new Map([['old', { kind: 'absence', label: 'Urlaub', detail: '', from: '2023-07-01', to: '2023-07-14', playerId: 'p1' }]]));
+    firebase.records.playerRecords.set('p1/measurements', new Map([['m-old', { date: '2023-07-01', height: '140', weight: '35', playerId: 'p1' }]]));
+    byText(fixture, 'Sicherung herunterladen')!.click();
+    await vi.waitFor(() => expect(saved).toHaveLength(1));
+    const text = saved[0].text;
+    expect(text).toContain('2023-07-14');
+    expect(text).toContain('"140"');
+  });
+
   it('lädt die Sicherung als JSON mit allen Daten und vermerkt den Export', async () => {
     const fixture = await render();
     byText(fixture, 'Sicherung herunterladen')!.click();
@@ -109,7 +120,7 @@ describe('Export (Daten exportieren)', () => {
     await settle(fixture);
     byText(fixture, 'Bericht erstellen')!.click();
     await settle(fixture);
-    expect(printed).toHaveLength(1);
+    await vi.waitFor(() => expect(printed).toHaveLength(1));
     expect(printed[0]).toContain('&lt;b&gt;Ben&lt;/b&gt;');
     expect(printed[0]).not.toContain('<b>Ben</b>');
   });
@@ -129,7 +140,7 @@ describe('Export (Daten exportieren)', () => {
     const fixture = await render('trainer', 'revoked');
     byText(fixture, 'Bericht erstellen')!.click(); // erster Spieler: Einwilligung ok
     await settle(fixture);
-    expect(printed).toHaveLength(1);
+    await vi.waitFor(() => expect(printed).toHaveLength(1));
     const select = root(fixture).querySelector('select') as HTMLSelectElement;
     select.value = 'p2';
     select.dispatchEvent(new Event('change'));

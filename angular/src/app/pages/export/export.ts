@@ -9,6 +9,8 @@ import { OpponentsService } from '../../core/opponents/opponents.service';
 import { todayIso } from '../../core/shared/dates';
 import { type Player, consentRevokedMessage } from '../../core/player/player';
 import { profileReportHtml } from '../../core/profile/profile-report';
+import { type Absence, absenceFromDoc } from '../../core/records/absence';
+import { type Measurement, measurementFromDoc } from '../../core/records/measurement';
 import { type DevelopmentPlan, planFromDoc } from '../../core/records/plan';
 import { SessionService } from '../../core/auth/session.service';
 import { SyncService } from '../../core/shell/sync.service';
@@ -106,7 +108,7 @@ export class Export implements OnInit {
     this.done.set('');
     try {
       if (kind === 'json') await this.exportJson();
-      else this.exportPdf();
+      else await this.exportPdf();
     } catch {
       this.failure.set('Der Export hat nicht geklappt. Bitte erneut versuchen.');
     } finally {
@@ -125,6 +127,7 @@ export class Export implements OnInit {
         }),
       ),
     );
+    const history = await this.readHistory(players);
     const now = new Date();
     const data = buildExport({
       teamId: environment.teamId,
@@ -133,8 +136,8 @@ export class Export implements OnInit {
       events: this.team.events(),
       ratings: this.team.ratingsByEvent(),
       plans,
-      absences: new Map(this.team.data().map((entry) => [entry.player.id, entry.absences])),
-      measurements: new Map(this.team.data().map((entry) => [entry.player.id, entry.measurements])),
+      absences: new Map(players.map((player) => [player.id, history.get(player.id)!.absences])),
+      measurements: new Map(players.map((player) => [player.id, history.get(player.id)!.measurements])),
       opponents: this.opponents.opponents(),
     });
     this.files.saveText(exportFileName(now), JSON.stringify(data, null, 2));
@@ -142,12 +145,38 @@ export class Export implements OnInit {
     this.done.set('Die Sicherung wurde heruntergeladen.');
   }
 
-  private exportPdf(): void {
+  /**
+   * Volle Abwesenheits- und Messhistorie je Spieler, einmalig beim Export gelesen: die Übersichten halten nur das
+   * Fenster, das sie brauchen (SCRUM-200).
+   */
+  private async readHistory(players: readonly Player[]): Promise<Map<string, { absences: readonly Absence[]; measurements: readonly Measurement[] }>> {
+    const today = todayIso();
+    return new Map(
+      await Promise.all(
+        players.map(async (player) => {
+          const [absences, measurements] = await Promise.all([
+            this.playerRecordsApi.readPlayerRecords(player.id, 'absences'),
+            this.playerRecordsApi.readPlayerRecords(player.id, 'measurements'),
+          ]);
+          return [
+            player.id,
+            {
+              absences: absences.map((doc) => absenceFromDoc(doc.id, doc.data)),
+              measurements: measurements.map((doc) => measurementFromDoc(doc.id, doc.data, today)),
+            },
+          ] as const;
+        }),
+      ),
+    );
+  }
+
+  private async exportPdf(): Promise<void> {
     const player = this.selected();
     const entry = this.team.data().find((item) => item.player.id === player?.id);
     if (!player || !entry) return;
+    const history = (await this.readHistory([player])).get(player.id)!;
     this.files.print(
-      profileReportHtml({ teamName: environment.teamName, player, items: entry.items, absences: entry.absences, measurements: entry.measurements, today: todayIso() }),
+      profileReportHtml({ teamName: environment.teamName, player, items: entry.items, absences: history.absences, measurements: history.measurements, today: todayIso() }),
     );
     this.workspace.record(`Spielerprofil als PDF vorbereitet (${player.name})`);
     this.done.set('Der Druckdialog wurde geöffnet – dort „Als PDF speichern“ wählen.');
@@ -191,6 +220,7 @@ export class Export implements OnInit {
   private async currentIds(backup: Backup): Promise<CurrentIds> {
     const today = todayIso();
     const entries = this.team.data();
+    const history = await this.readHistory(entries.map((entry) => entry.player));
     const ids = (items: readonly { id: string }[]) => new Set(items.map((item) => item.id));
     const plans = new Map<string, ReadonlySet<string>>(
       await Promise.all(
@@ -205,8 +235,8 @@ export class Export implements OnInit {
       events: ids(this.team.events()),
       opponents: ids(this.opponents.opponents()),
       developmentPlans: plans,
-      absences: new Map(entries.map((entry) => [entry.player.id, ids(entry.absences)])),
-      measurements: new Map(entries.map((entry) => [entry.player.id, ids(entry.measurements)])),
+      absences: new Map(entries.map((entry) => [entry.player.id, ids(history.get(entry.player.id)!.absences)])),
+      measurements: new Map(entries.map((entry) => [entry.player.id, ids(history.get(entry.player.id)!.measurements)])),
     };
   }
 
