@@ -344,3 +344,11 @@ p.muted a {
   vertical-align: -0.1em;
   color: var(--tk-muted);
 }
+
+/* Saison-Hinweis unter der Liste (SCRUM-199). */
+.seasons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tk-space-2);
+}

@@ -20,14 +20,20 @@ export class FakeEventsApi implements Pick<EventsApi, keyof EventsApi> {
   failBatchNumber: number | null = null;
   private batchCalls = 0;
   eventWatchers = 0;
+  /** `fromDate` des letzten Abos (null = alle Events). */
+  lastFromDate: string | null | undefined = undefined;
+  /** Nur wenn gesetzt, filtert die Attrappe wie die echte Abfrage `date >= fromDate` (sonst bleiben Tests mit festen Daten zeitunabhängig). */
+  filterByDate = false;
   private eventsListener: ((docs: RawDoc[], meta: SnapshotMeta) => void) | null = null;
   private eventsErrorListener: ((error: unknown) => void) | null = null;
 
   async watchEvents(
     onData: (docs: RawDoc[], meta: SnapshotMeta) => void,
     onError: (error: unknown) => void,
+    fromDate: string | null = null,
   ): Promise<() => void> {
-    this.calls.push('watchEvents');
+    this.calls.push(fromDate ? `watchEvents:from:${fromDate}` : 'watchEvents');
+    this.lastFromDate = fromDate;
     if (this.watchEventsError) throw this.watchEventsError;
     this.eventWatchers += 1;
     this.eventsListener = onData;
@@ -42,8 +48,9 @@ export class FakeEventsApi implements Pick<EventsApi, keyof EventsApi> {
 
   emitEvents(meta: SnapshotMeta = this.eventsMeta): void {
     this.eventsMeta = meta;
+    const from = this.filterByDate ? this.lastFromDate : null;
     this.eventsListener?.(
-      [...this.events].map(([id, data]) => ({ id, data })),
+      [...this.events].filter(([, data]) => !from || String(data['date'] ?? '') >= from).map(([id, data]) => ({ id, data })),
       meta,
     );
   }
