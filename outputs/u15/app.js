@@ -3566,6 +3566,47 @@ function localIsoDate(date = new Date()) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
+// OPPONENT-LINK START (SCRUM-34: Spiele <-> Gegnerprofile)
+// Name fuer den Abgleich: ohne Gross-/Kleinschreibung und doppelte Leerzeichen.
+function opponentNameKey(name) {
+  return String(name || "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+// Gegnerprofil eines Spiels: zuerst ueber opponentId; bei Altdaten ohne (oder mit verwaister) opponentId
+// nur zur ANZEIGE ueber den Namen. Es wird nichts gespeichert oder migriert.
+function opponentProfileForEvent(event, opponents) {
+  if (!event || event.type !== "Spiel") return null;
+  const list = Array.isArray(opponents) ? opponents : [];
+  if (event.opponentId) {
+    const linked = list.find((item) => item.id === event.opponentId);
+    if (linked) return linked;
+  }
+  const key = opponentNameKey(event.opponent);
+  if (!key) return null;
+  return list.find((item) => opponentNameKey(item.name) === key) || null;
+}
+
+// Bilanz gegen ein Gegnerprofil. Gezaehlt werden nur Spiele mit Ergebnis (resultOf liefert null sonst).
+function opponentRecord(opponent, events, opponents, resultOf) {
+  const record = { games: [], wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0 };
+  if (!opponent) return record;
+  (events || []).forEach((event) => {
+    const profile = opponentProfileForEvent(event, opponents);
+    if (!profile || profile.id !== opponent.id) return;
+    const result = resultOf(event);
+    if (!result) return;
+    record.games.push({ eventId: event.id, date: event.date || "", title: event.title || "", ...result });
+    if (result.outcome === "Sieg") record.wins += 1;
+    else if (result.outcome === "Niederlage") record.losses += 1;
+    else record.draws += 1;
+    record.goalsFor += result.goalsFor;
+    record.goalsAgainst += result.goalsAgainst;
+  });
+  record.games.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  return record;
+}
+// OPPONENT-LINK END
+
 // Ein Ergebnis zaehlt nur, wenn beide Werte eingetragen sind und das Spiel nicht in der
 // Zukunft liegt (ein vorab angelegtes Spiel mit 0:0 ist kein Unentschieden).
 function gameResult(event) {
@@ -4377,6 +4418,35 @@ function eventCardsHtml(events) {
   }).join("");
 }
 
+// Matchplan, Staerken und Schwaechen des Gegners direkt im Spiel (nur fuer Rollen mit Zugriff auf die Gegneranalyse).
+function renderEventOpponentPlan(event) {
+  const box = $("#eventOpponentPlan");
+  if (!box) return;
+  const profile = canManageRecords() && allowedViews().includes("opponents") ? opponentProfileForEvent(event, state.opponents) : null;
+  if (!profile) {
+    box.innerHTML = "";
+    box.hidden = true;
+    return;
+  }
+  const record = opponentRecord(profile, state.events, state.opponents, gameResult);
+  const parts = [
+    profile.gamePlan ? opponentDetail("Matchplan", profile.gamePlan) : "",
+    profile.strengths ? opponentDetail("Stärken", profile.strengths) : "",
+    profile.weaknesses ? opponentDetail("Schwächen", profile.weaknesses) : ""
+  ].join("");
+  box.innerHTML = `
+    <h3>Gegner: ${escapeHtml(profile.name)}</h3>
+    <p class="muted">${profile.formation ? `Formation ${escapeHtml(profile.formation)} · ` : ""}${escapeHtml(profile.style || "Unbekannt")} · ${opponentRecordText(record)}</p>
+    ${parts ? `<div class="opponent-detail-grid">${parts}</div>` : '<p class="muted">Im Gegnerprofil sind noch kein Matchplan, keine Stärken und Schwächen eingetragen.</p>'}
+    <button class="ghost-button" data-action="open-opponent" data-id="${escapeHtml(profile.id)}" type="button">Zum Gegnerprofil</button>`;
+  box.hidden = false;
+}
+
+function opponentRecordText(record) {
+  if (!record.games.length) return "Bisher keine Spiele mit Ergebnis gegen diesen Gegner";
+  return `Bilanz ${record.wins} S · ${record.draws} U · ${record.losses} N · Tore ${record.goalsFor}:${record.goalsAgainst}`;
+}
+
 function renderEvents() {
   syncEventSelect();
   const events = filteredEvents();
@@ -4442,6 +4512,7 @@ function renderRatingTable() {
   $("#eventEditorMeta").textContent = `${event.type} · ${event.date}${result ? ` · Ergebnis ${result.goalsFor}:${result.goalsAgainst}` : ""} · Anstrengung ${exertionLabel(eventExertion(event))}${event.location ? ` · ${event.location}` : ""}`;
   if (matchDuration) $("#eventEditorMeta").textContent += ` · ${matchDuration} Min.`;
   else $("#eventEditorMeta").textContent += ` · ${eventPlannedMinutes(event)} Min.`;
+  renderEventOpponentPlan(event);
   const lineupBox = $("#eventLineup");
   if (lineupBox) {
     const html = event.type === "Spiel" && canManageRecords() ? eventLineupHtml(event) : "";
@@ -4717,12 +4788,36 @@ function openEventDialog(existing) {
   $("#eventLocation").value = editing?.location || "";
   $("#eventTrainingFocus").value = editing?.trainingFocus || "Eigener Ballbesitz";
   $("#eventOpponent").value = editing?.opponent || "";
+  fillEventOpponentSelect(editing?.opponentId || "");
   $("#eventGoalsFor").value = hasScore(editing?.goalsFor) ? editing.goalsFor : "";
   $("#eventGoalsAgainst").value = hasScore(editing?.goalsAgainst) ? editing.goalsAgainst : "";
   $("#eventMatchDuration").value = editing?.matchDuration || 90;
   $("#eventNotes").value = editing?.notes || "";
   syncEventGameFields();
   $("#eventDialog").showModal();
+}
+
+// Gegnerprofil-Auswahl im Event-Dialog (Freitextfeld "Gegner" bleibt als Ausweichmoeglichkeit).
+function fillEventOpponentSelect(selectedId) {
+  const select = $("#eventOpponentSelect");
+  if (!select) return;
+  const profiles = [...(state.opponents || [])].sort((a, b) => String(a.name).localeCompare(String(b.name), "de"));
+  const known = profiles.some((item) => item.id === selectedId);
+  select.innerHTML = '<option value="">Kein Profil (Freitext)</option>'
+    + profiles.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`).join("");
+  select.value = known ? selectedId : "";
+}
+
+function onEventOpponentSelectChange() {
+  const profile = (state.opponents || []).find((item) => item.id === $("#eventOpponentSelect").value);
+  if (profile) $("#eventOpponent").value = profile.name;
+}
+
+// Wird der Name von Hand geaendert, passt er nicht mehr zum gewaehlten Profil: Zuordnung loesen.
+function onEventOpponentTextInput() {
+  const select = $("#eventOpponentSelect");
+  const profile = (state.opponents || []).find((item) => item.id === select.value);
+  if (profile && opponentNameKey(profile.name) !== opponentNameKey($("#eventOpponent").value)) select.value = "";
 }
 
 function syncEventGameFields() {
@@ -4732,12 +4827,29 @@ function syncEventGameFields() {
     field.disabled = !isGame;
     field.closest("label").hidden = !isGame;
   });
+  const opponentSelect = $("#eventOpponentSelect");
+  if (opponentSelect) {
+    const hasProfiles = canManageRecords() && (state.opponents || []).length > 0;
+    opponentSelect.disabled = !isGame || !hasProfiles;
+    opponentSelect.closest("label").hidden = !isGame || !hasProfiles;
+  }
   const trainingFocus = $("#eventTrainingFocus");
   trainingFocus.disabled = isGame;
   trainingFocus.closest("label").hidden = isGame;
   const trainingDuration = $("#eventTrainingDuration");
   trainingDuration.disabled = isGame;
   trainingDuration.closest("label").hidden = isGame;
+}
+
+function eventOpponentIdFromForm() {
+  if ($("#eventType").value !== "Spiel") return "";
+  const select = $("#eventOpponentSelect");
+  const id = select && !select.disabled ? select.value : "";
+  if (id) return id;
+  // Das ausgeblendete Feld (Rolle ohne Zugriff / keine Profile) darf eine bestehende Zuordnung nicht loeschen.
+  const editId = $("#eventId").value;
+  const existing = editId ? state.events.find((item) => item.id === editId) : null;
+  return select && select.disabled && existing?.opponentId && opponentNameKey(existing.opponent) === opponentNameKey($("#eventOpponent").value) ? existing.opponentId : "";
 }
 
 function saveEvent(event) {
@@ -4755,6 +4867,7 @@ function saveEvent(event) {
     location: $("#eventLocation").value.trim(),
     trainingFocus: $("#eventType").value === "Training" ? $("#eventTrainingFocus").value : "",
     opponent: $("#eventOpponent").value.trim(),
+    opponentId: eventOpponentIdFromForm(),
     goalsFor: $("#eventType").value === "Spiel" ? scoreOrEmpty($("#eventGoalsFor").value) : "",
     goalsAgainst: $("#eventType").value === "Spiel" ? scoreOrEmpty($("#eventGoalsAgainst").value) : "",
     matchDuration: $("#eventType").value === "Spiel" ? Number($("#eventMatchDuration").value || 90) : "",
@@ -6117,13 +6230,18 @@ function renderOpponentAnalysis() {
     .sort((a, b) => a.name.localeCompare(b.name, "de"));
   $("#opponentCount").textContent = `${opponents.length} Gegner`;
   $("#opponentList").innerHTML = opponents.map((opponent) => {
+    const record = opponentRecord(opponent, state.events, state.opponents, gameResult);
+    const gamesDetail = record.games.length
+      ? `<section><span>Bisherige Spiele</span><ul class="opponent-games">${record.games.map((game) => `<li>${escapeHtml(formatDate(game.date))} · ${game.goalsFor}:${game.goalsAgainst} (${game.outcome})</li>`).join("")}</ul></section>`
+      : "";
     const details = [
       opponent.strengths ? opponentDetail("Stärken", opponent.strengths) : "",
       opponent.weaknesses ? opponentDetail("Schwächen", opponent.weaknesses) : "",
       opponent.keyPlayers ? opponentDetail("Schlüsselspieler", opponent.keyPlayers) : "",
       opponent.setPieces ? opponentDetail("Standards", opponent.setPieces) : "",
       opponent.gamePlan ? opponentDetail("Matchplan", opponent.gamePlan) : "",
-      opponent.notes ? opponentDetail("Notizen", opponent.notes) : ""
+      opponent.notes ? opponentDetail("Notizen", opponent.notes) : "",
+      gamesDetail
     ].join("");
     return `
     <article class="opponent-card">
@@ -6131,6 +6249,7 @@ function renderOpponentAnalysis() {
         <div>
           <span class="event-type">${escapeHtml(opponent.style)}</span>
           <strong>${escapeHtml(opponent.name)}</strong>
+          <small class="muted">${opponentRecordText(record)}</small><br />
           <small class="muted">${opponent.formation ? `Formation ${escapeHtml(opponent.formation)} · ` : ""}aktualisiert ${formatDate(opponent.updatedAt)}</small>
         </div>
         <div class="row-actions">
@@ -6495,6 +6614,12 @@ on("#absenceReason", "change", syncAbsenceReasonField);
 on("#measurementForm", "submit", saveMeasurement);
 on("#cancelMeasurementBtn", "click", resetMeasurementForm);
 on("#opponentForm", "submit", saveOpponent);
+on("#eventOpponentSelect", "change", onEventOpponentSelectChange);
+on("#eventOpponent", "input", onEventOpponentTextInput);
+on("#eventOpponentPlan", "click", (event) => {
+  const button = event.target.closest("button[data-action='open-opponent']");
+  if (button) window.TeamKompass?.openOpponent?.(button.dataset.id);
+});
 on("#cancelOpponentBtn", "click", resetOpponentForm);
 on("#opponentSearch", "input", (event) => {
   opponentFilter = event.target.value;

@@ -2177,3 +2177,7 @@ menu {
   display: grid;
   gap: 2px;
 }
+
+.opponent-games { margin: 6px 0 0; padding-left: 18px; }
+#eventOpponentPlan .opponent-detail-grid { margin-bottom: 10px; }
+@media (max-width: 640px) { #eventOpponentPlan .opponent-detail-grid { grid-template-columns: 1fr; } }
