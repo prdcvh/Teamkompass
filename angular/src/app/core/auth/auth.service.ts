@@ -18,6 +18,9 @@ export type AuthStatus = 'loading' | 'signedOut' | 'ready' | 'unavailable';
 /** Wartezeit vor dem zweiten Versuch, ein frisch angemeldetes Konto anzulegen (siehe claim). */
 export const CLAIM_RETRY_DELAY_MS = 1500;
 
+/** Wartezeit vor dem zweiten Versuch, den lokalen Firestore-Speicher zu leeren (ein anderer Tab hält ihn evtl. noch kurz offen). */
+export const CACHE_CLEAR_RETRY_MS = 1000;
+
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly authApi = inject(AuthApi);
@@ -43,6 +46,7 @@ export class AuthService {
   private epoch = 0;
   private identityUid: string | null = null;
   private inflight: Promise<void> | null = null;
+  private purging: Promise<void> | null = null;
 
   /** Startet die Anmeldeprüfung (einmal beim App-Start). */
   start(retryDelayMs = CLAIM_RETRY_DELAY_MS): void {
@@ -135,6 +139,8 @@ export class AuthService {
     }
     this.enter(null);
     this.reset();
+    // Erst weiterleiten, wenn auch der lokale Firestore-Speicher leer ist (geteilte Geräte, Daten von Minderjährigen).
+    await this.purgeLocalCache();
     this.status.set('signedOut');
   }
 
@@ -175,6 +181,8 @@ export class AuthService {
     this.enter(user);
     if (!user) {
       this.reset();
+      // Auch bei Abmeldung in einem anderen Tab, abgelaufener Anmeldung und beim Start ohne Anmeldung.
+      void this.purgeLocalCache();
       this.markStatus('signedOut');
       return;
     }
@@ -240,6 +248,26 @@ export class AuthService {
   private reset(): void {
     this.session.clear();
     clearLocalTeamData();
+  }
+
+  /**
+   * Leert den lokalen Firestore-Speicher (SCRUM-199). Mehrere gleichzeitige Aufrufe teilen sich einen Lauf; ein Fehler
+   * darf das Abmelden nie aufhalten.
+   */
+  private purgeLocalCache(): Promise<void> {
+    this.purging ??= (async () => {
+      try {
+        if (!(await this.authApi.clearLocalCache())) {
+          await new Promise((resolve) => setTimeout(resolve, CACHE_CLEAR_RETRY_MS));
+          await this.authApi.clearLocalCache();
+        }
+      } catch (error) {
+        console.error(error);
+      } finally {
+        this.purging = null;
+      }
+    })();
+    return this.purging;
   }
 
   private markStatus(status: AuthStatus): void {

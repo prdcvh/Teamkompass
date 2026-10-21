@@ -114,6 +114,16 @@
       }
     }
 
+    <p class="seasons muted">
+      @if (events.scope() === 'all') {
+        Alle Saisons werden angezeigt.
+        <button tkButton type="button" (click)="events.showCurrentSeason()">Nur aktuelle Saison</button>
+      } @else {
+        Angezeigt: Saison ab {{ formatDate(events.seasonStart()) }}.
+        <button tkButton type="button" (click)="events.showAllSeasons()">Ältere Saisons laden</button>
+      }
+    </p>
+
     <ng-template #body let-list="list" let-months="months">
       @if (cards()) {
         @if (months) {

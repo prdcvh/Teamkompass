@@ -29,6 +29,9 @@ async function setup(team, events) {
     const eventExertion = () => 5;
     const selectedEvent = () => state.events.find((e) => e.id === state.selectedEventId) || state.events[0];
     const renderRatingTable = () => {};
+    const showsRsvp = () => false; // SCRUM-175: Zu-/Absagen nur im Rollen-Modus
+    const rsvpCountsText = () => "";
+    const rsvpCounts = () => ({});
     function syncEventSelect() {} // SCRUM-129 (liegt ausserhalb des ausgeschnittenen Bereichs)
     ${listPart}
     ${resetPart}

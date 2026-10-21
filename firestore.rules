@@ -210,6 +210,28 @@ service cloud.firestore {
         match /privateNotes/{playerId} {
           allow read, write: if isTrainer();
         }
+
+        // Zu-/Absagen (SCRUM-175): Spieler bzw. Eltern antworten nur fuer den eigenen Spieler (Dokument-ID =
+        // eigene playerId) und nur fuer ein bestehendes Event. Erlaubt sind genau diese Felder: Zusage/Absage,
+        // ein kurzer, freiwilliger Grund, wer geantwortet hat (Spieler oder Eltern) und der Server-Zeitstempel.
+        // Der Grund kann ein Gesundheitsdatum sein ("krank") - lesen duerfen ihn deshalb nur der Trainer und
+        // der eigene Spieler bzw. die eigenen Eltern, nicht Medizin oder Scouts. Spieler lesen per gezieltem Get
+        // (nie als Liste), deshalb reicht der Pfadvergleich. Die Anwesenheit ("Fehlt") setzt weiterhin nur der
+        // Trainer-Client in der Bewertung; Loeschen nur der Trainer (Spieler/Event loeschen).
+        match /responses/{playerId} {
+          allow read: if isTrainer() || isPlayerFor(playerId);
+          allow create, update: if isPlayerFor(playerId)
+            && exists(/databases/$(database)/documents/teams/$(teamId)/events/$(eventId))
+            && request.resource.data.keys().hasOnly(['playerId', 'status', 'reason', 'by', 'updatedAt'])
+            && request.resource.data.playerId == playerId
+            && request.resource.data.status in ["yes", "no"]
+            && request.resource.data.reason is string
+            && request.resource.data.reason.size() <= 200
+            && (request.resource.data.status == "no" || request.resource.data.reason == "")
+            && request.resource.data.by == memberDoc().data.role
+            && request.resource.data.updatedAt == request.time;
+          allow delete: if isTrainer();
+        }
       }
 
       // Scout-Sicht (SCRUM-170): je Spieler ein Dokument, das ausschliesslich der Trainer-Client schreibt

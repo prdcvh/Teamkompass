@@ -544,6 +544,12 @@ label {
   letter-spacing: 0.01em;
 }
 
+/* Hinweistext unter einem Formularfeld (z. B. Event-Notiz, SCRUM-203): normal statt fett wie das Label. */
+.field-hint {
+  font-weight: 400;
+  letter-spacing: normal;
+}
+
 input,
 select,
 textarea {
@@ -2382,4 +2388,89 @@ p.muted {
   padding: 0 11px;
   font-size: 0.74rem;
   margin-left: 0;
+}
+
+/* Zu-/Absagen (SCRUM-175): Spieler/Eltern sehen die naechsten Termine, der Trainer die Rueckmeldungen. */
+.rsvp-panel {
+  margin-bottom: 14px;
+}
+
+.rsvp-list {
+  display: grid;
+  gap: 10px;
+}
+
+.rsvp-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 10px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.rsvp-info {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rsvp-form {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+}
+
+.rsvp-form label {
+  display: grid;
+  gap: 4px;
+  font-size: 0.85rem;
+}
+
+.rsvp-form .button-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.rsvp-form .button-row button {
+  min-height: 44px;
+  margin: 0;
+}
+
+.rsvp-form button[aria-pressed="true"] {
+  outline: 3px solid currentColor;
+  outline-offset: 2px;
+}
+
+.rsvp-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 0;
+}
+
+.rsvp-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: var(--ink);
+  background: var(--soft-amber);
+  font-size: 0.78rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.rsvp-badge.rsvp-yes {
+  background: var(--soft-green);
+}
+
+.rsvp-badge.rsvp-no {
+  background: var(--soft-danger);
+}
+
+.event-card .rsvp-counts {
+  font-size: 0.8rem;
 }

@@ -48,6 +48,8 @@ export interface TeamEvent {
   /** Nur bei Training. */
   readonly trainingFocus: string;
   readonly opponent: string;
+  /** Verknüpftes Gegnerprofil (SCRUM-34); fehlt bei Spielen, die nur einen Gegnernamen haben. */
+  readonly opponentId?: string;
   /** Nur bei Spielen; null = noch kein Ergebnis. */
   readonly goalsFor: number | null;
   readonly goalsAgainst: number | null;
@@ -77,6 +79,7 @@ export interface EventDraft {
   readonly location: string;
   readonly trainingFocus: string;
   readonly opponent: string;
+  readonly opponentId: string;
   readonly goalsFor: string;
   readonly goalsAgainst: string;
   readonly matchDuration: string;
@@ -119,6 +122,7 @@ export function emptyDraft(today: string): EventDraft {
     location: '',
     trainingFocus: TRAINING_FOCUSES[0],
     opponent: '',
+    opponentId: '',
     goalsFor: '',
     goalsAgainst: '',
     matchDuration: String(DEFAULT_MATCH_DURATION),
@@ -139,6 +143,7 @@ export function draftFromEvent(event: TeamEvent): EventDraft {
     location: event.location,
     trainingFocus: event.trainingFocus || TRAINING_FOCUSES[0],
     opponent: event.opponent,
+    opponentId: event.opponentId ?? '',
     goalsFor: event.goalsFor === null ? '' : String(event.goalsFor),
     goalsAgainst: event.goalsAgainst === null ? '' : String(event.goalsAgainst),
     matchDuration: String(event.matchDuration ?? DEFAULT_MATCH_DURATION),
@@ -204,6 +209,7 @@ export function eventFromDraft(draft: EventDraft, id: string): TeamEvent {
     location: draft.location.trim(),
     trainingFocus: game ? '' : draft.trainingFocus,
     opponent: draft.opponent.trim(),
+    ...(game && draft.opponentId.trim() !== '' ? { opponentId: draft.opponentId.trim() } : {}),
     goalsFor: game ? wholeNumber(draft.goalsFor, 0, MAX_SCORE) : null,
     goalsAgainst: game ? wholeNumber(draft.goalsAgainst, 0, MAX_SCORE) : null,
     matchDuration: game ? (wholeNumber(draft.matchDuration, 1, MAX_MATCH_DURATION) ?? DEFAULT_MATCH_DURATION) : null,
@@ -239,6 +245,7 @@ export function eventFromDoc(id: string, data: Readonly<Record<string, unknown>>
     location: text(data['location']),
     trainingFocus: type === 'Spiel' ? '' : text(data['trainingFocus']) || TRAINING_FOCUSES[0],
     opponent: text(data['opponent']),
+    ...(type === 'Spiel' && text(data['opponentId']) !== '' ? { opponentId: text(data['opponentId']) } : {}),
     goalsFor: type === 'Spiel' ? score(data['goalsFor']) : null,
     goalsAgainst: type === 'Spiel' ? score(data['goalsAgainst']) : null,
     matchDuration: type === 'Spiel' ? (Number.isFinite(duration) && duration > 0 ? duration : DEFAULT_MATCH_DURATION) : null,
@@ -265,6 +272,7 @@ export function docFromEvent(event: TeamEvent): Record<string, unknown> {
     location: event.location,
     trainingFocus: event.trainingFocus,
     opponent: event.opponent,
+    opponentId: event.opponentId ?? '',
     goalsFor: event.goalsFor ?? '',
     goalsAgainst: event.goalsAgainst ?? '',
     matchDuration: event.matchDuration ?? '',
@@ -347,28 +355,4 @@ export function sortEvents(events: readonly TeamEvent[], sort: EventSort): TeamE
   if (sort === 'chronological') return [...events].sort(compareChronological);
   const direction = sort === 'date-asc' ? 1 : -1;
   return [...events].sort((a, b) => direction * a.date.localeCompare(b.date) || a.title.localeCompare(b.title, 'de'));
-}
-
-export interface EventMonth {
-  readonly label: string;
-  readonly events: readonly TeamEvent[];
-}
-
-/** „Oktober 2026“; ohne gültiges Datum „Ohne Datum“. */
-export function monthLabel(iso: string): string {
-  if (!isIsoDate(iso)) return 'Ohne Datum';
-  const label = new Date(`${iso}T00:00:00Z`).toLocaleDateString('de-DE', { month: 'long', year: 'numeric', timeZone: 'UTC' });
-  return label.charAt(0).toUpperCase() + label.slice(1);
-}
-
-/** Gruppiert die (bereits sortierten) Events nach Monat, Reihenfolge bleibt erhalten. */
-export function groupByMonth(events: readonly TeamEvent[]): EventMonth[] {
-  const months: { label: string; events: TeamEvent[] }[] = [];
-  for (const event of events) {
-    const label = monthLabel(event.date);
-    const last = months[months.length - 1];
-    if (last?.label === label) last.events.push(event);
-    else months.push({ label, events: [event] });
-  }
-  return months;
 }

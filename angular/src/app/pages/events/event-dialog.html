@@ -20,6 +20,24 @@
           </div>
         }
       </dl>
+      @if (plan(); as plan) {
+        <section class="opponent-plan" aria-label="Gegnerprofil">
+          <h3>Gegner: {{ plan.profile.name }}</h3>
+          <p class="plan-meta">@if (plan.profile.formation) { Formation {{ plan.profile.formation }} · }{{ plan.profile.style }} · {{ plan.recordText }}</p>
+          @if (plan.details.length > 0) {
+            <dl>
+              @for (detail of plan.details; track detail.label) {
+                <div class="fact">
+                  <dt>{{ detail.label }}</dt>
+                  <dd class="notes">{{ detail.value }}</dd>
+                </div>
+              }
+            </dl>
+          } @else {
+            <p class="plan-meta">Im Gegnerprofil sind noch kein Matchplan, keine Stärken und Schwächen eingetragen.</p>
+          }
+        </section>
+      }
     </div>
   } @else {
   <form (submit)="submit($event)" novalidate>
@@ -190,6 +208,19 @@
       </label>
     } @else {
       <div class="grid">
+        @if (profiles().length > 0) {
+          <div class="field">
+            <label class="tk-label">
+              Gegnerprofil
+              <select class="tk-input" name="opponentId" [value]="draft().opponentId" (change)="chooseProfile(value($event))">
+                <option value="">Kein Profil (Freitext)</option>
+                @for (profile of profiles(); track profile.id) {
+                  <option [value]="profile.id" [selected]="profile.id === draft().opponentId">{{ profile.name }}</option>
+                }
+              </select>
+            </label>
+          </div>
+        }
         <div class="field">
           <label class="tk-label">
             Gegner
@@ -201,7 +232,7 @@
               [value]="draft().opponent"
               [attr.aria-invalid]="errors().opponent ? 'true' : null"
               [attr.aria-describedby]="errors().opponent ? 'err-opponent' : null"
-              (input)="patch({ opponent: value($event) })"
+              (input)="changeOpponentText(value($event))"
             />
           </label>
           @if (errors().opponent) {
@@ -282,10 +313,14 @@
           placeholder="Schwerpunkt, Besonderheiten"
           [value]="draft().notes"
           [attr.aria-invalid]="errors().notes ? 'true' : null"
-          [attr.aria-describedby]="errors().notes ? 'err-notes' : null"
+          [attr.aria-describedby]="errors().notes ? 'notes-hint err-notes' : 'notes-hint'"
           (input)="patch({ notes: value($event) })"
         ></textarea>
       </label>
+      <p class="hint notes-hint" id="notes-hint">
+        Für alle Teammitglieder sichtbar (Spieler, Eltern, Medizin-Zugang) – bitte keine Gesundheitsangaben (z.&nbsp;B.
+        Verletzungen, Krankheiten) eintragen. Dafür gibt es Abwesenheiten und die „Interne Notiz (nur Trainer)“ bei der Bewertung.
+      </p>
       @if (errors().notes) {
         <span class="error" id="err-notes" role="alert">{{ errors().notes }}</span>
       }

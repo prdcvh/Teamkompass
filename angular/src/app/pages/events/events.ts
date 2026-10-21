@@ -11,10 +11,9 @@ import {
   type TeamEvent,
   filterEvents,
   formatDate,
-  groupByMonth,
   resultText,
 } from '../../core/events/event';
-import { sectionEvents } from '../../core/events/event-sections';
+import { groupByMonth, sectionEvents } from '../../core/events/event-sections';
 import { EventsService } from '../../core/events/events.service';
 import { isSeriesEvent } from '../../core/planning/series-events';
 import { SyncService } from '../../core/shell/sync.service';

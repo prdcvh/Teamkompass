@@ -332,12 +332,14 @@
                 <div>
                   <h2 id="eventEditorTitle">Event bewerten</h2>
                   <span class="muted" id="eventEditorMeta">Training oder Spiel auswählen</span>
+                  <p class="rsvp-summary" id="eventRsvpSummary" hidden></p>
                 </div>
                 <div class="button-row">
                   <button class="ghost-button" id="editEventBtn" type="button">Event bearbeiten</button>
                   <button class="ghost-button danger" id="deleteEventBtn" type="button">Event löschen</button>
                 </div>
               </div>
+              <div class="event-lineup" id="eventOpponentPlan" hidden></div>
               <div class="event-lineup" id="eventLineup" hidden></div>
               <div class="rating-toolbar">
                 <label>
@@ -409,6 +411,13 @@
         </section>
 
         <section class="view" id="profilesView">
+          <section class="panel rsvp-panel" id="rsvpPanel" hidden>
+            <div class="panel-head">
+              <h2>Nächste Termine</h2>
+              <span class="muted">Bitte zu- oder absagen</span>
+            </div>
+            <div class="rsvp-list" id="rsvpList"></div>
+          </section>
           <div class="profile-layout">
             <section class="panel profile-summary">
               <div class="panel-head">
@@ -775,13 +784,14 @@
               <option value="Umschalten">Umschalten</option>
             </select>
           </label>
+          <label>Gegnerprofil <select id="eventOpponentSelect"><option value="">Kein Profil (Freitext)</option></select></label>
           <label>Gegner <input id="eventOpponent" maxlength="50" placeholder="nur bei Spielen" /></label>
           <label>Spieldauer <input id="eventMatchDuration" type="number" min="1" max="150" value="90" /></label>
           <label>Dauer (Min.) <input id="eventTrainingDuration" type="number" min="1" max="300" value="90" /></label>
           <label>Eigene Tore <input id="eventGoalsFor" type="number" min="0" max="99" /></label>
           <label>Gegentore <input id="eventGoalsAgainst" type="number" min="0" max="99" /></label>
         </div>
-        <label>Notiz <textarea id="eventNotes" rows="3" placeholder="Schwerpunkt, Ergebnis, Belastung, Besonderheiten"></textarea></label>
+        <label>Notiz <textarea id="eventNotes" rows="3" placeholder="Schwerpunkt, Ergebnis, Belastung, Besonderheiten" aria-describedby="eventNotesHint"></textarea><small class="muted field-hint" id="eventNotesHint">Für alle Teammitglieder sichtbar (Spieler, Eltern, Medizin-Zugang) – bitte keine Gesundheitsangaben (z. B. Verletzungen, Krankheiten) eintragen. Dafür gibt es Abwesenheiten und die „Interne Notiz (nur Trainer)“ bei der Bewertung.</small></label>
         <menu>
           <button class="ghost-button" type="button" id="cancelEventDialogBtn">Abbrechen</button>
           <button class="primary-button" type="submit" id="eventSubmitBtn">Event speichern</button>

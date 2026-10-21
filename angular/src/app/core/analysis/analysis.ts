@@ -73,11 +73,14 @@ export function thinPositions(coverage: readonly [string, number][], limit = 6):
   return coverage.filter(([, count]) => count <= 1).map(([position]) => position).slice(0, limit);
 }
 
-/** Trainingseinheiten je Spielphase; Einheiten ohne Angabe zählen zu „Eigener Ballbesitz“. */
-export function trainingFocusCounts(events: readonly TeamEvent[]): Record<string, number> {
+/**
+ * Trainingseinheiten je Spielphase; Einheiten ohne Angabe zählen zu „Eigener Ballbesitz“.
+ * Nur bereits stattgefundene Trainings (Datum heute oder früher, `today` als JJJJ-MM-TT) zählen.
+ */
+export function trainingFocusCounts(events: readonly TeamEvent[], today: string): Record<string, number> {
   const counts: Record<string, number> = Object.fromEntries(TRAINING_FOCUSES.map((focus) => [focus, 0]));
   for (const event of events) {
-    if (event.type !== 'Training') continue;
+    if (event.type !== 'Training' || event.date > today) continue;
     const focus = event.trainingFocus || TRAINING_FOCUSES[0];
     counts[focus] = (counts[focus] ?? 0) + 1;
   }

@@ -52,4 +52,14 @@ export class FakeAuthApi implements Pick<AuthApi, keyof AuthApi> {
     this.calls.push('signOut');
     this.emit(null);
   }
+
+  /** Test-Hilfe: wie oft der lokale Speicher geleert wurde (Datenschutz beim Abmelden). */
+  cacheClears = 0;
+  clearCacheResult = true;
+
+  async clearLocalCache(): Promise<boolean> {
+    this.cacheClears += 1;
+    this.calls.push('clearLocalCache');
+    return this.clearCacheResult;
+  }
 }

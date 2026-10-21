@@ -36,7 +36,8 @@ describe('Datenformat alte App ↔ Angular', () => {
     };
     // Neue Felder (SCRUM-95) sind für ältere Dokumente leer; die bestehenden Felder bleiben unverändert.
     // Die Anstrengung (SCRUM-137) wird aus der bisherigen Intensität 1/2/3 als 3/5/7 abgeleitet (hier 3 → 7).
-    const empty = { startTime: '', durationMinutes: '', locationCoords: null, exertion: 7 };
+    // Gegnerprofil-Verknüpfung (SCRUM-34): ohne Zuordnung leer, damit ein Lösen per merge sicher ankommt.
+    const empty = { startTime: '', durationMinutes: '', locationCoords: null, exertion: 7, opponentId: '' };
     expect(docFromEvent(eventFromDoc('e1', training))).toEqual({ ...training, ...empty });
     const match = { ...training, id: 'e2', type: 'Spiel', trainingFocus: '', opponent: 'SV Nord', goalsFor: 3, goalsAgainst: 1, matchDuration: 70 };
     expect(docFromEvent(eventFromDoc('e2', match))).toEqual({ ...match, ...empty });
@@ -47,7 +48,7 @@ describe('Datenformat alte App ↔ Angular', () => {
   it('Event mit Startzeit, Dauer und Koordinaten bleibt unverändert erhalten', () => {
     const doc = {
       id: 'e3', type: 'Training', title: 'Mittwoch', date: '2026-10-14', exertion: 5, intensity: 2, location: 'Platz 1', trainingFocus: 'Umschalten',
-      opponent: '', goalsFor: '', goalsAgainst: '', matchDuration: '', notes: '',
+      opponent: '', opponentId: '', goalsFor: '', goalsAgainst: '', matchDuration: '', notes: '',
       startTime: '17:30', durationMinutes: 90, locationCoords: { lat: 50.18, lon: 8.47, name: 'Königstein' },
     };
     expect(docFromEvent(eventFromDoc('e3', doc))).toEqual(doc);

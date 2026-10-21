@@ -3,6 +3,7 @@
  * Das Dokument `teams/{teamId}/opponents/{id}` ist mit der bisherigen App identisch
  * (siehe outputs/team-manager/app.js: normalizeOpponent, saveOpponent). Nur Trainer dürfen Gegner lesen und schreiben.
  */
+import type { TeamEvent } from '../events/event';
 import { formatDate, isIsoDate, todayIso } from '../shared/dates';
 
 export { formatDate };
@@ -151,4 +152,66 @@ export function filterOpponents(opponents: readonly Opponent[], query: string): 
 /** Gefüllte Detailfelder mit Beschriftung (leere fehlen). */
 export function detailsOf(opponent: Opponent): { label: string; value: string }[] {
   return DETAIL_FIELDS.map(({ key, label }) => ({ label, value: opponent[key] })).filter((entry) => entry.value !== '');
+}
+
+/** Name für den Abgleich: ohne Groß-/Kleinschreibung und doppelte Leerzeichen. */
+export function opponentNameKey(name: string): string {
+  return name.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+/**
+ * Gegnerprofil eines Spiels (SCRUM-34): zuerst über `opponentId`; bei Altdaten ohne (oder mit verwaister) `opponentId`
+ * nur zur Anzeige über den Namen. Es wird nichts gespeichert oder migriert.
+ */
+export function opponentForEvent(event: TeamEvent, opponents: readonly Opponent[]): Opponent | null {
+  if (event.type !== 'Spiel') return null;
+  if (event.opponentId) {
+    const linked = opponents.find((opponent) => opponent.id === event.opponentId);
+    if (linked) return linked;
+  }
+  const key = opponentNameKey(event.opponent);
+  if (!key) return null;
+  return opponents.find((opponent) => opponentNameKey(opponent.name) === key) ?? null;
+}
+
+export interface OpponentGame {
+  readonly eventId: string;
+  readonly date: string;
+  readonly goalsFor: number;
+  readonly goalsAgainst: number;
+  readonly outcome: 'Sieg' | 'Unentschieden' | 'Niederlage';
+}
+
+export interface OpponentRecord {
+  readonly games: readonly OpponentGame[];
+  readonly wins: number;
+  readonly draws: number;
+  readonly losses: number;
+  readonly goalsFor: number;
+  readonly goalsAgainst: number;
+}
+
+/** Bilanz gegen einen Gegner: nur Spiele mit Ergebnis, die nicht in der Zukunft liegen; neueste zuerst. */
+export function opponentRecord(opponent: Opponent, events: readonly TeamEvent[], opponents: readonly Opponent[], today: string = todayIso()): OpponentRecord {
+  const games: OpponentGame[] = [];
+  for (const event of events) {
+    if (event.goalsFor === null || event.goalsAgainst === null || (event.date && event.date > today)) continue;
+    if (opponentForEvent(event, opponents)?.id !== opponent.id) continue;
+    const outcome = event.goalsFor > event.goalsAgainst ? 'Sieg' : event.goalsFor < event.goalsAgainst ? 'Niederlage' : 'Unentschieden';
+    games.push({ eventId: event.id, date: event.date, goalsFor: event.goalsFor, goalsAgainst: event.goalsAgainst, outcome });
+  }
+  games.sort((a, b) => b.date.localeCompare(a.date));
+  return {
+    games,
+    wins: games.filter((game) => game.outcome === 'Sieg').length,
+    draws: games.filter((game) => game.outcome === 'Unentschieden').length,
+    losses: games.filter((game) => game.outcome === 'Niederlage').length,
+    goalsFor: games.reduce((sum, game) => sum + game.goalsFor, 0),
+    goalsAgainst: games.reduce((sum, game) => sum + game.goalsAgainst, 0),
+  };
+}
+
+export function recordText(record: OpponentRecord): string {
+  if (record.games.length === 0) return 'Bisher keine Spiele mit Ergebnis gegen diesen Gegner';
+  return `Bilanz ${record.wins} S · ${record.draws} U · ${record.losses} N · Tore ${record.goalsFor}:${record.goalsAgainst}`;
 }

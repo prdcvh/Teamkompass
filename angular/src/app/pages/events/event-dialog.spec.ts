@@ -157,4 +157,14 @@ describe('EventDialog: Ortssuche (SCRUM-97) und Standardort Königstein (SCRUM-1
     submit(fixture);
     await vi.waitFor(() => expect(savedEvent('Ohne Ort')).toMatchObject({ location: '', locationCoords: null }));
   });
+
+  it('warnt am Notizfeld, dass die Notiz für alle Teammitglieder sichtbar ist (SCRUM-203)', async () => {
+    const fixture = await render();
+    const notes = q<HTMLTextAreaElement>(fixture, 'textarea[name="notes"]')!;
+    const hint = q(fixture, '#notes-hint');
+    expect(text(hint)).toContain('Für alle Teammitglieder sichtbar');
+    expect(text(hint)).toContain('keine Gesundheitsangaben');
+    // Screenreader lesen den Hinweis zusammen mit dem Feld vor.
+    expect(notes.getAttribute('aria-describedby')?.split(' ')).toContain('notes-hint');
+  });
 });

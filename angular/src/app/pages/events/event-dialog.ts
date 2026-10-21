@@ -19,6 +19,8 @@ import {
   resultText,
 } from '../../core/events/event';
 import { EventsService } from '../../core/events/events.service';
+import { type Opponent, opponentForEvent, opponentNameKey, opponentRecord, recordText } from '../../core/opponents/opponent';
+import { OpponentsService } from '../../core/opponents/opponents.service';
 import { type GeocodedPlace, GeocodingService, GEOCODING_MIN_QUERY, coordsFromPlace, geocodingMessage, placeLabel } from '../../core/geocoding/geocoding.service';
 import { TEAM_HOME_LOCATION } from '../../core/team-settings/team-settings';
 import { todayIso } from '../../core/shared/dates';
@@ -40,6 +42,7 @@ import { Icon } from '../../ui/icon/icon';
 export class EventDialog {
   private readonly events = inject(EventsService);
   private readonly geocoding = inject(GeocodingService);
+  private readonly opponents = inject(OpponentsService);
 
   readonly open = input(false);
   /** Zu bearbeitendes Event; leer = neues Event anlegen. */
@@ -86,6 +89,23 @@ export class EventDialog {
     return rows.filter((row) => row.value.trim() !== '');
   });
 
+  /** Gegnerprofile zur Auswahl (nur Trainer bekommen sie geladen, sonst leer). */
+  protected readonly profiles = computed(() => [...this.opponents.opponents()].sort((a, b) => a.name.localeCompare(b.name, 'de')));
+  /** Leseansicht eines Spiels: Matchplan, Stärken, Schwächen und Bilanz des Gegners (SCRUM-34). */
+  protected readonly plan = computed(() => {
+    const event = this.shown();
+    if (!event || !this.canEdit()) return null;
+    const list = this.opponents.opponents();
+    const profile = opponentForEvent(event, list);
+    if (!profile) return null;
+    const details = [
+      { label: 'Matchplan', value: profile.gamePlan },
+      { label: 'Stärken', value: profile.strengths },
+      { label: 'Schwächen', value: profile.weaknesses },
+    ].filter((entry) => entry.value !== '');
+    return { profile, details, recordText: recordText(opponentRecord(profile, this.events.events(), list)) };
+  });
+
   /** Ortssuche: Treffer, Zustand und Meldung. Gesucht wird nur auf Klick, nie beim Tippen. */
   protected readonly places = signal<readonly GeocodedPlace[]>([]);
   protected readonly searchState = signal<'idle' | 'searching' | 'done'>('idle');
@@ -102,6 +122,7 @@ export class EventDialog {
       if (!this.open()) return;
       const event = this.event();
       untracked(() => {
+        this.opponents.start(); // startet nur für Trainer
         this.formMode.set(event === null);
         this.draft.set(event ? draftFromEvent(event) : emptyDraft(todayIso()));
         this.errors.set({});
@@ -140,6 +161,19 @@ export class EventDialog {
 
   protected removeCoords(): void {
     this.patch({ locationCoords: null });
+  }
+
+  protected chooseProfile(id: string): void {
+    const profile: Opponent | undefined = this.opponents.opponents().find((entry) => entry.id === id);
+    this.patch(profile ? { opponentId: profile.id, opponent: profile.name.slice(0, MAX_TEXT_LENGTH) } : { opponentId: '' });
+  }
+
+  /** Wird der Name von Hand geändert und passt nicht mehr zum gewählten Profil, löst sich die Zuordnung. */
+  protected changeOpponentText(text: string): void {
+    const draft = this.draft();
+    const profile = draft.opponentId ? this.opponents.opponents().find((entry) => entry.id === draft.opponentId) : undefined;
+    const keep = profile !== undefined && opponentNameKey(profile.name) === opponentNameKey(text);
+    this.patch({ opponent: text, ...(keep || !profile ? {} : { opponentId: '' }) });
   }
 
   protected patch(change: Partial<EventDraft>): void {
