@@ -994,6 +994,8 @@ function normalizeRating(rating = {}) {
   };
   // Von der Abwesenheits-Automatik gesetzt und seither nicht angefasst (siehe applyAutoAbsence).
   if (rating.autoAbsence === true) normalized.autoAbsence = true;
+  // Von einer Absage gesetzt (SCRUM-175, siehe applyRsvpAbsence) und seither nicht angefasst.
+  if (rating.rsvpAbsence === true) normalized.rsvpAbsence = true;
   normalized.grade = calculatedGrade(normalized);
   return normalized;
 }
@@ -1175,9 +1177,11 @@ let privateNoteListeners = {};
 let planListeners = {};
 let absenceListeners = {};
 let measurementListeners = {};
+// Zu-/Absagen (SCRUM-175): Trainer je Event die ganze Unter-Collection, Spieler/Eltern nur das eigene Dokument.
+let responseListeners = {};
 let legacyBlobMode = false;
 let legacyCloudSaveTimer = null;
-const cloudCache = { players: [], events: [], ratings: {}, privateNotes: {}, developmentPlans: {}, absences: {}, measurements: {}, opponents: [], lineup: null };
+const cloudCache = { players: [], events: [], ratings: {}, privateNotes: {}, responses: {}, developmentPlans: {}, absences: {}, measurements: {}, opponents: [], lineup: null };
 
 function isCloudActive() {
   return Boolean(firestoreDb);
@@ -1290,7 +1294,7 @@ async function handleAuthStateChanged(user) {
     // Ohne Anmeldung darf kein Teamstand im Browser bleiben - weder im Speicher noch lokal.
     clearLocalTeamData();
     if (state.players.length || state.events.length) {
-      Object.assign(cloudCache, { players: [], events: [], ratings: {}, privateNotes: {}, developmentPlans: {}, absences: {}, measurements: {}, opponents: [], lineup: null });
+      Object.assign(cloudCache, { players: [], events: [], ratings: {}, privateNotes: {}, responses: {}, developmentPlans: {}, absences: {}, measurements: {}, opponents: [], lineup: null });
       state = normalizeState({ players: [], events: [], opponents: [] });
       renderAll();
     }
@@ -1344,6 +1348,7 @@ function startCloudSync() {
   cloudCache.events = [];
   cloudCache.ratings = {};
   cloudCache.privateNotes = {};
+  cloudCache.responses = {};
   cloudCache.developmentPlans = {};
   cloudCache.absences = {};
   cloudCache.measurements = {};
@@ -1368,8 +1373,11 @@ function startCloudSync() {
     if (currentRole === "trainer") {
       syncRatingListeners(eventIds);
       syncPrivateNoteListeners(eventIds);
+      syncResponseListeners(rsvpListenerEventIds(cloudCache.events, localIsoDate(), RSVP_TRAINER_LOOKBACK_DAYS));
     }
     else if (["player", "parent"].includes(currentRole) && currentPlayerId) syncPlayerRatingListeners(eventIds);
+    // Spieler/Eltern: nur die eigene Rueckmeldung zu kommenden Terminen (SCRUM-175).
+    if (["player", "parent"].includes(currentRole) && currentPlayerId) syncResponseListeners(rsvpListenerEventIds(cloudCache.events, localIsoDate(), 0));
     rebuildStateFromCloudCache();
     cloudListenerRecovered("events");
   }, (error) => cloudListenerFailed("events", error)));
@@ -1526,6 +1534,39 @@ function syncPlayerRatingListeners(eventIds) {
       },
       (error) => cloudListenerFailed(`ratings:${eventId}`, error)
     );
+  });
+}
+
+// Zu-/Absagen (SCRUM-175): teams/{teamId}/events/{eventId}/responses/{playerId}. Der Trainer liest je Event die
+// ganze Unter-Collection, Spieler/Eltern nur das eigene Dokument (gezielter Get - siehe firestore.rules).
+function responseFromDoc(data = {}) {
+  const updatedAt = data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : (typeof data.updatedAt === "string" ? data.updatedAt : "");
+  return { status: data.status, reason: typeof data.reason === "string" ? data.reason : "", by: data.by || "", updatedAt };
+}
+
+function syncResponseListeners(eventIds) {
+  const idSet = new Set(eventIds);
+  Object.keys(responseListeners).forEach((eventId) => {
+    if (idSet.has(eventId)) return;
+    responseListeners[eventId]();
+    delete responseListeners[eventId];
+    delete cloudCache.responses[eventId];
+  });
+  eventIds.forEach((eventId) => {
+    if (responseListeners[eventId]) return;
+    const own = currentRole !== "trainer";
+    responseListeners[eventId] = own
+      ? firestoreModule.onSnapshot(teamDoc("events", eventId, "responses", currentPlayerId), (docSnap) => {
+        cloudCache.responses[eventId] = docSnap.exists() ? { [currentPlayerId]: responseFromDoc(docSnap.data()) } : {};
+        rebuildStateFromCloudCache();
+        cloudListenerRecovered(`responses:${eventId}`);
+      }, (error) => cloudListenerFailed(`responses:${eventId}`, error))
+      : firestoreModule.onSnapshot(teamCollection("events", eventId, "responses"), (snapshot) => {
+        cloudCache.responses[eventId] = {};
+        snapshot.forEach((docSnap) => { cloudCache.responses[eventId][docSnap.id] = responseFromDoc(docSnap.data()); });
+        rebuildStateFromCloudCache();
+        cloudListenerRecovered(`responses:${eventId}`);
+      }, (error) => cloudListenerFailed(`responses:${eventId}`, error));
   });
 }
 
@@ -1801,6 +1842,8 @@ function stopCloudSync() {
   ratingListeners = {};
   Object.values(privateNoteListeners).forEach((unsubscribe) => unsubscribe());
   privateNoteListeners = {};
+  Object.values(responseListeners).forEach((unsubscribe) => unsubscribe());
+  responseListeners = {};
   Object.values(planListeners).forEach((unsubscribe) => unsubscribe());
   planListeners = {};
   Object.values(absenceListeners).forEach((unsubscribe) => unsubscribe());
@@ -1810,7 +1853,7 @@ function stopCloudSync() {
 }
 
 function rebuildStateFromCloudCache() {
-  const events = cloudCache.events.map((event) => ({ ...event, ratings: cloudCache.ratings[event.id] || {}, privateNotes: cloudCache.privateNotes[event.id] || {} }));
+  const events = cloudCache.events.map((event) => ({ ...event, ratings: cloudCache.ratings[event.id] || {}, privateNotes: cloudCache.privateNotes[event.id] || {}, responses: cloudCache.responses[event.id] || {} }));
   state = normalizeState({
     players: cloudCache.players,
     events,
@@ -1821,6 +1864,12 @@ function rebuildStateFromCloudCache() {
     opponents: cloudCache.opponents,
     selectedEventId: state.selectedEventId
   });
+  // Absage -> "Fehlt", Zusage nach Absage -> "Offen" (SCRUM-175). Spieler duerfen keine Bewertungen schreiben,
+  // deshalb uebertraegt der Trainer-Client die Rueckmeldungen - erst wenn alles Noetige geladen ist, sonst
+  // wuerde die Abwesenheits-Automatik mit unvollstaendigen Daten Eintraege zuruecksetzen.
+  if (isCloudTrainer() && scoutPublish.playersLoaded && state.players.every((player) => cloudCache.absences[player.id])) {
+    reconcileRsvp((eventId) => Boolean(cloudCache.ratings[eventId] && cloudCache.responses[eventId]));
+  }
   writeLocalCache();
   // Sobald einmal echte Spieler in der neuen Struktur angekommen sind, macht die
   // Migration aus dem alten Blob-Dokument keinen Sinn mehr - im Gegenteil, sie wuerde
@@ -1861,6 +1910,8 @@ async function cloudDeletePlayer(playerId) {
     refs.push(...ratingSnapshots.filter((snapshot) => snapshot.exists()).map((snapshot) => snapshot.ref));
     const privateNoteSnapshots = await Promise.all(state.events.map((event) => firestoreModule.getDoc(teamDoc("events", event.id, "privateNotes", playerId))));
     refs.push(...privateNoteSnapshots.filter((snapshot) => snapshot.exists()).map((snapshot) => snapshot.ref));
+    const responseSnapshots = await Promise.all(state.events.map((event) => firestoreModule.getDoc(teamDoc("events", event.id, "responses", playerId))));
+    refs.push(...responseSnapshots.filter((snapshot) => snapshot.exists()).map((snapshot) => snapshot.ref));
     // Einladungscodes und Zugaenge (members) des Spielers: sonst bleibt ein Code gueltig bzw. ein Zugang
     // bestehen, der auf einen nicht mehr vorhandenen Spieler zeigt.
     const accessSnapshots = await Promise.all(["invites", "members"].map((name) => firestoreModule.getDocs(firestoreModule.query(teamCollection(name), firestoreModule.where("playerId", "==", playerId)))));
@@ -1884,8 +1935,8 @@ async function commitDeleteRefs(refs) {
 
 async function cloudSaveEvent(event) {
   if (!isCloudTrainer()) return;
-  // Weder Bewertungen noch interne Notizen gehoeren ins Event-Dokument (fuer alle Teammitglieder lesbar).
-  const { ratings, privateNotes, ...meta } = event;
+  // Weder Bewertungen, interne Notizen noch Zu-/Absagen gehoeren ins Event-Dokument (fuer alle Teammitglieder lesbar).
+  const { ratings, privateNotes, responses, ...meta } = event;
   try {
     await firestoreModule.setDoc(teamDoc("events", event.id), meta, { merge: true });
     cloudWriteSucceeded();
@@ -1897,11 +1948,12 @@ async function cloudSaveEvent(event) {
 async function cloudDeleteEvent(event) {
   if (!isCloudTrainer()) return;
   try {
-    const [ratings, privateNotes] = await Promise.all([
+    const [ratings, privateNotes, responses] = await Promise.all([
       firestoreModule.getDocs(teamCollection("events", event.id, "ratings")),
-      firestoreModule.getDocs(teamCollection("events", event.id, "privateNotes"))
+      firestoreModule.getDocs(teamCollection("events", event.id, "privateNotes")),
+      firestoreModule.getDocs(teamCollection("events", event.id, "responses"))
     ]);
-    await commitDeleteRefs([...ratings.docs.map((docSnap) => docSnap.ref), ...privateNotes.docs.map((docSnap) => docSnap.ref), teamDoc("events", event.id)]);
+    await commitDeleteRefs([...ratings.docs.map((docSnap) => docSnap.ref), ...privateNotes.docs.map((docSnap) => docSnap.ref), ...responses.docs.map((docSnap) => docSnap.ref), teamDoc("events", event.id)]);
     cloudWriteSucceeded();
   } catch (error) {
     cloudWriteFailed(error, "Event konnte nicht vollständig aus der Cloud gelöscht werden.");
@@ -3538,6 +3590,107 @@ function reconcileAbsences(options = {}) {
 }
 // AVAILABILITY END
 
+// RSVP START (Zu-/Absagen, SCRUM-175; getestet in tests/rsvp.test.mjs)
+// Spieler und Eltern sagen fuer den eigenen Spieler zu ("yes") oder ab ("no"), optional mit Grund.
+// Gespeichert in teams/{teamId}/events/{eventId}/responses/{playerId} (Regeln: nur der eigene Spieler,
+// nur diese Felder). Eine Absage belegt die Anwesenheit mit "Fehlt" vor, eine spaetere Zusage setzt sie
+// auf "Offen" zurueck - aber nur, solange niemand die Bewertung von Hand geaendert hat (rsvpAbsence).
+const RSVP_STATUSES = ["yes", "no"];
+const RSVP_REASON_MAX = 200;
+// Der Trainer sieht Rueckmeldungen fuer kommende Termine und die der letzten Tage (spaete Absagen).
+const RSVP_TRAINER_LOOKBACK_DAYS = 14;
+const RSVP_PLAYER_EVENT_LIMIT = 10;
+
+function rsvpStatus(event, playerId) {
+  const status = event?.responses?.[playerId]?.status;
+  return RSVP_STATUSES.includes(status) ? status : "open";
+}
+
+function rsvpCounts(event, players) {
+  const counts = { yes: 0, no: 0, open: 0 };
+  players.forEach((player) => { counts[rsvpStatus(event, player.id)] += 1; });
+  return counts;
+}
+
+function rsvpReason(value) {
+  return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, RSVP_REASON_MAX);
+}
+
+function rsvpAbsenceNote(response) {
+  const reason = rsvpReason(response?.reason);
+  return reason ? `Abgesagt: ${reason}` : "Abgesagt";
+}
+
+// Inhalt des Firestore-Dokuments (ohne Zeitstempel, den setzt der Server). Ein Grund nur bei einer Absage.
+function buildRsvpResponse(playerId, status, reason, role) {
+  if (!playerId || !RSVP_STATUSES.includes(status) || !["player", "parent"].includes(role)) return null;
+  return { playerId, status, reason: status === "no" ? rsvpReason(reason) : "", by: role };
+}
+
+function addIsoDays(isoDate, days) {
+  const date = new Date(`${isoDate}T12:00:00`);
+  date.setDate(date.getDate() + days);
+  return localIsoDate(date);
+}
+
+// Fuer welche Events Rueckmeldungs-Listener laufen: ab heute (Spieler) bzw. ab heute minus lookbackDays (Trainer).
+function rsvpListenerEventIds(events, today, lookbackDays = 0) {
+  const from = lookbackDays ? addIsoDays(today, -lookbackDays) : today;
+  return events.filter((event) => event?.id && event.date && event.date >= from).map((event) => event.id);
+}
+
+// Termine, auf die Spieler/Eltern antworten koennen: heute und spaeter, chronologisch, hoechstens limit.
+function upcomingRsvpEvents(events, today, limit = RSVP_PLAYER_EVENT_LIMIT) {
+  return events
+    .filter((event) => event.date && event.date >= today)
+    .sort((a, b) => a.date.localeCompare(b.date) || String(a.title || "").localeCompare(String(b.title || "")))
+    .slice(0, limit);
+}
+
+// Wie applyAutoAbsence, aber fuer Absagen: ueberschreibt nur unbearbeitete Bewertungen ("Offen" ohne
+// Eingaben, keine Abwesenheits-Automatik) und nimmt nur selbst gesetzte Eintraege (rsvpAbsence) zurueck.
+function applyRsvpAbsence(event) {
+  let changed = false;
+  state.players.forEach((player) => {
+    const status = rsvpStatus(event, player.id);
+    const existing = event.ratings?.[player.id];
+    if (status === "no") {
+      const note = rsvpAbsenceNote(event.responses[player.id]);
+      if (existing?.rsvpAbsence) {
+        if (existing.attendance === "absent" && existing.note === note) return;
+        event.ratings[player.id] = { ...existing, attendance: "absent", note };
+      } else {
+        if (existing?.autoAbsence) return;
+        if (existing?.attendance && existing.attendance !== "open") return;
+        if (hasRatingData(existing)) return;
+        event.ratings ||= {};
+        event.ratings[player.id] = { ...blankRating(), attendance: "absent", note, rsvpAbsence: true };
+      }
+    } else {
+      if (!existing?.rsvpAbsence) return;
+      event.ratings[player.id] = { ...blankRating(), rsvpAbsence: false };
+    }
+    cloudSaveRating(event.id, player.id, event.ratings[player.id]);
+    changed = true;
+  });
+  return changed;
+}
+
+// isReady(eventId): sind Bewertungen und Rueckmeldungen dieses Events geladen? Nach einer Zusage greift die
+// normale Abwesenheits-Automatik wieder (z. B. Spieler ist inzwischen verletzt gemeldet).
+function reconcileRsvp(isReady = () => true) {
+  let changed = false;
+  state.events.forEach((event) => {
+    if (!event.responses || !isReady(event.id)) return;
+    if (applyRsvpAbsence(event)) {
+      applyAutoAbsence(event);
+      changed = true;
+    }
+  });
+  return changed;
+}
+// RSVP END
+
 function ageFromBirthdate(value) {
   if (!value) return null;
   const today = new Date();
@@ -4413,6 +4566,7 @@ function eventCardsHtml(events) {
         <small>${escapeHtml(event.date)}${event.opponent ? ` · vs. ${escapeHtml(event.opponent)}` : ""}${result ? ` · ${result.goalsFor}:${result.goalsAgainst}` : ""}</small>
         <span>Anstrengung ${exertionLabel(eventExertion(event))}</span>
         <span>${rated} Bewertungen</span>
+        ${showsRsvp() && event.date >= localIsoDate() ? `<span class="rsvp-counts">${rsvpCountsText(rsvpCounts(event, state.players))}</span>` : ""}
       </button>
     `;
   }).join("");
@@ -4503,10 +4657,12 @@ function renderRatingTable() {
     $("#eventEditorMeta").textContent = "Lege zuerst ein Event an.";
     $("#ratingTable").innerHTML = "";
     $("#ratingStepper").hidden = true;
+    renderRsvpSummary(null);
     return;
   }
 
   $("#eventEditorTitle").textContent = event.title;
+  renderRsvpSummary(event);
   const result = gameResult(event);
   const matchDuration = event.type === "Spiel" ? Number(event.matchDuration || 90) : "";
   $("#eventEditorMeta").textContent = `${event.type} · ${event.date}${result ? ` · Ergebnis ${result.goalsFor}:${result.goalsAgainst}` : ""} · Anstrengung ${exertionLabel(eventExertion(event))}${event.location ? ` · ${event.location}` : ""}`;
@@ -4554,7 +4710,7 @@ function renderRatingTable() {
     ` : "";
     return `
       <tr class="attendance-row attendance-${attendance}">
-        <td data-label="Spieler"><div class="player-cell"><span class="number-badge">${player.number}</span><strong>${escapeHtml(player.name)}</strong></div></td>
+        <td data-label="Spieler"><div class="player-cell"><span class="number-badge">${player.number}</span><strong>${escapeHtml(player.name)}</strong>${rsvpBadgeHtml(event, player.id)}</div></td>
         <td data-label="Anwesenheit">${attendanceSelectHtml(player.id, attendance, event.type === "Spiel")}</td>
         <td data-label="Gesamtnote"><span class="computed-grade">${gradeLabel(calculatedGrade(rating))}</span></td>
         <td data-label="Einsatz">${gradeSelectHtml(player.id, "effort", rating.effort)}</td>
@@ -4637,6 +4793,7 @@ function renderRatingCard(player, event, matchDuration) {
       <div>
         <strong>${escapeHtml(player.name)}</strong>
         ${consentChipHtml(player)}
+        ${rsvpBadgeHtml(event, player.id)}
         <span class="computed-grade">Gesamtnote ${gradeLabel(calculatedGrade(rating))}</span>
       </div>
     </div>
@@ -4899,6 +5056,7 @@ function updateRating(playerId, field, value, rerender = true) {
   event.ratings[playerId][field] = ["effort", "technique", "tactics", "comprehension", "minutes", "goals", "assists"].includes(field) && value !== "" ? Number(value) : value;
   // Eine Hand-Aenderung macht aus dem automatisch gesetzten Eintrag einen normalen: er wird nie wieder zurueckgesetzt.
   if (event.ratings[playerId].autoAbsence) event.ratings[playerId].autoAbsence = false;
+  if (event.ratings[playerId].rsvpAbsence) event.ratings[playerId].rsvpAbsence = false;
   if (field === "minutes" && value !== "") {
     event.ratings[playerId].minutes = Math.min(Number(event.matchDuration || 90), Math.max(0, Number(value)));
   }
@@ -4968,6 +5126,7 @@ function drawProfile() {
   renderProfileChart(player, ratings);
   renderProfileHistory(ratings);
   renderProfileDeepAnalysis(playerId, ratings);
+  renderRsvpPanel();
   renderDevelopmentPlans(playerId);
   renderAbsenceList(playerId);
   renderMeasurementList(playerId);
@@ -5060,6 +5219,96 @@ function deleteDevelopmentPlan(planId) {
   persist();
   cloudDeleteDevelopmentPlan(playerId, planId);
   drawProfile();
+}
+
+// Zu-/Absagen gibt es nur im Rollen-Modus mit Anmeldung (dort koennen Spieler/Eltern antworten).
+function showsRsvp() {
+  return isCloudTrainer();
+}
+
+function rsvpCountsText(counts) {
+  return `${counts.yes} zugesagt · ${counts.no} abgesagt · ${counts.open} offen`;
+}
+
+function rsvpBadgeHtml(event, playerId) {
+  if (!showsRsvp()) return "";
+  const status = rsvpStatus(event, playerId);
+  if (status === "open") return `<span class="rsvp-badge rsvp-open">Offen</span>`;
+  const response = event.responses[playerId];
+  const reason = status === "no" ? rsvpReason(response.reason) : "";
+  const label = status === "yes" ? "Zugesagt" : "Abgesagt";
+  const by = response.by === "parent" ? " (Eltern)" : "";
+  return `<span class="rsvp-badge rsvp-${status}">${label}${by}${reason ? `: ${escapeHtml(reason)}` : ""}</span>`;
+}
+
+function renderRsvpSummary(event) {
+  const box = $("#eventRsvpSummary");
+  if (!box) return;
+  if (!event || !showsRsvp()) {
+    box.hidden = true;
+    box.innerHTML = "";
+    return;
+  }
+  const counts = rsvpCounts(event, state.players);
+  box.hidden = false;
+  box.innerHTML = `<strong>Rückmeldungen:</strong> <span class="rsvp-badge rsvp-yes">${counts.yes} zugesagt</span> <span class="rsvp-badge rsvp-no">${counts.no} abgesagt</span> <span class="rsvp-badge rsvp-open">${counts.open} offen</span>`;
+}
+
+// Zu-/Absagen fuer Spieler und Eltern (SCRUM-175): naechste Termine mit Zusagen/Absagen und optionalem Grund.
+function renderRsvpPanel() {
+  const panel = $("#rsvpPanel");
+  if (!panel) return;
+  const active = isCloudActive() && ["player", "parent"].includes(currentRole) && Boolean(currentPlayerId);
+  panel.hidden = !active;
+  if (!active) {
+    $("#rsvpList").innerHTML = "";
+    return;
+  }
+  const events = upcomingRsvpEvents(state.events, localIsoDate());
+  const parent = currentRole === "parent";
+  $("#rsvpList").innerHTML = events.map((event) => {
+    const status = rsvpStatus(event, currentPlayerId);
+    const response = event.responses?.[currentPlayerId];
+    const pill = status === "yes" ? `<span class="status-pill success">Zugesagt</span>`
+      : status === "no" ? `<span class="status-pill danger">Abgesagt</span>`
+      : `<span class="status-pill warning">Noch offen</span>`;
+    return `
+      <article class="rsvp-item rsvp-item-${status}">
+        <div class="rsvp-info">
+          <strong>${escapeHtml(event.title || event.type)}</strong>
+          <small class="muted">${escapeHtml(formatDate(event.date))} · ${escapeHtml(event.type)}${event.opponent ? ` · vs. ${escapeHtml(event.opponent)}` : ""}${event.location ? ` · ${escapeHtml(event.location)}` : ""}</small>
+        </div>
+        ${pill}
+        <form class="rsvp-form" data-event-id="${escapeHtml(event.id)}">
+          <label>Grund bei Absage (freiwillig, sieht nur das Trainerteam)
+            <input name="reason" type="text" maxlength="${RSVP_REASON_MAX}" value="${escapeHtml(status === "no" ? response?.reason || "" : "")}" placeholder="z. B. Familienfeier" />
+          </label>
+          <div class="button-row">
+            <button class="primary-button" type="submit" value="yes" ${status === "yes" ? 'aria-pressed="true"' : 'aria-pressed="false"'}>${parent ? "Zusagen" : "Ich bin dabei"}</button>
+            <button class="ghost-button danger" type="submit" value="no" ${status === "no" ? 'aria-pressed="true"' : 'aria-pressed="false"'}>${parent ? "Absagen" : "Ich kann nicht"}</button>
+          </div>
+        </form>
+      </article>
+    `;
+  }).join("") || `<p class="muted">Keine anstehenden Termine.</p>`;
+}
+
+async function saveRsvp(event) {
+  event.preventDefault();
+  if (!isCloudActive() || !["player", "parent"].includes(currentRole) || !currentPlayerId) return;
+  const form = event.target.closest(".rsvp-form");
+  const status = event.submitter?.value;
+  const target = state.events.find((item) => item.id === form?.dataset.eventId);
+  const payload = buildRsvpResponse(currentPlayerId, status, form?.querySelector("input[name=reason]")?.value, currentRole);
+  if (!target || !payload) return;
+  form.querySelectorAll("button").forEach((button) => { button.disabled = true; });
+  try {
+    await firestoreModule.setDoc(teamDoc("events", target.id, "responses", currentPlayerId), { ...payload, updatedAt: firestoreModule.serverTimestamp() });
+    setSyncState("saved", status === "yes" ? "Zusage gespeichert" : "Absage gespeichert");
+  } catch (error) {
+    cloudWriteFailed(error, "Rückmeldung konnte nicht gespeichert werden.");
+  }
+  form.querySelectorAll("button").forEach((button) => { button.disabled = false; });
 }
 
 async function saveSelfReflection(event) {
@@ -6635,6 +6884,7 @@ on("#developmentPlanList", "click", (event) => {
   if (button.dataset.action === "delete-plan") deleteDevelopmentPlan(button.dataset.id);
 });
 on("#developmentPlanList", "submit", saveSelfReflection);
+on("#rsvpList", "submit", saveRsvp);
 
 on("#absenceList", "click", (event) => {
   const button = event.target.closest("button");
