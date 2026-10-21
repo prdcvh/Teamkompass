@@ -544,6 +544,12 @@ label {
   letter-spacing: 0.01em;
 }
 
+/* Hinweistext unter einem Formularfeld (z. B. Event-Notiz, SCRUM-203): normal statt fett wie das Label. */
+.field-hint {
+  font-weight: 400;
+  letter-spacing: normal;
+}
+
 input,
 select,
 textarea {
