@@ -82,6 +82,86 @@ describe('Settings (Einstellungen & Datenschutz)', () => {
     expect(root(fixture).textContent).toContain('<img src=x onerror=alert(1)>');
   });
 
+  describe('Erinnerung per E-Mail (SCRUM-100)', () => {
+    async function renderAs(role: 'trainer' | 'physio' | 'player', email: string | null) {
+      firebase = new FakeFirebase();
+      await TestBed.configureTestingModule({ imports: [Settings], providers: [...provideFakeFirebase(firebase)] }).compileComponents();
+      const session = TestBed.inject(SessionService);
+      session.role.set(role);
+      session.uid.set('u1');
+      session.email.set(email);
+      const fixture = TestBed.createComponent(Settings);
+      await fixture.whenStable();
+      fixture.detectChanges();
+      return fixture;
+    }
+    const toggle = (fixture: { nativeElement: unknown }) => root(fixture).querySelector<HTMLInputElement>('#email-erinnerung input[role="switch"]');
+
+    it('ist nur für Trainer mit E-Mail-Konto sichtbar', async () => {
+      expect(toggle(await renderAs('trainer', null))).toBeNull();
+      TestBed.resetTestingModule();
+      expect(toggle(await renderAs('physio', 'a@b.de'))).toBeNull();
+      TestBed.resetTestingModule();
+      expect(toggle(await renderAs('player', null))).toBeNull();
+      TestBed.resetTestingModule();
+      expect(toggle(await renderAs('trainer', 'trainer@example.test'))).not.toBeNull();
+    });
+
+    it('ist standardmäßig aus, nennt die Kontoadresse und grenzt sich vom Geräte-Hinweis ab', async () => {
+      const fixture = await renderAs('trainer', 'trainer@example.test');
+      expect(toggle(fixture)?.checked).toBe(false);
+      expect(root(fixture).textContent).toContain('trainer@example.test');
+      expect(root(fixture).querySelector('header')?.textContent).toContain('gilt dagegen für dein Konto');
+      expect(firebase.notifications.docs.size).toBe(0);
+    });
+
+    it('speichert den Schalter in der Cloud und lädt ihn wieder', async () => {
+      const fixture = await renderAs('trainer', 'trainer@example.test');
+      toggle(fixture)!.click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(firebase.notifications.docs.get('u1')).toEqual({ emailReminders: true });
+      TestBed.resetTestingModule();
+      firebase = new FakeFirebase();
+      firebase.notifications.docs.set('u1', { emailReminders: true });
+      await TestBed.configureTestingModule({ imports: [Settings], providers: [...provideFakeFirebase(firebase)] }).compileComponents();
+      const session = TestBed.inject(SessionService);
+      session.role.set('trainer');
+      session.uid.set('u1');
+      session.email.set('trainer@example.test');
+      const again = TestBed.createComponent(Settings);
+      await again.whenStable();
+      again.detectChanges();
+      expect(toggle(again)?.checked).toBe(true);
+    });
+
+    it('zeigt bei einem Speicherfehler eine verständliche Meldung und lässt den Schalter aus', async () => {
+      const fixture = await renderAs('trainer', 'trainer@example.test');
+      firebase.notifications.saveError = { code: 'permission-denied' };
+      toggle(fixture)!.click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(root(fixture).querySelector('#email-erinnerung [role="alert"]')?.textContent).toContain('konnte nicht gespeichert werden');
+      expect(toggle(fixture)?.checked).toBe(false);
+    });
+
+    it('zeigt bei einem Ladefehler eine Meldung und bietet erneutes Laden an', async () => {
+      firebase = new FakeFirebase();
+      firebase.notifications.readError = { code: 'unavailable' };
+      await TestBed.configureTestingModule({ imports: [Settings], providers: [...provideFakeFirebase(firebase)] }).compileComponents();
+      const session = TestBed.inject(SessionService);
+      session.role.set('trainer');
+      session.uid.set('u1');
+      session.email.set('trainer@example.test');
+      const fixture = TestBed.createComponent(Settings);
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(root(fixture).querySelector('#email-erinnerung [role="alert"]')?.textContent).toContain('konnte nicht geladen werden');
+      expect(toggle(fixture)?.disabled).toBe(true);
+      expect(firebase.calls.filter((call) => call === 'readNotifications')).toHaveLength(1);
+    });
+  });
+
   describe('Passwort ändern', () => {
     const fill = (fixture: { nativeElement: unknown }, name: string, value: string) => {
       const input = root(fixture).querySelector<HTMLInputElement>(`input[name="${name}"]`)!;

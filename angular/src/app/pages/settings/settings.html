@@ -2,7 +2,12 @@
   <header class="head">
     <p class="tk-eyebrow">TeamKompass</p>
     <h1>Einstellungen &amp; Datenschutz</h1>
-    <p class="muted">Diese Einstellungen gelten nur für dieses Gerät. Daten in der Cloud bleiben unberührt.</p>
+    <p class="muted">
+      Darstellung und lokale Daten gelten nur für dieses Gerät; Daten in der Cloud bleiben unberührt.
+      @if (notifications.available()) {
+        Die E-Mail-Erinnerung gilt dagegen für dein Konto auf allen Geräten.
+      }
+    </p>
   </header>
 
   <tk-card>
@@ -34,6 +39,37 @@
       }
     </div>
   </tk-card>
+
+  @if (notifications.available()) {
+    <tk-card>
+      <div class="panel" id="email-erinnerung">
+        <h2>Erinnerung per E-Mail (Cloud, für dein Konto)</h2>
+        <label class="row">
+          <span>Erinnerung per E-Mail, wenn Bewertungen offen sind</span>
+          <input
+            type="checkbox"
+            role="switch"
+            [checked]="notifications.emailReminders()"
+            [disabled]="notifications.load() !== 'ready' || notifications.saving()"
+            (change)="toggleReminders($event)"
+          />
+        </label>
+        <p class="muted">
+          Ist der Schalter an, bekommst du eine E-Mail an <strong>{{ notifications.accountEmail() }}</strong> (die Adresse deines Kontos), wenn vergangene Trainings noch nicht bewertet sind.
+          Jede E-Mail enthält einen Abmeldelink. Standard ist aus. Die Adresse wird nicht zusätzlich gespeichert.
+        </p>
+        <p class="muted">Hinweis: Der Versand startet erst, wenn der Erinnerungsdienst eingerichtet ist. Bis dahin wird nur deine Wahl gespeichert.</p>
+        @if (notifications.load() === 'error') {
+          <div>
+            <button tkButton type="button" (click)="notifications.start()">Erneut laden</button>
+          </div>
+        }
+        @if (notifications.error()) {
+          <p class="error" role="alert">{{ notifications.error() }}</p>
+        }
+      </div>
+    </tk-card>
+  }
 
   @if (canChangePassword()) {
     <tk-card>

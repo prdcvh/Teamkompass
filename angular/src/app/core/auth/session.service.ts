@@ -11,6 +11,10 @@ export class SessionService {
   readonly displayName = signal('');
   /** Spielerprofil, auf das sich Spieler/Eltern beschränken (leer bei Trainer/Medizin). */
   readonly playerId = signal<string | null>(null);
+  /** Kennung des angemeldeten Kontos (Firebase Auth); Schlüssel für kontobezogene Cloud-Einstellungen. */
+  readonly uid = signal<string | null>(null);
+  /** E-Mail-Adresse des Kontos (nur bei E-Mail-Konten, sonst null). Nur zur Anzeige; wird nirgends kopiert. */
+  readonly email = signal<string | null>(null);
 
   /** Kürzel für das runde Namensschild, z. B. „Pascal von Hinueber“ → „PH“. */
   initials(): string {
@@ -25,5 +29,7 @@ export class SessionService {
     this.role.set(null);
     this.displayName.set('');
     this.playerId.set(null);
+    this.uid.set(null);
+    this.email.set(null);
   }
 }
