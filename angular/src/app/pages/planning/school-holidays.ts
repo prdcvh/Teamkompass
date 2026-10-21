@@ -17,7 +17,7 @@ export interface SchoolHoliday {
 }
 
 /** Stand der Liste: Tag, an dem die Quellen geprüft wurden. */
-export const SCHOOL_HOLIDAYS_CHECKED = '2026-10-16';
+export const SCHOOL_HOLIDAYS_CHECKED = '2026-10-21';
 
 export const SCHOOL_HOLIDAYS_SOURCE = 'Hessisches Kultusministerium (Ferientermine), für 2026 bis zu den Sommerferien Kultusministerkonferenz';
 
@@ -42,6 +42,9 @@ export const SCHOOL_HOLIDAYS: readonly SchoolHoliday[] = [
   { name: 'Sommerferien', from: '2029-07-16', to: '2029-08-24' },
   { name: 'Herbstferien', from: '2029-10-15', to: '2029-10-26' },
   { name: 'Weihnachtsferien', from: '2029-12-24', to: '2030-01-11' },
+  // 2030: Herbstferien (Schuljahr 2030/31) noch nicht veröffentlicht, daher steht 2030 nicht in COVERED_HOLIDAY_YEARS.
+  { name: 'Osterferien', from: '2030-04-08', to: '2030-04-22' },
+  { name: 'Sommerferien', from: '2030-07-22', to: '2030-08-30' },
 ];
 
 /**
