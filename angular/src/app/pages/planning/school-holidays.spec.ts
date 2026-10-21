@@ -32,6 +32,8 @@ describe('Schulferien Hessen (Hinweis)', () => {
 
   it('liefert für ein nicht hinterlegtes Jahr null statt halber Daten', () => {
     expect(schoolHolidaysForYear(2025)).toBeNull();
+    // Ostern/Sommer 2030 stehen schon in der Liste, aber 2030 ist erst vollständig, wenn auch die Herbstferien da sind.
+    expect(SCHOOL_HOLIDAYS.some((holiday) => holiday.from.startsWith('2030-'))).toBe(true);
     expect(schoolHolidaysForYear(2030)).toBeNull();
   });
 
@@ -59,7 +61,7 @@ describe('Schulferien Hessen (Hinweis)', () => {
     expect(root.textContent).toContain('22.03.2027 bis 02.04.2027');
     expect(root.textContent).toContain('23.12.2026 bis 12.01.2027');
     expect(root.textContent).toContain('Hessisches Kultusministerium');
-    expect(root.textContent).toContain('Stand 16.10.2026');
+    expect(root.textContent).toContain('Stand 21.10.2026');
     expect(root.querySelector('button')).toBeNull();
   });
 
