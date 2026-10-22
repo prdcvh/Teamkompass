@@ -117,16 +117,17 @@ table {
   table-layout: fixed;
 }
 
-.col-player { width: 16%; }
+.col-player { width: 15%; }
 .col-attendance { width: 14%; }
 .col-total { width: 7%; }
 .col-grade { width: 7%; }
 .col-count { width: 5.5%; }
-.col-note { width: 17%; }
+.col-note { width: 15%; }
 
-table.game .col-player { width: 14%; }
-table.game .col-grade { width: 6.6%; }
-table.game .col-note { width: 11.3%; }
+table.game .col-player { width: 13%; }
+table.game .col-attendance { width: 13%; }
+table.game .col-grade { width: 6%; }
+table.game .col-note { width: 10%; }
 
 .matrix {
   padding: var(--tk-space-2);

@@ -102,4 +102,36 @@ describe('ProfileService', () => {
     expect(profile.items()).toEqual([]);
     expect(firebase.ratings.ratingDocWatchers).toBe(0);
   });
+
+  describe('Trainingspunkte (SCRUM-104)', () => {
+    it('Trainer: liest die Punkte je Event aus dem Trainer-Pfad und folgt Änderungen', async () => {
+      const profile = await setup();
+      firebase.ratings.privateNotes.set('e1', new Map([['p1', { playerId: 'p1', note: '', points: 5 }]]));
+      profile.start('p1');
+      await settle(profile);
+      expect(firebase.calls).toContain('watchPrivateDoc:e1:p1');
+      expect(profile.pointItems().map((entry) => [entry.event.id, entry.points])).toEqual([['e1', 5], ['e2', 0]]);
+      await firebase.ratings.savePoints('e2', 'p1', 3);
+      expect(profile.pointItems().find((entry) => entry.event.id === 'e2')?.points).toBe(3);
+    });
+
+    it('Nicht-Trainer: fragt den Trainer-Pfad nie ab und hat keine Punkte', async () => {
+      const profile = await setup(null);
+      TestBed.inject(SessionService).role.set('player');
+      profile.start('p1');
+      await settle(profile);
+      expect(firebase.calls.some((call) => call.startsWith('watchPrivateDoc'))).toBe(false);
+      expect(profile.pointItems()).toEqual([]);
+    });
+
+    it('beendet die Punkte-Abos beim Abmelden', async () => {
+      const profile = await setup();
+      profile.start('p1');
+      await settle(profile);
+      expect(firebase.ratings.privateDocWatchers).toBe(2);
+      TestBed.inject(SessionService).role.set(null);
+      TestBed.tick();
+      expect(firebase.ratings.privateDocWatchers).toBe(0);
+    });
+  });
 });

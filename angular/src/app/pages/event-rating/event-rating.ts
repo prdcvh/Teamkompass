@@ -155,6 +155,19 @@ export class EventRating implements OnInit {
     this.ratings.setField(player.id, field, value);
   }
 
+  /** Punkte im Feld: leer bei 0, damit das Feld nicht mit Nullen gefüllt wirkt. */
+  protected pointsText(player: Player): string {
+    const points = this.ratings.pointsFor(player.id);
+    return points > 0 ? String(points) : '';
+  }
+
+  /** Speichert die Punkte und zeigt im Feld den bereinigten Wert (negativ/ungültig wird zu leer = 0). */
+  protected setPoints(player: Player, event: Event): void {
+    const input = event.target as HTMLInputElement;
+    this.ratings.setPoints(player.id, input.value);
+    input.value = this.pointsText(player);
+  }
+
   protected setNote(player: Player, value: string): void {
     this.ratings.setPrivateNote(player.id, value);
   }

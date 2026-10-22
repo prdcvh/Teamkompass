@@ -65,6 +65,36 @@ describe('Profile (Spielerprofil)', () => {
     expect(text(rows[1])).toContain('Passspiel'); // Event-Notiz, wenn kein Feedback da ist
   });
 
+  describe('Trainingspunkte (SCRUM-104)', () => {
+    it('zeigt Summe und Verlauf; ein Spiel ohne „Punkte vergeben“ zählt nicht, Punkte bleiben gespeichert', async () => {
+      const fixture = await render();
+      await firebase.ratings.savePoints('e1', 'p1', 4);
+      await firebase.ratings.savePoints('e2', 'p1', 9); // Spiel ohne pointsEnabled
+      await firebase.ratings.savePoints('e3', 'p1', 2);
+      fixture.detectChanges();
+      expect(text(q(fixture, '.points-total'))).toContain('6 Punkte gesamt');
+      const rows = qa(fixture, '.points-history li').map(text);
+      expect(rows).toHaveLength(2); // das Spiel taucht nicht auf
+      expect(rows[0]).toContain('Training Zukunft');
+      expect(rows[1]).toContain('Training Montag');
+      expect(rows[1]).toContain('Summe 4');
+      // Auf „ja“ gestellt, zählen die gespeicherten 9 Punkte wieder.
+      firebase.events.events.set('e2', { ...firebase.events.events.get('e2'), pointsEnabled: true });
+      firebase.events.emitEvents();
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(text(q(fixture, '.points-total'))).toContain('15 Punkte gesamt');
+      });
+    });
+
+    it('bleibt für Nicht-Trainer verborgen', async () => {
+      const fixture = await render();
+      TestBed.inject(SessionService).role.set('physio');
+      fixture.detectChanges();
+      expect(q(fixture, '.points-total')).toBeNull();
+    });
+  });
+
   it('maskiert Namen und Titel (keine unmaskierte HTML-Ausgabe)', async () => {
     const fixture = await render();
     expect(root(fixture).querySelector('img')).toBeNull();

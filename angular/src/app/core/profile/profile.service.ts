@@ -4,6 +4,7 @@ import { EventsService } from '../events/events.service';
 import { RatingsApi } from '../firebase/ratings.api';
 import { type EventRating } from './profile';
 import { type Rating, ratingFromDoc } from '../ratings/rating';
+import { type PointsEntry, normalizePoints } from '../points/points';
 import { SessionService } from '../auth/session.service';
 import { SyncService } from '../shell/sync.service';
 
@@ -22,6 +23,8 @@ export class ProfileService {
   readonly playerId = signal<string | null>(null);
   /** Rating je Event-ID; `null` = für dieses Event gibt es (noch) keine Bewertung dieses Spielers. */
   private readonly byEvent = signal<ReadonlyMap<string, Rating | null>>(new Map());
+  /** Trainingspunkte je Event-ID (SCRUM-104); nur für Trainer gefüllt, fehlender Eintrag = 0. */
+  private readonly pointsByEvent = signal<ReadonlyMap<string, number>>(new Map());
   /** Anzahl der Events, deren erste Antwort noch aussteht. */
   private readonly waiting = signal(0);
   readonly error = signal('');
@@ -32,6 +35,11 @@ export class ProfileService {
     [...this.events.events()]
       .sort((a, b) => b.date.localeCompare(a.date))
       .map((event) => ({ event, rating: this.byEvent().get(event.id) ?? null })),
+  );
+
+  /** Alle Events mit den gespeicherten Punkten des Spielers (ob das Event sie zählt, entscheidet `points.ts`). Nur Trainer. */
+  readonly pointItems = computed<PointsEntry[]>(() =>
+    this.session.role() === 'trainer' ? this.events.events().map((event) => ({ event, points: this.pointsByEvent().get(event.id) ?? 0 })) : [],
   );
 
   private unsubscribers = new Map<string, () => void>();
@@ -67,6 +75,7 @@ export class ProfileService {
     this.pending.clear();
     this.playerId.set(null);
     this.byEvent.set(new Map());
+    this.pointsByEvent.set(new Map());
     this.waiting.set(0);
     this.error.set('');
   }
@@ -74,22 +83,30 @@ export class ProfileService {
   private reconcile(playerId: string, ids: readonly string[]): void {
     const wanted = new Set(ids);
     const generation = this.generation;
-    for (const [eventId, unsubscribe] of this.unsubscribers) {
+    for (const [key, unsubscribe] of this.unsubscribers) {
+      const eventId = key.startsWith('p:') ? key.slice(2) : key;
       if (wanted.has(eventId)) continue;
       unsubscribe();
-      this.unsubscribers.delete(eventId);
-      this.pending.delete(eventId);
-      this.byEvent.update((map) => {
+      this.unsubscribers.delete(key);
+      this.pending.delete(key);
+      const drop = (map: ReadonlyMap<string, unknown>) => {
         const next = new Map(map);
         next.delete(eventId);
         return next;
-      });
+      };
+      if (key.startsWith('p:')) this.pointsByEvent.update((map) => drop(map) as Map<string, number>);
+      else this.byEvent.update((map) => drop(map) as Map<string, Rating | null>);
     }
+    const trainer = this.session.role() === 'trainer';
     for (const eventId of ids) {
       if (this.unsubscribers.has(eventId) || this.pending.has(`open:${eventId}`)) continue;
       this.pending.add(`open:${eventId}`);
       this.pending.add(eventId);
       this.watch(playerId, eventId, generation);
+      if (trainer) {
+        this.pending.add(`p:${eventId}`);
+        this.watchPoints(playerId, eventId, generation);
+      }
     }
     this.waiting.set([...this.pending].filter((key) => !key.startsWith('open:')).length);
   }
@@ -120,6 +137,33 @@ export class ProfileService {
       })
       .catch((error) => {
         this.pending.delete(`open:${eventId}`);
+        if (generation === this.generation) this.fail(error);
+      });
+  }
+
+  /** Punkte aus dem Trainer-Dokument des Spielers (nur Trainer dürfen den Pfad lesen). */
+  private watchPoints(playerId: string, eventId: string, generation: number): void {
+    const key = `p:${eventId}`;
+    this.ratingsApi
+      .watchPrivateDoc(
+        eventId,
+        playerId,
+        (data, meta) => {
+          if (generation !== this.generation) return;
+          this.pointsByEvent.update((map) => new Map(map).set(eventId, normalizePoints(data?.['points'])));
+          this.pending.delete(key);
+          this.waiting.set([...this.pending].filter((entry) => !entry.startsWith('open:')).length);
+          this.sync.applySnapshot(meta);
+        },
+        (error) => {
+          if (generation === this.generation) this.fail(error);
+        },
+      )
+      .then((unsubscribe) => {
+        if (generation !== this.generation || this.error()) unsubscribe();
+        else this.unsubscribers.set(key, unsubscribe);
+      })
+      .catch((error) => {
         if (generation === this.generation) this.fail(error);
       });
   }

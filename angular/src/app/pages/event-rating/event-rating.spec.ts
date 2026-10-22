@@ -11,12 +11,12 @@ describe('EventRating (Event bewerten)', () => {
   let firebase: FakeFirebase;
   const isMobile = signal(false);
 
-  async function render(options: { mobile?: boolean; eventId?: string; game?: boolean; consent?: string; lineup?: boolean; role?: 'trainer' | 'physio' } = {}) {
-    const { mobile = false, eventId = 'e1', game = true, consent, lineup = false, role = 'trainer' } = options;
+  async function render(options: { mobile?: boolean; eventId?: string; game?: boolean; consent?: string; lineup?: boolean; role?: 'trainer' | 'physio'; points?: boolean } = {}) {
+    const { mobile = false, eventId = 'e1', game = true, consent, lineup = false, role = 'trainer', points = false } = options;
     isMobile.set(mobile);
     firebase = new FakeFirebase();
     firebase.events.events.set('e1', game
-      ? { type: 'Spiel', title: 'Heimspiel', date: '2026-10-10', opponent: 'SV Nord', goalsFor: 3, goalsAgainst: 1, intensity: 3, location: 'Platz 1', matchDuration: 70 }
+      ? { type: 'Spiel', title: 'Heimspiel', date: '2026-10-10', opponent: 'SV Nord', goalsFor: 3, goalsAgainst: 1, intensity: 3, location: 'Platz 1', matchDuration: 70, ...(points ? { pointsEnabled: true } : {}) }
       : { type: 'Training', title: 'Training Montag', date: '2026-10-05', intensity: 2 });
     firebase.players.players.set('p1', { name: 'Jonas Keller', positions: ['TW'], number: 1, birthdate: '2012-05-05', status: 'Fit' });
     firebase.players.players.set('p2', { name: 'Elias Wagner', positions: ['RV'], number: 2, birthdate: '2012-06-06', status: 'Fit', ...(consent ? { consentStatus: consent } : {}) });
@@ -55,6 +55,48 @@ describe('EventRating (Event bewerten)', () => {
     select.value = value;
     select.dispatchEvent(new Event('change'));
   };
+
+  describe('Trainingspunkte (SCRUM-104)', () => {
+    it('Training: Punktefeld in der Matrix, speichert ganze Zahlen im Trainer-Pfad und leer = 0', async () => {
+      const fixture = await render({ game: false });
+      const input = q<HTMLInputElement>(fixture, 'input[aria-label="Punkte: Jonas Keller"]');
+      expect(input).not.toBeNull();
+      expect(qa(fixture, 'th').some((th) => text(th) === 'Punkte')).toBe(true);
+      pick(input!, '12');
+      await vi.waitFor(() => expect(firebase.calls).toContain('savePoints:e1:p1:12'));
+      expect(firebase.ratings.privateNotes.get('e1')?.get('p1')).toMatchObject({ note: 'Vertraulich', points: 12 });
+      expect(firebase.ratings.ratings.get('e1')?.get('p1')).not.toHaveProperty('points'); // nie ins sichtbare Bewertungsdokument
+      pick(input!, '');
+      await vi.waitFor(() => expect(firebase.calls).toContain('savePoints:e1:p1:0'));
+    });
+
+    it('verwirft negative Punkte und leert das Feld', async () => {
+      const fixture = await render({ game: false });
+      const input = q<HTMLInputElement>(fixture, 'input[aria-label="Punkte: Elias Wagner"]')!;
+      pick(input, '-4');
+      expect(input.value).toBe('');
+      expect(firebase.calls.some((call) => call.startsWith('savePoints:e1:p2'))).toBe(false); // 0 war schon 0
+    });
+
+    it('Spiel mit „Punkte vergeben: nein“ zeigt kein Punktefeld', async () => {
+      const fixture = await render({ game: true });
+      expect(q(fixture, 'input[aria-label^="Punkte"]')).toBeNull();
+      expect(qa(fixture, 'th').some((th) => text(th) === 'Punkte')).toBe(false);
+    });
+
+    it('Spiel mit „ja“ zeigt das Feld', async () => {
+      const fixture = await render({ game: true, points: true });
+      expect(q<HTMLInputElement>(fixture, 'input[aria-label="Punkte: Jonas Keller"]')).not.toBeNull();
+    });
+
+    it('Handy: Punktefeld in der Karte', async () => {
+      const fixture = await render({ game: false, mobile: true });
+      const input = q<HTMLInputElement>(fixture, 'input[aria-label="Punkte: Jonas Keller"]');
+      expect(input).not.toBeNull();
+      pick(input!, '3');
+      await vi.waitFor(() => expect(firebase.calls).toContain('savePoints:e1:p1:3'));
+    });
+  });
 
   describe('gespeicherte Aufstellung (SCRUM-122)', () => {
     it('zeigt die Aufstellung des Spiels nur lesend: Formation, Positionen, Bank', async () => {

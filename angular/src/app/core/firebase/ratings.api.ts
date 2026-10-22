@@ -82,6 +82,34 @@ export class RatingsApi {
     await setDoc(doc(db, 'teams', environment.teamId, 'events', eventId, 'ratings', playerId), { ...data, playerId }, { merge: true });
   }
 
+  /** Echtzeit-Abo auf das Trainer-Dokument (Notiz und Punkte) eines Spielers in einem Event; null = es gibt keins. Nur Trainer. */
+  async watchPrivateDoc(
+    eventId: string,
+    playerId: string,
+    onData: (data: Readonly<Record<string, unknown>> | null, meta: SnapshotMeta) => void,
+    onError: (error: unknown) => void,
+  ): Promise<() => void> {
+    const { db } = await this.connection.get();
+    const { doc, onSnapshot } = await import('firebase/firestore');
+    return onSnapshot(
+      doc(db, 'teams', environment.teamId, 'events', eventId, 'privateNotes', playerId),
+      { includeMetadataChanges: true },
+      (snapshot) =>
+        onData(snapshot.exists() ? snapshot.data() : null, { fromCache: snapshot.metadata.fromCache, hasPendingWrites: snapshot.metadata.hasPendingWrites }),
+      onError,
+    );
+  }
+
+  /**
+   * Schreibt die Trainingspunkte (SCRUM-104) ins Trainer-Dokument des Spielers (merge: die Notiz bleibt erhalten).
+   * Wie die interne Notiz bewusst im Pfad, den Spieler und Eltern nie lesen.
+   */
+  async savePoints(eventId: string, playerId: string, points: number): Promise<void> {
+    const { db } = await this.connection.get();
+    const { doc, setDoc } = await import('firebase/firestore');
+    await setDoc(doc(db, 'teams', environment.teamId, 'events', eventId, 'privateNotes', playerId), { playerId, points }, { merge: true });
+  }
+
   /** Schreibt die interne Notiz. Sie liegt bewusst getrennt von der Bewertung, die Spieler und Eltern lesen dürfen. */
   async savePrivateNote(eventId: string, playerId: string, note: string): Promise<void> {
     const { db } = await this.connection.get();

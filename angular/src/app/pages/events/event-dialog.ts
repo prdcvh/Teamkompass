@@ -83,6 +83,8 @@ export class EventDialog {
       { label: 'Ort', value: event.location },
       { label: 'Gegner', value: event.type === 'Spiel' ? event.opponent : '' },
       { label: 'Ergebnis', value: resultText(event) },
+      // Punkte sehen nur Trainer (die Leseansicht gibt es für alle Rollen, die Termine lesen dürfen).
+      { label: 'Punkte vergeben', value: event.type === 'Spiel' && this.canEdit() ? (event.pointsEnabled ? 'Ja' : 'Nein') : '' },
       { label: 'Anstrengung', value: exertionLabel(event.exertion) },
       { label: 'Trainingsschwerpunkt', value: event.type === 'Training' ? event.trainingFocus : '' },
     ];

@@ -40,9 +40,10 @@ describe('Datenformat alte App ↔ Angular', () => {
     const empty = { startTime: '', durationMinutes: '', locationCoords: null, exertion: 7, opponentId: '' };
     expect(docFromEvent(eventFromDoc('e1', training))).toEqual({ ...training, ...empty });
     const match = { ...training, id: 'e2', type: 'Spiel', trainingFocus: '', opponent: 'SV Nord', goalsFor: 3, goalsAgainst: 1, matchDuration: 70 };
-    expect(docFromEvent(eventFromDoc('e2', match))).toEqual({ ...match, ...empty });
+    // Punkte vergeben (SCRUM-104): Spiele tragen die Auswahl (fehlend = nein), Trainings bekommen kein Feld.
+    expect(docFromEvent(eventFromDoc('e2', match))).toEqual({ ...match, ...empty, pointsEnabled: false });
     const open = { ...match, goalsFor: '', goalsAgainst: '' };
-    expect(docFromEvent(eventFromDoc('e2', open))).toEqual({ ...open, ...empty });
+    expect(docFromEvent(eventFromDoc('e2', open))).toEqual({ ...open, ...empty, pointsEnabled: false });
   });
 
   it('Event mit Startzeit, Dauer und Koordinaten bleibt unverändert erhalten', () => {
