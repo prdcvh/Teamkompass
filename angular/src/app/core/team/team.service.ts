@@ -2,6 +2,7 @@ import { Injectable, computed, effect, inject, signal, untracked } from '@angula
 import { authErrorMessage, errorCode } from '../auth/auth-errors';
 import { EventsService } from '../events/events.service';
 import { PlayerRecordsApi } from '../firebase/player-records.api';
+import { PlayerStatsApi } from '../firebase/player-stats.api';
 import { RatingsApi } from '../firebase/ratings.api';
 import type { RawDoc, SnapshotMeta } from '../firebase/types';
 import { addDays, todayIso } from '../shared/dates';
@@ -13,6 +14,8 @@ import { SessionService } from '../auth/session.service';
 import { SquadService } from '../player/squad.service';
 import { SyncService } from '../shell/sync.service';
 import { type PlayerData, type RatingsByEvent, itemsFor } from './team';
+import { ratingsFromDocs, ratingsFromPlayerStats } from './player-stats';
+import { PlayerStatsMode } from './player-stats-mode';
 
 /**
  * Daten für die Teamauswertung (Start-Dashboard): Bewertungen aller Spieler je Event sowie Abwesenheiten und
@@ -22,6 +25,12 @@ import { type PlayerData, type RatingsByEvent, itemsFor } from './team';
  * Abwesenheiten und Messwerte sind hier nur das Fenster, das die Übersichten brauchen (SCRUM-200): aktuelle
  * Abwesenheiten kommen vom {@link SquadAbsencesService} (ein gemeinsames Abo mit der Kaderliste), Messwerte der letzten
  * {@link MEASUREMENT_WINDOW_DAYS} Tage von hier. Die volle Historie liest das Spielerprofil bzw. der Export.
+ *
+ * Bewertungen (SCRUM-201): Sind die Zusammenfassungen je Spieler eingerichtet ({@link PlayerStatsMode}), reicht ein
+ * Abo auf `playerStats` (ein Dokument je Spieler) statt eines Abos je Event mit allen Bewertungen. Daraus entsteht
+ * dieselbe {@link RatingsByEvent}-Struktur (ohne Rückmeldungstexte), alle Kennzahlen rechnen unverändert. Sonst – noch
+ * nicht eingerichtet, Regeln noch alt, Fehler – wird wie bisher je Event abonniert. Rückmeldungstexte (JSON-Sicherung)
+ * liefert {@link fullRatings} bei Bedarf.
  */
 @Injectable({ providedIn: 'root' })
 export class TeamService {
@@ -32,27 +41,41 @@ export class TeamService {
   private readonly squad = inject(SquadService);
   private readonly eventsService = inject(EventsService);
   private readonly squadAbsences = inject(SquadAbsencesService);
+  private readonly statsApi = inject(PlayerStatsApi);
+  private readonly statsMode = inject(PlayerStatsMode);
 
   readonly active = signal(false);
   readonly events = computed(() => this.eventsService.events());
-  /** Bewertungen aller Spieler je Event (nur lesen). */
-  readonly ratingsByEvent = computed<RatingsByEvent>(() => this.ratings());
+  /** Bewertungen aller Spieler je Event (nur lesen; aus den Zusammenfassungen ohne Rückmeldungstext). */
+  readonly ratingsByEvent = computed<RatingsByEvent>(() =>
+    this.fromStats() ? ratingsFromPlayerStats(this.stats(), this.eventsService.events()) : this.ratings(),
+  );
   private readonly ownError = signal('');
   readonly error = computed(() => this.ownError() || (this.active() && this.squadAbsences.error() ? this.message(this.squadAbsences.error()) : ''));
   private readonly ratings = signal<RatingsByEvent>(new Map());
+  private readonly stats = signal<readonly RawDoc[]>([]);
+  /** Bewertungen kommen aus den Zusammenfassungen (Abo `s:` aktiv). */
+  private readonly fromStats = signal(false);
   private readonly measurements = signal<ReadonlyMap<string, readonly Measurement[]>>(new Map());
   /** Abos, auf deren erste Antwort noch gewartet wird. */
   private readonly waiting = signal(0);
 
   readonly loading = computed(
-    () => this.active() && !this.error() && (this.squad.load() !== 'ready' || this.eventsService.load() !== 'ready' || this.waiting() > 0 || this.squadAbsences.waiting() > 0),
+    () =>
+      this.active() &&
+      !this.error() &&
+      (this.squad.load() !== 'ready' ||
+        this.eventsService.load() !== 'ready' ||
+        this.statsMode.state() === 'loading' ||
+        this.waiting() > 0 ||
+        this.squadAbsences.waiting() > 0),
   );
   readonly ready = computed(() => this.active() && !this.loading() && !this.error() && this.squad.load() === 'ready');
   /** Je Spieler: alle Events mit seiner Bewertung, Abwesenheiten, Messwerte. */
   readonly data = computed<PlayerData[]>(() =>
     this.squad.players().map((player) => ({
       player,
-      items: itemsFor(player.id, this.eventsService.events(), this.ratings()),
+      items: itemsFor(player.id, this.eventsService.events(), this.ratingsByEvent()),
       absences: this.squadAbsences.byPlayer().get(player.id) ?? [],
       measurements: this.measurements().get(player.id) ?? [],
     })),
@@ -65,8 +88,11 @@ export class TeamService {
 
   constructor() {
     effect(() => {
+      const stats = this.statsMode.state();
+      // Solange unklar ist, ob es Zusammenfassungen gibt, wird noch nichts abonniert (sonst unnötige Lesevorgänge).
+      const ratingKeys = stats === 'on' ? ['s:'] : stats === 'loading' ? [] : this.eventsService.events().map((event) => `r:${event.id}`);
       const wanted = [
-        ...this.eventsService.events().map((event) => `r:${event.id}`),
+        ...ratingKeys,
         ...this.squad.players().flatMap((player) => [`m:${player.id}`]),
       ];
       if (this.active()) untracked(() => this.reconcile(wanted));
@@ -94,6 +120,8 @@ export class TeamService {
     this.pending.clear();
     this.active.set(false);
     this.ratings.set(new Map());
+    this.stats.set([]);
+    this.fromStats.set(false);
     this.measurements.set(new Map());
     this.waiting.set(0);
     this.ownError.set('');
@@ -126,7 +154,10 @@ export class TeamService {
   private drop(key: string): void {
     this.pending.delete(key);
     const id = key.slice(2);
-    if (key.startsWith('r:')) this.ratings.update((map) => without(map, id));
+    if (key === 's:') {
+      this.stats.set([]);
+      this.fromStats.set(false);
+    } else if (key.startsWith('r:')) this.ratings.update((map) => without(map, id));
     else this.measurements.update((map) => without(map, id));
   }
 
@@ -136,7 +167,10 @@ export class TeamService {
     const since = addDays(today, -MEASUREMENT_WINDOW_DAYS);
     const onData = (docs: RawDoc[], meta: SnapshotMeta) => {
       if (generation !== this.generation) return;
-      if (key.startsWith('r:')) {
+      if (key === 's:') {
+        this.stats.set(docs);
+        this.fromStats.set(true);
+      } else if (key.startsWith('r:')) {
         const byPlayer = new Map<string, Rating>(docs.map((entry) => [entry.id, ratingFromDoc(entry.data)]));
         this.ratings.update((map) => new Map(map).set(id, byPlayer));
       } else {
@@ -150,9 +184,11 @@ export class TeamService {
       if (generation === this.generation) this.fail(error);
     };
     const subscribe =
-      key.startsWith('r:')
-        ? this.ratingsApi.watchRatings(id, onData, onError)
-        : this.playerRecordsApi.watchRecentMeasurements(id, since, onData, onError);
+      key === 's:'
+        ? this.statsApi.watchPlayerStats(onData, onError)
+        : key.startsWith('r:')
+          ? this.ratingsApi.watchRatings(id, onData, onError)
+          : this.playerRecordsApi.watchRecentMeasurements(id, since, onData, onError);
     subscribe
       .then((unsubscribe) => {
         this.opening.delete(key);
@@ -163,6 +199,15 @@ export class TeamService {
         this.opening.delete(key);
         if (generation === this.generation) this.fail(error);
       });
+  }
+
+  /**
+   * Alle Bewertungen der geladenen Events mit Rückmeldungstext (JSON-Sicherung). Mit Zusammenfassungen einmalig vom
+   * Server gelesen, sonst die vorhandenen Abo-Daten.
+   */
+  async fullRatings(): Promise<RatingsByEvent> {
+    if (!this.fromStats()) return this.ratings();
+    return ratingsFromDocs(await this.statsApi.readAllRatings(this.eventsService.events().map((event) => event.id)));
   }
 
   private fail(error: unknown): void {

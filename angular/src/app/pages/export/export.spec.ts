@@ -223,6 +223,43 @@ describe('Export (Daten exportieren)', () => {
     expect(root(fixture).textContent).toContain('Die Sicherung wurde eingespielt');
   });
 
+  it('SCRUM-201: mit Zusammenfassungen enthält die Sicherung trotzdem die Rückmeldungen (einmalig gelesen)', async () => {
+    const fixture = await render();
+    firebase.ratings.ratings.get('e1')!.set('p1', { ...firebase.ratings.ratings.get('e1')!.get('p1'), note: 'Starkes Spiel' });
+    firebase.playerStats.marker = { version: 1, builtAt: '2026-10-21T20:00:00.000Z' };
+    firebase.playerStats.emitMarker();
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(firebase.calls).toContain('watchPlayerStats');
+      expect(byText(fixture, 'Sicherung herunterladen')).toBeTruthy();
+    });
+    byText(fixture, 'Sicherung herunterladen')!.click();
+    await vi.waitFor(() => expect(saved).toHaveLength(1));
+    const data = JSON.parse(saved[0].text);
+    expect(data.events.find((e: { title: string }) => e.title === 'Spiel gegen Eppstein').ratings.p1.note).toBe('Starkes Spiel');
+    expect(firebase.calls.some((call) => call.startsWith('readAllRatings:'))).toBe(true);
+  });
+
+  it('SCRUM-201: nach dem Einspielen werden eingerichtete Zusammenfassungen neu berechnet', async () => {
+    const fixture = await render();
+    firebase.playerStats.marker = { version: 1, builtAt: '2026-10-21T20:00:00.000Z' };
+    firebase.playerStats.emitMarker();
+    await choose(fixture, backupFile());
+    dialogButton(fixture, 'Sicherung einspielen').click();
+    await vi.waitFor(() => expect(firebase.calls.some((call) => call.startsWith('writeRebuild:'))).toBe(true));
+    await settle(fixture);
+    expect(root(fixture).textContent).toContain('Die Sicherung wurde eingespielt');
+  });
+
+  it('SCRUM-201: ohne eingerichtete Zusammenfassungen wird beim Einspielen nichts neu berechnet', async () => {
+    const fixture = await render();
+    await choose(fixture, backupFile());
+    dialogButton(fixture, 'Sicherung einspielen').click();
+    await vi.waitFor(() => expect(writes).toHaveLength(1));
+    await settle(fixture);
+    expect(firebase.calls.some((call) => call.startsWith('writeRebuild:'))).toBe(false);
+  });
+
   it('Sicherung einspielen: Abbrechen schreibt nichts', async () => {
     const fixture = await render();
     await choose(fixture, backupFile());

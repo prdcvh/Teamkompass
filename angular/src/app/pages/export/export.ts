@@ -16,6 +16,7 @@ import { type DevelopmentPlan, planFromDoc } from '../../core/records/plan';
 import { SessionService } from '../../core/auth/session.service';
 import { SyncService } from '../../core/shell/sync.service';
 import { TeamService } from '../../core/team/team.service';
+import { PlayerStatsService } from '../../core/team/player-stats.service';
 import { WorkspaceService } from '../../core/device/workspace.service';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
@@ -41,6 +42,7 @@ interface PendingImport {
 })
 export class Export implements OnInit, OnDestroy {
   private readonly team = inject(TeamService);
+  private readonly stats = inject(PlayerStatsService);
   private readonly eventsService = inject(EventsService);
   private readonly opponents = inject(OpponentsService);
   private readonly playerRecordsApi = inject(PlayerRecordsApi);
@@ -136,13 +138,15 @@ export class Export implements OnInit, OnDestroy {
       ),
     );
     const history = await this.readHistory(players);
+    // Mit Rückmeldungstexten: bei eingerichteten Zusammenfassungen einmalig vom Server gelesen (SCRUM-201).
+    const ratings = await this.team.fullRatings();
     const now = new Date();
     const data = buildExport({
       teamId: environment.teamId,
       now,
       players,
       events: this.team.events(),
-      ratings: this.team.ratingsByEvent(),
+      ratings,
       plans,
       absences: new Map(players.map((player) => [player.id, history.get(player.id)!.absences])),
       measurements: new Map(players.map((player) => [player.id, history.get(player.id)!.measurements])),
@@ -261,8 +265,11 @@ export class Export implements OnInit, OnDestroy {
     this.importDone.set('');
     try {
       await this.backupApi.writeAll(backupOperations(pending.backup));
+      // Die Sicherung schreibt Bewertungen direkt: eingerichtete Zusammenfassungen danach neu berechnen (SCRUM-201).
+      const statsOk = this.stats.state() !== 'on' || (await this.stats.rebuild())?.differences.length === 0;
       this.workspace.record(`Sicherung eingespielt (${pending.fileName})`);
       this.importDone.set('Die Sicherung wurde eingespielt. Die Daten erscheinen in wenigen Sekunden.');
+      if (!statsOk) this.importError.set('Die Kennzahlen-Zusammenfassung konnte nicht neu berechnet werden. Bitte unter Einstellungen „Neu berechnen“ drücken.');
     } catch {
       this.importError.set('Die Sicherung konnte nicht vollständig eingespielt werden. Bitte prüfen und ggf. erneut versuchen – bereits geschriebene Teile bleiben bestehen.');
     } finally {

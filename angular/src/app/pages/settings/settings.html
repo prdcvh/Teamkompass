@@ -101,6 +101,62 @@
     </tk-card>
   }
 
+  @if (stats.available()) {
+    <tk-card>
+      <div class="panel" id="kennzahlen-zusammenfassung">
+        <h2>Kennzahlen-Zusammenfassung (Cloud, für das Team)</h2>
+        <p class="muted">
+          Start, Aufstellung und Teamanalyse können ihre Zahlen aus einer kleinen Zusammenfassung je Spieler lesen statt aus
+          allen Einzelbewertungen. Das spart Ladezeit und Kosten; die Zahlen bleiben gleich.
+        </p>
+        <p role="status" data-testid="stats-state">
+          @switch (stats.state()) {
+            @case ('on') {
+              Eingerichtet{{ stats.builtAt() ? ' (zuletzt neu berechnet am ' + time(stats.builtAt()!) + ')' : '' }}.
+            }
+            @case ('denied') {
+              Noch nicht verfügbar: Die Freigabe in der Cloud fehlt noch. Die Übersichten rechnen wie bisher.
+            }
+            @case ('loading') {
+              Wird geprüft …
+            }
+            @default {
+              Noch nicht eingerichtet. Die Übersichten rechnen wie bisher aus allen Einzelbewertungen.
+            }
+          }
+        </p>
+        @if (stats.state() !== 'denied' && stats.state() !== 'loading') {
+          <p class="muted">
+            „Neu berechnen“ liest einmal alle Bewertungen und baut die Zusammenfassung neu auf. Bitte währenddessen nicht bewerten.
+            „Prüfen“ vergleicht die Zusammenfassung mit einer Neuberechnung und ändert nichts.
+          </p>
+          <div class="actions">
+            <button tkButton variant="primary" type="button" [disabled]="stats.busy() !== 'idle'" (click)="stats.rebuild()">
+              {{ stats.busy() === 'rebuilding' ? 'Wird berechnet …' : 'Neu berechnen' }}
+            </button>
+            @if (stats.state() === 'on') {
+              <button tkButton type="button" [disabled]="stats.busy() !== 'idle'" (click)="stats.check()">
+                {{ stats.busy() === 'checking' ? 'Wird geprüft …' : 'Prüfen' }}
+              </button>
+            }
+          </div>
+        }
+        @if (stats.result(); as result) {
+          @if (result.differences.length === 0) {
+            <p role="status" data-testid="stats-result">Geprüft: Die Zusammenfassung stimmt mit allen {{ result.ratings }} Bewertungen überein ({{ result.players }} Spieler).</p>
+          } @else {
+            <p class="error" role="alert" data-testid="stats-result">
+              Geprüft: {{ result.differences.length }} Abweichung(en) gefunden. Bitte „Neu berechnen“ drücken.
+            </p>
+          }
+        }
+        @if (stats.error()) {
+          <p class="error" role="alert">{{ stats.error() }}</p>
+        }
+      </div>
+    </tk-card>
+  }
+
   <tk-card>
     <div class="panel">
       <h2>Aktivitätsverlauf</h2>

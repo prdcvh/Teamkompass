@@ -6,6 +6,7 @@ import { LineupApi } from '../firebase/lineup.api';
 import { NotificationsApi } from '../firebase/notifications.api';
 import { OpponentsApi } from '../firebase/opponents.api';
 import { PlayerRecordsApi } from '../firebase/player-records.api';
+import { PlayerStatsApi } from '../firebase/player-stats.api';
 import { PlanningApi } from '../firebase/planning.api';
 import { PlayersApi } from '../firebase/players.api';
 import { RatingsApi } from '../firebase/ratings.api';
@@ -21,6 +22,7 @@ import { FakeNotificationsApi } from './fake-notifications.api';
 import { FakeOpponentsApi } from './fake-opponents.api';
 import { FakePlanningApi } from './fake-planning.api';
 import { FakePlayerRecordsApi } from './fake-player-records.api';
+import { FakePlayerStatsApi } from './fake-player-stats.api';
 import { FakePlayersApi } from './fake-players.api';
 import { FakeRatingsApi } from './fake-ratings.api';
 import { FakeScoutApi } from './fake-scout.api';
@@ -44,6 +46,7 @@ export class FakeFirebase {
   readonly notifications = new FakeNotificationsApi(this.calls);
   readonly planning =new FakePlanningApi(this.calls);
   readonly scout = new FakeScoutApi(this.calls);
+  readonly playerStats = new FakePlayerStatsApi(this.calls, this.events, this.ratings);
 
   constructor() {
     this.events.hasRecords = (id) => (this.ratings.ratings.get(id)?.size ?? 0) > 0 || (this.ratings.privateNotes.get(id)?.size ?? 0) > 0;
@@ -67,5 +70,6 @@ export function provideFakeFirebase(fake: FakeFirebase): Provider[] {
     { provide: NotificationsApi, useValue: fake.notifications },
     { provide: PlanningApi, useValue: fake.planning },
     { provide: ScoutApi, useValue: fake.scout },
+    { provide: PlayerStatsApi, useValue: fake.playerStats },
   ];
 }

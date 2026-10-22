@@ -41,6 +41,12 @@ h2 {
   justify-content: space-between;
 }
 
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tk-space-3);
+}
+
 .field {
   display: grid;
   gap: var(--tk-space-2);
