@@ -14,3 +14,9 @@ npm run verify
 Vor jedem Hosting-Deployment laufen Syntax-, Sicherheits- und Konsistenztests.
 Hinweise zum sicheren Rollout der Einmal-Einladungen stehen in
 `NEXT_LEVEL_UPGRADE.md`.
+
+## Lizenz
+
+Copyright (c) 2026 Pascal da Cruz von Hinüber. Alle Rechte vorbehalten. Nutzung,
+Kopie und Weitergabe sind ohne schriftliche Erlaubnis nicht gestattet, siehe
+[`LICENSE`](LICENSE).
