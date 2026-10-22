@@ -67,9 +67,47 @@ export class FakeRatingsApi implements Pick<RatingsApi, keyof RatingsApi> {
     this.calls.push(`savePrivateNote:${eventId}:${playerId}`);
     if (this.savePrivateNoteError) throw this.savePrivateNoteError;
     const store = this.privateNotes.get(eventId) ?? new Map<string, Record<string, unknown>>();
-    store.set(playerId, { playerId, note });
+    store.set(playerId, { ...store.get(playerId), playerId, note });
     this.privateNotes.set(eventId, store);
     this.emitSub('privateNotes', eventId);
+    this.pushPrivateDoc(eventId, playerId);
+  }
+
+  savePointsError: unknown = null;
+
+  async savePoints(eventId: string, playerId: string, points: number): Promise<void> {
+    this.calls.push(`savePoints:${eventId}:${playerId}:${points}`);
+    if (this.savePointsError) throw this.savePointsError;
+    const store = this.privateNotes.get(eventId) ?? new Map<string, Record<string, unknown>>();
+    store.set(playerId, { ...store.get(playerId), playerId, points });
+    this.privateNotes.set(eventId, store);
+    this.emitSub('privateNotes', eventId);
+    this.pushPrivateDoc(eventId, playerId);
+  }
+
+  // --- Trainer-Dokument (Notiz + Punkte) eines einzelnen Spielers je Event (Profil) ---
+  privateDocWatchers = 0;
+  private privateDocListeners = new Map<string, { onData: (data: Readonly<Record<string, unknown>> | null, meta: SnapshotMeta) => void; onError: (error: unknown) => void }>();
+
+  async watchPrivateDoc(
+    eventId: string,
+    playerId: string,
+    onData: (data: Readonly<Record<string, unknown>> | null, meta: SnapshotMeta) => void,
+    onError: (error: unknown) => void,
+  ): Promise<() => void> {
+    this.calls.push(`watchPrivateDoc:${eventId}:${playerId}`);
+    this.privateDocWatchers += 1;
+    const key = `${eventId}:${playerId}`;
+    this.privateDocListeners.set(key, { onData, onError });
+    onData(this.privateNotes.get(eventId)?.get(playerId) ?? null, { fromCache: false, hasPendingWrites: false });
+    return () => {
+      this.privateDocWatchers -= 1;
+      this.privateDocListeners.delete(key);
+    };
+  }
+
+  private pushPrivateDoc(eventId: string, playerId: string): void {
+    this.privateDocListeners.get(`${eventId}:${playerId}`)?.onData(this.privateNotes.get(eventId)?.get(playerId) ?? null, { fromCache: false, hasPendingWrites: false });
   }
 
   // --- Bewertung eines einzelnen Spielers je Event (Profil) ---

@@ -67,6 +67,11 @@ export interface TeamEvent {
    * ihn dann nicht mehr. Fehlt, solange nichts von Hand geändert wurde.
    */
   readonly seriesEdited?: true;
+  /**
+   * Nur bei Spielen (SCRUM-104): Der Trainer vergibt für dieses Spiel Trainingspunkte. Fehlt oder `false` = das
+   * Spiel zählt nicht fürs Punktesammeln. Trainings brauchen die Angabe nicht (dort sind Punkte immer möglich).
+   */
+  readonly pointsEnabled?: boolean;
 }
 
 /** Eingaben aus dem Formular; alles als Text, wie es der Nutzer eingibt. */
@@ -88,6 +93,8 @@ export interface EventDraft {
   /** Wird im Formular nicht bearbeitet (kommt mit der Ortssuche), aber beim Bearbeiten erhalten. */
   readonly locationCoords: LocationCoords | null;
   readonly notes: string;
+  /** Nur bei Spielen: „Punkte vergeben“ (SCRUM-104). Neue Spiele starten mit „ja“. */
+  readonly pointsEnabled: boolean;
 }
 
 export type EventErrors = Partial<
@@ -130,6 +137,7 @@ export function emptyDraft(today: string): EventDraft {
     durationMinutes: String(DEFAULT_TRAINING_DURATION),
     locationCoords: null,
     notes: '',
+    pointsEnabled: true,
   };
 }
 
@@ -151,6 +159,7 @@ export function draftFromEvent(event: TeamEvent): EventDraft {
     durationMinutes: event.durationMinutes === null ? (event.type === 'Training' ? String(DEFAULT_TRAINING_DURATION) : '') : String(event.durationMinutes),
     locationCoords: event.locationCoords,
     notes: event.notes,
+    pointsEnabled: event.pointsEnabled === true,
   };
 }
 
@@ -217,6 +226,7 @@ export function eventFromDraft(draft: EventDraft, id: string): TeamEvent {
     durationMinutes: game ? null : wholeNumber(draft.durationMinutes, 1, MAX_TRAINING_DURATION),
     locationCoords: draft.locationCoords,
     notes: draft.notes.trim(),
+    ...(game ? { pointsEnabled: draft.pointsEnabled } : {}),
   };
 }
 
@@ -257,6 +267,7 @@ export function eventFromDoc(id: string, data: Readonly<Record<string, unknown>>
     locationCoords: isLocationCoords(coords) ? { lat: coords.lat, lon: coords.lon, name: coords.name } : null,
     notes: text(data['notes']),
     ...(data['seriesEdited'] === true ? { seriesEdited: true as const } : {}),
+    ...(type === 'Spiel' ? { pointsEnabled: data['pointsEnabled'] === true } : {}),
   };
 }
 
@@ -280,6 +291,8 @@ export function docFromEvent(event: TeamEvent): Record<string, unknown> {
     durationMinutes: event.durationMinutes ?? '',
     locationCoords: event.locationCoords ?? null,
     notes: event.notes,
+    // Nur bei Spielen; Trainings bleiben unverändert (dort sind Punkte immer möglich).
+    ...(event.type === 'Spiel' ? { pointsEnabled: event.pointsEnabled === true } : {}),
   };
 }
 

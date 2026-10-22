@@ -134,4 +134,43 @@ describe('RatingsService', () => {
     expect(ratings.ratingFor('p1').attendance).toBe('open');
     expect(firebase.ratings.ratingWatchers).toBe(0);
   });
+
+  describe('Trainingspunkte (SCRUM-104)', () => {
+    it('Spiel ohne „Punkte vergeben“: setPoints schreibt nichts', async () => {
+      const ratings = await setup();
+      ratings.start('e1');
+      await vi.waitFor(() => expect(ratings.load()).toBe('ready'));
+      expect(ratings.pointsActive()).toBe(false);
+      expect(ratings.setPoints('p1', '5')).toBe(false);
+      expect(firebase.calls.some((call) => call.startsWith('savePoints'))).toBe(false);
+    });
+
+    it('Spiel mit „ja“: speichert Punkte, behält die Notiz, lädt gespeicherte Punkte', async () => {
+      const ratings = await setup();
+      firebase.events.events.set('e1', { type: 'Spiel', title: 'Heimspiel', date: '2026-10-10', matchDuration: 70, pointsEnabled: true });
+      firebase.events.emitEvents();
+      firebase.ratings.privateNotes.get('e1')!.set('p2', { playerId: 'p2', note: '', points: 4 });
+      ratings.start('e1');
+      await vi.waitFor(() => expect(ratings.load()).toBe('ready'));
+      await vi.waitFor(() => expect(ratings.pointsActive()).toBe(true));
+      expect(ratings.pointsFor('p2')).toBe(4);
+      expect(ratings.setPoints('p1', '8')).toBe(true);
+      expect(ratings.pointsFor('p1')).toBe(8);
+      await vi.waitFor(() => expect(firebase.calls).toContain('savePoints:e1:p1:8'));
+      expect(firebase.ratings.privateNotes.get('e1')?.get('p1')).toMatchObject({ note: 'Nur für uns', points: 8 });
+      expect(ratings.setPoints('p1', '8')).toBe(false); // unverändert
+      expect(ratings.setPoints('p1', '-2')).toBe(true); // negativ = 0
+      expect(ratings.pointsFor('p1')).toBe(0);
+      ratings.setPrivateNote('p2', 'neu');
+      await vi.waitFor(() => expect(firebase.ratings.privateNotes.get('e1')?.get('p2')).toMatchObject({ note: 'neu', points: 4 }));
+    });
+
+    it('Nicht-Trainer: keine Punkte, kein Schreiben', async () => {
+      const ratings = await setup('physio');
+      ratings.start('e1');
+      await vi.waitFor(() => expect(ratings.load()).toBe('ready'));
+      expect(ratings.pointsFor('p1')).toBe(0);
+      expect(ratings.setPoints('p1', '3')).toBe(false);
+    });
+  });
 });
