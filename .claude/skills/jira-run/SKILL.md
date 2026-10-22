@@ -33,7 +33,7 @@ Zusatzvorgabe des PO (kann leer sein): `$ARGUMENTS`
 
      Regelmäßige Updates (Wunsch des PO): Schicke kurze Updates per send_message (Tool mcp__claude-code-remote__send_message, per ToolSearch laden) an die Sitzung <Sitzungs-ID aus Schritt 2>, aus der der PO den Run gestartet hat:
      - jedes Mal, wenn du (oder ein Sub-Agent) ein Ticket in Jira verschiebst: eine Zeile, z. B. „SCRUM-171 → In Überprüfung (PR #236)“,
-     - einmal, wenn du nach deiner Einschätzung fertig bist: den Abschlussbericht in kurzer Form (was in Überprüfung ist, was auf eine PO-Entscheidung wartet, warum du aufhörst).
+     - einmal, wenn du nach deiner Einschätzung fertig bist: den Abschlussbericht in kurzer Form (was in Überprüfung ist, was auf eine PO-Entscheidung wartet, warum du aufhörst, und am Ende die Frage an den PO, ob er bereit ist zu mergen, mit der Liste der PRs, die deine Kontrolle bestanden haben (PR-Nummer + Ticket).
      Die Push-Nachricht mit dem Nachtplan bleibt zusätzlich. Schlägt send_message fehl, einfach normal weiterarbeiten und es im Abschlussbericht erwähnen.
      ```
 4. Antworte dem PO in einem kurzen Satz auf Deutsch: Run gestartet, mit
@@ -45,8 +45,15 @@ Zusatzvorgabe des PO (kann leer sein): `$ARGUMENTS`
 Kommt später eine Nachricht der Run-Sitzung hier an (als Turn, den eine
 andere Sitzung geschickt hat), gib sie dem PO knapp auf Deutsch weiter:
 Ticket-Verschiebungen in einer Zeile, den Abschlussbericht als kurze
-Zusammenfassung. Nicht selbst darauf reagieren oder etwas bauen – es sind nur
-Infos für den PO.
+Zusammenfassung mit der Merge-Frage. Nicht selbst darauf reagieren oder etwas
+bauen – es sind nur Infos für den PO.
+
+Sagt der PO darauf ja (egal zu welcher Tageszeit): die genannten PRs hier
+mergen, einen nach dem anderen. Vor jedem Merge den aktuellen `main` in den PR
+holen, `npm run verify` laufen lassen und prüfen, dass CI grün ist; danach das
+Ticket in Jira auf „Erledigt“ setzen. Draft-PRs, die auf eine PO-Entscheidung
+warten, nicht mergen. Schlägt etwas fehl, nicht mergen, sondern dem PO sagen,
+was fehlt.
 
 Schlägt `fire_trigger` fehl (Aufgabe nicht gefunden, keine Berechtigung):
 nichts selbst bauen, sondern dem PO den Fehler nennen. Findet sich die Aufgabe

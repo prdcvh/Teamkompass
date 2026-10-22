@@ -125,19 +125,25 @@ keeps the board current, reports at sprint end).
   (a scheduled night session, starting around 22:30 Europe/Berlin). It has
   **no fixed end time** (PO, 2026-10-16): it keeps working until the usage
   limit is used up (see "Quota" below), even if that runs into the morning.
-  Apart from that running night session, during the day Claude does **not**
-  start new tickets and does
-  **not** push or merge to `main` — not even right after the PO approves
-  tickets — unless the PO explicitly asks in chat. Answering questions and
-  small Jira housekeeping are fine at any time.
+  Apart from that running night session (or a run the PO starts with
+  `/jira-run`), during the day Claude does **not** start new tickets unless
+  the PO explicitly asks in chat. Answering questions and small Jira
+  housekeeping are fine at any time.
+- **Merging is tied to a question, not the time of day (PO, 2026-10-22).** A
+  run (night session or `/jira-run`) never merges on its own. At the end of
+  every run Claude asks the PO whether they are ready to merge, listing the
+  PRs that passed the check. Once the PO says yes, Claude merges them (one at
+  a time, latest `main` brought in and `npm run verify` re-run first) and sets
+  the tickets to `Erledigt`, whatever the time of day. PRs that need a PO
+  decision (see below) stay Draft and are not part of that question.
 - **Night-session rules.** Work the active sprint, critical tickets first,
   following everything in this file. Nobody can be asked at night, so
   anything that needs a PO decision (changes to `firestore.rules` or auth with
   uncertain real-world effect, new hosting targets, unclear acceptance
   criteria) stays a **Draft PR**, the ticket goes to `In Überprüfung` with a
-  comment saying exactly what the PO has to decide. Everything else follows
-  the normal merge workflow. Finish with a short report (what is done, what
-  waits for the PO).
+  comment saying exactly what the PO has to decide. Finish with a short
+  report (what is done, what waits for the PO) that ends with the merge
+  question above.
 - **One sub-agent per ticket (standing instruction from the PO,
   2026-10-15).** In the night session, the main session only orchestrates:
   for each ticket it sends a separate sub-agent (Agent tool, one ticket at a
@@ -148,15 +154,16 @@ keeps the board current, reports at sprint end).
   criteria, every app copy touched, test present, verify/CI green, ticket
   comment as required above. If something is off, the sub-agent fixes it
   (via SendMessage, or a new sub-agent given a concrete list of the
-  problems). Only after that check passes does the main session merge (per the merge
-  workflow) and set the ticket to `Erledigt`. Every ticket gets a fresh
+  problems). Only after that check passes is the PR ready; it is merged and
+  the ticket set to `Erledigt` once the PO answers the end-of-run merge
+  question with yes. Every ticket gets a fresh
   sub-agent; one is never reused for a second ticket.
 - **Parallel tickets (PO, 2026-10-15).** At most 3 sub-agents at once, each
   in its own worktree (`isolation: "worktree"`), and only for tickets that
   clearly don't touch the same code area (e.g. an Angular ticket next to a
   player-profile fix). Tickets that overlap run one after another. The main
-  session checks and merges one PR at a time; before each merge it brings
-  the latest `main` into that PR and re-runs `npm run verify`.
+  session checks one PR at a time; before each merge it brings the latest
+  `main` into that PR and re-runs `npm run verify`.
   The 3 slots are a rolling pool, not rounds: as soon as one sub-agent
   reports back, the main session immediately starts a fresh sub-agent on the
   next suitable (non-overlapping) ticket and checks the finished one while
