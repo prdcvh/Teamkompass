@@ -1,8 +1,8 @@
 <section class="page" [attr.data-variant]="mobile() ? 'mobile' : 'desktop'">
   <header class="head">
-    <p class="tk-eyebrow">{{ teamName }}</p>
+    <p class="tk-eyebrow">{{ teamName() }}</p>
     <h1>Start</h1>
-    <p class="meta">Team-ID {{ teamId }}</p>
+    <p class="meta">Team-ID {{ teamId() }}</p>
   </header>
 
   <tk-break-notice />

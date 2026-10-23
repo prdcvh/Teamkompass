@@ -3,7 +3,25 @@ import type { FirebaseApp } from 'firebase/app';
 import type { Auth } from 'firebase/auth';
 import type { Firestore } from 'firebase/firestore';
 import { environment } from '../../../environments/environment';
+import { appCheckSiteKey } from '../../../environments/firebase';
 import { openFirestore, wipeFirestore } from './firestore-cache';
+
+/**
+ * App Check (SCRUM-181): nur mit eingetragenem Websiteschlüssel. Ohne Schlüssel passiert nichts – kein zusätzlicher
+ * Code wird geladen. Ein Fehler beim Start von App Check darf die App nicht blockieren (Firebase lehnt dann höchstens
+ * Anfragen ab, falls in der Konsole „erzwingen“ aktiv ist).
+ */
+export async function startAppCheck(app: FirebaseApp, siteKey: string = appCheckSiteKey): Promise<boolean> {
+  if (!siteKey) return false;
+  try {
+    const { initializeAppCheck, ReCaptchaEnterpriseProvider } = await import('firebase/app-check');
+    initializeAppCheck(app, { provider: new ReCaptchaEnterpriseProvider(siteKey), isTokenAutoRefreshEnabled: true });
+    return true;
+  } catch (error) {
+    console.error('App Check konnte nicht gestartet werden.', error);
+    return false;
+  }
+}
 
 export interface FirebaseSdk {
   readonly app: FirebaseApp;
@@ -29,6 +47,7 @@ export class FirebaseConnection {
         import('firebase/firestore'),
       ]);
       const app = initializeApp(environment.firebase);
+      await startAppCheck(app);
       return { app, auth: getAuth(app), db: openFirestore(app, firestore) };
     })();
     return this.sdk;

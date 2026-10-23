@@ -30,6 +30,8 @@ export const ROUTES = [
   '/start', '/kader', '/events', '/events/e1', '/events/e2', '/events/e3', '/events/e4', '/planung', '/profile', '/profile/p1', '/teamanalyse',
   '/gegneranalyse', '/aufstellung', '/suche', '/zugaenge', '/trainer-konto', '/scout-zugang', '/medizin-zugang', '/export', '/einstellungen', '/styleguide',
   '/anmelden?as=none', '/ansicht?as=player', '/ansicht?as=physio', '/ansicht?as=scout',
+  // Registrierung, Teamauswahl und Einstieg (SCRUM-181).
+  '/registrieren?as=none&code=ABCDEFGHJKLMNPQR', '/team-waehlen?as=multi', '/willkommen?as=fresh',
 ];
 
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json' };

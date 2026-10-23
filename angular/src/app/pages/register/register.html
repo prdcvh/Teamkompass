@@ -1,0 +1,168 @@
+<main class="register">
+  <div class="panel">
+    <header class="head">
+      <p class="tk-eyebrow">TeamKompass · Registrierung</p>
+      <h1>
+        @switch (reg.step()) {
+          @case ('account') {
+            Konto anlegen
+          }
+          @case ('verify') {
+            E-Mail bestätigen
+          }
+          @default {
+            {{ reg.invite()?.kind === 'club' ? 'Verein und Team anlegen' : 'Team anlegen' }}
+          }
+        }
+      </h1>
+      <ol class="steps" aria-label="Schritte">
+        @for (label of ['Konto', 'E-Mail', 'Team']; track label; let index = $index) {
+          <li [class.done]="index + 1 < stepNumber()" [class.current]="index + 1 === stepNumber()" [attr.aria-current]="index + 1 === stepNumber() ? 'step' : null">
+            <span class="dot" aria-hidden="true">{{ index + 1 }}</span>{{ label }}
+          </li>
+        }
+      </ol>
+    </header>
+
+    <div class="card">
+      @switch (reg.step()) {
+        @case ('account') {
+          <form (ngSubmit)="submitAccount()" novalidate>
+            <p class="hint">
+              TeamKompass ist im Moment nur mit Einladung nutzbar. Den Code hast du per Mail oder Link bekommen.
+            </p>
+            <div class="field">
+              <label class="tk-label">
+                Einladungscode
+                <input class="tk-input code" type="text" name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD-EFGH-JKLM-NPQR" required [(ngModel)]="code" [attr.aria-invalid]="reg.accountErrors().code ? 'true' : null" />
+              </label>
+              @if (reg.accountErrors().code) {
+                <span class="error" role="alert">{{ reg.accountErrors().code }}</span>
+              }
+            </div>
+            <div class="field">
+              <label class="tk-label">
+                E-Mail
+                <input class="tk-input" type="email" name="email" autocomplete="username" required [(ngModel)]="email" [attr.aria-invalid]="reg.accountErrors().email ? 'true' : null" />
+              </label>
+              @if (reg.accountErrors().email) {
+                <span class="error" role="alert">{{ reg.accountErrors().email }}</span>
+              }
+            </div>
+            <div class="field">
+              <label class="tk-label">
+                Passwort
+                <span class="password">
+                  <input class="tk-input" [type]="showPassword() ? 'text' : 'password'" name="password" [attr.autocomplete]="existing() ? 'current-password' : 'new-password'" required [(ngModel)]="password" [attr.aria-invalid]="reg.accountErrors().password ? 'true' : null" />
+                  <button type="button" class="reveal" [attr.aria-pressed]="showPassword()" [attr.aria-label]="showPassword() ? 'Passwort verbergen' : 'Passwort anzeigen'" (click)="showPassword.set(!showPassword())">
+                    {{ showPassword() ? 'Verbergen' : 'Anzeigen' }}
+                  </button>
+                </span>
+              </label>
+              @if (!existing()) {
+                <small class="muted">Mindestens {{ minLength }} Zeichen mit Groß- und Kleinbuchstaben und einer Ziffer.</small>
+              }
+              @if (reg.accountErrors().password) {
+                <span class="error" role="alert">{{ reg.accountErrors().password }}</span>
+              }
+            </div>
+            @if (!existing()) {
+              <div class="field">
+                <label class="tk-label">
+                  Passwort wiederholen
+                  <input class="tk-input" [type]="showPassword() ? 'text' : 'password'" name="repeat" autocomplete="new-password" required [(ngModel)]="repeat" [attr.aria-invalid]="reg.accountErrors().repeat ? 'true' : null" />
+                </label>
+                @if (reg.accountErrors().repeat) {
+                  <span class="error" role="alert">{{ reg.accountErrors().repeat }}</span>
+                }
+              </div>
+            }
+            <button tkButton variant="primary" type="submit" [disabled]="reg.busy()" [attr.aria-busy]="reg.busy()">
+              {{ existing() ? 'Anmelden und weitermachen' : 'Konto anlegen' }}
+            </button>
+            <button type="button" class="linklike" (click)="toggleExisting()">
+              {{ existing() ? 'Ich brauche noch ein Konto' : 'Ich habe schon ein Konto (E-Mail bestätigt?)' }}
+            </button>
+          </form>
+        }
+        @case ('verify') {
+          <div class="verify">
+            <p>
+              Wir haben eine Mail an <strong>{{ reg.email() }}</strong> geschickt. Klicke auf den Link darin, um deine Adresse zu
+              bestätigen. Danach geht es hier weiter.
+            </p>
+            <p class="muted">Keine Mail da? Bitte auch im Spam-Ordner nachsehen.</p>
+            <button tkButton variant="primary" type="button" [disabled]="reg.busy()" [attr.aria-busy]="reg.busy()" (click)="reg.checkVerified()">Ich habe bestätigt – weiter</button>
+            <button type="button" class="linklike" [disabled]="reg.busy()" (click)="reg.resend()">Mail noch einmal schicken</button>
+          </div>
+        }
+        @case ('team') {
+          <form (ngSubmit)="submitTeam()" novalidate>
+            @if (reg.invite()?.kind === 'club') {
+              <p class="hint">Dein Code <strong>{{ formattedCode() }}</strong> legt einen neuen Verein an. Du wirst Vereinsadmin und Trainer des ersten Teams.</p>
+              <div class="field">
+                <label class="tk-label">
+                  Name des Vereins
+                  <input class="tk-input" type="text" name="clubName" autocomplete="organization" maxlength="100" required [(ngModel)]="clubName" (input)="suggest()" [attr.aria-invalid]="reg.teamErrors().clubName ? 'true' : null" />
+                </label>
+                @if (reg.teamErrors().clubName) {
+                  <span class="error" role="alert">{{ reg.teamErrors().clubName }}</span>
+                }
+              </div>
+            } @else {
+              <p class="hint">
+                Du legst ein neues Team im Verein <strong>{{ reg.clubName() || 'deines Vereinsadmins' }}</strong> an und wirst dessen Trainer.
+              </p>
+            }
+            <div class="field">
+              <label class="tk-label">
+                Altersklasse
+                <select class="tk-input" name="ageGroup" required (change)="chooseAgeGroup(value($event))" [attr.aria-invalid]="reg.teamErrors().ageGroup ? 'true' : null">
+                  <option value="" [selected]="!ageGroup() && !ownAgeGroup()">Bitte wählen</option>
+                  @for (group of ageGroups; track group) {
+                    <option [value]="group" [selected]="ageGroup() === group && !ownAgeGroup()">{{ group }}</option>
+                  }
+                  <option value="other" [selected]="ownAgeGroup()">Andere …</option>
+                </select>
+              </label>
+              @if (ownAgeGroup()) {
+                <label class="tk-label">
+                  Eigene Bezeichnung
+                  <input class="tk-input" type="text" name="ownAgeGroup" maxlength="40" [value]="ageGroup()" (input)="setOwnAgeGroup(value($event))" />
+                </label>
+              }
+              @if (reg.teamErrors().ageGroup) {
+                <span class="error" role="alert">{{ reg.teamErrors().ageGroup }}</span>
+              }
+            </div>
+            <div class="field">
+              <label class="tk-label">
+                Teamname
+                <input class="tk-input" type="text" name="teamName" maxlength="100" required [(ngModel)]="teamName" (input)="touchTeamName()" [attr.aria-invalid]="reg.teamErrors().teamName ? 'true' : null" />
+              </label>
+              <small class="muted">So erscheint das Team in der App, z. B. „SV Musterstadt U11“.</small>
+              @if (reg.teamErrors().teamName) {
+                <span class="error" role="alert">{{ reg.teamErrors().teamName }}</span>
+              }
+            </div>
+            <button tkButton variant="primary" type="submit" [disabled]="reg.busy()" [attr.aria-busy]="reg.busy()">
+              {{ reg.invite()?.kind === 'club' ? 'Verein und Team anlegen' : 'Team anlegen' }}
+            </button>
+          </form>
+        }
+        @default {
+          <p role="status">Fertig! Dein Team wird geöffnet …</p>
+        }
+      }
+
+      @if (reg.notice()) {
+        <p class="hint" role="status">{{ reg.notice() }}</p>
+      }
+      @if (reg.error()) {
+        <p class="error" role="alert">{{ reg.error() }}</p>
+      }
+    </div>
+
+    <p class="foot"><a routerLink="/anmelden">Zurück zur Anmeldung</a></p>
+  </div>
+</main>

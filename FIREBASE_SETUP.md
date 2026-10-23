@@ -254,3 +254,56 @@ Gehoert ein Team schon zu einem anderen Verein, bricht das Skript ab und schreib
 hinzugefuegte Teams (Abschnitt 6) bitte in `scripts/assign-clubs-lib.mjs` (`TEAMS`) eintragen und das
 Skript erneut laufen lassen. Mitglieder, die die Alt-Apps nach dem Lauf anlegen, haben kein `uid`-Feld –
 ein erneuter Lauf ergaenzt es.
+
+
+## 10. Registrierung nur mit Einladung (`scripts/create-club-invite.mjs`, SCRUM-181)
+
+Neue Trainer registrieren sich selbst in der Angular-App (`https://teamkompass-u14.web.app/registrieren`),
+aber **nur mit einem Einladungscode**. Es gibt zwei Arten:
+
+| Code | Wer legt ihn an | Was der Einloesende bekommt |
+|---|---|---|
+| Vereinscode | nur der PO, per Skript | neuer Verein (er wird Vereinsadmin) + erstes Team (er wird Trainer) |
+| Beitrittscode | Vereinsadmin in der App (Einstellungen → „Verein“) oder PO per Skript mit `--club` | neues Team im bestehenden Verein (er wird Trainer, **nicht** Vereinsadmin) |
+
+Ein Code gilt **einmal**, laeuft ab (Standard 14 Tage), kann an eine E-Mail-Adresse gebunden werden und
+funktioniert nur mit **bestaetigter** E-Mail-Adresse. Die Regeln (`firestore.rules`, Abschnitt `clubInvites`)
+erzwingen das; Tests: `tests/rules/registration.test.mjs`.
+
+### Vorher einmalig in der Firebase Console
+
+1. **Authentication → Anmeldemethode → E-Mail/Passwort**: muss aktiviert sein (ist es fuer die Trainer schon).
+2. **Authentication → Einstellungen → Autorisierte Domains**: `teamkompass-u14.web.app` muss drinstehen (die
+   `*.web.app`/`*.firebaseapp.com`-Adressen des Projekts stehen normalerweise schon drin). Fuer Vorschau-Links
+   nicht noetig: die Bestaetigungsmail kommt dann ohne Ruecksprung-Link, man oeffnet die Registrierung selbst wieder.
+3. Optional **Authentication → Vorlagen → E-Mail-Adressbestaetigung**: Absendername/Text auf Deutsch anpassen.
+
+### Code fuer einen neuen Verein erzeugen
+
+1. Dienstkonto-Schluessel wie in Abschnitt 7, Schritt 1 (ausserhalb des Repos ablegen, danach loeschen).
+2. Einmalig: `npm install --no-save firebase-admin`
+3. **Probelauf (Standard, schreibt nichts):**
+   `GOOGLE_APPLICATION_CREDENTIALS=/pfad/key.json node scripts/create-club-invite.mjs --email trainer@verein.de`
+4. Echter Lauf: gleicher Aufruf mit `--apply` am Ende. Das Skript zeigt Code und Link, z. B.
+   `https://teamkompass-u14.web.app/registrieren?code=ABCD…`. Den Link nur an diese eine Person schicken.
+
+Optionen: `--days <1-60>` (Gueltigkeit), `--club <vereinsId>` (Beitrittscode statt neuer Verein),
+`--note "<Notiz>"`, `--base-url https://…` (andere Adresse im Link). Ohne `--email` gilt der Code fuer jede
+bestaetigte Adresse – dann wie ein Passwort behandeln.
+
+### App Check (Schutz vor Missbrauch) – vorbereitet, aber aus
+
+Die App startet App Check nur, wenn in `angular/src/environments/firebase.ts` ein Schluessel in `appCheckSiteKey`
+steht (heute leer = aus). Zum Einschalten:
+
+1. Google Cloud Console → **reCAPTCHA** → Schluessel anlegen (Typ „Website“, Domain `teamkompass-u14.web.app`
+   und ggf. weitere Hosting-Adressen).
+2. Firebase Console → **App Check** → Web-App → Anbieter **reCAPTCHA Enterprise** → Schluessel eintragen.
+3. Schluessel in `appCheckSiteKey` eintragen und in `firebase.json` (Ziel `u14`) die Content-Security-Policy
+   erweitern: `script-src` um `https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/`,
+   `frame-src https://www.google.com/recaptcha/`, `connect-src` um `https://content-firebaseappcheck.googleapis.com`.
+4. Einige Tage unter App Check → **Messwerte** beobachten. **Nicht „Erzwingen“ einschalten, solange die Alt-Apps
+   (`outputs/*`) laufen** – die senden kein App-Check-Token und waeren sonst ausgesperrt.
+
+Bis dahin begrenzt die Einladungspflicht neue Konten: ohne Code entsteht kein Verein und kein Team; ein Konto ohne
+Code sieht nichts.

@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { environment } from '../../../environments/environment';
+import { CurrentTeam } from '../team/current-team.service';
 import type { PlayerStatsDoc } from '../team/player-stats';
 import { FirebaseConnection } from './firebase-connection';
 import type { RawDoc, SnapshotMeta } from './types';
@@ -21,6 +21,7 @@ export type RatingDocsByEvent = ReadonlyMap<string, readonly RawDoc[]>;
 @Injectable({ providedIn: 'root' })
 export class PlayerStatsApi {
   private readonly connection = inject(FirebaseConnection);
+  private readonly team = inject(CurrentTeam);
 
   /** Echtzeit-Abo auf das Kennzeichen (null = gibt es nicht). */
   async watchMarker(
@@ -30,7 +31,7 @@ export class PlayerStatsApi {
     const { db } = await this.connection.get();
     const { doc, onSnapshot } = await import('firebase/firestore');
     return onSnapshot(
-      doc(db, 'teams', environment.teamId, 'meta', 'playerStats'),
+      doc(db, 'teams', this.team.id(), 'meta', 'playerStats'),
       (snapshot) => onData(snapshot.exists() ? snapshot.data() : null, { fromCache: snapshot.metadata.fromCache, hasPendingWrites: snapshot.metadata.hasPendingWrites }),
       onError,
     );
@@ -41,7 +42,7 @@ export class PlayerStatsApi {
     const { db } = await this.connection.get();
     const { collection, onSnapshot } = await import('firebase/firestore');
     return onSnapshot(
-      collection(db, 'teams', environment.teamId, 'playerStats'),
+      collection(db, 'teams', this.team.id(), 'playerStats'),
       { includeMetadataChanges: true },
       (snapshot) =>
         onData(
@@ -56,7 +57,7 @@ export class PlayerStatsApi {
   async readPlayerStats(): Promise<RawDoc[]> {
     const { db } = await this.connection.get();
     const { collection, getDocsFromServer } = await import('firebase/firestore');
-    const snapshot = await getDocsFromServer(collection(db, 'teams', environment.teamId, 'playerStats'));
+    const snapshot = await getDocsFromServer(collection(db, 'teams', this.team.id(), 'playerStats'));
     return snapshot.docs.map((entry) => ({ id: entry.id, data: entry.data() }));
   }
 
@@ -67,12 +68,12 @@ export class PlayerStatsApi {
   async readAllRatings(eventIds: readonly string[] | null = null): Promise<RatingDocsByEvent> {
     const { db } = await this.connection.get();
     const { collection, getDocsFromServer } = await import('firebase/firestore');
-    const ids = eventIds ?? (await getDocsFromServer(collection(db, 'teams', environment.teamId, 'events'))).docs.map((entry) => entry.id);
+    const ids = eventIds ?? (await getDocsFromServer(collection(db, 'teams', this.team.id(), 'events'))).docs.map((entry) => entry.id);
     const result = new Map<string, RawDoc[]>();
     for (let offset = 0; offset < ids.length; offset += 10) {
       await Promise.all(
         ids.slice(offset, offset + 10).map(async (id) => {
-          const snapshot = await getDocsFromServer(collection(db, 'teams', environment.teamId, 'events', id, 'ratings'));
+          const snapshot = await getDocsFromServer(collection(db, 'teams', this.team.id(), 'events', id, 'ratings'));
           result.set(id, snapshot.docs.map((entry) => ({ id: entry.id, data: entry.data() })));
         }),
       );
@@ -89,8 +90,8 @@ export class PlayerStatsApi {
     const { db } = await this.connection.get();
     const { doc, writeBatch } = await import('firebase/firestore');
     const ops: ((batch: ReturnType<typeof writeBatch>) => void)[] = [
-      ...set.map((entry) => (batch: ReturnType<typeof writeBatch>) => batch.set(doc(db, 'teams', environment.teamId, 'playerStats', entry.playerId), entry)),
-      ...remove.map((id) => (batch: ReturnType<typeof writeBatch>) => batch.delete(doc(db, 'teams', environment.teamId, 'playerStats', id))),
+      ...set.map((entry) => (batch: ReturnType<typeof writeBatch>) => batch.set(doc(db, 'teams', this.team.id(), 'playerStats', entry.playerId), entry)),
+      ...remove.map((id) => (batch: ReturnType<typeof writeBatch>) => batch.delete(doc(db, 'teams', this.team.id(), 'playerStats', id))),
     ];
     for (let offset = 0; offset < ops.length; offset += 400) {
       const batch = writeBatch(db);
@@ -98,6 +99,6 @@ export class PlayerStatsApi {
       await batch.commit();
     }
     const { setDoc } = await import('firebase/firestore');
-    await setDoc(doc(db, 'teams', environment.teamId, 'meta', 'playerStats'), { ...marker });
+    await setDoc(doc(db, 'teams', this.team.id(), 'meta', 'playerStats'), { ...marker });
   }
 }

@@ -101,6 +101,10 @@
     </tk-card>
   }
 
+  @if (canChangePassword()) {
+    <tk-club-admin-card />
+  }
+
   @if (stats.available()) {
     <tk-card>
       <div class="panel" id="kennzahlen-zusammenfassung">

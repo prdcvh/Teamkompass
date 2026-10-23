@@ -113,3 +113,38 @@ input[role='switch']:checked::after {
   color: var(--tk-red-dark);
   font-size: var(--tk-text-sm);
 }
+
+/* Vereinsadmin: Trainer-Einladungen (SCRUM-181). */
+h3 {
+  margin: var(--tk-space-2) 0 0;
+  font-size: var(--tk-text-md);
+}
+
+.invite-result {
+  display: grid;
+  gap: var(--tk-space-2);
+  padding: var(--tk-space-3);
+  background: var(--tk-soft-green);
+  border-radius: var(--tk-radius-md);
+}
+
+.invite-result .link code {
+  overflow-wrap: anywhere;
+}
+
+.invites {
+  display: grid;
+  gap: var(--tk-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.invites li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tk-space-2);
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--tk-text-sm);
+}

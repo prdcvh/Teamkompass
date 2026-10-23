@@ -83,6 +83,7 @@
               }
             </button>
             <button type="button" class="linklike" (click)="openReset()">Passwort vergessen?</button>
+            <p class="register">Neu als Trainer? <a routerLink="/registrieren">Mit Einladungscode registrieren</a></p>
           </form>
         } @else {
           <form (ngSubmit)="submitCode()" #codeForm="ngForm">

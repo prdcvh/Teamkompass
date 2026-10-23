@@ -1,0 +1,26 @@
+<main class="choice">
+  <div class="panel">
+    <p class="tk-eyebrow">TeamKompass</p>
+    <h1>Team wählen</h1>
+    <p class="hint">Du hast Zugang zu mehreren Teams. Welches möchtest du öffnen? Wechseln kannst du später unter „Team wechseln“.</p>
+
+    <ul class="list">
+      @for (choice of team.choices(); track choice.teamId) {
+        <li>
+          <button type="button" class="item" [class.current]="isCurrent(choice)" [attr.aria-current]="isCurrent(choice) ? 'true' : null" (click)="open(choice)">
+            <span class="text">
+              <strong>{{ title(choice) }}</strong>
+              <small>{{ subtitle(choice) }}</small>
+            </span>
+            @if (isCurrent(choice)) {
+              <span class="badge">geöffnet</span>
+            }
+            <span class="chevron" aria-hidden="true">›</span>
+          </button>
+        </li>
+      }
+    </ul>
+
+    <p class="foot"><a routerLink="/abmelden">Abmelden</a></p>
+  </div>
+</main>

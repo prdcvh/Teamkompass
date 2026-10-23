@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { environment } from '../../../environments/environment';
+import { CurrentTeam } from '../team/current-team.service';
 import { FirebaseConnection } from './firebase-connection';
 import type { SnapshotMeta } from './types';
 
@@ -7,6 +7,7 @@ import type { SnapshotMeta } from './types';
 @Injectable({ providedIn: 'root' })
 export class LineupApi {
   private readonly connection = inject(FirebaseConnection);
+  private readonly team = inject(CurrentTeam);
 
   /** Echtzeit-Abo auf die Startelf (`meta/lineup`, ein einzelnes Dokument; null = noch keine gespeichert). Nur Trainer. */
   async watchLineup(
@@ -16,7 +17,7 @@ export class LineupApi {
     const { db } = await this.connection.get();
     const { doc, onSnapshot } = await import('firebase/firestore');
     return onSnapshot(
-      doc(db, 'teams', environment.teamId, 'meta', 'lineup'),
+      doc(db, 'teams', this.team.id(), 'meta', 'lineup'),
       { includeMetadataChanges: true },
       (snapshot) =>
         onData(snapshot.exists() ? snapshot.data() : null, { fromCache: snapshot.metadata.fromCache, hasPendingWrites: snapshot.metadata.hasPendingWrites }),
@@ -31,7 +32,7 @@ export class LineupApi {
   async saveLineup(data: Readonly<Record<string, unknown>>): Promise<void> {
     const { db } = await this.connection.get();
     const { doc, setDoc } = await import('firebase/firestore');
-    await setDoc(doc(db, 'teams', environment.teamId, 'meta', 'lineup'), data, { merge: true });
+    await setDoc(doc(db, 'teams', this.team.id(), 'meta', 'lineup'), data, { merge: true });
   }
 
   /**
@@ -41,7 +42,7 @@ export class LineupApi {
   async saveEventLineup(eventId: string, entry: Readonly<Record<string, unknown>>): Promise<void> {
     const { db } = await this.connection.get();
     const { doc, setDoc } = await import('firebase/firestore');
-    await setDoc(doc(db, 'teams', environment.teamId, 'meta', 'lineup'), { byEvent: { [eventId]: entry } }, { merge: true });
+    await setDoc(doc(db, 'teams', this.team.id(), 'meta', 'lineup'), { byEvent: { [eventId]: entry } }, { merge: true });
   }
 
   /**
@@ -52,7 +53,7 @@ export class LineupApi {
     const { db } = await this.connection.get();
     const { doc, updateDoc, deleteField } = await import('firebase/firestore');
     try {
-      await updateDoc(doc(db, 'teams', environment.teamId, 'meta', 'lineup'), { [`byEvent.${eventId}`]: deleteField() });
+      await updateDoc(doc(db, 'teams', this.team.id(), 'meta', 'lineup'), { [`byEvent.${eventId}`]: deleteField() });
     } catch (error) {
       if ((error as { code?: string } | null)?.code !== 'not-found') throw error;
     }

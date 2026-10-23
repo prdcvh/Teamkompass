@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { environment } from '../../../environments/environment';
+import { CurrentTeam } from '../../core/team/current-team.service';
 import { formatDate, resultText } from '../../core/events/event';
 import { LayoutService } from '../../core/shell/layout.service';
 import { formationName, lineupIsEmpty, onPitchCount, pitchMarkers } from '../../core/lineup/lineup';
@@ -54,8 +54,9 @@ export class Home implements OnInit {
   private readonly squad = inject(SquadService);
   private readonly session = inject(SessionService);
   protected readonly isTrainer = computed(() => this.session.role() === 'trainer');
-  protected readonly teamName = environment.teamName;
-  protected readonly teamId = environment.teamId;
+  private readonly current = inject(CurrentTeam);
+  protected readonly teamName = this.current.name;
+  protected readonly teamId = this.current.id;
 
   protected readonly figures = computed(() => dashboardFigures(this.team.data(), this.team.events(), todayIso()));
   protected readonly board = computed(() =>

@@ -32,13 +32,113 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/clubs/$(clubId)/admins/$(request.auth.uid));
     }
 
+    // ---------------------------------------------------------------------------------------------
+    // Registrierung nur mit Einladung (SCRUM-181, PO-Entscheidung 23.10.2026: keine freie Registrierung).
+    // clubInvites/{code}   kind ("club" | "team"), clubId, teamId, expiresAt, createdAt, email (optional), createdBy
+    // - kind "club": legt der PO mit scripts/create-club-invite.mjs an (Admin-Zugang, umgeht diese Regeln). Wer den
+    //   Code einloest, legt in EINEM Schreibvorgang an: den neuen Verein clubs/{clubId}, sich selbst als Vereinsadmin,
+    //   das erste Team teams/{teamId} (hasTrainer true, firstTrainerUid = eigenes Konto) und sich selbst als dessen
+    //   Trainer - und loescht dabei den Code. clubId und teamId sind schon im Code festgelegt (Zufalls-IDs), damit
+    //   jede Teilregel den Code findet und niemand damit einen BESTEHENDEN Verein oder ein bestehendes Team erreicht.
+    // - kind "team": Beitritt zu einem bestehenden Verein. Legt der Vereinsadmin (in der App oder der PO per Skript)
+    //   an. Der Einloesende legt das Team teams/{teamId} im Verein an und wird dessen erster Trainer - aber NICHT
+    //   Vereinsadmin und ohne Zugriff auf andere Teams des Vereins.
+    // Einloesen nur mit bestaetigter E-Mail-Adresse (E-Mail-Bestaetigung), nur vor Ablauf, nur einmal (der Code wird im
+    // selben Schreibvorgang geloescht), und - falls der Code an eine E-Mail gebunden ist - nur mit genau dieser Adresse.
+    // ---------------------------------------------------------------------------------------------
+
+    function verifiedEmail() {
+      return signedIn()
+        && request.auth.token.get('email_verified', false) == true
+        && request.auth.token.get('email', null) is string;
+    }
+
+    function clubInvitePath(code) {
+      return /databases/$(database)/documents/clubInvites/$(code);
+    }
+
+    // Der Code ist gueltig, passt zu Art/Verein/Team und wird in genau diesem Schreibvorgang verbraucht.
+    function claimsClubInvite(code, kind, clubId, teamId) {
+      return code is string && code.size() > 0 && code.size() <= 64
+        && verifiedEmail()
+        && exists(clubInvitePath(code))
+        && !existsAfter(clubInvitePath(code))
+        && get(clubInvitePath(code)).data.kind == kind
+        && get(clubInvitePath(code)).data.clubId == clubId
+        && get(clubInvitePath(code)).data.teamId == teamId
+        && get(clubInvitePath(code)).data.expiresAt is timestamp
+        && get(clubInvitePath(code)).data.expiresAt > request.time
+        && (get(clubInvitePath(code)).data.get('email', null) == null
+          || get(clubInvitePath(code)).data.get('email', null) == request.auth.token.email.lower());
+    }
+
+    // Registrierung eines ersten Trainers fuer teams/{teamId} im Verein clubId mit dem Code "code":
+    // - Vereinscode: der Verein entsteht in diesem Schreibvorgang neu, mit dem eigenen Konto als Admin (dessen
+    //   Admin-Eintrag den Code im Feld inviteCode traegt);
+    // - Beitrittscode: der Verein besteht schon.
+    function registersWith(code, clubId, teamId) {
+      return clubId is string && clubId.size() > 0 && (
+        (claimsClubInvite(code, "club", clubId, teamId)
+          && !exists(/databases/$(database)/documents/clubs/$(clubId))
+          && existsAfter(/databases/$(database)/documents/clubs/$(clubId))
+          && getAfter(/databases/$(database)/documents/clubs/$(clubId)/admins/$(request.auth.uid)).data.get('inviteCode', null) == code)
+        || (claimsClubInvite(code, "team", clubId, teamId)
+          && exists(/databases/$(database)/documents/clubs/$(clubId)))
+      );
+    }
+
+    match /clubInvites/{code} {
+      // Wer einen Code kennt und eine bestaetigte E-Mail hat, darf ihn gezielt abrufen (die App zeigt dann Verein/Art an).
+      // Der Vereinsadmin sieht die Beitrittscodes seines Vereins (Liste nur mit Filter clubId == eigener Verein).
+      allow get: if verifiedEmail() || (resource != null && isClubAdmin(resource.data.get('clubId', null)));
+      allow list: if isClubAdmin(resource.data.clubId);
+      // In der App legt nur ein Vereinsadmin Codes an - und nur Beitrittscodes fuer den eigenen Verein (neue Vereine
+      // nur per Skript des PO). Der Code ist 16 Zeichen lang (Alphabet ohne 0/O/1/I), hoechstens 30 Tage gueltig, und
+      // das kuenftige Team hat eine noch freie Zufalls-ID.
+      allow create: if code.matches('^[A-HJ-NP-Z2-9]{16}$')
+        && isClubAdmin(request.resource.data.get('clubId', null))
+        && request.resource.data.keys().hasOnly(['kind', 'clubId', 'teamId', 'expiresAt', 'createdAt', 'email', 'createdBy'])
+        && request.resource.data.kind == "team"
+        && request.resource.data.teamId is string
+        && request.resource.data.teamId.matches('^[A-Za-z0-9]{20}$')
+        && !exists(/databases/$(database)/documents/teams/$(request.resource.data.teamId))
+        && request.resource.data.expiresAt is timestamp
+        && request.resource.data.expiresAt > request.time
+        && request.resource.data.expiresAt <= request.time + duration.value(30, 'd')
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.createdBy == request.auth.uid
+        && (request.resource.data.get('email', null) == null
+          || (request.resource.data.email is string && request.resource.data.email.size() <= 254
+            && request.resource.data.email == request.resource.data.email.lower()));
+      allow update: if false;
+      // Loeschen: der Vereinsadmin zieht einen Beitrittscode zurueck - oder der Code wird beim Einloesen verbraucht
+      // (im selben Schreibvorgang entstehen das Team mit dem eigenen Konto als erstem Trainer und dessen Zugang).
+      allow delete: if (resource.data.kind == "team" && isClubAdmin(resource.data.clubId))
+        || (signedIn()
+          && resource.data.teamId is string
+          && !exists(/databases/$(database)/documents/teams/$(resource.data.teamId))
+          && getAfter(/databases/$(database)/documents/teams/$(resource.data.teamId)).data.get('firstTrainerUid', null) == request.auth.uid
+          && getAfter(/databases/$(database)/documents/teams/$(resource.data.teamId)/members/$(request.auth.uid)).data.get('claimedInviteCode', null) == code);
+    }
+
     match /clubs/{clubId} {
       // Name und Logo sind oeffentliche Angaben (PO-Entscheidung 3): Einzelabruf fuer jeden Angemeldeten.
       // Auflisten aller Vereine ist verboten.
       allow get: if signedIn();
       allow list: if false;
-      // Vereine legt bis SCRUM-181 (Registrierung) nur das Admin-Skript an; geloescht wird nie per App.
-      allow create, delete: if false;
+      // Neuer Verein nur bei der Registrierung mit einem Vereinscode (SCRUM-181, siehe oben); geloescht wird nie per App.
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['name', 'logoUrl', 'createdAt'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 100
+        && request.resource.data.get('logoUrl', null) == null
+        && request.resource.data.createdAt == request.time
+        && getAfter(/databases/$(database)/documents/clubs/$(clubId)/admins/$(request.auth.uid)).data.get('inviteCode', null) is string
+        && claimsClubInvite(
+          getAfter(/databases/$(database)/documents/clubs/$(clubId)/admins/$(request.auth.uid)).data.inviteCode,
+          "club", clubId,
+          get(clubInvitePath(getAfter(/databases/$(database)/documents/clubs/$(clubId)/admins/$(request.auth.uid)).data.inviteCode)).data.get('teamId', null));
+      allow delete: if false;
       allow update: if isClubAdmin(clubId)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'logoUrl'])
         && request.resource.data.name is string
@@ -49,12 +149,23 @@ service cloud.firestore {
       match /admins/{uid} {
         allow get: if isClubAdmin(clubId) || (signedIn() && request.auth.uid == uid);
         allow list: if isClubAdmin(clubId);
-        // Nur ein bestehender Admin ernennt weitere Admins - niemand traegt sich selbst ein.
-        allow create: if isClubAdmin(clubId)
+        // Nur ein bestehender Admin ernennt weitere Admins - niemand traegt sich selbst ein. Einzige Ausnahme: wer einen
+        // Vereinscode einloest, wird erster Admin des Vereins, der im selben Schreibvorgang NEU entsteht (SCRUM-181).
+        allow create: if (isClubAdmin(clubId)
           && request.resource.data.keys().hasOnly(['uid', 'role', 'createdAt'])
           && request.resource.data.uid == uid
           && request.resource.data.role == "admin"
-          && request.resource.data.createdAt == request.time;
+          && request.resource.data.createdAt == request.time)
+          || (signedIn() && request.auth.uid == uid
+          && request.resource.data.keys().hasOnly(['uid', 'role', 'createdAt', 'inviteCode'])
+          && request.resource.data.uid == uid
+          && request.resource.data.role == "admin"
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.inviteCode is string
+          && !exists(/databases/$(database)/documents/clubs/$(clubId))
+          && existsAfter(/databases/$(database)/documents/clubs/$(clubId))
+          && claimsClubInvite(request.resource.data.inviteCode, "club", clubId,
+            get(clubInvitePath(request.resource.data.inviteCode)).data.get('teamId', null)));
         allow update: if false;
         // Niemand entfernt sich selbst (der Verein bliebe sonst ggf. ohne Admin).
         allow delete: if isClubAdmin(clubId) && request.auth.uid != uid;
@@ -150,13 +261,26 @@ service cloud.firestore {
       // Neues Team: nur ein Admin des Vereins, nur fuer den eigenen Verein, noch ohne Trainer. Die Team-ID muss
       // eine zufaellige 20-stellige Firestore-ID sein: Bestehende Teams (mein-team, U15, U17, U14) haben bis zum
       // Skriptlauf kein Team-Dokument - so kann sie niemand als "neues Team" fuer seinen Verein beanspruchen.
+      // SCRUM-181: Zweiter Weg - wer einen Vereins- oder Beitrittscode einloest, legt genau das im Code festgelegte Team
+      // an, mit sich selbst als erstem Trainer (hasTrainer true, firstTrainerUid = eigenes Konto, Trainer-Zugang im selben
+      // Schreibvorgang, der den Code traegt).
       allow create: if teamId.matches('^[A-Za-z0-9]{20}$')
-        && isClubAdmin(request.resource.data.get('clubId', null))
-        && request.resource.data.keys().hasOnly(['clubId', 'name', 'label', 'hasTrainer', 'createdAt'])
-        && request.resource.data.hasTrainer == false
         && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 100
         && request.resource.data.get('label', '') is string && request.resource.data.get('label', '').size() <= 40
-        && request.resource.data.createdAt == request.time;
+        && request.resource.data.createdAt == request.time
+        && (
+          (isClubAdmin(request.resource.data.get('clubId', null))
+            && request.resource.data.keys().hasOnly(['clubId', 'name', 'label', 'hasTrainer', 'createdAt'])
+            && request.resource.data.hasTrainer == false)
+          || (isSignedIn()
+            && request.resource.data.keys().hasOnly(['clubId', 'name', 'label', 'hasTrainer', 'firstTrainerUid', 'createdAt'])
+            && request.resource.data.hasTrainer == true
+            && request.resource.data.firstTrainerUid == request.auth.uid
+            && getAfter(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid)).data.role == "trainer"
+            && registersWith(
+              getAfter(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid)).data.get('claimedInviteCode', null),
+              request.resource.data.get('clubId', null), teamId))
+        );
       // Aendern: Trainer des Teams oder Admin des Vereins, nur Name/Bezeichnung. clubId ist unveraenderlich
       // (kein Team wandert in einen fremden Verein). hasTrainer kann nur einmal von false auf true wechseln - im
       // selben Schreibvorgang, in dem der Vereinsadmin den ersten Trainer (firstTrainerUid) anlegt.
@@ -237,6 +361,20 @@ service cloud.firestore {
             && request.resource.data.keys().hasOnly(['role', 'email', 'uid', 'createdAt'])
             && request.resource.data.get('email', '') is string
             && request.resource.data.createdAt == request.time
+          )
+          // 4. SCRUM-181: Registrierung mit Vereins- oder Beitrittscode - das eigene Konto wird erster Trainer des Teams,
+          //    das im selben Schreibvorgang neu entsteht (firstTrainerUid = eigenes Konto). Der Code steht im Feld
+          //    claimedInviteCode und wird dabei verbraucht; die E-Mail ist die bestaetigte Adresse des Kontos.
+          || (
+            isSignedIn() && request.auth.uid == uid
+            && request.resource.data.keys().hasOnly(['role', 'email', 'uid', 'createdAt', 'claimedInviteCode'])
+            && request.resource.data.role == "trainer"
+            && request.resource.data.uid == uid
+            && request.resource.data.email == request.auth.token.get('email', null)
+            && request.resource.data.createdAt == request.time
+            && !exists(teamPath())
+            && getAfter(teamPath()).data.get('firstTrainerUid', null) == uid
+            && registersWith(request.resource.data.claimedInviteCode, getAfter(teamPath()).data.get('clubId', null), teamId)
           )
         );
         // Kein Update: eine bestehende Mitgliedschaft wird nicht bearbeitet, sondern

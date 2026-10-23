@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { environment } from '../../../environments/environment';
+import { CurrentTeam } from '../../core/team/current-team.service';
 import { formatDate } from '../../core/events/event';
 import { LayoutService } from '../../core/shell/layout.service';
 import { ageFromBirthdate, todayIso } from '../../core/shared/dates';
@@ -53,7 +53,8 @@ export class MemberView implements OnInit {
   protected readonly sync = inject(SyncService);
   protected readonly mobile = inject(LayoutService).isMobile;
 
-  protected readonly club = `${environment.clubName} ${environment.teamLabel}`;
+  private readonly team = inject(CurrentTeam);
+  protected readonly club = computed(() => [this.team.clubName(), this.team.label()].filter(Boolean).join(' '));
   protected readonly today = todayIso();
 
   protected readonly role = this.session.role;

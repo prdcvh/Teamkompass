@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { environment } from '../../../environments/environment';
+import { CurrentTeam } from '../team/current-team.service';
 import type { ScoutChange } from '../scout/scout-profile';
 import { FirebaseConnection } from './firebase-connection';
 import type { RawDoc, SnapshotMeta } from './types';
@@ -11,12 +11,13 @@ import type { RawDoc, SnapshotMeta } from './types';
 @Injectable({ providedIn: 'root' })
 export class ScoutApi {
   private readonly connection = inject(FirebaseConnection);
+  private readonly team = inject(CurrentTeam);
 
   async watchScoutProfiles(onData: (docs: RawDoc[], meta: SnapshotMeta) => void, onError: (error: unknown) => void): Promise<() => void> {
     const { db } = await this.connection.get();
     const { collection, onSnapshot } = await import('firebase/firestore');
     return onSnapshot(
-      collection(db, 'teams', environment.teamId, 'scoutProfiles'),
+      collection(db, 'teams', this.team.id(), 'scoutProfiles'),
       { includeMetadataChanges: true },
       (snapshot) =>
         onData(
@@ -34,7 +35,7 @@ export class ScoutApi {
     for (let offset = 0; offset < changes.length; offset += 400) {
       const batch = writeBatch(db);
       for (const change of changes.slice(offset, offset + 400)) {
-        const ref = doc(db, 'teams', environment.teamId, 'scoutProfiles', change.id);
+        const ref = doc(db, 'teams', this.team.id(), 'scoutProfiles', change.id);
         if (change.type === 'set') batch.set(ref, change.data);
         else batch.delete(ref);
       }

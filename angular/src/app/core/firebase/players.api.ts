@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { environment } from '../../../environments/environment';
+import { CurrentTeam } from '../team/current-team.service';
 import { PlayerStatsMode } from '../team/player-stats-mode';
 import { FirebaseConnection } from './firebase-connection';
 import type { RawDoc, SnapshotMeta } from './types';
@@ -11,6 +11,7 @@ const PLAYER_SUBCOLLECTIONS = ['developmentPlans', 'absences', 'measurements'] a
 @Injectable({ providedIn: 'root' })
 export class PlayersApi {
   private readonly connection = inject(FirebaseConnection);
+  private readonly team = inject(CurrentTeam);
   private readonly statsMode = inject(PlayerStatsMode);
 
   /**
@@ -24,7 +25,7 @@ export class PlayersApi {
     const { db } = await this.connection.get();
     const { collection, onSnapshot } = await import('firebase/firestore');
     return onSnapshot(
-      collection(db, 'teams', environment.teamId, 'players'),
+      collection(db, 'teams', this.team.id(), 'players'),
       { includeMetadataChanges: true },
       (snapshot) =>
         onData(
@@ -47,7 +48,7 @@ export class PlayersApi {
     const { db } = await this.connection.get();
     const { doc, onSnapshot } = await import('firebase/firestore');
     return onSnapshot(
-      doc(db, 'teams', environment.teamId, 'players', playerId),
+      doc(db, 'teams', this.team.id(), 'players', playerId),
       { includeMetadataChanges: true },
       (snapshot) =>
         onData(snapshot.exists() ? snapshot.data() : null, { fromCache: snapshot.metadata.fromCache, hasPendingWrites: snapshot.metadata.hasPendingWrites }),
@@ -59,14 +60,14 @@ export class PlayersApi {
   async savePlayer(id: string, data: Readonly<Record<string, unknown>>): Promise<void> {
     const { db } = await this.connection.get();
     const { doc, setDoc } = await import('firebase/firestore');
-    await setDoc(doc(db, 'teams', environment.teamId, 'players', id), data, { merge: true });
+    await setDoc(doc(db, 'teams', this.team.id(), 'players', id), data, { merge: true });
   }
 
   /** Löscht den Spieler samt Unterdaten, Bewertungen, internen Notizen in allen Events und Zusammenfassung (in Blöcken, Limit 500 je Schreibvorgang). */
   async deletePlayer(id: string): Promise<void> {
     const { db } = await this.connection.get();
     const { collection, doc, getDocs, query, where, writeBatch } = await import('firebase/firestore');
-    const base = ['teams', environment.teamId] as const;
+    const base = ['teams', this.team.id()] as const;
     const [events, invites, members, ...children] = await Promise.all([
       getDocs(collection(db, ...base, 'events')),
       getDocs(query(collection(db, ...base, 'invites'), where('playerId', '==', id))),

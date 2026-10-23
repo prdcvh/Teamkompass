@@ -1,0 +1,37 @@
+<section class="page">
+  <header class="head">
+    <p class="tk-eyebrow">{{ team.title() }}</p>
+    <h1>Willkommen bei TeamKompass</h1>
+    <p class="lead">Dein Team <strong>{{ team.name() }}</strong> ist angelegt. Zwei kurze Schritte, dann kann es losgehen.</p>
+  </header>
+
+  <ol class="steps">
+    <li [class.done]="hasPlayer()">
+      <span class="num" aria-hidden="true">{{ hasPlayer() ? '✓' : '1' }}</span>
+      <div class="text">
+        <h2>Ersten Spieler anlegen</h2>
+        <p>Name, Rückennummer und Position reichen für den Anfang. Den Rest kannst du später ergänzen.</p>
+      </div>
+      <a class="action" routerLink="/kader" [queryParams]="hasPlayer() ? {} : { neu: 1 }">
+        {{ hasPlayer() ? 'Zum Kader' : 'Spieler anlegen' }}
+      </a>
+    </li>
+    <li [class.done]="hasEvent()">
+      <span class="num" aria-hidden="true">{{ hasEvent() ? '✓' : '2' }}</span>
+      <div class="text">
+        <h2>Ersten Termin anlegen</h2>
+        <p>Ein Training oder Spiel mit Datum und Uhrzeit. Danach kannst du dort Anwesenheit und Leistung bewerten.</p>
+      </div>
+      <a class="action" routerLink="/events" [queryParams]="hasEvent() ? {} : { neu: 1 }">
+        {{ hasEvent() ? 'Zu den Events' : 'Termin anlegen' }}
+      </a>
+    </li>
+  </ol>
+
+  <p class="next">
+    @if (done()) {
+      <span>Geschafft! Spieler und Eltern lädst du unter <a routerLink="/zugaenge">Spieler-Zugänge</a> ein.</span>
+    }
+    <a class="to-start" routerLink="/start">{{ done() ? 'Zur Übersicht' : 'Später – zur Übersicht' }}</a>
+  </p>
+</section>

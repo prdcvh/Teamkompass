@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { environment } from '../../../environments/environment';
+import { CurrentTeam } from '../team/current-team.service';
 import { FirebaseConnection } from './firebase-connection';
 
 export interface WriteOperation {
@@ -12,6 +12,7 @@ export interface WriteOperation {
 @Injectable({ providedIn: 'root' })
 export class BackupApi {
   private readonly connection = inject(FirebaseConnection);
+  private readonly team = inject(CurrentTeam);
 
   /** Schreibt in Blöcken (Limit 500 je Schreibvorgang). Bricht ein Block ab, bleiben bereits geschriebene Blöcke bestehen. */
   async writeAll(operations: readonly WriteOperation[]): Promise<void> {
@@ -20,7 +21,7 @@ export class BackupApi {
     for (let offset = 0; offset < operations.length; offset += 450) {
       const batch = writeBatch(db);
       for (const op of operations.slice(offset, offset + 450)) {
-        const ref = doc(db, 'teams', environment.teamId, ...op.path);
+        const ref = doc(db, 'teams', this.team.id(), ...op.path);
         if (op.merge) batch.set(ref, op.data, { merge: true });
         else batch.set(ref, op.data);
       }

@@ -1,0 +1,191 @@
+/* Registrierung (SCRUM-181): gleiche Bausteine wie das Anmeldeformular (Karte mit rotem Rand, Felder, Hinweise). */
+:host {
+  display: block;
+  min-height: 100vh;
+  background: var(--tk-bg);
+}
+
+.register {
+  display: flex;
+  justify-content: center;
+  padding: var(--tk-space-6) var(--tk-space-4);
+}
+
+.panel {
+  width: min(100%, 480px);
+}
+
+.head h1 {
+  margin: var(--tk-space-1) 0 var(--tk-space-4);
+  font-size: 28px;
+  letter-spacing: -0.01em;
+}
+
+.steps {
+  display: flex;
+  gap: var(--tk-space-3);
+  margin: 0 0 var(--tk-space-4);
+  padding: 0;
+  list-style: none;
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+  font-weight: 600;
+}
+
+.steps li {
+  display: flex;
+  align-items: center;
+  gap: var(--tk-space-2);
+}
+
+.steps .dot {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--tk-line);
+  border-radius: 50%;
+  font-size: var(--tk-text-xs);
+}
+
+.steps .current {
+  color: var(--tk-ink);
+}
+
+.steps .current .dot {
+  color: var(--tk-on-red);
+  background: var(--tk-red);
+  border-color: var(--tk-red);
+}
+
+.steps .done .dot {
+  border-color: var(--tk-green);
+  color: var(--tk-green);
+}
+
+.card {
+  padding: var(--tk-space-5);
+  background: var(--tk-surface);
+  border: 1px solid var(--tk-line);
+  border-top: 4px solid var(--tk-red);
+  border-radius: var(--tk-radius-xl);
+  box-shadow: var(--tk-shadow-card);
+}
+
+form,
+.verify {
+  display: grid;
+  gap: var(--tk-space-3);
+}
+
+.field {
+  display: grid;
+  gap: var(--tk-space-1);
+}
+
+.verify p {
+  margin: 0;
+}
+
+.hint,
+.muted {
+  margin: 0;
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+.code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.card .tk-input {
+  background: var(--tk-bg);
+}
+
+.password {
+  position: relative;
+  display: block;
+}
+
+.password .tk-input {
+  padding-right: 96px;
+}
+
+.reveal {
+  position: absolute;
+  top: 50%;
+  right: var(--tk-space-2);
+  min-height: 32px;
+  padding: 0 var(--tk-space-2);
+  color: var(--tk-muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--tk-radius-sm);
+  font-size: var(--tk-text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.reveal:focus-visible,
+.linklike:focus-visible {
+  outline: 2px solid var(--tk-red-dark);
+  outline-offset: 2px;
+}
+
+.linklike {
+  justify-self: start;
+  min-height: 44px;
+  padding: var(--tk-space-2) 0;
+  color: var(--tk-red-dark);
+  background: none;
+  border: 0;
+  font: inherit;
+  font-size: var(--tk-text-sm);
+  text-align: left;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.error {
+  margin: var(--tk-space-3) 0 0;
+  padding: var(--tk-space-3);
+  color: var(--tk-red);
+  background: var(--tk-soft-red);
+  border-radius: var(--tk-radius-md);
+  font-size: var(--tk-text-sm);
+  font-weight: 600;
+}
+
+.field .error {
+  margin: 0;
+  padding: var(--tk-space-2) var(--tk-space-3);
+}
+
+.foot {
+  margin: var(--tk-space-4) 0 0;
+  font-size: var(--tk-text-sm);
+  text-align: center;
+}
+
+.foot a {
+  display: inline-block;
+  padding: var(--tk-space-2);
+  color: var(--tk-red-dark);
+}
+
+@media (max-width: 600px) {
+  .register {
+    padding: var(--tk-space-4);
+  }
+
+  .card {
+    padding: var(--tk-space-4);
+  }
+
+  .head h1 {
+    font-size: 24px;
+  }
+}

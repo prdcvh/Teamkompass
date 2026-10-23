@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { environment } from '../../../environments/environment';
+import { CurrentTeam } from '../team/current-team.service';
 import { FirebaseConnection } from './firebase-connection';
 import type { RawDoc, SnapshotMeta } from './types';
 
@@ -7,6 +7,7 @@ import type { RawDoc, SnapshotMeta } from './types';
 @Injectable({ providedIn: 'root' })
 export class OpponentsApi {
   private readonly connection = inject(FirebaseConnection);
+  private readonly team = inject(CurrentTeam);
 
   /** Echtzeit-Abo auf die Gegnerprofile. Lesen und Schreiben dürfen nur Trainer. */
   async watchOpponents(
@@ -16,7 +17,7 @@ export class OpponentsApi {
     const { db } = await this.connection.get();
     const { collection, onSnapshot } = await import('firebase/firestore');
     return onSnapshot(
-      collection(db, 'teams', environment.teamId, 'opponents'),
+      collection(db, 'teams', this.team.id(), 'opponents'),
       { includeMetadataChanges: true },
       (snapshot) =>
         onData(
@@ -30,12 +31,12 @@ export class OpponentsApi {
   async saveOpponent(id: string, data: Readonly<Record<string, unknown>>): Promise<void> {
     const { db } = await this.connection.get();
     const { doc, setDoc } = await import('firebase/firestore');
-    await setDoc(doc(db, 'teams', environment.teamId, 'opponents', id), data, { merge: true });
+    await setDoc(doc(db, 'teams', this.team.id(), 'opponents', id), data, { merge: true });
   }
 
   async deleteOpponent(id: string): Promise<void> {
     const { db } = await this.connection.get();
     const { deleteDoc, doc } = await import('firebase/firestore');
-    await deleteDoc(doc(db, 'teams', environment.teamId, 'opponents', id));
+    await deleteDoc(doc(db, 'teams', this.team.id(), 'opponents', id));
   }
 }

@@ -1,5 +1,5 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { ChangeDetectionStrategy, Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { LayoutService, injectNarrowViewport } from '../../core/shell/layout.service';
 import { ageFromBirthdate, formatDate } from '../../core/shared/dates';
 import { CONSENT_LABELS, type Player, STANDARD_POSITIONS, positionText } from '../../core/player/player';
@@ -90,6 +90,18 @@ export class Squad implements OnInit {
   });
   protected readonly deleteBusy = signal(false);
   protected readonly filtering = computed(() => this.query().trim() !== '' || this.position() !== 'all' || this.status() !== 'all');
+
+  /** Einstieg nach der Registrierung (SCRUM-181): /kader?neu=1 öffnet direkt „Spieler anlegen“, sobald der Kader geladen ist. */
+  private readonly openOnLoad = inject(ActivatedRoute).snapshot.queryParamMap.get('neu') === '1';
+  private openedOnLoad = false;
+
+  constructor() {
+    effect(() => {
+      if (!this.openOnLoad || this.openedOnLoad || !this.squad.canEdit()) return;
+      this.openedOnLoad = true;
+      untracked(() => this.openNew());
+    });
+  }
 
   ngOnInit(): void {
     this.squad.start();

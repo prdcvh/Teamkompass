@@ -1,5 +1,6 @@
 import { inject } from '@angular/core';
 import { type CanActivateChildFn, type CanActivateFn, Router } from '@angular/router';
+import { CurrentTeam } from '../team/current-team.service';
 import { AuthService } from './auth.service';
 import { homeFor } from './role';
 import { SessionService } from './session.service';
@@ -10,6 +11,7 @@ export const authGuard: CanActivateFn = async () => {
   const auth = inject(AuthService);
   const router = inject(Router);
   await auth.whenResolved();
+  if (auth.status() === 'chooseTeam') return router.createUrlTree(['/team-waehlen']);
   return auth.status() === 'ready' ? true : router.createUrlTree(['/anmelden']);
 };
 
@@ -19,7 +21,19 @@ export const guestGuard: CanActivateFn = async () => {
   const router = inject(Router);
   const session = inject(SessionService);
   await auth.whenResolved();
+  if (auth.status() === 'chooseTeam') return router.createUrlTree(['/team-waehlen']);
   return auth.status() === 'ready' ? router.createUrlTree([homeFor(session.role())]) : true;
+};
+
+/** Teamauswahl (SCRUM-181): nach der Anmeldung mit mehreren Teams oder später zum Wechseln. */
+export const teamChoiceGuard: CanActivateFn = async () => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+  const team = inject(CurrentTeam);
+  await auth.whenResolved();
+  if (auth.status() === 'chooseTeam') return true;
+  if (auth.status() !== 'ready') return router.createUrlTree(['/anmelden']);
+  return team.choices().length > 1 ? true : router.createUrlTree(['/']);
 };
 
 /** Trainer-Bereiche. Spieler, Eltern und Medizin gehen zu ihrer einen Ansicht. */
