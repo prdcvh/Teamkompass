@@ -1,7 +1,8 @@
 # Architektur-Notiz: Verein → Teams (SCRUM-180)
 
-Stand: 23.10.2026 · Status: **Entwurf, wartet auf Freigabe durch den PO** · noch nichts gebaut,
-`firestore.rules` unverändert.
+Stand: 23.10.2026 · Status: **vom PO freigegeben (23.10.2026), alle Empfehlungen gelten (Abschnitt 9)** ·
+umgesetzt in SCRUM-180: `firestore.rules`, Regeltests `tests/rules/clubs.test.mjs`, Einmal-Skript
+`scripts/assign-clubs.mjs`. Registrierung, Teamauswahl in der App und „ein Build für alle“ folgen mit SCRUM-181.
 
 ## Kurzfassung
 
@@ -33,10 +34,11 @@ Stand: 23.10.2026 · Status: **Entwurf, wartet auf Freigabe durch den PO** · no
 ## 2. Vorgeschlagenes Modell
 
 ```txt
-clubs/{clubId}                       name, logoUrl (optional), createdAt
+clubs/{clubId}                       name, logoUrl (optional/null), createdAt
 clubs/{clubId}/admins/{uid}          uid (= Dokument-ID), role: "admin", createdAt
 teams/{teamId}                       NEU mit Feldern: clubId, name ("1. FC Königstein U14"),
-                                     label ("U14"), hasTrainer, createdAt
+                                     label ("U14"), hasTrainer, firstTrainerUid (nur bei neuen Teams),
+                                     createdAt
 teams/{teamId}/members/{uid}         wie heute + NEUES Feld uid (= Dokument-ID)
 teams/{teamId}/…                     alles andere unverändert
 ```
@@ -72,9 +74,24 @@ Handgriff in der Firebase-Konsole).
 Darf nicht: Spieler, Termine, Bewertungen, Notizen, Abwesenheiten, Messwerte, Zugänge eines Teams lesen –
 außer er ist selbst Mitglied dieses Teams. Teams löschen (bleibt dem PO per Admin-Zugang vorbehalten).
 
-## 3. Skizze der Regeländerungen (Pseudo-Regeln, noch nicht umgesetzt)
+## 3. Regeländerungen (umgesetzt in SCRUM-180)
 
-Alle bestehenden Regeln unter `teams/{teamId}/…` bleiben **wörtlich gleich**. Es kommen nur Blöcke dazu:
+Alle bestehenden Regeln unter `teams/{teamId}/…` bleiben gleich. Es kommen nur Blöcke dazu. Umgesetzt wurde die
+Skizze unten mit diesen Verschärfungen (Ergebnis des Sicherheits-Reviews):
+
+- **Neue Teams nur mit Zufalls-ID** (20 Zeichen, wie Firestore-Auto-IDs). Grund: Die bestehenden Teams
+  (`mein-team`, `U15`, `U17`, `U14`) haben bis zum Skriptlauf **kein** Team-Dokument. Ohne diese Bedingung könnte ein
+  Vereinsadmin `teams/mein-team` als „neues Team ohne Trainer“ für seinen Verein anlegen und sich dann als ersten
+  Trainer eintragen.
+- **Erster Trainer genau einmal:** Der Vereinsadmin setzt im selben Schreibvorgang `hasTrainer: true` und
+  `firstTrainerUid` im Team-Dokument und legt genau dieses `members`-Dokument (Rolle `trainer`) an. `hasTrainer`
+  kann nur von `false` auf `true` wechseln, nie zurück – auch nicht durch den Trainer. Fehlt das Feld, gilt das Team
+  als besetzt.
+- **`uid` in `members` muss der Dokument-ID entsprechen** (auf allen Anlege-Wegen), damit kein Dokument in der
+  Teamsuche eines fremden Kontos auftaucht.
+- Teams ohne Team-Dokument oder ohne `clubId` funktionieren unverändert; alle Admin-Wege sind dort gesperrt.
+
+Ursprüngliche Skizze:
 
 ```txt
 function isClubAdmin(clubId) =
@@ -124,21 +141,25 @@ match /{path=**}/admins/{adminId}
 | `mein-team` | `fc-koenigstein` (1. FC Königstein) | Live-U14 |
 | `U15` | `fc-koenigstein` | Live |
 | `U17` | `fc-koenigstein` | Live (wird mit SCRUM-169 auf Angular umgestellt) |
-| `U14` | `fc-koenigstein` oder eigener Test-Verein | Angular-Testkopie von `mein-team`, Frage 4 |
+| `U14` | `test-verein` (eigener Test-Verein) | Angular-Testkopie von `mein-team`, Frage 4 |
 
-Vereinsadmin für `fc-koenigstein`: Konto des PO (Frage 5).
+Vereinsadmin für `fc-koenigstein` (und `test-verein`): nur das Konto des PO (Frage 5).
 
 ## 5. Migration ohne Datenumzug
 
-Ein Einmal-Skript nach dem Muster von `scripts/copy-team.mjs` (Admin-Zugang, mit `--dry-run`, Ausführung
-nur durch den PO):
+Einmal-Skript `scripts/assign-clubs.mjs` nach dem Muster von `scripts/copy-team.mjs` (Admin-Zugang,
+Ausführung nur durch den PO, Anleitung in `FIREBASE_SETUP.md` §9). **Probelauf ist Standard**, geschrieben wird
+nur mit `--apply`. Mehrfach ausführbar; ein Team, das schon einem anderen Verein gehört, bricht den Lauf ab.
 
-1. `clubs/fc-koenigstein` anlegen (Name, Logo) und `clubs/fc-koenigstein/admins/{PO-UID}`.
-   Bei den vier Teams `hasTrainer: true` setzen (sie haben alle schon Trainer).
+1. `clubs/fc-koenigstein` und `clubs/test-verein` anlegen (Name, `logoUrl: null`) und jeweils
+   `admins/{PO-UID}`. Bei den vier Teams `hasTrainer: true` setzen (sie haben alle schon Trainer).
 2. In `teams/mein-team`, `U15`, `U17`, `U14` die Felder `clubId`, `name`, `label` setzen (`merge`, die
-   Unter-Collections werden nicht angefasst).
+   Unter-Collections werden nicht angefasst, vorhandene Felder nicht überschrieben).
 3. In jedes vorhandene `members`-Dokument das Feld `uid` (= Dokument-ID) schreiben. Ändert keine Rolle und
    kein Recht.
+
+`scripts/copy-team.mjs` kopiert das Team-Dokument selbst seitdem nicht mehr mit – sonst würde ein erneutes
+Kopieren `mein-team → U14` die Zuordnung von U14 zum Test-Verein überschreiben.
 
 Reihenfolge: zuerst neue Regeln deployen (rein ergänzend, Alt-App merkt nichts), dann Skript, dann
 Angular-Version mit Teamauswahl. Die Alt-Apps (`outputs/*`) lesen keines der neuen Felder und laufen
@@ -199,23 +220,19 @@ Die Abfrage über `members` (Empfehlung) hat nur eine Wahrheit.
 - Regeln dürfen pro Anfrage höchstens 10 (Einzelzugriff) bzw. 20 (Sammelschreiben) Dokumente nachschlagen;
   die Einladungs-Regel ist schon nahe dran, die neuen Prüfungen kommen dort nicht hinzu.
 
-## 9. Fragen an den PO
+## 9. Entscheidungen des PO (entschieden am 23.10.2026, alle Empfehlungen gelten)
 
-1. **Rechte des Vereinsadmins:** nur Verwaltung ohne Spielerdaten (Empfehlung) – oder automatisch wie ein
-   Trainer in allen Teams des Vereins?
-2. **Ersten Trainer einsetzen:** Darf der Vereinsadmin das – und nur solange ein Team noch keinen Trainer hat
-   (Empfehlung)? Oder bleibt das ein Handgriff in der Firebase-Konsole?
-3. **Vereinsname und Logo** für jeden angemeldeten Nutzer lesbar (es sind öffentliche Angaben)? Empfehlung: ja.
-4. **Test-Team U14:** in den Verein 1. FC Königstein (dann taucht es bei Personen mit Zugang zu beiden in der
-   Teamauswahl auf) oder in einen eigenen Test-Verein (Empfehlung)?
-5. **Vereinsadmin 1. FC Königstein:** nur dein Konto, oder weitere Personen?
-6. **Vereins-ID:** sprechend `fc-koenigstein` für den bestehenden Verein, zufällige IDs für neue Vereine aus
-   der Registrierung (Empfehlung)?
-7. **Einmal-Skript:** Einverstanden, dass du es wie `copy-team.mjs` mit Dienstkonto-Schlüssel selbst ausführst
-   (erst Trockenlauf)?
-8. **Gesamtfreigabe:** Modell A wie beschrieben umsetzen?
+1. **Rechte des Vereinsadmins:** **entschieden: nur Verwaltung** (Name, Logo, Teams anlegen, ersten Trainer
+   einsetzen). Er sieht **keine** Spielerdaten, Noten oder Gesundheitsdaten.
+2. **Ersten Trainer einsetzen:** **entschieden: ja, aber nur solange das Team noch keinen Trainer hat.**
+3. **Vereinsname und Logo:** **entschieden: für jeden angemeldeten Nutzer lesbar.**
+4. **Test-Team U14:** **entschieden: eigener Test-Verein** (`test-verein`).
+5. **Vereinsadmin 1. FC Königstein:** **entschieden: nur das Konto des PO.**
+6. **Vereins-ID:** **entschieden: `fc-koenigstein`** für den bestehenden Verein, zufällige IDs für neue Vereine.
+7. **Einmal-Skript:** **entschieden: der PO startet es selbst, zuerst als Probelauf** (Probelauf ist Standard).
+8. **Gesamtfreigabe:** **entschieden: Modell A wird so umgesetzt.**
 
-## 10. Geplante Regeltests (`tests/rules/clubs.test.mjs`)
+## 10. Regeltests (`tests/rules/clubs.test.mjs`, umgesetzt)
 
 Zwei Vereine A und B mit je einem Team (A1, B1), Trainer, Spieler und Vereinsadmin je Verein:
 
@@ -234,3 +251,27 @@ Zwei Vereine A und B mit je einem Team (A1, B1), Trainer, Spieler und Vereinsadm
 7. Erster Trainer: Vereinsadmin darf genau einmal einsetzen, danach nicht mehr.
 8. Rückwärtskompatibel: alle bestehenden Regeltests (`roles`, `invite-claim`, `rsvp`, `player-stats`,
    `validation`) laufen unverändert grün, auch für Teams **ohne** `clubId` und `members` **ohne** `uid`.
+
+Zusätzlich umgesetzt: niemand macht sich selbst zum Vereinsadmin; `uid` muss der Dokument-ID entsprechen;
+Altteams ohne Team-Dokument kann niemand für einen Verein beanspruchen; das Einmal-Skript ändert keine Rechte und
+ist wiederholbar. **Bekannte, bewusste Ausnahme (unverändert seit SCRUM-77):** Einen Einladungscode, den man
+kennt, darf jeder Angemeldete gezielt abrufen (nötig für die Anmeldung). Auflisten bleibt Trainern vorbehalten.
+Das wird mit SCRUM-181 neu bewertet (Abschnitt 6).
+
+## 11. Schnittstellen für SCRUM-181
+
+- **Meine Teams:** `query(collectionGroup(db, 'members'), where('uid', '==', auth.uid))` → `ref.parent.parent.id`
+  ist die `teamId`, `data().role` die Rolle. Ohne den `uid`-Filter lehnt Firestore die Abfrage ab. Abgelaufene
+  Zugänge (`expiresAt` in der Vergangenheit) liefert die Abfrage mit – die App muss sie selbst ausblenden.
+- **Team-Daten:** `getDoc(teams/{teamId})` → `clubId`, `name`, `label` (Mitglieder dürfen lesen).
+  **Verein:** `getDoc(clubs/{clubId})` → `name`, `logoUrl` (jeder Angemeldete, `logoUrl` kann `null` sein).
+- **Meine Vereine (Admin):** `query(collectionGroup(db, 'admins'), where('uid', '==', auth.uid))`, Teams des Vereins:
+  `query(collection(db, 'teams'), where('clubId', '==', clubId))`.
+- **Neue Mitgliedschaften** sollten `uid` (= Dokument-ID) mitschreiben, sonst fehlen sie in der Teamsuche
+  (Spieler-Einlösung: `uid` ist im erlaubten Feldsatz).
+- **Neues Team (Vereinsadmin):** `setDoc(doc(collection(db, 'teams')), { clubId, name, label, hasTrainer: false,
+  createdAt: serverTimestamp() })` – die ID muss eine 20-stellige Auto-ID sein.
+- **Erster Trainer (Vereinsadmin), ein Batch:** `update(teams/{teamId}, { hasTrainer: true, firstTrainerUid: uid })`
+  und `set(teams/{teamId}/members/{uid}, { role: 'trainer', email, uid, createdAt: serverTimestamp() })`.
+- **Neuer Verein:** per App noch nicht möglich (`clubs` create ist gesperrt) – Registrierung kommt mit SCRUM-181
+  (braucht dann eine eigene Regel oder einen Server-Weg).

@@ -226,3 +226,31 @@ Die Angular-Neuentwicklung (Jira-Epic SCRUM-40) wird als eigene Hosting-Site
 2. Daten kopieren (Abschnitt 7): `node scripts/copy-team.mjs mein-team U14`.
 3. Erst danach den PR nach `main` mergen; vorher schlaegt der neue Deploy-Schritt bei jedem
    Merge fehl. Die App ist danach unter `https://teamkompass-u14.web.app` erreichbar.
+
+
+## 9. Teams einem Verein zuordnen (`scripts/assign-clubs.mjs`, SCRUM-180)
+
+Datenmodell und Regeln: `docs/architektur-verein-teams.md`. Das Einmal-Skript legt die Vereine
+`clubs/fc-koenigstein` (1. FC Koenigstein: `mein-team`, `U15`, `U17`) und `clubs/test-verein`
+(Angular-Testteam `U14`) an, traegt dein Konto als einzigen Vereinsadmin ein, setzt in den vier
+Team-Dokumenten `clubId`, `name`, `label`, `hasTrainer: true` und schreibt in jedes `members`-Dokument das
+Feld `uid` (= Dokument-ID). Es zieht **nichts um**, loescht nichts, ueberschreibt keine vorhandenen Felder
+und aendert keine Rolle. Es kann gefahrlos mehrfach laufen.
+
+Reihenfolge: erst die neuen Regeln deployen (Merge des PR), dann das Skript. Die bestehenden Apps merken
+von beidem nichts.
+
+Ausfuehrung nur durch den Product Owner (braucht Admin-Zugang):
+
+1. Dienstkonto-Schluessel wie in Abschnitt 7, Schritt 1 (ausserhalb des Repos ablegen, danach loeschen).
+2. Einmalig: `npm install --no-save firebase-admin`
+3. Deine UID: Firebase Console -> Authentication -> Nutzer -> Spalte "Nutzer-UID" deines Trainer-Kontos.
+4. **Probelauf (Standard, schreibt nichts)** – zeigt, was geschrieben wuerde:
+   `GOOGLE_APPLICATION_CREDENTIALS=/pfad/key.json node scripts/assign-clubs.mjs --admin-uid <DEINE-UID>`
+5. Echter Lauf: gleicher Aufruf mit `--apply` am Ende.
+6. Kontrolle in der Firebase Console: `clubs/fc-koenigstein`, `teams/mein-team` (Felder `clubId` usw.).
+
+Gehoert ein Team schon zu einem anderen Verein, bricht das Skript ab und schreibt nichts. Spaeter
+hinzugefuegte Teams (Abschnitt 6) bitte in `scripts/assign-clubs-lib.mjs` (`TEAMS`) eintragen und das
+Skript erneut laufen lassen. Mitglieder, die die Alt-Apps nach dem Lauf anlegen, haben kein `uid`-Feld –
+ein erneuter Lauf ergaenzt es.
