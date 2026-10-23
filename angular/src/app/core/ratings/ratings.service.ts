@@ -4,6 +4,7 @@ import { EventsService } from '../events/events.service';
 import { RatingsApi } from '../firebase/ratings.api';
 import type { RawDoc, SnapshotMeta } from '../firebase/types';
 import { countsPoints, normalizePoints } from '../points/points';
+import { RankingService } from '../points/ranking.service';
 import { MAX_NOTE_LENGTH, type Rating, type RatingField, BLANK_RATING, applyChange, docFromRating, ratingFromDoc } from './rating';
 import { SessionService } from '../auth/session.service';
 import { SyncService } from '../shell/sync.service';
@@ -22,6 +23,7 @@ export class RatingsService {
   private readonly session = inject(SessionService);
   private readonly sync = inject(SyncService);
   private readonly events = inject(EventsService);
+  private readonly ranking = inject(RankingService);
 
   readonly eventId = signal<string | null>(null);
   readonly ratings = signal<ReadonlyMap<string, Rating>>(new Map());
@@ -157,7 +159,10 @@ export class RatingsService {
     this.markSyncing();
     void this.ratingsApi
       .savePoints(eventId, playerId, points)
-      .then(() => this.sync.clearError())
+      .then(() => {
+        this.sync.clearError();
+        this.ranking.invalidate();
+      })
       .catch((error) => this.failWrite(error, 'Punkte konnten nicht gespeichert werden.'));
     return true;
   }

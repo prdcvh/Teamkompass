@@ -23,6 +23,7 @@ import { InstallHint } from '../../ui/install-hint/install-hint';
 import { Weather } from '../../ui/weather/weather';
 import { HomeBoard } from './home-board/home-board';
 import { HomeLineup } from './home-lineup/home-lineup';
+import { HomeRanking } from './home-ranking/home-ranking';
 
 /** Beschriftung der Bänder von vorn nach hinten (Reihenfolge von PITCH_BANDS umgekehrt). */
 const BAND_LABELS: readonly string[] = ['Angriff', 'Offensiv', 'Mittelfeld', 'Defensiv', 'Abwehr'];
@@ -40,7 +41,7 @@ const TREND_TEXT: Record<Exclude<FormTrend, null>, string> = { besser: 'Form ste
 /** Start-Dashboard: Kennzahlen des Teams, nächstes Event und Bestenliste (nur für Trainer mit Daten). */
 @Component({
   selector: 'app-home',
-  imports: [RouterLink, Button, Card, InstallHint, Weather, BreakNotice, HomeLineup, HomeBoard],
+  imports: [RouterLink, Button, Card, InstallHint, Weather, BreakNotice, HomeLineup, HomeBoard, HomeRanking],
   templateUrl: './home.html',
   styleUrl: './home.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

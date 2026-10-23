@@ -25,6 +25,10 @@ antworten nur für den eigenen Spieler, nur mit erlaubten Feldern (Zusage/Absage
 Absage, eigene Rolle, Server-Zeitstempel) und nur für bestehende Events; lesen dürfen nur Trainer und der eigene
 Spieler bzw. die eigenen Eltern, löschen nur der Trainer.
 
+`ranking.test.mjs`: MVP-Rangliste (SCRUM-105) unter `meta/ranking` – Trainer sowie Spieler und Eltern des Teams lesen,
+Fremde, andere Teams, abgelaufene Zugänge, Scout und Medizin nicht; schreiben und löschen nur der Trainer (nur die Felder
+`week`, `month`, `updatedAt`); die Einzelpunkte im Trainer-Pfad bleiben für Spieler gesperrt.
+
 `player-stats.test.mjs`: Zusammenfassung je Spieler (SCRUM-201) unter `playerStats/{playerId}` und das Kennzeichen
 `meta/playerStats` – nur Trainer lesen/schreiben/löschen (Spieler und Eltern auch die eigene nicht, Medizin, Scouts,
 abgelaufene Zugänge und Nicht-Mitglieder gar nicht), Format-Prüfung (nur `playerId`, `version`, `events`), Bewertung und

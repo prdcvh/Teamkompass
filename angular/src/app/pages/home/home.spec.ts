@@ -17,7 +17,7 @@ describe('Home (Start-Dashboard)', () => {
     return todayIso(date);
   };
 
-  async function render(role: 'trainer' | 'player' = 'trainer', mobile = false, lineup: Record<string, unknown> | null = null) {
+  async function render(role: 'trainer' | 'player' = 'trainer', mobile = false, lineup: Record<string, unknown> | null = null, mutate?: (firebase: FakeFirebase) => void) {
     isMobile.set(mobile);
     firebase = new FakeFirebase();
     firebase.lineup.lineup = lineup;
@@ -26,6 +26,7 @@ describe('Home (Start-Dashboard)', () => {
     firebase.events.events.set('e1', { type: 'Spiel', title: 'Heimspiel', date: day(-3), goalsFor: 3, goalsAgainst: 1, matchDuration: 70 });
     firebase.events.events.set('e2', { type: 'Spiel', title: '<img src=x onerror=alert(1)>', date: day(4), opponent: 'SV Nord', location: 'Kunstrasen' });
     firebase.ratings.ratings.set('e1', new Map([['p1', { attendance: 'present', effort: 2, technique: 2, tactics: 2, comprehension: 2, playerId: 'p1' }]]));
+    mutate?.(firebase);
     TestBed.configureTestingModule({
       providers: [provideRouter([]), ...provideFakeFirebase(firebase), { provide: LayoutService, useValue: { isMobile } }],
     });
@@ -109,6 +110,47 @@ describe('Home (Start-Dashboard)', () => {
     expect(root(fixture).querySelector('.stats')).toBeNull();
     expect(firebase.calls).not.toContain('watchPlayers');
     expect(firebase.lineup.lineupWatchers).toBe(0);
+  });
+
+  describe('MVP der Woche und des Monats (SCRUM-105)', () => {
+    const withPoints = (firebase: FakeFirebase) => {
+      firebase.events.events.set('e3', { type: 'Training', title: 'Training heute', date: day(0) });
+      firebase.ratings.privateNotes.set('e3', new Map([['p1', { playerId: 'p1', points: 5 }], ['p2', { playerId: 'p2', points: 5 }]]));
+    };
+    const lists = (fixture: { nativeElement: unknown }) => [...root(fixture).querySelectorAll('app-home-ranking .panel')];
+
+    it('zeigt zwei Ranglisten mit Platz, Name und Punkten; Gleichstand teilt sich Platz 1 und beide sind MVP', async () => {
+      const fixture = await render('trainer', false, null, withPoints);
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(lists(fixture)).toHaveLength(2);
+      });
+      const [week, month] = lists(fixture);
+      expect(week.querySelector('h2')?.textContent).toBe('MVP der Woche');
+      expect(month.querySelector('h2')?.textContent).toBe('MVP des Monats');
+      const rows = [...week.querySelectorAll('li')].map((li) => li.textContent?.replace(/\s+/g, ' ').trim());
+      expect(rows).toEqual(['1 <b>Ben</b> MVP5 Punkte', '1 Ali Adler MVP5 Punkte']);
+      expect(root(fixture).querySelector('app-home-ranking b')).toBeNull();
+    });
+
+    it('zeigt ohne Punkte einen freundlichen Leerzustand', async () => {
+      const fixture = await render();
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(lists(fixture)).toHaveLength(2);
+      });
+      expect(text(fixture)).toContain('Noch keine Punkte in diesem Zeitraum');
+      expect(root(fixture).querySelector('app-home-ranking li')).toBeNull();
+    });
+
+    it('stapelt die Listen am Handy untereinander', async () => {
+      const fixture = await render('trainer', true, null, withPoints);
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(lists(fixture)).toHaveLength(2);
+      });
+      expect(root(fixture).querySelector('app-home-ranking .ranking')?.getAttribute('data-variant')).toBe('mobile');
+    });
   });
 
   describe('Pausen-Hinweis (SCRUM-150)', () => {
