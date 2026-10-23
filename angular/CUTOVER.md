@@ -87,7 +87,7 @@ kopieren. Dann gibt es keinen Datenumzug und keinen Stichtag, an dem zwei Ständ
 
 **Stand SCRUM-169 (23.10.2026):** U17 ist umgestellt – Hosting-Ziel `u17` liefert den Angular-Build
 `dist/team-u17/browser` aus (Team-ID `U17`), jeder PR hat eine U17-Vorschau. Rückweg und Hinweise:
-`FIREBASE_SETUP.md` §9. Noch offen: eine Woche beobachten, Rollback einmal üben, danach U15 und
+`FIREBASE_SETUP.md` §11. Noch offen: eine Woche beobachten, Rollback einmal üben, danach U15 und
 `mein-team` mit eigener Freigabe. Bekannte Lücke: Zu-/Absagen (SCRUM-175) gibt es in Angular noch nicht
 (SCRUM-205).
 

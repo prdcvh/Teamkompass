@@ -35,7 +35,7 @@ App-Manifest (`teams/<team>/manifest.webmanifest`) austauscht:
 
 Bauen: `ng build -c production,u17`. Diese Builds sprechen **echte Teamdaten** an; es gibt
 bewusst keine `ng serve`-Konfiguration dafür. Das Hosting-Ziel `u17` zeigt seit SCRUM-169 auf
-`dist/team-u17/browser` (Rückweg: `FIREBASE_SETUP.md` §9); `mein-team` und `u15` laufen noch auf der alten
+`dist/team-u17/browser` (Rückweg: `FIREBASE_SETUP.md` §11); `mein-team` und `u15` laufen noch auf der alten
 App. Umstellen weiterer Live-Teams nur mit PO-Freigabe (Ablaufplan in SCRUM-76). Ein neues Team braucht eine Zeile mehr
 in `angular.json`, `environment.<team>.ts`, `teams/<team>/manifest.webmanifest` und `build:teams`.
 

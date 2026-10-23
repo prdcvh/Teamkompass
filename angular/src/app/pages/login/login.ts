@@ -55,12 +55,8 @@ export class Login {
       this.code = code.trim().slice(0, 128);
       this.tab.set('code');
     }
-  }
-
-  constructor() {
     // Einladungslink der bisherigen App (SCRUM-169): Code vorausfüllen und aus der Adresszeile entfernen (soll nicht
     // im Verlauf stehen bleiben). Angemeldet wird erst per Knopfdruck.
-    const params = inject(ActivatedRoute).snapshot.queryParamMap;
     if (!params.has(INVITE_PARAM)) return;
     const invite = inviteCodeFromParam(params.get(INVITE_PARAM));
     if (invite) {
