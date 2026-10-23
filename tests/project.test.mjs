@@ -1024,6 +1024,15 @@ test("Angular schreibt die Startelf mit merge, damit die Spiel-Aufstellungen (by
   }
 });
 
+test("Angular: Kein Datenzugriff nutzt die feste Team-ID aus dem Build, alle nehmen das Team aus CurrentTeam (SCRUM-181)", async () => {
+  const dir = "angular/src/app/core/firebase";
+  const files = (await readdir(new URL(`../${dir}`, import.meta.url))).filter((name) => name.endsWith(".api.ts"));
+  assert.ok(files.length > 0);
+  for (const name of files) {
+    assert.doesNotMatch(await read(`${dir}/${name}`), /environment\.teamId/, `${name} nutzt noch environment.teamId`);
+  }
+});
+
 test("Angular: Build je Live-Team mit derselben Team-ID wie die heutige App (SCRUM-124)", async () => {
   const angular = JSON.parse(await read("angular/angular.json"));
   const architect = angular.projects["teamkompass-angular"].architect;
