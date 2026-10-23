@@ -61,8 +61,8 @@ test("CSP erlaubt nur den versionierten Firebase-SDK-Pfad und die benoetigten Go
     const script = directive("script-src").split(/\s+/).slice(1);
     const connect = directive("connect-src").split(/\s+/).slice(1);
     for (const source of script) assert.ok(source === "'self'" || source === "https://www.gstatic.com/firebasejs/10.12.5/", `${target.target}: script-src erlaubt ${source}`);
-    // Nur das Angular-Target u14 darf zusaetzlich das Wetter von Open-Meteo abrufen (SCRUM-96).
-    const weather = target.target === "u14" ? ["https://api.open-meteo.com", "https://geocoding-api.open-meteo.com"] : [];
+    // Nur die Angular-Targets (u14, seit SCRUM-169 auch u17) duerfen zusaetzlich das Wetter von Open-Meteo abrufen (SCRUM-96).
+    const weather = target.public.startsWith("angular/") ? ["https://api.open-meteo.com", "https://geocoding-api.open-meteo.com"] : [];
     assert.deepEqual(connect.sort(), ["'self'", "https://firestore.googleapis.com", "https://identitytoolkit.googleapis.com", "https://securetoken.googleapis.com", ...weather].sort(), `${target.target}: connect-src zu breit`);
   }
   // Die Live-Kopien laden das SDK genau aus diesem Pfad; aendert sich die Version, muss die CSP mitziehen.
@@ -350,6 +350,48 @@ test("Angular-Target u14: Output, SPA-Rewrite, Caching, CSP und Deploy-Schritt",
   const deploy = await read(".github/workflows/firebase-hosting-merge.yml");
   assert.match(deploy, /target: u14/);
   assert.match(deploy, /npm run verify/, "Der Angular-Build laeuft ueber verify vor dem Deploy");
+});
+
+test("Live-Team U17 läuft auf dem Angular-Build mit Team-ID U17, Rückweg outputs/u17 bleibt (SCRUM-169)", async () => {
+  const config = JSON.parse(await read("firebase.json"));
+  const u17 = config.hosting.find((entry) => entry.target === "u17");
+  const u14 = config.hosting.find((entry) => entry.target === "u14");
+  assert.ok(u17, "Hosting-Target u17 fehlt");
+
+  // Public = Ausgabe der Build-Konfiguration u17 (application-Builder legt die Dateien unter browser/ ab).
+  const angular = JSON.parse(await read("angular/angular.json"));
+  const build = angular.projects["teamkompass-angular"].architect.build.configurations.u17;
+  assert.equal(u17.public, `angular/${build.outputPath}/browser`);
+  assert.notEqual(u17.public, u14.public, "U17 und das Testteam U14 brauchen getrennte Ausgabeordner");
+  assert.match(await read("angular/src/environments/environment.u17.ts"), /teamId: 'U17'/);
+
+  // Gleiche Header (CSP, Caching) und SPA-Rewrite wie das erprobte Angular-Ziel u14.
+  assert.deepEqual(u17.headers, u14.headers);
+  assert.deepEqual(u17.rewrites, [{ source: "**", destination: "/index.html" }]);
+  assert.deepEqual(u17.ignore, u14.ignore);
+  const firebaserc = JSON.parse(await read(".firebaserc"));
+  assert.deepEqual(firebaserc.targets["teamkompass-b8aac"].hosting.u17, ["teamkompass-u17"], "kein neues Hosting-Ziel, nur umgebogen");
+
+  // Deploy beim Merge: Build aus dem Verify-Job wird hochgeladen, im Deploy-Job an genau den public-Pfad gelegt.
+  const merge = await read(".github/workflows/firebase-hosting-merge.yml");
+  const [mergeVerify, mergeDeploy] = merge.split(/\n  build_and_deploy:/);
+  assert.match(mergeVerify, /name: angular-dist-u17\n\s+path: angular\/dist\/team-u17\/browser\n\s+if-no-files-found: error/);
+  assert.match(mergeDeploy, /download-artifact[\s\S]*?name: angular-dist-u17\n\s+path: angular\/dist\/team-u17\/browser/);
+  assert.ok(mergeDeploy.indexOf("angular-dist-u17") < mergeDeploy.indexOf("target: u17"), "Build muss vor dem u17-Deploy da sein");
+
+  // Vorschau je PR auf der Site teamkompass-u17, damit der PO den Angular-Build vor dem Merge sieht.
+  const preview = await read(".github/workflows/firebase-hosting-pull-request.yml");
+  const [previewVerify, previewDeploy] = preview.split(/\n  build_and_preview:/);
+  assert.match(previewVerify, /name: angular-dist-u17\n\s+path: angular\/dist\/team-u17\/browser/);
+  assert.match(previewDeploy, /download-artifact[\s\S]*?name: angular-dist-u17[\s\S]*?target: u17/);
+  assert.doesNotMatch(previewDeploy, /channelId: live/, "PR-Vorschau darf nie live deployen");
+  // Die Vorschaukanaele der U17-Site werden wie die der Haupt-Site aufgeraeumt (SCRUM-132).
+  assert.match(await read(".github/workflows/firebase-preview-cleanup.yml"), /SITES: teamkompass-b8aac teamkompass-u17/);
+
+  // Rückweg: die alte U17-App bleibt vollständig im Repo (firebase.json-Eintrag zurück auf outputs/u17).
+  for (const file of ["index.html", "app.js", "firebase-config.js", "service-worker.js", "assets/club-logo.png"]) await read(`outputs/u17/${file}`);
+  assert.match(await read("outputs/u17/firebase-config.js"), /teamId: "U17"/);
+  assert.match(await read("FIREBASE_SETUP.md"), /"public": "outputs\/u17"/, "Rollback-Anleitung fehlt");
 });
 
 test("Angular-PWA (SCRUM-76): Manifest, Service Worker im Produktions-Build, Update-Dateien nie lange gecacht", async () => {
@@ -903,7 +945,7 @@ test("Hosting: Doku und Beispiel-Konfiguration werden nicht ausgeliefert, Starts
     assert.ok(target.ignore.includes("**/*.example.js"), `${target.target}: *.example.js muss ausgeschlossen sein`);
     const headers = target.headers ?? [];
     const noCache = (source) => headers.some((rule) => rule.source === source && rule.headers.some((header) => header.key === "Cache-Control" && /no-cache/.test(header.value)));
-    if (target.target !== "u14") {
+    if (!target.public.startsWith("angular/")) {
       assert.ok(noCache("/"), `${target.target}: "/" braucht Cache-Control no-cache`);
       assert.ok(noCache("/index.html"), `${target.target}: "/index.html" braucht Cache-Control no-cache`);
     } else {

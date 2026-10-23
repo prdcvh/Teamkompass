@@ -1,16 +1,22 @@
 import { inject } from '@angular/core';
 import { type CanActivateChildFn, type CanActivateFn, Router } from '@angular/router';
 import { AuthService } from './auth.service';
+import { INVITE_PARAM, inviteCodeFromParam } from './invite-link';
 import { homeFor } from './role';
 import { SessionService } from './session.service';
 
-/** Seiten nur für Angemeldete. Wartet, bis der Anmeldezustand feststeht – vorher wird nichts gezeigt. */
-export const authGuard: CanActivateFn = async () => {
+/**
+ * Seiten nur für Angemeldete. Wartet, bis der Anmeldezustand feststeht – vorher wird nichts gezeigt.
+ * Ein Einladungslink der bisherigen App (`/?invite=<code>`) behält beim Weiterleiten seinen Code (SCRUM-169).
+ */
+export const authGuard: CanActivateFn = async (route) => {
   // inject() nur vor dem ersten await: danach gibt es keinen Injection-Kontext mehr.
   const auth = inject(AuthService);
   const router = inject(Router);
+  const invite = inviteCodeFromParam(route?.queryParamMap?.get(INVITE_PARAM));
   await auth.whenResolved();
-  return auth.status() === 'ready' ? true : router.createUrlTree(['/anmelden']);
+  if (auth.status() === 'ready') return true;
+  return router.createUrlTree(['/anmelden'], invite ? { queryParams: { [INVITE_PARAM]: invite } } : {});
 };
 
 /** Anmeldeseite: wer schon angemeldet ist, wird weitergeleitet. */

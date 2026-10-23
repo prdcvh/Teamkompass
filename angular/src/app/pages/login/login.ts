@@ -1,9 +1,11 @@
 import { ChangeDetectionStrategy, Component, ElementRef, inject, signal } from '@angular/core';
+import { Location } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { environment } from '../../../environments/environment';
 import { AccountService } from '../../core/auth/account.service';
 import { AuthService } from '../../core/auth/auth.service';
+import { INVITE_PARAM, inviteCodeFromParam } from '../../core/auth/invite-link';
 import { homeFor } from '../../core/auth/role';
 import { SessionService } from '../../core/auth/session.service';
 import { Button } from '../../ui/button/button';
@@ -38,6 +40,19 @@ export class Login {
   protected code = '';
   protected readonly club = environment.clubName;
   protected readonly team = environment.teamLabel;
+
+  constructor() {
+    // Einladungslink der bisherigen App (SCRUM-169): Code vorausfüllen und aus der Adresszeile entfernen (soll nicht
+    // im Verlauf stehen bleiben). Angemeldet wird erst per Knopfdruck.
+    const params = inject(ActivatedRoute).snapshot.queryParamMap;
+    if (!params.has(INVITE_PARAM)) return;
+    const invite = inviteCodeFromParam(params.get(INVITE_PARAM));
+    if (invite) {
+      this.code = invite;
+      this.tab.set('code');
+    }
+    inject(Location).replaceState('/anmelden');
+  }
 
   protected select(tab: Tab): void {
     this.tab.set(tab);
