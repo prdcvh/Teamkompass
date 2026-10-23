@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { type CanActivateChildFn, type CanActivateFn, Router, UrlTree } from '@angular/router';
+import { type CanActivateChildFn, type CanActivateFn, Router, UrlTree, convertToParamMap } from '@angular/router';
 import { AuthService } from './auth.service';
 import { authGuard, guestGuard, memberViewGuard, trainerGuard } from './auth.guard';
 import type { Role } from './role';
@@ -31,6 +31,17 @@ describe('Guards', () => {
     status.value = 'signedOut';
     resolve();
     expect(path(await pending)).toBe('/anmelden');
+  });
+
+  it('authGuard behält den Code eines Einladungslinks der bisherigen App beim Weiterleiten (SCRUM-169)', async () => {
+    status.value = 'signedOut';
+    resolve();
+    const code = 'ab'.repeat(24);
+    const route = (invite: string) => ({ queryParamMap: convertToParamMap({ invite }) }) as never;
+    const withInvite = (invite: string) => TestBed.runInInjectionContext(() => authGuard(route(invite), {} as never));
+    expect(path(await withInvite(code.toUpperCase()))).toBe(`/anmelden?invite=${code}`);
+    // Ungültige Werte werden nicht weitergereicht.
+    expect(path(await withInvite('<b>x</b>'))).toBe('/anmelden');
   });
 
   it('authGuard lässt Angemeldete durch', async () => {

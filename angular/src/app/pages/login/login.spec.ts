@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
-import { provideRouter, Router } from '@angular/router';
+import { Location } from '@angular/common';
+import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { SessionService } from '../../core/auth/session.service';
 import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
@@ -36,6 +37,29 @@ describe('Login', () => {
     expect(root(fixture).querySelector('h3')?.textContent).toBe('Spieler- oder Elternzugang');
     expect(root(fixture).querySelector('input[name="code"]')).not.toBeNull();
     expect(tabs[1].getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('füllt den Code aus einem Einladungslink der bisherigen App vor und entfernt ihn aus der Adresszeile (SCRUM-169)', async () => {
+    const code = 'cd'.repeat(24);
+    firebase = new FakeFirebase();
+    await TestBed.configureTestingModule({
+      imports: [Login],
+      providers: [
+        provideRouter([]),
+        ...provideFakeFirebase(firebase),
+        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({ invite: code.toUpperCase() }) } } },
+      ],
+    }).compileComponents();
+    TestBed.inject(AuthService).start(0);
+    const location = TestBed.inject(Location);
+    const replace = vi.spyOn(location, 'replaceState');
+    const fixture = TestBed.createComponent(Login);
+    await fixture.whenStable();
+    expect(root(fixture).querySelector('h3')?.textContent).toBe('Spieler- oder Elternzugang');
+    expect(root(fixture).querySelector<HTMLInputElement>('input[name="code"]')?.value).toBe(code);
+    expect(replace).toHaveBeenCalledWith('/anmelden');
+    // Angemeldet wird erst per Knopfdruck.
+    expect(firebase.calls.some((call) => call.startsWith('anon') || call.includes('claim'))).toBe(false);
   });
 
   it('zeigt Fehlermeldungen sichtbar als Hinweis an', async () => {

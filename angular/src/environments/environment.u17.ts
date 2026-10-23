@@ -1,6 +1,7 @@
 import { firebaseConfig } from './firebase';
 
-// Live-Team U17 (heute outputs/u17). Nur für den Umstieg (SCRUM-76), nicht deployen ohne PO-Freigabe.
+// Live-Team U17: seit SCRUM-169 auf Hosting-Ziel u17 (teamkompass-u17.web.app) live, echte Daten teams/U17.
+// Rückweg auf die alte App outputs/u17: FIREBASE_SETUP.md §11.
 export const environment = {
   teamId: 'U17',
   clubName: '1. FC Königstein',

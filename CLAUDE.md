@@ -14,8 +14,11 @@ build step, no bundler, no test suite.
   plans, absences, measurements, formation board, mobile stepper UI) and
   syncs to Firestore per-collection (see `cloudCache`/`cloudSave*` in
   `app.js`), not as one JSON blob.
-- `outputs/u17/` and `outputs/u15/`: the app deployed to the `u17`/`u15`
-  Firebase Hosting targets, one per additional team. Near-byte-identical to
+- `outputs/u17/` and `outputs/u15/`: one copy per additional team.
+  `outputs/u15` is deployed to hosting target `u15`. `outputs/u17` is **no
+  longer hosted** since SCRUM-169 (target `u17` serves the Angular U17 build,
+  see `angular/` below); it stays, in sync, only as the rollback copy
+  (`FIREBASE_SETUP.md` §11) — don't delete it. Near-byte-identical to
   `outputs/team-manager` — only team-branding strings (name/logo alt text)
   and `firebase-config.js` (`teamId: "U17"` / `"U15"`) differ. Diff against
   `outputs/team-manager` before assuming a change only needs to land once.
@@ -31,17 +34,20 @@ build step, no bundler, no test suite.
   Already generic per `teamId`, so a new team never needs rule changes.
 - `angular/`: the in-progress Angular rewrite (see Jira epic SCRUM-40). Own
   `package.json`, built separately; `npm run verify` also lints, builds and
-  tests it. It is **not** one of the copies above (feature requests against
-  "the app" don't automatically include it, and vice versa). It **is
-  deployed**: every merge to `main` builds it and publishes it to hosting
-  target `u14` → https://teamkompass-u14.web.app/ (last step of
-  `.github/workflows/firebase-hosting-merge.yml`, see `FIREBASE_SETUP.md`
-  §8). So an Angular change is live there right after merge — say so, don't
-  call it "not deployed". Its test team is `teamId: U14`, data copied from
-  `mein-team` — never write to `mein-team` from there.
+  tests it. It **is deployed** on every merge to `main`, twice: the default
+  build to hosting target `u14` → https://teamkompass-u14.web.app/ (test
+  team `teamId: U14`, data copied from `mein-team` — never write to
+  `mein-team` from there; `FIREBASE_SETUP.md` §8), and since SCRUM-169 the
+  `u17` build (`ng build -c production,u17`, `teamId: U17`) to hosting target
+  `u17` → https://teamkompass-u17.web.app/, the **live U17 team with real
+  data** (`FIREBASE_SETUP.md` §11). So an Angular change is live for real
+  U17 users right after merge — say so. Every PR also gets a U17 Angular
+  preview channel (real U17 data). `mein-team`/`U15` still run on
+  `outputs/*` until their own cutover (SCRUM-169).
 
 **A feature request against "the app" almost always means every copy**
-(root + every `outputs/*` team folder), not just root — root being out of
+(root + every `outputs/*` team folder **and `angular/`**, since U17 runs on
+Angular), not just root — root being out of
 sync has caused silently-no-op ships before (see git history: #61/#62,
 #59/#63). When only one copy is touched, say so explicitly and why.
 

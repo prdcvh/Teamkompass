@@ -28,6 +28,13 @@ jobs:
         run: npm ci --ignore-scripts --prefix angular
       - name: Verify application
         run: npm run verify
+      # SCRUM-169: Angular-Build der U17 (echte Teamdaten teams/U17) als Vorschau auf der Site teamkompass-u17.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: angular-dist-u17
+          path: angular/dist/team-u17/browser
+          if-no-files-found: error
+          retention-days: 1
   build_and_preview:
     needs: verify
     if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
@@ -42,3 +49,13 @@ jobs:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TEAMKOMPASS_B8AAC }}
           projectId: teamkompass-b8aac
           target: main
+      - uses: actions/download-artifact@v8
+        with:
+          name: angular-dist-u17
+          path: angular/dist/team-u17/browser
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TEAMKOMPASS_B8AAC }}
+          projectId: teamkompass-b8aac
+          target: u17

@@ -5,6 +5,9 @@
 # - workflow_dispatch (von Hand in GitHub -> Actions starten): loescht die Vorschauen aller PRs, die schon
 #   geschlossen sind. Vorschauen offener PRs und der Live-Kanal bleiben unangetastet.
 #
+# Vorschauen gibt es auf zwei Sites: teamkompass-b8aac (alte App, Ziel main) und seit SCRUM-169 teamkompass-u17
+# (Angular-Build der U17). Beide werden gleich behandelt.
+#
 # Sicherheit (wie SCRUM-57): Hier laeuft kein Code aus dem PR. Ausgecheckt wird nur der Standard-Branch (fuer
 # firebase.json/.firebaserc), es gibt kein npm install aus dem Repo; firebase-tools ist fest gepinnt.
 
@@ -24,7 +27,7 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     env:
-      SITE: teamkompass-b8aac
+      SITES: teamkompass-b8aac teamkompass-u17
       PROJECT: teamkompass-b8aac
       FIREBASE_TOOLS: firebase-tools@15.32.1
     steps:
@@ -47,29 +50,31 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
-          npx --yes "$FIREBASE_TOOLS" hosting:channel:list --site "$SITE" --project "$PROJECT" --json > "$RUNNER_TEMP/channels.json"
-          # Kanal-IDs der PR-Vorschauen haben die Form pr<Nummer>-<Branch> (FirebaseExtended/action-hosting-deploy).
-          node -e '
-            const out = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
-            for (const c of out.result.channels) {
-              const id = c.name.split("/").pop();
-              const m = /^pr(\d+)-/.exec(id);
-              if (m) console.log(m[1] + " " + id);
-            }
-          ' "$RUNNER_TEMP/channels.json" > "$RUNNER_TEMP/pr-channels.txt"
-          echo "Gefundene PR-Vorschaukanaele: $(wc -l < "$RUNNER_TEMP/pr-channels.txt")"
           deleted=0
-          while read -r -u 3 number channel; do
-            if [ -n "$PR_NUMBER" ]; then
-              [ "$number" = "$PR_NUMBER" ] || continue
-            else
-              state=$(gh pr view "$number" --repo "$GITHUB_REPOSITORY" --json state --jq .state < /dev/null)
-              [ "$state" != "OPEN" ] || { echo "behalte $channel (PR #$number ist offen)"; continue; }
-            fi
-            echo "loesche $channel"
-            npx --yes "$FIREBASE_TOOLS" hosting:channel:delete "$channel" --site "$SITE" --project "$PROJECT" --force < /dev/null
-            deleted=$((deleted + 1))
-          done 3< "$RUNNER_TEMP/pr-channels.txt"
+          for SITE in $SITES; do
+            npx --yes "$FIREBASE_TOOLS" hosting:channel:list --site "$SITE" --project "$PROJECT" --json > "$RUNNER_TEMP/channels.json"
+            # Kanal-IDs der PR-Vorschauen haben die Form pr<Nummer>-<Branch> (FirebaseExtended/action-hosting-deploy).
+            node -e '
+              const out = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+              for (const c of out.result.channels) {
+                const id = c.name.split("/").pop();
+                const m = /^pr(\d+)-/.exec(id);
+                if (m) console.log(m[1] + " " + id);
+              }
+            ' "$RUNNER_TEMP/channels.json" > "$RUNNER_TEMP/pr-channels.txt"
+            echo "$SITE: gefundene PR-Vorschaukanaele: $(wc -l < "$RUNNER_TEMP/pr-channels.txt")"
+            while read -r -u 3 number channel; do
+              if [ -n "$PR_NUMBER" ]; then
+                [ "$number" = "$PR_NUMBER" ] || continue
+              else
+                state=$(gh pr view "$number" --repo "$GITHUB_REPOSITORY" --json state --jq .state < /dev/null)
+                [ "$state" != "OPEN" ] || { echo "behalte $SITE/$channel (PR #$number ist offen)"; continue; }
+              fi
+              echo "loesche $SITE/$channel"
+              npx --yes "$FIREBASE_TOOLS" hosting:channel:delete "$channel" --site "$SITE" --project "$PROJECT" --force < /dev/null
+              deleted=$((deleted + 1))
+            done 3< "$RUNNER_TEMP/pr-channels.txt"
+          done
           echo "Geloescht: $deleted"
       - name: Service-Account entfernen
         if: always()

@@ -215,7 +215,8 @@ Die Angular-Neuentwicklung (Jira-Epic SCRUM-40) wird als eigene Hosting-Site
 - `.github/workflows/firebase-hosting-merge.yml`: Der Angular-Build laeuft bereits in
   `npm run verify`; danach deployt ein eigener Schritt `target: u14` (als letzter Schritt,
   damit ein Problem dort die Live-Teams nicht aufhaelt).
-- Fuer Pull-Request-Vorschauen wird das Target nicht gebaut (es gibt dafuer noch keine Site).
+- Fuer Pull-Request-Vorschauen wird das Target `u14` nicht gebaut (Vorschau des Angular-Builds gibt es
+  seit SCRUM-169 auf der Site `teamkompass-u17`, siehe Abschnitt 11).
 - PWA (SCRUM-76): Manifest `angular/public/manifest.webmanifest`, Service Worker von Angular
   (`angular/ngsw-config.json`, nur im Produktions-Build). `ngsw.json`/`ngsw-worker.js` fallen unter
   die `no-cache`-Regel `**`, Updates kommen also sofort an (Hinweis "Neue Version verfuegbar").
@@ -307,3 +308,55 @@ steht (heute leer = aus). Zum Einschalten:
 
 Bis dahin begrenzt die Einladungspflicht neue Konten: ohne Code entsteht kein Verein und kein Team; ein Konto ohne
 Code sieht nichts.
+
+## 11. Live-Team auf Angular umstellen und Rückweg (Rollback)
+
+Seit SCRUM-169 liefert das Hosting-Ziel `u17` (Site `teamkompass-u17`) den **Angular-Build der U17**
+aus (`ng build -c production,u17`, Team-ID `U17`, Ausgabe `angular/dist/team-u17/browser`). Die U17
+liest und schreibt dieselben Daten wie vorher (`teams/U17/...`), Firestore-Regeln unverändert. Die alte
+App `outputs/u17/` bleibt im Repo, nur für den Rückweg.
+
+- `firebase.json`, Eintrag `"target": "u17"`: `"public": "angular/dist/team-u17/browser"`, Header und
+  SPA-Rewrite wie beim Ziel `u14`.
+- `.github/workflows/firebase-hosting-merge.yml`: der Verify-Job lädt `angular/dist/team-u17/browser`
+  als Artefakt `angular-dist-u17` hoch, der Deploy-Job legt es dorthin zurück und deployt `target: u17`.
+- `.github/workflows/firebase-hosting-pull-request.yml`: jeder PR bekommt zusätzlich eine
+  **Vorschau der U17-Angular-App** auf `teamkompass-u17--pr<Nr>-<branch>.web.app` (eigener Bot-Kommentar
+  im PR). Achtung: die Vorschau arbeitet mit den **echten U17-Daten** – dort nur lesen bzw. gezielt testen.
+- Vorschaukanäle beider Sites räumt `firebase-preview-cleanup.yml` auf.
+
+### Rückweg auf die alte App
+
+**Sofort (Notfall, ohne Code):** Firebase Console → Hosting → Site `teamkompass-u17` →
+Versionsverlauf → bei der letzten Version vor der Umstellung „Zurücksetzen“ (rollback). Wirkt sofort, wird
+aber beim **nächsten Merge nach `main`** wieder überschrieben – deshalb immer auch den dauerhaften Weg
+gehen.
+
+**Dauerhaft (per PR):**
+
+1. In `firebase.json` den Eintrag `"target": "u17"` durch eine Kopie des `u15`-Eintrags ersetzen und darin
+   nur `target` und `public` ändern:
+
+   ```json
+   "target": "u17",
+   "public": "outputs/u17",
+   ```
+
+   (also wieder die Header der alten App mit dem gstatic-Firebase-SDK in der CSP, ohne `rewrites`).
+2. Den Test „Live-Team U17 läuft auf dem Angular-Build …“ (SCRUM-169) in `tests/project.test.mjs`
+   entfernen bzw. umdrehen. Die Artefakt-Schritte `angular-dist-u17` in den Workflows dürfen bleiben.
+3. `npm run verify`, PR, Merge nach `main` → der Merge-Workflow deployt `outputs/u17` live.
+4. Prüfen: `https://teamkompass-u17.web.app` neu laden – die alte Oberfläche erscheint, Trainer und
+   Spieler sind weiter angemeldet.
+
+**Was auf den Geräten passiert:** Der Angular-Service-Worker fragt bei jedem Öffnen `ngsw.json` ab. Die
+alte App hat diese Datei nicht (Antwort 404), daraufhin meldet er sich selbst ab und löscht seinen Cache;
+beim nächsten Laden kommt die alte App und registriert wieder `service-worker.js`. Zeigt ein Gerät danach
+dauerhaft einen Sync-Fehler (älteres Firebase-SDK mit dem Offline-Speicher der neueren Version), hilft
+einmal „Website-Daten löschen“ im Browser; Daten gehen dabei nicht verloren, sie liegen in Firestore.
+
+**Vor einem erneuten Umstieg auf Angular:** Die alte App aktualisiert die Angular-Zusammenfassungen je
+Spieler (`teams/U17/playerStats`, SCRUM-201) nicht. Wurden sie in Angular eingerichtet („Einstellungen →
+Zusammenfassungen → Neu berechnen“), nach dem erneuten Umstieg sofort dort **„Neu berechnen“** drücken
+(oder vorher das Dokument `teams/U17/meta/playerStats` löschen – dann rechnet Angular wieder aus allen
+Bewertungen).
