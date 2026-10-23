@@ -18,7 +18,7 @@ build step, no bundler, no test suite.
   `outputs/u15` is deployed to hosting target `u15`. `outputs/u17` is **no
   longer hosted** since SCRUM-169 (target `u17` serves the Angular U17 build,
   see `angular/` below); it stays, in sync, only as the rollback copy
-  (`FIREBASE_SETUP.md` §9) — don't delete it. Near-byte-identical to
+  (`FIREBASE_SETUP.md` §11) — don't delete it. Near-byte-identical to
   `outputs/team-manager` — only team-branding strings (name/logo alt text)
   and `firebase-config.js` (`teamId: "U17"` / `"U15"`) differ. Diff against
   `outputs/team-manager` before assuming a change only needs to land once.
@@ -40,7 +40,7 @@ build step, no bundler, no test suite.
   `mein-team` from there; `FIREBASE_SETUP.md` §8), and since SCRUM-169 the
   `u17` build (`ng build -c production,u17`, `teamId: U17`) to hosting target
   `u17` → https://teamkompass-u17.web.app/, the **live U17 team with real
-  data** (`FIREBASE_SETUP.md` §9). So an Angular change is live for real
+  data** (`FIREBASE_SETUP.md` §11). So an Angular change is live for real
   U17 users right after merge — say so. Every PR also gets a U17 Angular
   preview channel (real U17 data). `mein-team`/`U15` still run on
   `outputs/*` until their own cutover (SCRUM-169).

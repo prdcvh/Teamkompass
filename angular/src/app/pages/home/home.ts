@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { environment } from '../../../environments/environment';
+import { CurrentTeam } from '../../core/team/current-team.service';
 import { formatDate, resultText } from '../../core/events/event';
 import { LayoutService } from '../../core/shell/layout.service';
 import { formationName, lineupIsEmpty, onPitchCount, pitchMarkers } from '../../core/lineup/lineup';
@@ -23,6 +23,7 @@ import { InstallHint } from '../../ui/install-hint/install-hint';
 import { Weather } from '../../ui/weather/weather';
 import { HomeBoard } from './home-board/home-board';
 import { HomeLineup } from './home-lineup/home-lineup';
+import { HomeRanking } from './home-ranking/home-ranking';
 
 /** Beschriftung der Bänder von vorn nach hinten (Reihenfolge von PITCH_BANDS umgekehrt). */
 const BAND_LABELS: readonly string[] = ['Angriff', 'Offensiv', 'Mittelfeld', 'Defensiv', 'Abwehr'];
@@ -40,7 +41,7 @@ const TREND_TEXT: Record<Exclude<FormTrend, null>, string> = { besser: 'Form ste
 /** Start-Dashboard: Kennzahlen des Teams, nächstes Event und Bestenliste (nur für Trainer mit Daten). */
 @Component({
   selector: 'app-home',
-  imports: [RouterLink, Button, Card, InstallHint, Weather, BreakNotice, HomeLineup, HomeBoard],
+  imports: [RouterLink, Button, Card, InstallHint, Weather, BreakNotice, HomeLineup, HomeBoard, HomeRanking],
   templateUrl: './home.html',
   styleUrl: './home.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -53,8 +54,9 @@ export class Home implements OnInit {
   private readonly squad = inject(SquadService);
   private readonly session = inject(SessionService);
   protected readonly isTrainer = computed(() => this.session.role() === 'trainer');
-  protected readonly teamName = environment.teamName;
-  protected readonly teamId = environment.teamId;
+  private readonly current = inject(CurrentTeam);
+  protected readonly teamName = this.current.name;
+  protected readonly teamId = this.current.id;
 
   protected readonly figures = computed(() => dashboardFigures(this.team.data(), this.team.events(), todayIso()));
   protected readonly board = computed(() =>

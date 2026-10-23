@@ -1,9 +1,11 @@
 <nav aria-label="Hauptnavigation">
   <div class="brand">
-    <img class="logo" src="club-logo.png" alt="" width="38" height="34" />
+    @if (team.logoSrc(); as logo) {
+      <img class="logo" [src]="logo" alt="" width="38" height="34" />
+    }
     <div>
       <strong>TeamKompass</strong>
-      <small>{{ club }} · {{ team }}</small>
+      <small>{{ team.title() }}</small>
     </div>
   </div>
 
@@ -33,6 +35,14 @@
 
   <p class="group">App</p>
   <ul class="app">
+    @if (team.choices().length > 1) {
+      <li>
+        <a routerLink="/team-waehlen" routerLinkActive="active" ariaCurrentWhenActive="page">
+          <tk-icon name="repeat" />
+          Team wechseln
+        </a>
+      </li>
+    }
     <li>
       <a [routerLink]="privacy.path" routerLinkActive="active" ariaCurrentWhenActive="page">
         <tk-icon [name]="privacy.icon" />

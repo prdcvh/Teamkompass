@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard, guestGuard, memberViewGuard, trainerGuard } from './core/auth/auth.guard';
+import { authGuard, guestGuard, memberViewGuard, teamChoiceGuard, trainerGuard } from './core/auth/auth.guard';
 import { Shell } from './shell/shell';
 
 export const routes: Routes = [
@@ -11,6 +11,18 @@ export const routes: Routes = [
     path: 'anmelden',
     canActivate: [guestGuard],
     loadComponent: () => import('./pages/login/login').then((m) => m.Login),
+  },
+  {
+    // Registrierung nur mit Einladungscode (SCRUM-181).
+    path: 'registrieren',
+    canActivate: [guestGuard],
+    loadComponent: () => import('./pages/register/register').then((m) => m.Register),
+  },
+  {
+    // Mehrere Teams: Auswahl nach der Anmeldung und „Team wechseln“ (SCRUM-181).
+    path: 'team-waehlen',
+    canActivate: [teamChoiceGuard],
+    loadComponent: () => import('./pages/team-choice/team-choice').then((m) => m.TeamChoice),
   },
   {
     path: 'abmelden',
@@ -29,6 +41,7 @@ export const routes: Routes = [
         children: [
           { path: '', pathMatch: 'full', redirectTo: 'start' },
           { path: 'start', loadComponent: () => import('./pages/home/home').then((m) => m.Home) },
+          { path: 'willkommen', loadComponent: () => import('./pages/welcome/welcome').then((m) => m.Welcome) },
           { path: 'kader', loadComponent: () => import('./pages/squad/squad').then((m) => m.Squad) },
           { path: 'events', loadComponent: () => import('./pages/events/events').then((m) => m.Events) },
           { path: 'events/:id', loadComponent: () => import('./pages/event-rating/event-rating').then((m) => m.EventRating) },

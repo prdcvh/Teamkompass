@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
-import { INVITE_ROLES, type InviteRole, parseExpiryDays } from '../../core/access/access';
+import { INVITE_ROLES, type InviteRole, parseExpiryDays, playerInviteLink } from '../../core/access/access';
+import { CurrentTeam } from '../../core/team/current-team.service';
 import { AccessService } from '../../core/access/access.service';
 import { consentRevokedMessage, isConsentRevoked, type Player } from '../../core/player/player';
 import { Button } from '../../ui/button/button';
@@ -15,6 +16,7 @@ import { Dialog } from '../../ui/dialog/dialog';
 })
 export class InviteDialog {
   private readonly access = inject(AccessService);
+  private readonly team = inject(CurrentTeam);
 
   readonly open = input(false);
   readonly players = input<readonly Player[]>([]);
@@ -93,6 +95,21 @@ export class InviteDialog {
       this.copied.set(true);
     } catch {
       this.copied.set(false); // Der Code bleibt markierbar sichtbar.
+    }
+  }
+
+  /**
+   * Einladungslink mit Team (SCRUM-181, „ein Build für alle“): Ohne festes Team im Build muss der Link sagen, in welches
+   * Team der Code gehört. Er füllt auf der Anmeldeseite den Code ein und wählt das Team.
+   */
+  protected async copyLink(): Promise<void> {
+    const created = this.created();
+    if (!created) return;
+    try {
+      await navigator.clipboard.writeText(playerInviteLink(location.origin, this.team.id(), created.code));
+      this.copied.set(true);
+    } catch {
+      this.copied.set(false);
     }
   }
 

@@ -1,8 +1,10 @@
 import { ChangeDetectionStrategy, Component, ElementRef, inject, signal } from '@angular/core';
 import { Location } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { environment } from '../../../environments/environment';
+import { TEAM_ID_PATTERN } from '../../core/access/access';
+import { CurrentTeam } from '../../core/team/current-team.service';
 import { AccountService } from '../../core/auth/account.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { INVITE_PARAM, inviteCodeFromParam } from '../../core/auth/invite-link';
@@ -15,7 +17,7 @@ type Tab = 'trainer' | 'code';
 /** Figma „01 Anmeldung“ / „01b Login Spieler/Eltern“: Trainer-Login und Einladungscode. */
 @Component({
   selector: 'app-login',
-  imports: [FormsModule, Button],
+  imports: [FormsModule, RouterLink, Button],
   templateUrl: './login.html',
   // Reihenfolge = Kaskade (mobile/motion überschreiben die Grundregeln).
   styleUrls: ['./login.css', './login-hero.css', './login-form.css', './login-mobile.css', './login-motion.css'],
@@ -40,6 +42,20 @@ export class Login {
   protected code = '';
   protected readonly club = environment.clubName;
   protected readonly team = environment.teamLabel;
+  private readonly currentTeam = inject(CurrentTeam);
+  /** Team aus dem Einladungslink (?team=…), SCRUM-181: damit ein Build alle Teams bedienen kann. */
+  private readonly linkTeam: string | null;
+
+  constructor() {
+    const params = inject(ActivatedRoute).snapshot.queryParamMap;
+    const team = params.get('team');
+    this.linkTeam = team && TEAM_ID_PATTERN.test(team) ? team : null;
+    const code = params.get('code');
+    if (code) {
+      this.code = code.trim().slice(0, 128);
+      this.tab.set('code');
+    }
+  }
 
   constructor() {
     // Einladungslink der bisherigen App (SCRUM-169): Code vorausfüllen und aus der Adresszeile entfernen (soll nicht
@@ -99,6 +115,7 @@ export class Login {
   }
 
   protected async submitCode(): Promise<void> {
+    if (this.linkTeam) this.currentTeam.select(this.linkTeam);
     await this.auth.signInWithCode(this.code);
     await this.leaveIfSignedIn();
   }

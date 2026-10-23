@@ -1,0 +1,103 @@
+:host {
+  display: block;
+  min-height: 100vh;
+  background: var(--tk-bg);
+}
+
+.choice {
+  display: flex;
+  justify-content: center;
+  padding: var(--tk-space-6) var(--tk-space-4);
+}
+
+.panel {
+  width: min(100%, 520px);
+}
+
+h1 {
+  margin: var(--tk-space-1) 0 var(--tk-space-2);
+  font-size: 28px;
+}
+
+.hint {
+  margin: 0 0 var(--tk-space-4);
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+.list {
+  display: grid;
+  gap: var(--tk-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--tk-space-3);
+  width: 100%;
+  min-height: 64px;
+  padding: var(--tk-space-3) var(--tk-space-4);
+  color: var(--tk-ink);
+  background: var(--tk-surface);
+  border: 1px solid var(--tk-line);
+  border-left: 4px solid var(--tk-red);
+  border-radius: var(--tk-radius-lg);
+  box-shadow: var(--tk-shadow-card);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.item:hover {
+  background: var(--tk-surface-2);
+}
+
+.item:focus-visible {
+  outline: 2px solid var(--tk-red-dark);
+  outline-offset: 2px;
+}
+
+.text {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+.text strong {
+  overflow-wrap: anywhere;
+}
+
+.text small {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+.badge {
+  padding: 2px var(--tk-space-2);
+  color: var(--tk-green);
+  background: var(--tk-soft-green);
+  border-radius: var(--tk-radius-pill);
+  font-size: var(--tk-text-xs);
+  font-weight: 600;
+}
+
+.chevron {
+  color: var(--tk-muted);
+  font-size: 24px;
+}
+
+.foot {
+  margin: var(--tk-space-5) 0 0;
+  text-align: center;
+  font-size: var(--tk-text-sm);
+}
+
+.foot a {
+  display: inline-block;
+  padding: var(--tk-space-2);
+  color: var(--tk-red-dark);
+}

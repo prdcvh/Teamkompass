@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { environment } from '../../../environments/environment';
+import { CurrentTeam } from '../../core/team/current-team.service';
 import { formatDate } from '../../core/events/event';
 import { LayoutService } from '../../core/shell/layout.service';
 import { ageFromBirthdate, todayIso } from '../../core/shared/dates';
@@ -20,6 +20,7 @@ import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 import { InstallHint } from '../../ui/install-hint/install-hint';
 import { Status } from '../../ui/status/status';
+import { HomeRanking } from '../home/home-ranking/home-ranking';
 import { LoadReportAction } from '../profile/load-report-action';
 import { ProfileExtras } from '../profile/profile-extras';
 
@@ -38,7 +39,7 @@ import { ProfileExtras } from '../profile/profile-extras';
  */
 @Component({
   selector: 'app-member-view',
-  imports: [RouterLink, Button, Card, InstallHint, Status, ProfileExtras, BreakNotice, LoadReportAction],
+  imports: [RouterLink, Button, Card, InstallHint, Status, ProfileExtras, BreakNotice, LoadReportAction, HomeRanking],
   templateUrl: './member-view.html',
   styleUrls: ['../profile/profile.css', './member-view.css', '../../ui/chart/chart.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -52,7 +53,8 @@ export class MemberView implements OnInit {
   protected readonly sync = inject(SyncService);
   protected readonly mobile = inject(LayoutService).isMobile;
 
-  protected readonly club = `${environment.clubName} ${environment.teamLabel}`;
+  private readonly team = inject(CurrentTeam);
+  protected readonly club = computed(() => [this.team.clubName(), this.team.label()].filter(Boolean).join(' '));
   protected readonly today = todayIso();
 
   protected readonly role = this.session.role;

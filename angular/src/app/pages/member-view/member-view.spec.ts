@@ -63,6 +63,28 @@ describe('MemberView (Ansicht für Spieler, Eltern und Medizin)', () => {
   }
 
   describe('Spieler', () => {
+    it('zeigt die MVP-Ranglisten aus dem Ranglisten-Dokument, ohne Einzelpunkte zu lesen (SCRUM-105)', async () => {
+      const today = new Date();
+      const iso = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+      const { monthPeriod, weekPeriod } = await import('../../core/points/ranking');
+      const week = weekPeriod(iso(today));
+      const month = monthPeriod(iso(today));
+      const fixture = await render('player', {
+        mutate: (f) => {
+          f.ranking.doc = {
+            week: { ...week, entries: [{ rank: 1, name: 'Elias Wagner', points: 9 }, { rank: 2, name: 'Jonas Keller', points: 4 }] },
+            month: { ...month, entries: [] },
+            updatedAt: 'x',
+          };
+        },
+      });
+      await settled(fixture, () => expect(root(fixture).querySelectorAll('app-home-ranking .panel')).toHaveLength(2));
+      const rows = [...root(fixture).querySelectorAll('app-home-ranking li')].map((li) => li.textContent?.replace(/\s+/g, ' ').trim());
+      expect(rows).toEqual(['1 Elias Wagner MVP9 Punkte', '2 Jonas Keller 4 Punkte']);
+      expect(text(fixture)).toContain('Noch keine Punkte in diesem Zeitraum');
+      expect(firebase.calls.filter((call) => call.startsWith('readPrivateNotes'))).toEqual([]);
+    });
+
     it('zeigt nur das eigene Profil mit eigenen Bewertungen und Rückmeldungen', async () => {
       const fixture = await render('player');
       await settled(fixture, () => expect(text(fixture)).toContain('Starkes Spiel'));

@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { environment } from '../../../environments/environment';
+import { CurrentTeam } from '../team/current-team.service';
 import { FirebaseConnection } from './firebase-connection';
 
 /**
@@ -10,18 +10,19 @@ import { FirebaseConnection } from './firebase-connection';
 @Injectable({ providedIn: 'root' })
 export class NotificationsApi {
   private readonly connection = inject(FirebaseConnection);
+  private readonly team = inject(CurrentTeam);
 
   /** Liest das Dokument des Kontos; null, wenn noch keins existiert. */
   async readNotifications(uid: string): Promise<Readonly<Record<string, unknown>> | null> {
     const { db } = await this.connection.get();
     const { doc, getDoc } = await import('firebase/firestore');
-    const snapshot = await getDoc(doc(db, 'teams', environment.teamId, 'notifications', uid));
+    const snapshot = await getDoc(doc(db, 'teams', this.team.id(), 'notifications', uid));
     return snapshot.exists() ? snapshot.data() : null;
   }
 
   async saveNotifications(uid: string, data: Readonly<Record<string, unknown>>): Promise<void> {
     const { db } = await this.connection.get();
     const { doc, setDoc } = await import('firebase/firestore');
-    await setDoc(doc(db, 'teams', environment.teamId, 'notifications', uid), data, { merge: true });
+    await setDoc(doc(db, 'teams', this.team.id(), 'notifications', uid), data, { merge: true });
   }
 }

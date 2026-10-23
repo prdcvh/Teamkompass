@@ -98,6 +98,24 @@ function seed(): FakeFirebase {
 }
 
 const fake = seed();
+// Registrierung und Teamauswahl (SCRUM-181): ein gültiger Vereinscode, E-Mail gilt als bestätigt; ein Konto mit zwei Teams.
+fake.registration.invites.set('ABCDEFGHJKLMNPQR', {
+  code: 'ABCDEFGHJKLMNPQR', kind: 'club', clubId: 'Club0000000000000001', teamId: 'Team0000000000000001', expiresAt: new Date(Date.now() + 7 * 86_400_000), email: null,
+});
+fake.registration.verified = true;
+fake.teams.memberships.set('new-coach', [{ teamId: 'Team0000000000000001', role: 'trainer', playerId: null, expiresAt: null }]);
+fake.teams.metas.set('Team0000000000000001', { name: 'SV Musterstadt U11', label: 'U11', clubId: 'Club0000000000000001', clubName: 'SV Musterstadt', logoUrl: null });
+fake.teams.memberships.set('e2e-multi', [
+  { teamId: 'U14', role: 'trainer', playerId: null, expiresAt: null },
+  { teamId: 'Team0000000000000001', role: 'trainer', playerId: null, expiresAt: null },
+  { teamId: 'Team0000000000000002', role: 'parent', playerId: 'p1', expiresAt: null },
+]);
+fake.teams.metas.set('U14', { name: 'Test-Team U14 (Angular)', label: 'U14 Test', clubId: 'test-verein', clubName: 'Test-Verein (Angular-Test)', logoUrl: null });
+fake.teams.metas.set('Team0000000000000002', { name: 'FC Beispiel U15', label: 'U15', clubId: 'c2', clubName: 'FC Beispiel', logoUrl: null });
+if (new URLSearchParams(location.search).get('as') === 'fresh') {
+  fake.players.players.clear();
+  fake.events.events.clear();
+}
 
 bootstrapApplication(App, {
   providers: [
@@ -114,6 +132,7 @@ bootstrapApplication(App, {
         : as === 'player' ? { uid: 'e2e-player', isAnonymous: true, email: null }
         : as === 'physio' ? { uid: 'e2e-physio', isAnonymous: false, email: 'physio@example.org' }
         : as === 'scout' || as === 'medical' ? { uid: 'e2e-scout', isAnonymous: false, email: 'scout@example.org' }
+        : as === 'multi' ? { uid: 'e2e-multi', isAnonymous: false, email: 'multi@example.org' }
         : { uid: 'e2e-uid', isAnonymous: false, email: 'trainer@example.org' };
       setTimeout(() => fake.auth.emit(user), 0);
     }),

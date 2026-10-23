@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { environment } from '../../../environments/environment';
+import { CurrentTeam } from '../team/current-team.service';
 import { PlayerStatsMode } from '../team/player-stats-mode';
 import { hasStatsSource, statsUpdate } from '../team/player-stats';
 import { FirebaseConnection } from './firebase-connection';
@@ -9,6 +9,7 @@ import type { RawDoc, SnapshotMeta } from './types';
 @Injectable({ providedIn: 'root' })
 export class RatingsApi {
   private readonly connection = inject(FirebaseConnection);
+  private readonly team = inject(CurrentTeam);
   private readonly statsMode = inject(PlayerStatsMode);
 
   /** Echtzeit-Abo auf die Bewertungen eines Events (Dokument je Spieler). Lesen dürfen Trainer und der jeweilige Spieler. */
@@ -38,7 +39,7 @@ export class RatingsApi {
     const { db } = await this.connection.get();
     const { collection, onSnapshot } = await import('firebase/firestore');
     return onSnapshot(
-      collection(db, 'teams', environment.teamId, 'events', eventId, name),
+      collection(db, 'teams', this.team.id(), 'events', eventId, name),
       { includeMetadataChanges: true },
       (snapshot) =>
         onData(
@@ -62,7 +63,7 @@ export class RatingsApi {
     const { db } = await this.connection.get();
     const { doc, onSnapshot } = await import('firebase/firestore');
     return onSnapshot(
-      doc(db, 'teams', environment.teamId, 'events', eventId, 'ratings', playerId),
+      doc(db, 'teams', this.team.id(), 'events', eventId, 'ratings', playerId),
       { includeMetadataChanges: true },
       (snapshot) =>
         onData(snapshot.exists() ? snapshot.data() : null, { fromCache: snapshot.metadata.fromCache, hasPendingWrites: snapshot.metadata.hasPendingWrites }),
@@ -74,7 +75,7 @@ export class RatingsApi {
   async readRatingDoc(eventId: string, playerId: string): Promise<Readonly<Record<string, unknown>> | null> {
     const { db } = await this.connection.get();
     const { doc, getDoc } = await import('firebase/firestore');
-    const snapshot = await getDoc(doc(db, 'teams', environment.teamId, 'events', eventId, 'ratings', playerId));
+    const snapshot = await getDoc(doc(db, 'teams', this.team.id(), 'events', eventId, 'ratings', playerId));
     return snapshot.exists() ? snapshot.data() : null;
   }
 
@@ -91,8 +92,8 @@ export class RatingsApi {
     const { db } = await this.connection.get();
     const { doc, writeBatch } = await import('firebase/firestore');
     const batch = writeBatch(db);
-    batch.set(doc(db, 'teams', environment.teamId, 'events', eventId, 'ratings', playerId), { ...data, playerId }, { merge: true });
-    if (withSummary) batch.set(doc(db, 'teams', environment.teamId, 'playerStats', playerId), statsUpdate(playerId, eventId, data), { merge: true });
+    batch.set(doc(db, 'teams', this.team.id(), 'events', eventId, 'ratings', playerId), { ...data, playerId }, { merge: true });
+    if (withSummary) batch.set(doc(db, 'teams', this.team.id(), 'playerStats', playerId), statsUpdate(playerId, eventId, data), { merge: true });
     await batch.commit();
   }
 
@@ -106,7 +107,7 @@ export class RatingsApi {
     const { db } = await this.connection.get();
     const { doc, onSnapshot } = await import('firebase/firestore');
     return onSnapshot(
-      doc(db, 'teams', environment.teamId, 'events', eventId, 'privateNotes', playerId),
+      doc(db, 'teams', this.team.id(), 'events', eventId, 'privateNotes', playerId),
       { includeMetadataChanges: true },
       (snapshot) =>
         onData(snapshot.exists() ? snapshot.data() : null, { fromCache: snapshot.metadata.fromCache, hasPendingWrites: snapshot.metadata.hasPendingWrites }),
@@ -121,13 +122,13 @@ export class RatingsApi {
   async savePoints(eventId: string, playerId: string, points: number): Promise<void> {
     const { db } = await this.connection.get();
     const { doc, setDoc } = await import('firebase/firestore');
-    await setDoc(doc(db, 'teams', environment.teamId, 'events', eventId, 'privateNotes', playerId), { playerId, points }, { merge: true });
+    await setDoc(doc(db, 'teams', this.team.id(), 'events', eventId, 'privateNotes', playerId), { playerId, points }, { merge: true });
   }
 
   /** Schreibt die interne Notiz. Sie liegt bewusst getrennt von der Bewertung, die Spieler und Eltern lesen dürfen. */
   async savePrivateNote(eventId: string, playerId: string, note: string): Promise<void> {
     const { db } = await this.connection.get();
     const { doc, setDoc } = await import('firebase/firestore');
-    await setDoc(doc(db, 'teams', environment.teamId, 'events', eventId, 'privateNotes', playerId), { playerId, note }, { merge: true });
+    await setDoc(doc(db, 'teams', this.team.id(), 'events', eventId, 'privateNotes', playerId), { playerId, note }, { merge: true });
   }
 }

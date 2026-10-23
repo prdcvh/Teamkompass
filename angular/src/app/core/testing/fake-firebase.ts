@@ -9,9 +9,14 @@ import { PlayerRecordsApi } from '../firebase/player-records.api';
 import { PlayerStatsApi } from '../firebase/player-stats.api';
 import { PlanningApi } from '../firebase/planning.api';
 import { PlayersApi } from '../firebase/players.api';
+import { RankingApi } from '../firebase/ranking.api';
 import { RatingsApi } from '../firebase/ratings.api';
 import { ScoutApi } from '../firebase/scout.api';
 import { TeamSettingsApi } from '../firebase/team-settings.api';
+import { TeamsApi } from '../firebase/teams.api';
+import { RegistrationApi } from '../firebase/registration.api';
+import { FakeTeamsApi } from './fake-teams.api';
+import { FakeRegistrationApi } from './fake-registration.api';
 import { WeatherProvider } from '../weather/weather-provider';
 import { OfflineWeatherProvider } from './fake-weather.provider';
 import { FakeAccessApi } from './fake-access.api';
@@ -24,6 +29,7 @@ import { FakePlanningApi } from './fake-planning.api';
 import { FakePlayerRecordsApi } from './fake-player-records.api';
 import { FakePlayerStatsApi } from './fake-player-stats.api';
 import { FakePlayersApi } from './fake-players.api';
+import { FakeRankingApi } from './fake-ranking.api';
 import { FakeRatingsApi } from './fake-ratings.api';
 import { FakeScoutApi } from './fake-scout.api';
 import { FakeTeamSettingsApi } from './fake-team-settings.api';
@@ -41,12 +47,15 @@ export class FakeFirebase {
   readonly lineup = new FakeLineupApi(this.calls);
   readonly opponents = new FakeOpponentsApi(this.calls);
   readonly ratings = new FakeRatingsApi(this.calls);
+  readonly ranking = new FakeRankingApi(this.calls, this.ratings.privateNotes);
   readonly records = new FakePlayerRecordsApi(this.calls);
   readonly settings = new FakeTeamSettingsApi(this.calls);
   readonly notifications = new FakeNotificationsApi(this.calls);
   readonly planning =new FakePlanningApi(this.calls);
   readonly scout = new FakeScoutApi(this.calls);
   readonly playerStats = new FakePlayerStatsApi(this.calls, this.events, this.ratings);
+  readonly teams = new FakeTeamsApi();
+  readonly registration = new FakeRegistrationApi(this.auth);
 
   constructor() {
     this.events.hasRecords = (id) => (this.ratings.ratings.get(id)?.size ?? 0) > 0 || (this.ratings.privateNotes.get(id)?.size ?? 0) > 0;
@@ -63,6 +72,7 @@ export function provideFakeFirebase(fake: FakeFirebase): Provider[] {
     { provide: LineupApi, useValue: fake.lineup },
     { provide: OpponentsApi, useValue: fake.opponents },
     { provide: RatingsApi, useValue: fake.ratings },
+    { provide: RankingApi, useValue: fake.ranking },
     { provide: PlayerRecordsApi, useValue: fake.records },
     // Seiten zeigen Wetter; Tests sollen nie ins Netz (SCRUM-98).
     { provide: WeatherProvider, useClass: OfflineWeatherProvider },
@@ -71,5 +81,7 @@ export function provideFakeFirebase(fake: FakeFirebase): Provider[] {
     { provide: PlanningApi, useValue: fake.planning },
     { provide: ScoutApi, useValue: fake.scout },
     { provide: PlayerStatsApi, useValue: fake.playerStats },
+    { provide: TeamsApi, useValue: fake.teams },
+    { provide: RegistrationApi, useValue: fake.registration },
   ];
 }

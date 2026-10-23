@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { environment } from '../../../environments/environment';
+import { CurrentTeam } from '../team/current-team.service';
 import { PLAYER_STATS_VERSION } from '../team/player-stats';
 import { PlayerStatsMode } from '../team/player-stats-mode';
 import { FirebaseConnection } from './firebase-connection';
@@ -9,6 +9,7 @@ import type { RawDoc, SnapshotMeta } from './types';
 @Injectable({ providedIn: 'root' })
 export class EventsApi {
   private readonly connection = inject(FirebaseConnection);
+  private readonly team = inject(CurrentTeam);
   private readonly statsMode = inject(PlayerStatsMode);
 
   /**
@@ -24,7 +25,7 @@ export class EventsApi {
   ): Promise<() => void> {
     const { db } = await this.connection.get();
     const { collection, onSnapshot, query, where } = await import('firebase/firestore');
-    const events = collection(db, 'teams', environment.teamId, 'events');
+    const events = collection(db, 'teams', this.team.id(), 'events');
     return onSnapshot(
       fromDate ? query(events, where('date', '>=', fromDate)) : events,
       { includeMetadataChanges: true },
@@ -41,7 +42,7 @@ export class EventsApi {
   async saveEvent(id: string, data: Readonly<Record<string, unknown>>): Promise<void> {
     const { db } = await this.connection.get();
     const { doc, setDoc } = await import('firebase/firestore');
-    await setDoc(doc(db, 'teams', environment.teamId, 'events', id), data, { merge: true });
+    await setDoc(doc(db, 'teams', this.team.id(), 'events', id), data, { merge: true });
   }
 
   /**
@@ -52,7 +53,7 @@ export class EventsApi {
     const { db } = await this.connection.get();
     const { doc, writeBatch } = await import('firebase/firestore');
     const batch = writeBatch(db);
-    for (const entry of entries) batch.set(doc(db, 'teams', environment.teamId, 'events', entry.id), entry.data, { merge: true });
+    for (const entry of entries) batch.set(doc(db, 'teams', this.team.id(), 'events', entry.id), entry.data, { merge: true });
     await batch.commit();
   }
 
@@ -69,7 +70,7 @@ export class EventsApi {
       await Promise.all(
         ids.slice(offset, offset + 10).map(async (id) => {
           for (const name of ['ratings', 'privateNotes'] as const) {
-            const snapshot = await getDocs(query(collection(db, 'teams', environment.teamId, 'events', id, name), limit(1)));
+            const snapshot = await getDocs(query(collection(db, 'teams', this.team.id(), 'events', id, name), limit(1)));
             if (!snapshot.empty) found.add(id);
           }
         }),
@@ -86,7 +87,7 @@ export class EventsApi {
     const { db } = await this.connection.get();
     const { doc, writeBatch } = await import('firebase/firestore');
     const batch = writeBatch(db);
-    for (const id of ids) batch.delete(doc(db, 'teams', environment.teamId, 'events', id));
+    for (const id of ids) batch.delete(doc(db, 'teams', this.team.id(), 'events', id));
     await batch.commit();
   }
 
@@ -97,7 +98,7 @@ export class EventsApi {
   async deleteEvent(id: string): Promise<void> {
     const { db } = await this.connection.get();
     const { collection, deleteField, doc, getDocs, writeBatch } = await import('firebase/firestore');
-    const base = ['teams', environment.teamId, 'events', id] as const;
+    const base = ['teams', this.team.id(), 'events', id] as const;
     const [ratings, privateNotes, withSummary] = await Promise.all([
       getDocs(collection(db, ...base, 'ratings')),
       getDocs(collection(db, ...base, 'privateNotes')),
@@ -112,7 +113,7 @@ export class EventsApi {
           ? [
               (batch: ReturnType<typeof writeBatch>) =>
                 batch.set(
-                  doc(db, 'teams', environment.teamId, 'playerStats', entry.id),
+                  doc(db, 'teams', this.team.id(), 'playerStats', entry.id),
                   { playerId: entry.id, version: PLAYER_STATS_VERSION, events: { [id]: deleteField() } },
                   { merge: true },
                 ),

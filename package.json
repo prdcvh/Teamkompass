@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "node --check outputs/team-manager/app.js && node --check outputs/team-manager/next-level.js && node --check outputs/team-manager/qr-code.js && node --check outputs/team-manager/service-worker.js && node --check scripts/copy-team.mjs && node --check scripts/copy-team-lib.mjs",
+    "check": "node --check outputs/team-manager/app.js && node --check outputs/team-manager/next-level.js && node --check outputs/team-manager/qr-code.js && node --check outputs/team-manager/service-worker.js && node --check scripts/copy-team.mjs && node --check scripts/copy-team-lib.mjs && node --check scripts/assign-clubs.mjs && node --check scripts/assign-clubs-lib.mjs && node --check scripts/create-club-invite.mjs && node --check scripts/club-invite-lib.mjs",
     "test": "node --test tests/*.test.mjs",
     "verify": "npm run check && npm test && npm run verify:angular",
     "verify:angular": "npm --prefix angular run lint && npm --prefix angular run build && npm --prefix angular run build:teams && npm --prefix angular test -- --watch=false"

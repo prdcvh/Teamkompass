@@ -10,3 +10,10 @@ export const firebaseConfig = {
   appId: '1:942049581058:web:9d92343bb4037b80186f1b',
   measurementId: 'G-HSSGEM2KL7',
 } as const;
+
+/**
+ * App Check (Schutz vor Missbrauch, SCRUM-181/SCRUM-59): reCAPTCHA-Enterprise-Websiteschlüssel (öffentlich, kein
+ * Geheimnis). Leer = App Check aus – so bleibt es, bis der PO den Schlüssel in der Firebase-Konsole angelegt hat
+ * (Anleitung: FIREBASE_SETUP.md, Abschnitt 10). Erst danach in der Konsole „erzwingen“, sonst sperrt Firebase die App aus.
+ */
+export const appCheckSiteKey = '';

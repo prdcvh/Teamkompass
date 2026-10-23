@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { environment } from '../../../environments/environment';
+import { CurrentTeam } from '../team/current-team.service';
 import { normalizeRole } from '../auth/role';
 import type { StaffRole } from '../access/access';
 import { FirebaseConnection } from './firebase-connection';
@@ -9,11 +9,12 @@ import type { InviteRecord, MemberRecord, RawDoc } from './types';
 @Injectable({ providedIn: 'root' })
 export class AccessApi {
   private readonly connection = inject(FirebaseConnection);
+  private readonly team = inject(CurrentTeam);
 
-  async readMember(uid: string): Promise<MemberRecord | null> {
+  async readMember(uid: string, teamId: string = this.team.id()): Promise<MemberRecord | null> {
     const { db } = await this.connection.get();
     const { doc, getDoc } = await import('firebase/firestore');
-    const snapshot = await getDoc(doc(db, 'teams', environment.teamId, 'members', uid));
+    const snapshot = await getDoc(doc(db, 'teams', teamId, 'members', uid));
     if (!snapshot.exists()) return null;
     const data = snapshot.data();
     // Bisherige Scout-Konten tragen noch „medical“ und werden hier zu Scouts (SCRUM-170).
@@ -25,7 +26,7 @@ export class AccessApi {
   async readInvite(code: string): Promise<InviteRecord | null> {
     const { db } = await this.connection.get();
     const { doc, getDoc } = await import('firebase/firestore');
-    const snapshot = await getDoc(doc(db, 'teams', environment.teamId, 'invites', code));
+    const snapshot = await getDoc(doc(db, 'teams', this.team.id(), 'invites', code));
     if (!snapshot.exists()) return null;
     const data = snapshot.data();
     const expires = data['expiresAt'] as { toDate?: () => Date } | null | undefined;
@@ -45,14 +46,16 @@ export class AccessApi {
     const { db } = await this.connection.get();
     const { doc, serverTimestamp, writeBatch } = await import('firebase/firestore');
     const batch = writeBatch(db);
-    batch.set(doc(db, 'teams', environment.teamId, 'members', uid), {
+    batch.set(doc(db, 'teams', this.team.id(), 'members', uid), {
       role: invite.role,
       playerId: invite.playerId,
       claimedInviteCode: code,
+      // Für die Teamsuche (SCRUM-180/181): uid = Dokument-ID, sonst taucht der Zugang nicht unter „meine Teams“ auf.
+      uid,
       expiresAt: invite.expiresAtRaw ?? null,
       createdAt: serverTimestamp(),
     });
-    batch.delete(doc(db, 'teams', environment.teamId, 'invites', code));
+    batch.delete(doc(db, 'teams', this.team.id(), 'invites', code));
     await batch.commit();
   }
 
@@ -60,7 +63,7 @@ export class AccessApi {
   async readMembers(): Promise<RawDoc[]> {
     const { db } = await this.connection.get();
     const { collection, getDocs } = await import('firebase/firestore');
-    const snapshot = await getDocs(collection(db, 'teams', environment.teamId, 'members'));
+    const snapshot = await getDocs(collection(db, 'teams', this.team.id(), 'members'));
     return snapshot.docs.map((entry) => ({ id: entry.id, data: entry.data() }));
   }
 
@@ -68,7 +71,7 @@ export class AccessApi {
   async readInvites(): Promise<RawDoc[]> {
     const { db } = await this.connection.get();
     const { collection, getDocs } = await import('firebase/firestore');
-    const snapshot = await getDocs(collection(db, 'teams', environment.teamId, 'invites'));
+    const snapshot = await getDocs(collection(db, 'teams', this.team.id(), 'invites'));
     return snapshot.docs.map((entry) => ({ id: entry.id, data: entry.data() }));
   }
 
@@ -76,7 +79,7 @@ export class AccessApi {
   async createInvite(code: string, data: { playerId: string; role: 'player' | 'parent'; expiresAt: Date | null }): Promise<void> {
     const { db } = await this.connection.get();
     const { Timestamp, doc, serverTimestamp, setDoc } = await import('firebase/firestore');
-    await setDoc(doc(db, 'teams', environment.teamId, 'invites', code), {
+    await setDoc(doc(db, 'teams', this.team.id(), 'invites', code), {
       playerId: data.playerId,
       role: data.role,
       expiresAt: data.expiresAt ? Timestamp.fromDate(data.expiresAt) : null,
@@ -88,14 +91,14 @@ export class AccessApi {
   async deleteMember(uid: string): Promise<void> {
     const { db } = await this.connection.get();
     const { deleteDoc, doc } = await import('firebase/firestore');
-    await deleteDoc(doc(db, 'teams', environment.teamId, 'members', uid));
+    await deleteDoc(doc(db, 'teams', this.team.id(), 'members', uid));
   }
 
   /** Zieht einen noch nicht eingelösten Einladungscode zurück. */
   async deleteInvite(code: string): Promise<void> {
     const { db } = await this.connection.get();
     const { deleteDoc, doc } = await import('firebase/firestore');
-    await deleteDoc(doc(db, 'teams', environment.teamId, 'invites', code));
+    await deleteDoc(doc(db, 'teams', this.team.id(), 'invites', code));
   }
 
   /**
@@ -114,7 +117,7 @@ export class AccessApi {
     try {
       const credential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
       const uid = credential.user.uid;
-      await setDoc(doc(db, 'teams', environment.teamId, 'members', uid), { role, email, createdAt: serverTimestamp() });
+      await setDoc(doc(db, 'teams', this.team.id(), 'members', uid), { role, email, uid, createdAt: serverTimestamp() });
       return uid;
     } finally {
       await signOut(secondaryAuth).catch(() => undefined);

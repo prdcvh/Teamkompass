@@ -25,7 +25,26 @@ antworten nur für den eigenen Spieler, nur mit erlaubten Feldern (Zusage/Absage
 Absage, eigene Rolle, Server-Zeitstempel) und nur für bestehende Events; lesen dürfen nur Trainer und der eigene
 Spieler bzw. die eigenen Eltern, löschen nur der Trainer.
 
+`ranking.test.mjs`: MVP-Rangliste (SCRUM-105) unter `meta/ranking` – Trainer sowie Spieler und Eltern des Teams lesen,
+Fremde, andere Teams, abgelaufene Zugänge, Scout und Medizin nicht; schreiben und löschen nur der Trainer (nur die Felder
+`week`, `month`, `updatedAt`); die Einzelpunkte im Trainer-Pfad bleiben für Spieler gesperrt.
+
 `player-stats.test.mjs`: Zusammenfassung je Spieler (SCRUM-201) unter `playerStats/{playerId}` und das Kennzeichen
 `meta/playerStats` – nur Trainer lesen/schreiben/löschen (Spieler und Eltern auch die eigene nicht, Medizin, Scouts,
 abgelaufene Zugänge und Nicht-Mitglieder gar nicht), Format-Prüfung (nur `playerId`, `version`, `events`), Bewertung und
 Zusammenfassung in einem Schreibvorgang, und dass ein `merge` den Eintrag eines Events vollständig ersetzt bzw. löscht.
+
+`clubs.test.mjs`: mehrere Vereine (SCRUM-180) – zwei Vereine A/B mit je einem Team, ein Altteam ohne
+Team-Dokument/`clubId`/`uid` und ein neues Team ohne Trainer. Prüft: Mitglieder aller Rollen aus Verein A lesen und
+schreiben nichts in Verein B; Vereinsadmin erreicht keinen fremden Verein und sieht im eigenen Verein keine
+Spieler-, Noten- oder Gesundheitsdaten; Teamsuche (`collectionGroup('members')` mit `uid`-Filter) liefert nur eigene
+Mitgliedschaften; `uid` muss der Dokument-ID entsprechen; `clubId` unveränderlich; Altteams können nicht
+beansprucht werden; Vereinsdokument lesen/ändern; erster Trainer genau einmal; niemand macht sich selbst zum
+Vereinsadmin; Altteams laufen unverändert; das Einmal-Skript (`scripts/assign-clubs-lib.mjs`) ändert keine Rechte.
+
+`registration.test.mjs`: Registrierung nur mit Einladung (SCRUM-181) – ein Vereinscode legt in einem Schreibvorgang
+Verein, Vereinsadmin, erstes Team und Trainer-Zugang an und wird dabei verbraucht; zweiter Versuch, abgelaufener Code,
+unbestätigte E-Mail, anonym, abgemeldet, fremde E-Mail bei gebundenem Code, unvollständige/verfälschte Schreibvorgänge
+und Codes, die auf bestehende Vereine/Teams zeigen, werden abgewiesen. Beitrittscodes (nur vom Vereinsadmin für den
+eigenen Verein): neues Team mit erstem Trainer, aber keine Adminrechte und kein Zugriff auf Nachbarteams. Ein mit dem
+Skript `scripts/create-club-invite.mjs` (Logik `scripts/club-invite-lib.mjs`) erzeugter Code lässt sich einlösen.

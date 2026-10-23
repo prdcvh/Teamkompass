@@ -1058,10 +1058,20 @@ test("Spieler- und Scout-Zugänge werden getrennt verwaltet (SCRUM-92)", async (
 
 test("Angular schreibt die Startelf mit merge, damit die Spiel-Aufstellungen (byEvent) der Live-Apps erhalten bleiben (SCRUM-126)", async () => {
   const api = await read("angular/src/app/core/firebase/lineup.api.ts");
-  assert.match(api, /setDoc\(doc\(db, 'teams', environment\.teamId, 'meta', 'lineup'\), data, \{ merge: true \}\)/);
+  // Seit SCRUM-181 kommt die Team-ID aus CurrentTeam (Datenbank) statt aus environment.teamId.
+  assert.match(api, /setDoc\(doc\(db, 'teams', this\.team\.id\(\), 'meta', 'lineup'\), data, \{ merge: true \}\)/);
   for (const team of teams) {
     const app = await read(`outputs/${team}/app.js`);
     assert.match(app, /byEvent: \{ \[eventId\]: entry \} \}, \{ merge: true \}/);
+  }
+});
+
+test("Angular: Kein Datenzugriff nutzt die feste Team-ID aus dem Build, alle nehmen das Team aus CurrentTeam (SCRUM-181)", async () => {
+  const dir = "angular/src/app/core/firebase";
+  const files = (await readdir(new URL(`../${dir}`, import.meta.url))).filter((name) => name.endsWith(".api.ts"));
+  assert.ok(files.length > 0);
+  for (const name of files) {
+    assert.doesNotMatch(await read(`${dir}/${name}`), /environment\.teamId/, `${name} nutzt noch environment.teamId`);
   }
 });
 
@@ -1107,9 +1117,12 @@ test("Angular: Build je Live-Team mit derselben Team-ID wie die heutige App (SCR
 test("Angular zeigt das Vereinslogo statt des „TK“-Zeichens (SCRUM-76)", async () => {
   for (const file of ["angular/src/app/shell/sidebar/sidebar.html", "angular/src/app/pages/login/login.html"]) {
     const html = await read(file);
-    assert.match(html, /<img class="logo" src="club-logo\.png"/);
+    // Sidebar seit SCRUM-181: Logo aus CurrentTeam.logoSrc() (mitgeliefertes club-logo.png nur für dessen Vereine).
+    assert.match(html, /<img class="logo" (src="club-logo\.png"|\[src\]="logo")/);
     assert.doesNotMatch(html, />TK</);
   }
+  const team = await read("angular/src/app/core/team/current-team.service.ts");
+  assert.match(team, /'club-logo\.png'/);
   const logo = await readFile(new URL("../angular/public/club-logo.png", import.meta.url));
   assert.equal(logo.subarray(1, 4).toString(), "PNG");
 });

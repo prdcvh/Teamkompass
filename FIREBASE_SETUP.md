@@ -216,7 +216,7 @@ Die Angular-Neuentwicklung (Jira-Epic SCRUM-40) wird als eigene Hosting-Site
   `npm run verify`; danach deployt ein eigener Schritt `target: u14` (als letzter Schritt,
   damit ein Problem dort die Live-Teams nicht aufhaelt).
 - Fuer Pull-Request-Vorschauen wird das Target `u14` nicht gebaut (Vorschau des Angular-Builds gibt es
-  seit SCRUM-169 auf der Site `teamkompass-u17`, siehe Abschnitt 9).
+  seit SCRUM-169 auf der Site `teamkompass-u17`, siehe Abschnitt 11).
 - PWA (SCRUM-76): Manifest `angular/public/manifest.webmanifest`, Service Worker von Angular
   (`angular/ngsw-config.json`, nur im Produktions-Build). `ngsw.json`/`ngsw-worker.js` fallen unter
   die `no-cache`-Regel `**`, Updates kommen also sofort an (Hinweis "Neue Version verfuegbar").
@@ -228,7 +228,88 @@ Die Angular-Neuentwicklung (Jira-Epic SCRUM-40) wird als eigene Hosting-Site
 3. Erst danach den PR nach `main` mergen; vorher schlaegt der neue Deploy-Schritt bei jedem
    Merge fehl. Die App ist danach unter `https://teamkompass-u14.web.app` erreichbar.
 
-## 9. Live-Team auf Angular umstellen und Rückweg (Rollback)
+
+## 9. Teams einem Verein zuordnen (`scripts/assign-clubs.mjs`, SCRUM-180)
+
+Datenmodell und Regeln: `docs/architektur-verein-teams.md`. Das Einmal-Skript legt die Vereine
+`clubs/fc-koenigstein` (1. FC Koenigstein: `mein-team`, `U15`, `U17`) und `clubs/test-verein`
+(Angular-Testteam `U14`) an, traegt dein Konto als einzigen Vereinsadmin ein, setzt in den vier
+Team-Dokumenten `clubId`, `name`, `label`, `hasTrainer: true` und schreibt in jedes `members`-Dokument das
+Feld `uid` (= Dokument-ID). Es zieht **nichts um**, loescht nichts, ueberschreibt keine vorhandenen Felder
+und aendert keine Rolle. Es kann gefahrlos mehrfach laufen.
+
+Reihenfolge: erst die neuen Regeln deployen (Merge des PR), dann das Skript. Die bestehenden Apps merken
+von beidem nichts.
+
+Ausfuehrung nur durch den Product Owner (braucht Admin-Zugang):
+
+1. Dienstkonto-Schluessel wie in Abschnitt 7, Schritt 1 (ausserhalb des Repos ablegen, danach loeschen).
+2. Einmalig: `npm install --no-save firebase-admin`
+3. Deine UID: Firebase Console -> Authentication -> Nutzer -> Spalte "Nutzer-UID" deines Trainer-Kontos.
+4. **Probelauf (Standard, schreibt nichts)** – zeigt, was geschrieben wuerde:
+   `GOOGLE_APPLICATION_CREDENTIALS=/pfad/key.json node scripts/assign-clubs.mjs --admin-uid <DEINE-UID>`
+5. Echter Lauf: gleicher Aufruf mit `--apply` am Ende.
+6. Kontrolle in der Firebase Console: `clubs/fc-koenigstein`, `teams/mein-team` (Felder `clubId` usw.).
+
+Gehoert ein Team schon zu einem anderen Verein, bricht das Skript ab und schreibt nichts. Spaeter
+hinzugefuegte Teams (Abschnitt 6) bitte in `scripts/assign-clubs-lib.mjs` (`TEAMS`) eintragen und das
+Skript erneut laufen lassen. Mitglieder, die die Alt-Apps nach dem Lauf anlegen, haben kein `uid`-Feld –
+ein erneuter Lauf ergaenzt es.
+
+
+## 10. Registrierung nur mit Einladung (`scripts/create-club-invite.mjs`, SCRUM-181)
+
+Neue Trainer registrieren sich selbst in der Angular-App (`https://teamkompass-u14.web.app/registrieren`),
+aber **nur mit einem Einladungscode**. Es gibt zwei Arten:
+
+| Code | Wer legt ihn an | Was der Einloesende bekommt |
+|---|---|---|
+| Vereinscode | nur der PO, per Skript | neuer Verein (er wird Vereinsadmin) + erstes Team (er wird Trainer) |
+| Beitrittscode | Vereinsadmin in der App (Einstellungen → „Verein“) oder PO per Skript mit `--club` | neues Team im bestehenden Verein (er wird Trainer, **nicht** Vereinsadmin) |
+
+Ein Code gilt **einmal**, laeuft ab (Standard 14 Tage), kann an eine E-Mail-Adresse gebunden werden und
+funktioniert nur mit **bestaetigter** E-Mail-Adresse. Die Regeln (`firestore.rules`, Abschnitt `clubInvites`)
+erzwingen das; Tests: `tests/rules/registration.test.mjs`.
+
+### Vorher einmalig in der Firebase Console
+
+1. **Authentication → Anmeldemethode → E-Mail/Passwort**: muss aktiviert sein (ist es fuer die Trainer schon).
+2. **Authentication → Einstellungen → Autorisierte Domains**: `teamkompass-u14.web.app` muss drinstehen (die
+   `*.web.app`/`*.firebaseapp.com`-Adressen des Projekts stehen normalerweise schon drin). Fuer Vorschau-Links
+   nicht noetig: die Bestaetigungsmail kommt dann ohne Ruecksprung-Link, man oeffnet die Registrierung selbst wieder.
+3. Optional **Authentication → Vorlagen → E-Mail-Adressbestaetigung**: Absendername/Text auf Deutsch anpassen.
+
+### Code fuer einen neuen Verein erzeugen
+
+1. Dienstkonto-Schluessel wie in Abschnitt 7, Schritt 1 (ausserhalb des Repos ablegen, danach loeschen).
+2. Einmalig: `npm install --no-save firebase-admin`
+3. **Probelauf (Standard, schreibt nichts):**
+   `GOOGLE_APPLICATION_CREDENTIALS=/pfad/key.json node scripts/create-club-invite.mjs --email trainer@verein.de`
+4. Echter Lauf: gleicher Aufruf mit `--apply` am Ende. Das Skript zeigt Code und Link, z. B.
+   `https://teamkompass-u14.web.app/registrieren?code=ABCD…`. Den Link nur an diese eine Person schicken.
+
+Optionen: `--days <1-60>` (Gueltigkeit), `--club <vereinsId>` (Beitrittscode statt neuer Verein),
+`--note "<Notiz>"`, `--base-url https://…` (andere Adresse im Link). Ohne `--email` gilt der Code fuer jede
+bestaetigte Adresse – dann wie ein Passwort behandeln.
+
+### App Check (Schutz vor Missbrauch) – vorbereitet, aber aus
+
+Die App startet App Check nur, wenn in `angular/src/environments/firebase.ts` ein Schluessel in `appCheckSiteKey`
+steht (heute leer = aus). Zum Einschalten:
+
+1. Google Cloud Console → **reCAPTCHA** → Schluessel anlegen (Typ „Website“, Domain `teamkompass-u14.web.app`
+   und ggf. weitere Hosting-Adressen).
+2. Firebase Console → **App Check** → Web-App → Anbieter **reCAPTCHA Enterprise** → Schluessel eintragen.
+3. Schluessel in `appCheckSiteKey` eintragen und in `firebase.json` (Ziel `u14`) die Content-Security-Policy
+   erweitern: `script-src` um `https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/`,
+   `frame-src https://www.google.com/recaptcha/`, `connect-src` um `https://content-firebaseappcheck.googleapis.com`.
+4. Einige Tage unter App Check → **Messwerte** beobachten. **Nicht „Erzwingen“ einschalten, solange die Alt-Apps
+   (`outputs/*`) laufen** – die senden kein App-Check-Token und waeren sonst ausgesperrt.
+
+Bis dahin begrenzt die Einladungspflicht neue Konten: ohne Code entsteht kein Verein und kein Team; ein Konto ohne
+Code sieht nichts.
+
+## 11. Live-Team auf Angular umstellen und Rückweg (Rollback)
 
 Seit SCRUM-169 liefert das Hosting-Ziel `u17` (Site `teamkompass-u17`) den **Angular-Build der U17**
 aus (`ng build -c production,u17`, Team-ID `U17`, Ausgabe `angular/dist/team-u17/browser`). Die U17

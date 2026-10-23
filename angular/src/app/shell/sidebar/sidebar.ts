@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
-import { environment } from '../../../environments/environment';
+import { CurrentTeam } from '../../core/team/current-team.service';
 import { ADMIN_ITEMS, PRIVACY_ITEM, SIDEBAR_ITEMS } from '../../core/shell/navigation';
 import { SessionService } from '../../core/auth/session.service';
 import { ThemeService } from '../../core/device/theme.service';
@@ -21,8 +21,8 @@ export class Sidebar {
   protected readonly items = SIDEBAR_ITEMS;
   protected readonly adminItems = ADMIN_ITEMS;
   protected readonly privacy = PRIVACY_ITEM;
-  protected readonly club = environment.clubName;
-  protected readonly team = environment.teamLabel;
+  /** Verein, Team und Logo kommen aus der Datenbank (SCRUM-181); bis dahin die Angaben des Builds. */
+  protected readonly team = inject(CurrentTeam);
   protected readonly season = seasonLabel(new Date());
 }
 
