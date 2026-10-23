@@ -35,6 +35,13 @@ export function mapValue(value, from, to, { isRef, makeRef }) {
   return value; // Timestamp, GeoPoint, Bytes, Primitive bleiben unveraendert
 }
 
+// Das Team-Dokument selbst (teams/<quelle>) wird nie kopiert: Es enthaelt seit SCRUM-180 die Vereinszuordnung
+// (clubId, name, label, hasTrainer). Die gehoert zum Zielteam (z.B. U14 im Test-Verein) und darf nicht durch die
+// der Quelle (mein-team im 1. FC Koenigstein) ueberschrieben werden. Unter-Collections werden normal kopiert.
+export function isTeamDocument(path, from) {
+  return path === `teams/${from}`;
+}
+
 // "teams/mein-team/events/e1/ratings/p1" -> "events/ratings" (Anzeige der Zaehler je Collection)
 export function collectionKey(path, from) {
   const rest = path.slice(`teams/${from}`.length).split("/").filter(Boolean);

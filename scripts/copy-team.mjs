@@ -4,7 +4,7 @@
 //   node scripts/copy-team.mjs mein-team U14
 //   node scripts/copy-team.mjs mein-team U14 --overwrite   (Ziel ist schon belegt, z.B. fuer den Cutover)
 // Die Quelle wird nie veraendert. Details und Einrichtung: FIREBASE_SETUP.md, Abschnitt "Daten in ein neues Team kopieren".
-import { collectionKey, mapPath, mapValue, parseArgs } from "./copy-team-lib.mjs";
+import { collectionKey, isTeamDocument, mapPath, mapValue, parseArgs } from "./copy-team-lib.mjs";
 
 let options;
 try {
@@ -49,7 +49,7 @@ writer?.onWriteError((error) => {
 
 async function copyDocument(sourceRef) {
   const snapshot = await sourceRef.get();
-  if (snapshot.exists) {
+  if (snapshot.exists && !isTeamDocument(sourceRef.path, from)) {
     const key = collectionKey(sourceRef.path, from);
     counts[key] = (counts[key] || 0) + 1;
     if (writer) writer.set(db.doc(mapPath(sourceRef.path, from, to)), mapValue(snapshot.data(), from, to, refHelpers));

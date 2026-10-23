@@ -9,6 +9,71 @@ rules_version = '2';
 //   nie die Daten anderer Spieler.
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // ---------------------------------------------------------------------------------------------
+    // Vereine (SCRUM-180, Architektur-Notiz docs/architektur-verein-teams.md, vom PO freigegeben).
+    // clubs/{clubId}               name, logoUrl, createdAt   - nur oeffentliche Angaben
+    // clubs/{clubId}/admins/{uid}  uid (= Dokument-ID), role "admin", createdAt
+    // teams/{teamId}               clubId, name, label, hasTrainer, firstTrainerUid, createdAt
+    // Wer was in einem Team sehen darf, entscheidet weiter allein teams/{teamId}/members/{uid}. Ein
+    // Vereinsadmin verwaltet nur (Name/Logo, Teams anlegen, ersten Trainer einsetzen) und sieht KEINE
+    // Spielerdaten, Noten oder Gesundheitsdaten - dafuer muesste er selbst Mitglied des Teams sein.
+    // Teams ohne Team-Dokument bzw. ohne clubId (Uebergang bis zum Lauf von scripts/assign-clubs.mjs)
+    // funktionieren unveraendert; alle Admin-Wege sind fuer sie gesperrt.
+    // ---------------------------------------------------------------------------------------------
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // clubId kann null sein (Team ohne Verein) - dann nie Admin.
+    function isClubAdmin(clubId) {
+      return signedIn() && clubId is string && clubId.size() > 0
+        && exists(/databases/$(database)/documents/clubs/$(clubId)/admins/$(request.auth.uid));
+    }
+
+    match /clubs/{clubId} {
+      // Name und Logo sind oeffentliche Angaben (PO-Entscheidung 3): Einzelabruf fuer jeden Angemeldeten.
+      // Auflisten aller Vereine ist verboten.
+      allow get: if signedIn();
+      allow list: if false;
+      // Vereine legt bis SCRUM-181 (Registrierung) nur das Admin-Skript an; geloescht wird nie per App.
+      allow create, delete: if false;
+      allow update: if isClubAdmin(clubId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'logoUrl'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 100
+        && (request.resource.data.get('logoUrl', null) == null
+          || (request.resource.data.logoUrl is string && request.resource.data.logoUrl.size() <= 500));
+
+      match /admins/{uid} {
+        allow get: if isClubAdmin(clubId) || (signedIn() && request.auth.uid == uid);
+        allow list: if isClubAdmin(clubId);
+        // Nur ein bestehender Admin ernennt weitere Admins - niemand traegt sich selbst ein.
+        allow create: if isClubAdmin(clubId)
+          && request.resource.data.keys().hasOnly(['uid', 'role', 'createdAt'])
+          && request.resource.data.uid == uid
+          && request.resource.data.role == "admin"
+          && request.resource.data.createdAt == request.time;
+        allow update: if false;
+        // Niemand entfernt sich selbst (der Verein bliebe sonst ggf. ohne Admin).
+        allow delete: if isClubAdmin(clubId) && request.auth.uid != uid;
+      }
+    }
+
+    // "In welchen Teams bin ich?" (Abfrage ueber alle members-Collections). Erlaubt NUR Dokumente, deren
+    // Feld uid die eigene UID ist - die Abfrage muss deshalb where('uid', '==', eigeneUid) enthalten, sonst
+    // lehnt Firestore sie ab. uid ist beim Anlegen immer gleich der Dokument-ID (siehe members-Regeln),
+    // fremde Mitgliedschaften (mit E-Mail-Adresse) bleiben unsichtbar.
+    match /{path=**}/members/{memberId} {
+      allow read: if signedIn() && resource.data.get('uid', null) == request.auth.uid;
+    }
+
+    // "In welchen Vereinen bin ich Admin?" - gleiche Absicherung.
+    match /{path=**}/admins/{adminId} {
+      allow read: if signedIn() && resource.data.get('uid', null) == request.auth.uid;
+    }
+
     match /teams/{teamId} {
 
       function isSignedIn() {
@@ -74,6 +139,43 @@ service cloud.firestore {
           && memberDoc().data.playerId == playerId;
       }
 
+      function teamPath() {
+        return /databases/$(database)/documents/teams/$(teamId);
+      }
+
+      // Das Team-Dokument selbst (SCRUM-180). Lesen: Teammitglieder und die Admins des eigenen Vereins.
+      allow get: if isTeamMember() || (resource != null && isClubAdmin(resource.data.get('clubId', null)));
+      // Liste nur fuer Vereinsadmins und nur mit Filter where('clubId', '==', eigenerVerein).
+      allow list: if isClubAdmin(resource.data.clubId);
+      // Neues Team: nur ein Admin des Vereins, nur fuer den eigenen Verein, noch ohne Trainer. Die Team-ID muss
+      // eine zufaellige 20-stellige Firestore-ID sein: Bestehende Teams (mein-team, U15, U17, U14) haben bis zum
+      // Skriptlauf kein Team-Dokument - so kann sie niemand als "neues Team" fuer seinen Verein beanspruchen.
+      allow create: if teamId.matches('^[A-Za-z0-9]{20}$')
+        && isClubAdmin(request.resource.data.get('clubId', null))
+        && request.resource.data.keys().hasOnly(['clubId', 'name', 'label', 'hasTrainer', 'createdAt'])
+        && request.resource.data.hasTrainer == false
+        && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 100
+        && request.resource.data.get('label', '') is string && request.resource.data.get('label', '').size() <= 40
+        && request.resource.data.createdAt == request.time;
+      // Aendern: Trainer des Teams oder Admin des Vereins, nur Name/Bezeichnung. clubId ist unveraenderlich
+      // (kein Team wandert in einen fremden Verein). hasTrainer kann nur einmal von false auf true wechseln - im
+      // selben Schreibvorgang, in dem der Vereinsadmin den ersten Trainer (firstTrainerUid) anlegt.
+      allow update: if (isTrainer() || isClubAdmin(resource.data.get('clubId', null)))
+        && request.resource.data.get('clubId', null) == resource.data.get('clubId', null)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'label', 'hasTrainer', 'firstTrainerUid'])
+        && request.resource.data.get('name', '') is string && request.resource.data.get('name', '').size() <= 100
+        && request.resource.data.get('label', '') is string && request.resource.data.get('label', '').size() <= 40
+        && (
+          (request.resource.data.get('hasTrainer', true) == resource.data.get('hasTrainer', true)
+            && request.resource.data.get('firstTrainerUid', null) == resource.data.get('firstTrainerUid', null))
+          || (resource.data.get('hasTrainer', true) == false
+            && request.resource.data.hasTrainer == true
+            && request.resource.data.firstTrainerUid is string
+            && existsAfter(/databases/$(database)/documents/teams/$(teamId)/members/$(request.resource.data.firstTrainerUid))
+            && getAfter(/databases/$(database)/documents/teams/$(teamId)/members/$(request.resource.data.firstTrainerUid)).data.role == "trainer")
+        );
+      allow delete: if false;
+
       match /members/{uid} {
         // Trainer duerfen die ganze Liste sehen (Zugaenge verwalten); diese Regel
         // haengt nicht von resource-Daten ab und ist daher fuer Listenabfragen sicher.
@@ -95,7 +197,10 @@ service cloud.firestore {
         // Deploy, klappte aber nach einem Neuladen) zeigt: es lag nie an der Regel-Logik,
         // sondern an der kurzen Verzoegerung, bis ein frisch deployter Regelsatz global
         // greift.
-        allow create: if
+        // SCRUM-180: Optionales Feld "uid" fuer die Teamsuche - wenn gesetzt, muss es der Dokument-ID entsprechen
+        // (sonst koennte ein Dokument in der Teamsuche eines fremden Kontos auftauchen). Ein dritter Weg (unten)
+        // erlaubt dem Vereinsadmin, den ersten Trainer eines neuen Teams einzusetzen.
+        allow create: if request.resource.data.get('uid', uid) == uid && (
           (isTrainer() && request.resource.data.role in ["trainer", "scout", "physio"])
           || (
             isSignedIn() && request.auth.uid == uid
@@ -103,7 +208,7 @@ service cloud.firestore {
             && request.resource.data.playerId is string
             && request.resource.data.claimedInviteCode is string
             // Nur die vorgesehenen Felder, Zeitstempel vom Server (SCRUM-63).
-            && request.resource.data.keys().hasOnly(['role', 'playerId', 'claimedInviteCode', 'expiresAt', 'createdAt'])
+            && request.resource.data.keys().hasOnly(['role', 'playerId', 'claimedInviteCode', 'expiresAt', 'createdAt', 'uid'])
             && request.resource.data.createdAt == request.time
             // Einmalverbrauch (SCRUM-77): Die Mitgliedschaft darf nur angelegt werden, wenn
             // derselbe Schreibvorgang (Batch) den Einladungscode loescht. Beide Clients
@@ -117,7 +222,23 @@ service cloud.firestore {
               get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.expiresAt == null
               || get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.expiresAt > request.time
             )
-          );
+          )
+          // 3. SCRUM-180: Der Vereinsadmin setzt den ERSTEN Trainer eines Teams seines Vereins ein - nur solange das
+          //    Team noch keinen Trainer hat (hasTrainer == false; fehlt das Feld, gilt das Team als besetzt) und nur
+          //    genau das Konto, das im selben Schreibvorgang als firstTrainerUid ins Team-Dokument kommt (das setzt
+          //    hasTrainer auf true, danach ist dieser Weg zu). Danach legen nur noch Trainer weitere Zugaenge an.
+          || (
+            isSignedIn()
+            && exists(teamPath())
+            && isClubAdmin(get(teamPath()).data.get('clubId', null))
+            && get(teamPath()).data.get('hasTrainer', true) == false
+            && getAfter(teamPath()).data.get('firstTrainerUid', null) == uid
+            && request.resource.data.role == "trainer"
+            && request.resource.data.keys().hasOnly(['role', 'email', 'uid', 'createdAt'])
+            && request.resource.data.get('email', '') is string
+            && request.resource.data.createdAt == request.time
+          )
+        );
         // Kein Update: eine bestehende Mitgliedschaft wird nicht bearbeitet, sondern
         // vom Trainer geloescht (Zugang sperren) und bei Bedarf neu eingeladen.
         allow update: if false;
