@@ -37,3 +37,10 @@ Spieler-, Noten- oder Gesundheitsdaten; Teamsuche (`collectionGroup('members')` 
 Mitgliedschaften; `uid` muss der Dokument-ID entsprechen; `clubId` unveränderlich; Altteams können nicht
 beansprucht werden; Vereinsdokument lesen/ändern; erster Trainer genau einmal; niemand macht sich selbst zum
 Vereinsadmin; Altteams laufen unverändert; das Einmal-Skript (`scripts/assign-clubs-lib.mjs`) ändert keine Rechte.
+
+`registration.test.mjs`: Registrierung nur mit Einladung (SCRUM-181) – ein Vereinscode legt in einem Schreibvorgang
+Verein, Vereinsadmin, erstes Team und Trainer-Zugang an und wird dabei verbraucht; zweiter Versuch, abgelaufener Code,
+unbestätigte E-Mail, anonym, abgemeldet, fremde E-Mail bei gebundenem Code, unvollständige/verfälschte Schreibvorgänge
+und Codes, die auf bestehende Vereine/Teams zeigen, werden abgewiesen. Beitrittscodes (nur vom Vereinsadmin für den
+eigenen Verein): neues Team mit erstem Trainer, aber keine Adminrechte und kein Zugriff auf Nachbarteams. Ein mit dem
+Skript `scripts/create-club-invite.mjs` (Logik `scripts/club-invite-lib.mjs`) erzeugter Code lässt sich einlösen.
