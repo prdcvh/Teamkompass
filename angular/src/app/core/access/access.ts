@@ -36,6 +36,18 @@ export function generateInviteCode(): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
+/** Team-IDs im Einladungslink: nur harmlose Zeichen (Firestore-IDs und die bestehenden Kennungen wie „mein-team“). */
+export const TEAM_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
+/**
+ * Einladungslink für Spieler/Eltern mit Team (SCRUM-181): Bei einem Build für alle Teams muss das Team im Link stehen.
+ * Die Anmeldeseite füllt damit den Code ein und löst ihn im richtigen Team ein.
+ */
+export function playerInviteLink(origin: string, teamId: string, code: string): string {
+  const params = new URLSearchParams({ team: teamId, code });
+  return `${origin}/anmelden?${params.toString()}`;
+}
+
 /** Ablaufdatum „N Tage ab jetzt“; null = unbefristet. */
 export function expiryFromDays(days: number | null, now: Date = new Date()): Date | null {
   return days === null ? null : new Date(now.getTime() + days * 24 * 60 * 60 * 1000);

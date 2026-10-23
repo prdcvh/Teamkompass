@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
+import { CurrentTeam } from '../../core/team/current-team.service';
 import { RouterLink } from '@angular/router';
 import { MORE_GROUPS, PRIVACY_ITEM } from '../../core/shell/navigation';
 import { ThemeService } from '../../core/device/theme.service';
@@ -18,6 +19,7 @@ export class MoreSheet {
   readonly closed = output<void>();
 
   protected readonly theme = inject(ThemeService);
+  protected readonly team = inject(CurrentTeam);
   protected readonly groups = MORE_GROUPS;
   protected readonly privacy = PRIVACY_ITEM;
 }

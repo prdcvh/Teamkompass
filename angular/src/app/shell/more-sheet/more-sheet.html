@@ -24,6 +24,15 @@
   <section>
     <h3>App</h3>
     <ul>
+      @if (team.choices().length > 1) {
+        <li>
+          <a routerLink="/team-waehlen" (click)="closed.emit()">
+            <span class="icon"><tk-icon name="repeat" /></span>
+            <span class="text"><strong>Team wechseln</strong><small>{{ team.title() }}</small></span>
+            <tk-icon name="chevron-right" />
+          </a>
+        </li>
+      }
       <li>
         <label class="row">
           <span class="icon"><tk-icon name="moon" /></span>

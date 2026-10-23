@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { environment } from '../../../environments/environment';
+import { CurrentTeam } from '../team/current-team.service';
 import { FirebaseConnection } from './firebase-connection';
 import type { SnapshotMeta } from './types';
 
@@ -11,6 +11,7 @@ import type { SnapshotMeta } from './types';
 @Injectable({ providedIn: 'root' })
 export class PlanningApi {
   private readonly connection = inject(FirebaseConnection);
+  private readonly team = inject(CurrentTeam);
 
   async watchPlanning(
     onData: (data: Readonly<Record<string, unknown>> | null, meta: SnapshotMeta) => void,
@@ -19,7 +20,7 @@ export class PlanningApi {
     const { db } = await this.connection.get();
     const { doc, onSnapshot } = await import('firebase/firestore');
     return onSnapshot(
-      doc(db, 'teams', environment.teamId, 'meta', 'planning'),
+      doc(db, 'teams', this.team.id(), 'meta', 'planning'),
       { includeMetadataChanges: true },
       (snapshot) =>
         onData(snapshot.exists() ? snapshot.data() : null, { fromCache: snapshot.metadata.fromCache, hasPendingWrites: snapshot.metadata.hasPendingWrites }),
@@ -31,14 +32,14 @@ export class PlanningApi {
   async saveSeries(id: string, data: Readonly<Record<string, unknown>>): Promise<void> {
     const { db } = await this.connection.get();
     const { doc, setDoc } = await import('firebase/firestore');
-    await setDoc(doc(db, 'teams', environment.teamId, 'meta', 'planning'), { series: { [id]: data } }, { merge: true });
+    await setDoc(doc(db, 'teams', this.team.id(), 'meta', 'planning'), { series: { [id]: data } }, { merge: true });
   }
 
   /** Löscht die Serie samt den Merkern ihrer von Hand gelöschten Termine. */
   async deleteSeries(id: string): Promise<void> {
     const { db } = await this.connection.get();
     const { doc, setDoc, deleteField } = await import('firebase/firestore');
-    await setDoc(doc(db, 'teams', environment.teamId, 'meta', 'planning'), { series: { [id]: deleteField() }, skipped: { [id]: deleteField() } }, { merge: true });
+    await setDoc(doc(db, 'teams', this.team.id(), 'meta', 'planning'), { series: { [id]: deleteField() }, skipped: { [id]: deleteField() } }, { merge: true });
   }
 
   /**
@@ -50,7 +51,7 @@ export class PlanningApi {
   async markSkipped(seriesId: string, date: string): Promise<void> {
     const { db } = await this.connection.get();
     const { doc, getDoc, setDoc } = await import('firebase/firestore');
-    const ref = doc(db, 'teams', environment.teamId, 'meta', 'planning');
+    const ref = doc(db, 'teams', this.team.id(), 'meta', 'planning');
     const seriesExists = await getDoc(ref).then(
       (snapshot) => (snapshot.get(`series.${seriesId}`) ?? null) !== null,
       () => true,
@@ -67,7 +68,7 @@ export class PlanningApi {
     const { db } = await this.connection.get();
     const { doc, onSnapshot } = await import('firebase/firestore');
     return onSnapshot(
-      doc(db, 'teams', environment.teamId, 'meta', 'breaks'),
+      doc(db, 'teams', this.team.id(), 'meta', 'breaks'),
       { includeMetadataChanges: true },
       (snapshot) =>
         onData(snapshot.exists() ? snapshot.data() : null, { fromCache: snapshot.metadata.fromCache, hasPendingWrites: snapshot.metadata.hasPendingWrites }),
@@ -79,12 +80,12 @@ export class PlanningApi {
   async saveBreak(id: string, data: Readonly<Record<string, unknown>>): Promise<void> {
     const { db } = await this.connection.get();
     const { doc, setDoc } = await import('firebase/firestore');
-    await setDoc(doc(db, 'teams', environment.teamId, 'meta', 'breaks'), { breaks: { [id]: data } }, { merge: true });
+    await setDoc(doc(db, 'teams', this.team.id(), 'meta', 'breaks'), { breaks: { [id]: data } }, { merge: true });
   }
 
   async deleteBreak(id: string): Promise<void> {
     const { db } = await this.connection.get();
     const { doc, setDoc, deleteField } = await import('firebase/firestore');
-    await setDoc(doc(db, 'teams', environment.teamId, 'meta', 'breaks'), { breaks: { [id]: deleteField() } }, { merge: true });
+    await setDoc(doc(db, 'teams', this.team.id(), 'meta', 'breaks'), { breaks: { [id]: deleteField() } }, { merge: true });
   }
 }

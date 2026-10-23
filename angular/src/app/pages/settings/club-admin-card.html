@@ -1,0 +1,42 @@
+@for (club of admin.clubs(); track club.clubId) {
+  <tk-card>
+    <div class="panel">
+      <h2>Verein: {{ club.name || club.clubId }}</h2>
+      <p class="muted">
+        Du bist Vereinsadmin. Lade einen Trainer ein: Er registriert sich mit dem Link, legt ein neues Team in diesem Verein
+        an und wird dessen Trainer. Du siehst dadurch keine Daten seines Teams. Der Link gilt 14 Tage und nur einmal.
+      </p>
+      <label class="field">
+        <span>E-Mail des Trainers (empfohlen: dann gilt der Link nur für diese Adresse)</span>
+        <input class="tk-input" type="email" autocomplete="off" [value]="email()" (input)="email.set(value($event))" />
+      </label>
+      <div>
+        <button tkButton variant="primary" type="button" [disabled]="admin.busy()" (click)="create(club.clubId)">Trainer-Einladung erstellen</button>
+      </div>
+      @if (admin.created(); as created) {
+        <div class="invite-result" role="status">
+          <p>Einladung erstellt. Code <code>{{ format(created.code) }}</code> – gültig bis {{ date(created.expiresAt) }}.</p>
+          <p class="link"><code>{{ created.link }}</code></p>
+          <button tkButton type="button" (click)="copy(created.link)">Link kopieren</button>
+          @if (copied()) {
+            <span class="muted">Kopiert.</span>
+          }
+        </div>
+      }
+      @if (club.invites.length) {
+        <h3>Offene Einladungen</h3>
+        <ul class="invites">
+          @for (invite of club.invites; track invite.code) {
+            <li>
+              <span><code>{{ format(invite.code) }}</code> · bis {{ date(invite.expiresAt) }}{{ invite.email ? ' · ' + invite.email : '' }}</span>
+              <button tkButton type="button" [disabled]="admin.busy()" (click)="admin.revoke(invite.code)">Zurückziehen</button>
+            </li>
+          }
+        </ul>
+      }
+      @if (admin.error()) {
+        <p class="error" role="alert">{{ admin.error() }}</p>
+      }
+    </div>
+  </tk-card>
+}

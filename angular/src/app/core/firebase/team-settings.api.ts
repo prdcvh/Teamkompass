@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { environment } from '../../../environments/environment';
+import { CurrentTeam } from '../team/current-team.service';
 import { FirebaseConnection } from './firebase-connection';
 import type { SnapshotMeta } from './types';
 
@@ -7,6 +7,7 @@ import type { SnapshotMeta } from './types';
 @Injectable({ providedIn: 'root' })
 export class TeamSettingsApi {
   private readonly connection = inject(FirebaseConnection);
+  private readonly team = inject(CurrentTeam);
 
   async watchSettings(
     onData: (data: Readonly<Record<string, unknown>> | null, meta: SnapshotMeta) => void,
@@ -15,7 +16,7 @@ export class TeamSettingsApi {
     const { db } = await this.connection.get();
     const { doc, onSnapshot } = await import('firebase/firestore');
     return onSnapshot(
-      doc(db, 'teams', environment.teamId, 'meta', 'settings'),
+      doc(db, 'teams', this.team.id(), 'meta', 'settings'),
       { includeMetadataChanges: true },
       (snapshot) =>
         onData(snapshot.exists() ? snapshot.data() : null, { fromCache: snapshot.metadata.fromCache, hasPendingWrites: snapshot.metadata.hasPendingWrites }),
@@ -27,6 +28,6 @@ export class TeamSettingsApi {
   async saveSettings(data: Readonly<Record<string, unknown>>): Promise<void> {
     const { db } = await this.connection.get();
     const { doc, setDoc } = await import('firebase/firestore');
-    await setDoc(doc(db, 'teams', environment.teamId, 'meta', 'settings'), data, { merge: true });
+    await setDoc(doc(db, 'teams', this.team.id(), 'meta', 'settings'), data, { merge: true });
   }
 }

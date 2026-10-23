@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
-import { environment } from '../../../environments/environment';
+import { CurrentTeam } from '../../core/team/current-team.service';
 import { type LoadReportPeriod, LOAD_REPORT_PERIODS, buildLoadReport, canCreateLoadReport, loadReportRange } from '../../core/analysis/load-report';
 import { loadReportHtml } from '../../core/analysis/load-report-html';
 import { SessionService } from '../../core/auth/session.service';
@@ -65,6 +65,7 @@ import { Dialog } from '../../ui/dialog/dialog';
 })
 export class LoadReportAction {
   private readonly session = inject(SessionService);
+  private readonly current = inject(CurrentTeam);
   private readonly files = inject(FileOutput);
 
   readonly player = input.required<Player>();
@@ -109,7 +110,7 @@ export class LoadReportAction {
       return;
     }
     const report = buildLoadReport({
-      teamName: environment.teamName,
+      teamName: this.current.name(),
       player,
       items: this.items(),
       absences: this.absences(),

@@ -1,6 +1,6 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { LayoutService, injectNarrowViewport } from '../../core/shell/layout.service';
 import {
   EVENT_SORT_OPTIONS,
@@ -72,6 +72,18 @@ export class Events implements OnInit {
   protected readonly pastMonths = computed(() => groupByMonth(this.sections().past));
   protected readonly laterMonths = computed(() => groupByMonth(this.sections().later));
   protected readonly filtering = computed(() => this.query().trim() !== '' || this.type() !== 'all');
+
+  /** Einstieg nach der Registrierung (SCRUM-181): /events?neu=1 öffnet direkt „Event anlegen“, sobald die Liste geladen ist. */
+  private readonly openOnLoad = inject(ActivatedRoute).snapshot.queryParamMap.get('neu') === '1';
+  private openedOnLoad = false;
+
+  constructor() {
+    effect(() => {
+      if (!this.openOnLoad || this.openedOnLoad || !this.events.canEdit()) return;
+      this.openedOnLoad = true;
+      untracked(() => this.openNew());
+    });
+  }
 
   ngOnInit(): void {
     this.events.start();

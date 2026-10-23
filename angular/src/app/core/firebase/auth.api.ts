@@ -12,7 +12,7 @@ export class AuthApi {
     const { auth } = await this.connection.get();
     const { onAuthStateChanged } = await import('firebase/auth');
     return onAuthStateChanged(auth, (user) =>
-      callback(user ? { uid: user.uid, isAnonymous: user.isAnonymous, email: user.email } : null),
+      callback(user ? { uid: user.uid, isAnonymous: user.isAnonymous, email: user.email, emailVerified: user.emailVerified } : null),
     );
   }
 
@@ -20,7 +20,7 @@ export class AuthApi {
     const { auth } = await this.connection.get();
     const { signInWithEmailAndPassword } = await import('firebase/auth');
     const { user } = await signInWithEmailAndPassword(auth, email, password);
-    return { uid: user.uid, isAnonymous: user.isAnonymous, email: user.email };
+    return { uid: user.uid, isAnonymous: user.isAnonymous, email: user.email, emailVerified: user.emailVerified };
   }
 
   /**

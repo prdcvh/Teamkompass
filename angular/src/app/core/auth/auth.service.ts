@@ -2,18 +2,21 @@ import { Injectable, inject, signal } from '@angular/core';
 import { authErrorMessage, errorCode } from './auth-errors';
 import { AccessApi } from '../firebase/access.api';
 import { AuthApi } from '../firebase/auth.api';
-import type { FirebaseUser, InviteRecord } from '../firebase/types';
+import type { FirebaseUser, InviteRecord, MemberRecord } from '../firebase/types';
 import { clearLocalTeamData } from '../device/local-data';
+import { CurrentTeam, pickTeam, rememberTeam, rememberedTeam } from '../team/current-team.service';
 import type { Role } from './role';
 import { SessionService } from './session.service';
+import { TeamAccess } from './team-access';
 
 /**
  * loading: Firebase wird gestartet – bis hierhin ist nichts von den Teamdaten sichtbar
  * signedOut: niemand angemeldet (oder Anmeldung verweigert)
  * ready: angemeldet, Rolle bekannt
  * unavailable: Firebase nicht erreichbar – die App bleibt gesperrt statt Daten zu zeigen
+ * chooseTeam: angemeldet, mehrere Teams und keins auf diesem Gerät gemerkt – erst die Teamauswahl (SCRUM-181)
  */
-export type AuthStatus = 'loading' | 'signedOut' | 'ready' | 'unavailable';
+export type AuthStatus = 'loading' | 'signedOut' | 'ready' | 'unavailable' | 'chooseTeam';
 
 /** Wartezeit vor dem zweiten Versuch, ein frisch angemeldetes Konto anzulegen (siehe claim). */
 export const CLAIM_RETRY_DELAY_MS = 1500;
@@ -26,6 +29,8 @@ export class AuthService {
   private readonly authApi = inject(AuthApi);
   private readonly accessApi = inject(AccessApi);
   private readonly session = inject(SessionService);
+  private readonly teamAccess = inject(TeamAccess);
+  private readonly team = inject(CurrentTeam);
 
   readonly status = signal<AuthStatus>('loading');
   readonly error = signal('');
@@ -47,6 +52,11 @@ export class AuthService {
   private identityUid: string | null = null;
   private inflight: Promise<void> | null = null;
   private purging: Promise<void> | null = null;
+  /** Registrierung läuft: angemeldetes Konto ohne Team nicht abmelden (SCRUM-181). */
+  private registering = false;
+  /** Teamauswahl offen: Konto und seine Teams bis zur Wahl. */
+  private pendingUser: FirebaseUser | null = null;
+  private pendingTeams = new Map<string, MemberRecord>();
 
   /** Startet die Anmeldeprüfung (einmal beim App-Start). */
   start(retryDelayMs = CLAIM_RETRY_DELAY_MS): void {
@@ -188,7 +198,54 @@ export class AuthService {
     }
     // Spieler-Anmeldung läuft: das members-Dokument entsteht erst im Anschluss (signInWithCode).
     if (this.claiming && user.isAnonymous) return;
+    // Registrierung läuft (SCRUM-181): Konto ohne Team bis zum Einlösen des Codes – nicht abmelden.
+    if (this.registering && !user.isAnonymous) return;
     await this.verify(user);
+  }
+
+  /** Registrierungsseite: ab jetzt wird ein angemeldetes Konto ohne Team nicht abgemeldet. */
+  beginRegistration(): void {
+    this.registering = true;
+  }
+
+  /** Registrierung abgebrochen oder Seite verlassen. */
+  endRegistration(): void {
+    this.registering = false;
+  }
+
+  /** Nach dem Einlösen des Codes: Zugang neu prüfen und direkt das neue Team öffnen. */
+  async completeRegistration(user: FirebaseUser, teamId: string): Promise<void> {
+    this.registering = false;
+    rememberTeam(teamId);
+    this.team.select(teamId);
+    // Neue Prüfung erzwingen (gleiche Identität wie bisher, aber jetzt mit Team).
+    this.identityUid = null;
+    await this.verify(user);
+  }
+
+  /** Teamauswahl: das gewählte Team öffnen (nur im Zustand „chooseTeam“, sonst nur merken). */
+  chooseTeam(teamId: string): boolean {
+    rememberTeam(teamId);
+    const user = this.pendingUser;
+    const member = this.pendingTeams.get(teamId);
+    if (this.status() !== 'chooseTeam' || !user || !member) return false;
+    this.team.select(teamId);
+    this.applyMember(user, member, this.epoch);
+    return true;
+  }
+
+  private applyMember(user: FirebaseUser, member: MemberRecord, epoch: number): void {
+    this.pendingUser = null;
+    this.pendingTeams = new Map();
+    this.session.role.set(member.role);
+    this.session.playerId.set(member.playerId);
+    this.session.displayName.set(displayNameFor(member.role, user.email));
+    this.session.uid.set(user.uid);
+    this.session.email.set(user.email);
+    this.error.set('');
+    this.markStatus('ready');
+    this.teamAccess.loadMeta(() => epoch === this.epoch);
+    void this.teamAccess.loadChoiceMetas(() => epoch === this.epoch);
   }
 
   /** Meldet die aktuelle Identität; ein Wechsel beginnt eine neue Epoche und macht laufende Prüfungen ungültig. */
@@ -209,8 +266,24 @@ export class AuthService {
 
   private async loadMember(user: FirebaseUser, epoch: number): Promise<void> {
     try {
-      const member = await this.accessApi.readMember(user.uid);
+      // Teams des Kontos (SCRUM-181): Teamsuche, Rückfall auf das Team des Builds.
+      const teams = await this.teamAccess.find(user);
       if (epoch !== this.epoch) return; // veraltet: inzwischen abgemeldet oder anderes Konto
+      this.team.choices.set([...teams].map(([teamId, record]) => ({ teamId, role: record.role, meta: null })));
+      const chosen = pickTeam([...teams.keys()], rememberedTeam());
+      if (teams.size > 0 && !chosen) {
+        // Mehrere Teams und keins auf diesem Gerät gemerkt: Auswahlseite. Rolle/Teamdaten erst nach der Wahl.
+        this.pendingUser = user;
+        this.pendingTeams = teams;
+        this.session.uid.set(user.uid);
+        this.session.email.set(user.email);
+        this.error.set('');
+        void this.teamAccess.loadChoiceMetas(() => epoch === this.epoch);
+        this.markStatus('chooseTeam');
+        return;
+      }
+      const member = chosen ? (teams.get(chosen) ?? null) : null;
+      if (chosen) this.team.select(chosen);
       if (!member) {
         // Anonyme Konten ohne Mitgliedschaft sind übrig gebliebene Code-Versuche: still beenden.
         if (!user.isAnonymous) {
@@ -222,13 +295,7 @@ export class AuthService {
         this.markStatus('signedOut');
         return;
       }
-      this.session.role.set(member.role);
-      this.session.playerId.set(member.playerId);
-      this.session.displayName.set(displayNameFor(member.role, user.email));
-      this.session.uid.set(user.uid);
-      this.session.email.set(user.email);
-      this.error.set('');
-      this.markStatus('ready');
+      this.applyMember(user, member, epoch);
     } catch (error) {
       if (epoch !== this.epoch) return;
       console.error(error);
@@ -247,6 +314,9 @@ export class AuthService {
   /** Ohne Anmeldung bleibt weder Teamstand im Speicher noch im Browser liegen. */
   private reset(): void {
     this.session.clear();
+    this.pendingUser = null;
+    this.pendingTeams = new Map();
+    this.team.reset();
     clearLocalTeamData();
   }
 

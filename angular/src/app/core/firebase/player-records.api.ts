@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { environment } from '../../../environments/environment';
+import { CurrentTeam } from '../team/current-team.service';
 import { FirebaseConnection } from './firebase-connection';
 import type { RawDoc, SnapshotMeta } from './types';
 
@@ -10,6 +10,7 @@ export type PlayerRecordKind = 'developmentPlans' | 'absences' | 'measurements';
 @Injectable({ providedIn: 'root' })
 export class PlayerRecordsApi {
   private readonly connection = inject(FirebaseConnection);
+  private readonly team = inject(CurrentTeam);
 
   /**
    * Echtzeit-Abo auf eine Unterkollektion eines Spielers (Förderpläne, Abwesenheiten, Messwerte). Lesen dürfen
@@ -24,7 +25,7 @@ export class PlayerRecordsApi {
   ): Promise<() => void> {
     const { db } = await this.connection.get();
     const { collection, onSnapshot, query, where } = await import('firebase/firestore');
-    const records = collection(db, 'teams', environment.teamId, 'players', playerId, name);
+    const records = collection(db, 'teams', this.team.id(), 'players', playerId, name);
     // Spieler und Eltern: die Regeln prüfen das Feld `playerId` der Dokumente, deshalb muss die Abfrage exakt danach filtern.
     return onSnapshot(
       options.ownOnly ? query(records, where('playerId', '==', playerId)) : records,
@@ -52,7 +53,7 @@ export class PlayerRecordsApi {
   ): Promise<() => void> {
     const { db } = await this.connection.get();
     const { collection, onSnapshot, or, query, where } = await import('firebase/firestore');
-    const records = collection(db, 'teams', environment.teamId, 'players', playerId, 'absences');
+    const records = collection(db, 'teams', this.team.id(), 'players', playerId, 'absences');
     return onSnapshot(
       query(records, or(where('to', '>=', since), where('to', '==', ''))),
       { includeMetadataChanges: true },
@@ -70,7 +71,7 @@ export class PlayerRecordsApi {
   ): Promise<() => void> {
     const { db } = await this.connection.get();
     const { collection, onSnapshot, query, where } = await import('firebase/firestore');
-    const records = collection(db, 'teams', environment.teamId, 'players', playerId, 'measurements');
+    const records = collection(db, 'teams', this.team.id(), 'players', playerId, 'measurements');
     return onSnapshot(
       query(records, where('date', '>=', since)),
       { includeMetadataChanges: true },
@@ -83,7 +84,7 @@ export class PlayerRecordsApi {
   async readPlayerRecords(playerId: string, name: PlayerRecordKind): Promise<RawDoc[]> {
     const { db } = await this.connection.get();
     const { collection, getDocs } = await import('firebase/firestore');
-    const snapshot = await getDocs(collection(db, 'teams', environment.teamId, 'players', playerId, name));
+    const snapshot = await getDocs(collection(db, 'teams', this.team.id(), 'players', playerId, name));
     return snapshot.docs.map((entry) => ({ id: entry.id, data: entry.data() }));
   }
 
@@ -91,13 +92,13 @@ export class PlayerRecordsApi {
   async savePlayerRecord(playerId: string, name: PlayerRecordKind, id: string, data: Readonly<Record<string, unknown>>): Promise<void> {
     const { db } = await this.connection.get();
     const { doc, setDoc } = await import('firebase/firestore');
-    await setDoc(doc(db, 'teams', environment.teamId, 'players', playerId, name, id), { ...data, playerId });
+    await setDoc(doc(db, 'teams', this.team.id(), 'players', playerId, name, id), { ...data, playerId });
   }
 
   async deletePlayerRecord(playerId: string, name: PlayerRecordKind, id: string): Promise<void> {
     const { db } = await this.connection.get();
     const { deleteDoc, doc } = await import('firebase/firestore');
-    await deleteDoc(doc(db, 'teams', environment.teamId, 'players', playerId, name, id));
+    await deleteDoc(doc(db, 'teams', this.team.id(), 'players', playerId, name, id));
   }
 
   /** Selbstreflexion: ändert nur diese beiden Felder des Förderplans (so erlauben es die Regeln dem Spieler). */
@@ -105,7 +106,7 @@ export class PlayerRecordsApi {
     const { db } = await this.connection.get();
     const { doc, setDoc } = await import('firebase/firestore');
     await setDoc(
-      doc(db, 'teams', environment.teamId, 'players', playerId, 'developmentPlans', planId),
+      doc(db, 'teams', this.team.id(), 'players', playerId, 'developmentPlans', planId),
       { selfReflection: text, selfReflectionAt: at },
       { merge: true },
     );

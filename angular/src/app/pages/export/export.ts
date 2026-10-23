@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
-import { environment } from '../../../environments/environment';
+import { CurrentTeam } from '../../core/team/current-team.service';
 import { type Backup, MAX_BACKUP_BYTES, type CurrentIds, backupOperations, overwriteCount, parseBackup, summarizeBackup, summaryLines, validateBackup } from '../../core/export/backup-import';
 import { EventsService } from '../../core/events/events.service';
 import { buildExport, exportFileName, revokedPlayers } from '../../core/export/export';
@@ -42,6 +42,7 @@ interface PendingImport {
 })
 export class Export implements OnInit, OnDestroy {
   private readonly team = inject(TeamService);
+  private readonly current = inject(CurrentTeam);
   private readonly stats = inject(PlayerStatsService);
   private readonly eventsService = inject(EventsService);
   private readonly opponents = inject(OpponentsService);
@@ -142,7 +143,7 @@ export class Export implements OnInit, OnDestroy {
     const ratings = await this.team.fullRatings();
     const now = new Date();
     const data = buildExport({
-      teamId: environment.teamId,
+      teamId: this.current.id(),
       now,
       players,
       events: this.team.events(),
@@ -188,7 +189,7 @@ export class Export implements OnInit, OnDestroy {
     if (!player || !entry) return;
     const history = (await this.readHistory([player])).get(player.id)!;
     this.files.print(
-      profileReportHtml({ teamName: environment.teamName, player, items: entry.items, absences: history.absences, measurements: history.measurements, today: todayIso() }),
+      profileReportHtml({ teamName: this.current.name(), player, items: entry.items, absences: history.absences, measurements: history.measurements, today: todayIso() }),
     );
     this.workspace.record(`Spielerprofil als PDF vorbereitet (${player.name})`);
     this.done.set('Der Druckdialog wurde geöffnet – dort „Als PDF speichern“ wählen.');

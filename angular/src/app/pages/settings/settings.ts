@@ -11,11 +11,12 @@ import { PlayerStatsService } from '../../core/team/player-stats.service';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 import { Dialog } from '../../ui/dialog/dialog';
+import { ClubAdminCard } from './club-admin-card';
 
 /** Einstellungen & Datenschutz: Darstellung, lokale Aufbewahrung, lokale Daten löschen, Aktivitätsverlauf. */
 @Component({
   selector: 'app-settings',
-  imports: [Button, Card, Dialog, FormsModule],
+  imports: [Button, Card, ClubAdminCard, Dialog, FormsModule],
   templateUrl: './settings.html',
   styleUrl: './settings.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

@@ -4,6 +4,8 @@ export interface FirebaseUser {
   readonly uid: string;
   readonly isAnonymous: boolean;
   readonly email: string | null;
+  /** E-Mail bestätigt (nur bei E-Mail-Konten gesetzt). */
+  readonly emailVerified?: boolean;
 }
 
 /** members/{uid}: verknüpft die Anmeldung mit Rolle und – für Spieler/Eltern – dem Spielerprofil. */

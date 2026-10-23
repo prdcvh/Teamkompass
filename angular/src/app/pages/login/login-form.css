@@ -162,3 +162,19 @@ h3 {
   outline: 2px solid var(--tk-red-dark);
   outline-offset: 2px;
 }
+
+/* Registrierung mit Einladungscode (SCRUM-181). */
+.register {
+  margin: 0;
+  padding-top: var(--tk-space-3);
+  border-top: 1px solid var(--tk-line);
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+.register a {
+  display: inline-block;
+  padding: var(--tk-space-2) 0;
+  color: var(--tk-red-dark);
+  font-weight: 600;
+}

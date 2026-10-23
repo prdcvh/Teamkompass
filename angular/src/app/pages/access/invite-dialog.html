@@ -15,10 +15,11 @@
         Behandle ihn bis dahin wie ein Passwort.
       </p>
       @if (copied()) {
-        <p class="muted" role="status">Code kopiert.</p>
+        <p class="muted" role="status">Kopiert.</p>
       }
       <menu>
         <button tkButton type="button" (click)="copy()">Code kopieren</button>
+        <button tkButton type="button" (click)="copyLink()">Link kopieren</button>
         <button tkButton variant="primary" type="button" (click)="close()">Fertig</button>
       </menu>
     </div>
