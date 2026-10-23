@@ -273,5 +273,22 @@ Das wird mit SCRUM-181 neu bewertet (Abschnitt 6).
   createdAt: serverTimestamp() })` – die ID muss eine 20-stellige Auto-ID sein.
 - **Erster Trainer (Vereinsadmin), ein Batch:** `update(teams/{teamId}, { hasTrainer: true, firstTrainerUid: uid })`
   und `set(teams/{teamId}/members/{uid}, { role: 'trainer', email, uid, createdAt: serverTimestamp() })`.
-- **Neuer Verein:** per App noch nicht möglich (`clubs` create ist gesperrt) – Registrierung kommt mit SCRUM-181
-  (braucht dann eine eigene Regel oder einen Server-Weg).
+- **Neuer Verein:** seit SCRUM-181 nur über einen Einladungscode, siehe Abschnitt 12.
+
+## 12. Registrierung nur mit Einladung (SCRUM-181, umgesetzt)
+
+PO-Entscheidung 23.10.2026: keine freie Registrierung. Gewählte Variante: **Einladungscodes `clubInvites/{code}`**
+(`kind`, `clubId`, `teamId`, `expiresAt`, `email` optional). Vereins- und Team-ID sind **schon im Code festgelegt**
+(Zufalls-IDs) – so findet jede Teilregel denselben Code, und ein Code kann nie einen bestehenden Verein oder ein
+bestehendes Team treffen.
+
+- **Vereinscode** (`kind: "club"`, nur per Skript `scripts/create-club-invite.mjs`): Ein Schreibvorgang löscht den
+  Code und legt `clubs/{clubId}`, `clubs/{clubId}/admins/{uid}` (mit `inviteCode`), `teams/{teamId}` (`hasTrainer:
+  true`, `firstTrainerUid: uid`) und `teams/{teamId}/members/{uid}` (Rolle `trainer`, `uid`, `claimedInviteCode`) an.
+- **Beitrittscode** (`kind: "team"`, vom Vereinsadmin in der App): gleicher Schreibvorgang ohne Verein/Admin;
+  der Verein muss bestehen. Der neue Trainer wird nicht Vereinsadmin.
+- Regeln verlangen: bestätigte E-Mail (`email_verified`), Code vorhanden und nicht abgelaufen, im selben
+  Schreibvorgang gelöscht, ggf. passende E-Mail, Admin/Trainer = das angemeldete Konto, Verein/Team neu.
+- Angular: Team-ID aus der Teamsuche (`CurrentTeam`), Rückfall auf `environment.teamId`; Auswahlseite bei mehreren
+  Teams; Spieler-Einladungslinks tragen das Team (`/anmelden?team=…&code=…`, offene Frage aus Abschnitt 6).
+- App Check: vorbereitet, ohne Schlüssel aus (FIREBASE_SETUP.md §10).
