@@ -555,6 +555,16 @@ service cloud.firestore {
         allow write: if isTrainer();
       }
 
+      // MVP-Rangliste (SCRUM-105): fertig berechnete Top-5-Listen (Platz, Name, Punkte) fuer Woche und Monat. Die
+      // Einzelpunkte liegen im Trainer-Pfad events/*/privateNotes, den Spieler nie lesen; dieses Dokument enthaelt nur die
+      // Auswertung. Lesen: Trainer sowie Spieler und Eltern des Teams. Schreiben nur der Trainer, nur diese drei Felder.
+      match /meta/ranking {
+        allow read: if isTrainer() || (isTeamMember() && memberDoc().data.role in ["player", "parent"]);
+        allow create, update: if isTrainer()
+          && request.resource.data.keys().hasOnly(['week', 'month', 'updatedAt']);
+        allow delete: if isTrainer();
+      }
+
       match /meta/operations {
         allow read, write: if isTrainer();
       }

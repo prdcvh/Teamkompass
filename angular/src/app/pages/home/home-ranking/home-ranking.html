@@ -1,0 +1,43 @@
+<section class="ranking" aria-label="MVP-Ranglisten" [attr.data-variant]="mobile() ? 'mobile' : 'desktop'">
+  @if (ranking.load() === 'error') {
+    <div class="notice" role="alert">
+      <p>{{ ranking.error() }}</p>
+      <button tkButton type="button" (click)="ranking.retry()">Erneut versuchen</button>
+    </div>
+  } @else if (ranking.load() !== 'ready') {
+    <p class="muted" role="status">Rangliste wird geladen …</p>
+  } @else {
+    <div class="lists">
+      @for (list of lists(); track list.key) {
+        <tk-card>
+          <div class="panel">
+            <div class="panel-head">
+              <h2>{{ list.title }}</h2>
+              <span class="muted">{{ list.range }}</span>
+            </div>
+            @if (list.entries.length === 0) {
+              <p class="muted">Noch keine Punkte in diesem Zeitraum. Sobald Punkte vergeben sind, erscheint hier die Rangliste.</p>
+            } @else {
+              <ol class="board">
+                @for (entry of list.entries; track $index) {
+                  <li [class.top]="isMvp(entry)">
+                    <span class="rank" [attr.aria-label]="'Platz ' + entry.rank">{{ entry.rank }}</span>
+                    <span class="name">
+                      {{ entry.name }}
+                      @if (isMvp(entry)) {
+                        <span class="mvp">MVP</span>
+                      }
+                    </span>
+                    @if (entry.points !== undefined) {
+                      <span class="points">{{ pointsText(entry.points) }}</span>
+                    }
+                  </li>
+                }
+              </ol>
+            }
+          </div>
+        </tk-card>
+      }
+    </div>
+  }
+</section>

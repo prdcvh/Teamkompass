@@ -43,6 +43,9 @@
     <p class="muted" role="status">Bewertungen werden geladen …</p>
   } @else {
     @if (player(); as p) {
+      @if (!picks()) {
+        <app-home-ranking [mobile]="mobile()" />
+      }
       <tk-card>
         <div class="header">
           <span class="number">{{ p.number }}</span>
