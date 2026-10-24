@@ -29,7 +29,7 @@ export const WIDTHS = [360, 390, 768, 1024, 1280, 1440, 1920];
 export const ROUTES = [
   '/start', '/kader', '/events', '/events/e1', '/events/e2', '/events/e3', '/events/e4', '/planung', '/profile', '/profile/p1', '/teamanalyse',
   '/gegneranalyse', '/aufstellung', '/suche', '/zugaenge', '/trainer-konto', '/scout-zugang', '/medizin-zugang', '/export', '/einstellungen', '/styleguide',
-  '/anmelden?as=none', '/ansicht?as=player', '/ansicht?as=physio', '/ansicht?as=scout',
+  '/anmelden?as=none', '/ansicht?as=player', '/ansicht?as=player-email', '/ansicht?as=physio', '/ansicht?as=scout',
   // Registrierung, Teamauswahl und Einstieg (SCRUM-181).
   '/registrieren?as=none&code=ABCDEFGHJKLMNPQR', '/team-waehlen?as=multi', '/willkommen?as=fresh',
 ];
