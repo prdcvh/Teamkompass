@@ -41,7 +41,8 @@ describe('TeamChoice (Teamauswahl)', () => {
     const items = (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('button.item');
     expect(items.length).toBe(2);
     expect(items[0].textContent).toContain('SV Muster · Trainer');
-    expect(items[1].textContent).toContain('FC Beispiel · Eltern');
+    // Bestehende Eltern-Zugänge erscheinen seit SCRUM-114 als Spieler-Zugang.
+    expect(items[1].textContent).toContain('FC Beispiel · Spieler');
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
     items[1].click();
     await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith('/ansicht'));

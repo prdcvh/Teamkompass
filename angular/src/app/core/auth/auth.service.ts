@@ -35,6 +35,11 @@ export class AuthService {
   readonly status = signal<AuthStatus>('loading');
   readonly error = signal('');
   readonly busy = signal(false);
+  /**
+   * Hinweis nach einer Registrierung, deren Zugang zwar angelegt ist, deren E-Mail-Verbindung aber scheiterte
+   * (SCRUM-114). Die Spieleransicht zeigt ihn an und bietet das Verbinden erneut an. Leer = kein Hinweis.
+   */
+  readonly notice = signal('');
 
   private started = false;
   private resolveFirstState!: () => void;
@@ -78,6 +83,7 @@ export class AuthService {
     return this.firstState;
   }
 
+  /** Anmeldung mit E-Mail und Passwort – für Trainer, Scout, Medizin und seit SCRUM-114 auch Spieler mit Konto. */
   async signInTrainer(email: string, password: string): Promise<void> {
     this.error.set('');
     this.busy.set(true);
@@ -92,14 +98,23 @@ export class AuthService {
     }
   }
 
-  /** Spieler/Eltern: anonym anmelden, Code prüfen, Zugang anlegen und Code verbrauchen. */
-  async signInWithCode(rawCode: string): Promise<void> {
+  /**
+   * Spieler: anonym anmelden, Code prüfen, Zugang anlegen und Code verbrauchen. Mit `account` (Registrierung, SCRUM-114)
+   * wird das Konto danach mit E-Mail und Passwort verbunden; die Benutzer-ID bleibt dabei gleich.
+   *
+   * Reihenfolge: erst den Code einlösen, dann verbinden. Scheitert das Verbinden (z. B. E-Mail schon vergeben, Anbieter
+   * nicht aktiv, Netz weg), ist der Zugang trotzdem angelegt und funktioniert wie ein reiner Code-Zugang; das Verbinden
+   * lässt sich in der Spieleransicht nachholen. Umgekehrt bliebe sonst ein E-Mail-Konto ohne Zugang zurück, das die
+   * Adresse blockiert. Die Eingaben (E-Mail-Format, Passwortregel) prüft die Anmeldeseite vorher.
+   */
+  async signInWithCode(rawCode: string, account?: { readonly email: string; readonly password: string }): Promise<void> {
     if (this.claiming) return;
     const code = rawCode.trim();
     if (!code) {
       this.error.set('Bitte den Einladungscode eingeben.');
       return;
     }
+    this.notice.set('');
     this.claiming = true;
     this.busy.set(true);
     this.error.set('');
@@ -132,9 +147,21 @@ export class AuthService {
       }
 
       if (!(await this.claim(uid, code, invite))) return;
+      let user: FirebaseUser = { uid, isAnonymous: true, email: null };
+      if (account) {
+        try {
+          user = await this.authApi.linkEmail(uid, account.email.trim(), account.password);
+        } catch (error) {
+          console.error(error);
+          this.notice.set(
+            `Dein Zugang ist angelegt, aber die E-Mail-Adresse konnte nicht verbunden werden. ${authErrorMessage(errorCode(error))} ` +
+              'Bitte verbinde sie unten erneut – sonst brauchst du nach dem Abmelden einen neuen Code.',
+          );
+        }
+      }
       // Der Anmeldezustand hat sich schon vor dem Anlegen des Zugangs gemeldet (damals noch
       // ohne members-Dokument) – jetzt die Rolle nachladen.
-      await this.verify({ uid, isAnonymous: true, email: null });
+      await this.verify(user);
     } finally {
       this.claiming = false;
       this.busy.set(false);
@@ -288,7 +315,7 @@ export class AuthService {
         // Anonyme Konten ohne Mitgliedschaft sind übrig gebliebene Code-Versuche: still beenden.
         if (!user.isAnonymous) {
           console.warn('Kein Teamzugang hinterlegt.');
-          this.error.set('Für dieses Team ist kein Zugang hinterlegt. Bitte wende dich an den Trainer.');
+          this.error.set('Für dieses Konto gibt es keinen gültigen Zugang zu diesem Team (zum Beispiel gesperrt oder abgelaufen). Bitte wende dich an den Trainer.');
         }
         await this.abandon();
         this.reset();
@@ -314,6 +341,7 @@ export class AuthService {
   /** Ohne Anmeldung bleibt weder Teamstand im Speicher noch im Browser liegen. */
   private reset(): void {
     this.session.clear();
+    this.notice.set('');
     this.pendingUser = null;
     this.pendingTeams = new Map();
     this.team.reset();

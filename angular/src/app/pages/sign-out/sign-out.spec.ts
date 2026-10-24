@@ -9,12 +9,13 @@ describe('SignOut (Abmelden)', () => {
   let signOut: ReturnType<typeof vi.fn>;
   let navigate: ReturnType<typeof vi.spyOn>;
 
-  async function render(role: Role | null) {
+  async function render(role: Role | null, email: string | null = null) {
     signOut = vi.fn().mockResolvedValue(undefined);
     TestBed.configureTestingModule({
       providers: [provideRouter([]), { provide: AuthService, useValue: { signOut } }],
     });
     TestBed.inject(SessionService).role.set(role);
+    TestBed.inject(SessionService).email.set(email);
     navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
     const fixture = TestBed.createComponent(SignOut);
     await fixture.whenStable();
@@ -45,5 +46,11 @@ describe('SignOut (Abmelden)', () => {
     button(fixture, 'Angemeldet bleiben').click();
     expect(signOut).not.toHaveBeenCalled();
     expect(navigate).toHaveBeenCalledWith('/ansicht');
+  });
+
+  it('meldet einen mit E-Mail verbundenen Spieler-Zugang ohne Warnung ab (SCRUM-114)', async () => {
+    await render('player', 'kind@familie.de');
+    await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith('/anmelden'));
+    expect(signOut).toHaveBeenCalledOnce();
   });
 });

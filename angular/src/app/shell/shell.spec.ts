@@ -22,7 +22,7 @@ describe('Shell (in der App)', () => {
         provideRouter(routes),
         { provide: LayoutService, useValue: { isMobile } },
         ...provideFakeFirebase(new FakeFirebase()),
-        { provide: AuthService, useValue: { whenResolved: () => Promise.resolve(), status: () => 'ready' } },
+        { provide: AuthService, useValue: { whenResolved: () => Promise.resolve(), status: () => 'ready', notice: signal('') } },
       ],
     }).compileComponents();
     TestBed.inject(SessionService).role.set(role);

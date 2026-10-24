@@ -3,7 +3,7 @@ import { Location } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { environment } from '../../../environments/environment';
-import { TEAM_ID_PATTERN } from '../../core/access/access';
+import { MIN_PASSWORD_LENGTH, type StaffErrors, TEAM_ID_PATTERN, validateStaffDraft } from '../../core/access/access';
 import { CurrentTeam } from '../../core/team/current-team.service';
 import { AccountService } from '../../core/auth/account.service';
 import { AuthService } from '../../core/auth/auth.service';
@@ -12,9 +12,13 @@ import { homeFor } from '../../core/auth/role';
 import { SessionService } from '../../core/auth/session.service';
 import { Button } from '../../ui/button/button';
 
-type Tab = 'trainer' | 'code';
+type Tab = 'email' | 'code';
 
-/** Figma „01 Anmeldung“ / „01b Login Spieler/Eltern“: Trainer-Login und Einladungscode. */
+/**
+ * Figma „01 Anmeldung“ / „01b Login Spieler/Eltern“. Reiter „Anmelden“: E-Mail + Passwort für alle mit Konto (Trainer,
+ * Scout, Medizin und seit SCRUM-114 Spieler). Reiter „Einladungscode“: einmalig Code einlösen und dabei E-Mail und
+ * Passwort festlegen; danach meldet sich der Spieler auf jedem Gerät mit E-Mail und Passwort an.
+ */
 @Component({
   selector: 'app-login',
   imports: [FormsModule, RouterLink, Button],
@@ -30,7 +34,7 @@ export class Login {
   private readonly session = inject(SessionService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
-  protected readonly tab = signal<Tab>('trainer');
+  protected readonly tab = signal<Tab>('email');
   protected readonly showPassword = signal(false);
   /** „Passwort vergessen?“: zeigt statt der Anmeldung das Formular zum Zurücksetzen. */
   protected readonly resetting = signal(false);
@@ -40,6 +44,12 @@ export class Login {
   protected email = '';
   protected password = '';
   protected code = '';
+  /** Registrierung mit Code (SCRUM-114): E-Mail, Passwort und Wiederholung des neuen Spieler-Kontos. */
+  protected newEmail = '';
+  protected newPassword = '';
+  protected newRepeat = '';
+  protected readonly accountErrors = signal<StaffErrors>({});
+  protected readonly minPassword = MIN_PASSWORD_LENGTH;
   protected readonly club = environment.clubName;
   protected readonly team = environment.teamLabel;
   private readonly currentTeam = inject(CurrentTeam);
@@ -105,14 +115,26 @@ export class Login {
     queueMicrotask(() => this.host.nativeElement.querySelector<HTMLElement>(`#tab-${tab}`)?.focus());
   }
 
-  protected async submitTrainer(): Promise<void> {
+  protected async submitEmail(): Promise<void> {
     await this.auth.signInTrainer(this.email, this.password);
     await this.leaveIfSignedIn();
   }
 
   protected async submitCode(): Promise<void> {
+    if (this.auth.busy()) return;
+    if (!this.code.trim()) {
+      this.auth.error.set('Bitte den Einladungscode eingeben.');
+      return;
+    }
+    // Eingaben prüfen, bevor der Code angefasst wird: ein Code ist nur einmal gültig.
+    const errors = validateStaffDraft({ email: this.newEmail, password: this.newPassword, repeat: this.newRepeat });
+    this.accountErrors.set(errors);
+    if (Object.keys(errors).length > 0) {
+      this.auth.error.set('');
+      return;
+    }
     if (this.linkTeam) this.currentTeam.select(this.linkTeam);
-    await this.auth.signInWithCode(this.code);
+    await this.auth.signInWithCode(this.code, { email: this.newEmail, password: this.newPassword });
     await this.leaveIfSignedIn();
   }
 

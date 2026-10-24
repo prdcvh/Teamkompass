@@ -12,6 +12,8 @@ export interface FirebaseUser {
 export interface MemberRecord {
   readonly role: Role;
   readonly playerId: string | null;
+  /** Ende eines befristeten Zugangs (fehlt/null = unbefristet). Abgelaufene Zugänge öffnen kein Team (SCRUM-114). */
+  readonly expiresAt?: Date | null;
 }
 
 /** invites/{code}: Einladungscode eines Spielers/Elternteils. */

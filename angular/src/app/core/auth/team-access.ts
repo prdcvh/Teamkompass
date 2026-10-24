@@ -5,6 +5,11 @@ import type { FirebaseUser, MemberRecord } from '../firebase/types';
 import { CurrentTeam, activeMemberships } from '../team/current-team.service';
 import { normalizeRole } from './role';
 
+/** Befristeter Zugang abgelaufen? (Gleiche Grenze wie die Firestore-Regeln: Ablaufzeit vor jetzt.) */
+export function memberExpired(member: Pick<MemberRecord, 'expiresAt'>, now: Date = new Date()): boolean {
+  return !!member.expiresAt && member.expiresAt.getTime() < now.getTime();
+}
+
 /**
  * „Meine Teams“ für den {@link AuthService} (SCRUM-181): Teamsuche, Rückfall auf das Team des Builds und Anzeigenamen.
  */
@@ -34,7 +39,9 @@ export class TeamAccess {
       if (teams.has(teamId)) continue;
       try {
         const legacy = await this.accessApi.readMember(user.uid, teamId);
-        if (legacy) teams.set(teamId, legacy);
+        // Abgelaufene Zugänge zählen nicht (wie in der Teamsuche) – sonst käme ein befristeter Spieler-Zugang nach
+        // Ablauf per E-Mail-Anmeldung wieder bis in seine Ansicht (SCRUM-114).
+        if (legacy && !memberExpired(legacy)) teams.set(teamId, legacy);
       } catch (error) {
         if (teams.size === 0 && teamId === this.team.fallbackId) throw error;
         console.warn(error);
