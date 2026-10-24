@@ -93,7 +93,7 @@ describe('AuthService – Teams aus der Datenbank', () => {
     auth.start(0);
     await auth.signInTrainer('fremd@verein.de', 'x');
     await vi.waitFor(() => expect(auth.status()).toBe('signedOut'));
-    expect(auth.error()).toContain('kein Zugang');
+    expect(auth.error()).toContain('keinen gültigen Zugang');
   });
 
   it('beim Abmelden geht es zurück zum Team des Builds', async () => {

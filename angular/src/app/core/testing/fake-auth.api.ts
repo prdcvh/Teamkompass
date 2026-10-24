@@ -48,6 +48,15 @@ export class FakeAuthApi implements Pick<AuthApi, keyof AuthApi> {
     return this.nextUid;
   }
 
+  linkError: unknown = null;
+
+  /** Wie Firebase: gleiche uid, kein neuer Anmeldezustand (onAuthStateChanged meldet sich beim Verknüpfen nicht). */
+  async linkEmail(expectedUid: string, email: string, password: string): Promise<FirebaseUser> {
+    this.calls.push(`link:${expectedUid}:${email}:${password}`);
+    if (this.linkError) throw this.linkError;
+    return { uid: expectedUid, isAnonymous: false, email };
+  }
+
   async signOut(): Promise<void> {
     this.calls.push('signOut');
     this.emit(null);

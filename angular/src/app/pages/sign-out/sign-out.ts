@@ -9,7 +9,8 @@ import { Card } from '../../ui/card/card';
 /**
  * „Abmelden“ aus Navigation und Mehr-Sheet: meldet ab, leert lokale Daten und geht zur Anmeldung.
  * Spieler und Eltern haben nur eine anonyme Anmeldung mit Einmal-Code: nach dem Abmelden kommen sie nur mit einem
- * neuen Code vom Trainer wieder hinein (SCRUM-32). Sie bekommen deshalb vorher eine klare Warnung.
+ * neuen Code vom Trainer wieder hinein (SCRUM-32). Sie bekommen deshalb vorher eine klare Warnung – außer ihr Zugang ist
+ * mit einer E-Mail verbunden (SCRUM-114).
  */
 @Component({
   selector: 'app-sign-out',
@@ -22,7 +23,8 @@ import { Card } from '../../ui/card/card';
             <h1>Wirklich abmelden?</h1>
             <p>
               Danach kommst du nur mit einem <strong>neuen Einladungscode</strong> von deinem Trainer wieder hinein. Der bisherige Code ist
-              verbraucht und lässt sich nicht noch einmal verwenden.
+              verbraucht und lässt sich nicht noch einmal verwenden. Tipp: Verbinde deinen Zugang vorher in deiner Ansicht mit einer
+              E-Mail-Adresse – dann meldest du dich jederzeit mit E-Mail und Passwort wieder an.
             </p>
             <div class="actions">
               <button tkButton type="button" (click)="cancel()">Angemeldet bleiben</button>
@@ -65,8 +67,12 @@ export class SignOut {
   private readonly session = inject(SessionService);
   private readonly role = this.session.role();
 
-  /** Anonyme Zugänge (Spieler, Eltern) verlieren mit dem Abmelden ihren Zugang. */
-  protected readonly warn = computed(() => this.role === 'player' || this.role === 'parent');
+  /**
+   * Anonyme Zugänge (Spieler, Eltern) verlieren mit dem Abmelden ihren Zugang. Mit E-Mail verbundene Spieler-Konten
+   * (SCRUM-114) melden sich einfach wieder mit E-Mail und Passwort an – keine Warnung.
+   */
+  private readonly email = this.session.email();
+  protected readonly warn = computed(() => (this.role === 'player' || this.role === 'parent') && !this.email);
 
   constructor() {
     if (!this.warn()) this.confirm();

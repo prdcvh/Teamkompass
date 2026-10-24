@@ -1,5 +1,5 @@
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
-import { type AccessEntry, type InviteRole, type StaffRole, generateInviteCode, expiryFromDays, inviteEntry, memberEntry, staffLabel } from './access';
+import { type AccessEntry, type StaffRole, generateInviteCode, expiryFromDays, inviteEntry, memberEntry, staffLabel } from './access';
 import { authErrorMessage, errorCode } from '../auth/auth-errors';
 import { AccessApi } from '../firebase/access.api';
 import { SessionService } from '../auth/session.service';
@@ -64,13 +64,16 @@ export class AccessService {
     this.error.set('');
   }
 
-  /** Erzeugt einen Einladungscode. Der Code wird nur hier zurückgegeben und nirgends zwischengespeichert. */
-  async createInvite(playerId: string, role: InviteRole, days: number | null): Promise<InviteResult> {
+  /**
+   * Erzeugt einen Einladungscode für einen Spieler-Zugang (seit SCRUM-114 ohne Wahl Spieler/Eltern). Der Code wird nur hier
+   * zurückgegeben und nirgends zwischengespeichert.
+   */
+  async createInvite(playerId: string, days: number | null): Promise<InviteResult> {
     if (!this.canWrite()) return { ok: false, message: 'Nur Trainer dürfen Zugänge vergeben.' };
     const code = generateInviteCode();
     const expiresAt = expiryFromDays(days);
     try {
-      await this.accessApi.createInvite(code, { playerId, role, expiresAt });
+      await this.accessApi.createInvite(code, { playerId, role: 'player', expiresAt });
     } catch (error) {
       console.error(error);
       return { ok: false, message: `Der Einladungscode konnte nicht erstellt werden. ${authErrorMessage(errorCode(error))}` };

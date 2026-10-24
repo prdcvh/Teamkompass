@@ -66,7 +66,7 @@ describe('Access (Zugänge: Spieler, Scouts und Medizin)', () => {
     expect(rows).toHaveLength(2);
     expect(text(q(fixture, '.meta'))).toBe('2 Zugänge');
     expect(rows[0]).toContain('Ben Widerruf');
-    expect(rows[0]).toContain('Eltern · Einladung offen');
+    expect(rows[0]).toContain('Spieler (bisher Eltern-Zugang) · Einladung offen');
     expect(rows[0]).toContain('Code …456789');
     expect(rows[0]).toContain('Unbegrenzt gültig');
     expect(rows.some((row) => row.includes('Anna Beispiel') && row.includes('Abgelaufen seit 01.01.2020'))).toBe(true);
@@ -101,7 +101,8 @@ describe('Access (Zugänge: Spieler, Scouts und Medizin)', () => {
     const dialog = await openInvite(fixture);
     expect(text(dialog.querySelector('h2'))).toBe('Zugang erzeugen');
     fill(dialog.querySelector<HTMLSelectElement>('select[name="player"]')!, 'p1', 'change');
-    fill(dialog.querySelector<HTMLSelectElement>('select[name="role"]')!, 'parent', 'change');
+    // Seit SCRUM-114 keine Wahl Spieler/Eltern mehr.
+    expect(dialog.querySelector('select[name="role"]')).toBeNull();
     fill(dialog.querySelector<HTMLInputElement>('input[name="days"]')!, '14');
     dialog.querySelector('form')!.dispatchEvent(new Event('submit'));
     await vi.waitFor(() => expect([...firebase.access.inviteDocs.values()].some((invite) => invite['playerId'] === 'p1')).toBe(true));
@@ -111,7 +112,7 @@ describe('Access (Zugänge: Spieler, Scouts und Medizin)', () => {
     });
     const code = text(dialog.querySelector('[data-testid="invite-code"]'));
     expect(code).toMatch(/^[0-9a-f]{48}$/);
-    expect(firebase.access.inviteDocs.get(code)).toMatchObject({ playerId: 'p1', role: 'parent' });
+    expect(firebase.access.inviteDocs.get(code)).toMatchObject({ playerId: 'p1', role: 'player' });
     expect(text(dialog)).toContain('läuft am');
     expect(text(q(fixture, '.meta'))).toBe('3 Zugänge');
 

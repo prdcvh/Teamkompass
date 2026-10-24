@@ -178,3 +178,19 @@ h3 {
   color: var(--tk-red-dark);
   font-weight: 600;
 }
+
+/* Konto anlegen mit Einladungscode (SCRUM-114): Hinweis und Fehler direkt unter dem Feld. */
+.field-hint,
+.field-error {
+  margin-top: calc(-1 * var(--tk-space-2));
+  font-size: var(--tk-text-sm);
+}
+
+.field-hint {
+  color: var(--tk-muted);
+}
+
+.field-error {
+  color: var(--tk-red-dark);
+  font-weight: 600;
+}

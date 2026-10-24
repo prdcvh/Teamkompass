@@ -40,12 +40,12 @@
       <p class="sub">Melde dich bei deiner Mannschaft an.</p>
 
       <div class="tabs" role="tablist" aria-label="Anmeldeart">
-        <button type="button" role="tab" id="tab-trainer" [attr.aria-selected]="tab() === 'trainer'" [attr.tabindex]="tab() === 'trainer' ? 0 : -1" [class.on]="tab() === 'trainer'" (click)="select('trainer')" (keydown.arrowright)="selectByKey('code')" (keydown.arrowleft)="selectByKey('code')">Trainer</button>
-        <button type="button" role="tab" id="tab-code" [attr.aria-selected]="tab() === 'code'" [attr.tabindex]="tab() === 'code' ? 0 : -1" [class.on]="tab() === 'code'" (click)="select('code')" (keydown.arrowleft)="selectByKey('trainer')" (keydown.arrowright)="selectByKey('trainer')">Spieler / Eltern</button>
+        <button type="button" role="tab" id="tab-email" [attr.aria-selected]="tab() === 'email'" [attr.tabindex]="tab() === 'email' ? 0 : -1" [class.on]="tab() === 'email'" (click)="select('email')" (keydown.arrowright)="selectByKey('code')" (keydown.arrowleft)="selectByKey('code')">Anmelden</button>
+        <button type="button" role="tab" id="tab-code" [attr.aria-selected]="tab() === 'code'" [attr.tabindex]="tab() === 'code' ? 0 : -1" [class.on]="tab() === 'code'" (click)="select('code')" (keydown.arrowleft)="selectByKey('email')" (keydown.arrowright)="selectByKey('email')">Einladungscode</button>
       </div>
 
-      <div class="card" role="tabpanel" [attr.aria-labelledby]="tab() === 'trainer' ? 'tab-trainer' : 'tab-code'">
-        @if (tab() === 'trainer' && resetting()) {
+      <div class="card" role="tabpanel" [attr.aria-labelledby]="tab() === 'email' ? 'tab-email' : 'tab-code'">
+        @if (tab() === 'email' && resetting()) {
           <form (ngSubmit)="submitReset()" #resetForm="ngForm">
             <h3>Passwort zurücksetzen</h3>
             <p class="hint">Gib die E-Mail-Adresse deines Kontos ein. Du bekommst einen Link, über den du selbst ein neues Passwort festlegst.</p>
@@ -59,9 +59,10 @@
               <p [class.error]="resetFailed()" [class.hint]="!resetFailed()" [attr.role]="resetFailed() ? 'alert' : 'status'">{{ resetMessage() }}</p>
             }
           </form>
-        } @else if (tab() === 'trainer') {
-          <form (ngSubmit)="submitTrainer()" #trainerForm="ngForm">
-            <h3>Trainer-Login</h3>
+        } @else if (tab() === 'email') {
+          <form (ngSubmit)="submitEmail()" #emailForm="ngForm">
+            <h3>Mit E-Mail anmelden</h3>
+            <p class="hint">Für Trainer und für Spieler, die schon ein Konto haben.</p>
             <label class="tk-label">
               E-Mail
               <input class="tk-input" type="email" name="email" autocomplete="username" required [(ngModel)]="email" />
@@ -86,18 +87,48 @@
             <p class="register">Neu als Trainer? <a routerLink="/registrieren">Mit Einladungscode registrieren</a></p>
           </form>
         } @else {
-          <form (ngSubmit)="submitCode()" #codeForm="ngForm">
-            <h3>Spieler- oder Elternzugang</h3>
-            <p class="hint">Gib den persönlichen Einladungscode ein, den du von deinem Trainer bekommen hast.</p>
+          <form (ngSubmit)="submitCode()" #codeForm="ngForm" novalidate>
+            <h3>Neu hier? Code einlösen</h3>
+            <p class="hint">
+              Gib den Einladungscode von deinem Trainer ein und lege einmalig E-Mail und Passwort fest. Danach meldest du dich auf
+              jedem Gerät unter „Anmelden“ mit E-Mail und Passwort an. Eltern und Spieler können sich einen Zugang teilen.
+            </p>
             <label class="tk-label">
               Einladungscode
               <input class="tk-input" type="text" name="code" autocomplete="off" autocapitalize="off" spellcheck="false" required [(ngModel)]="code" />
             </label>
+            <label class="tk-label">
+              E-Mail
+              <input class="tk-input" type="email" name="newEmail" autocomplete="email" required [attr.aria-invalid]="accountErrors().email ? 'true' : null" [attr.aria-describedby]="accountErrors().email ? 'new-email-error' : null" [(ngModel)]="newEmail" />
+            </label>
+            @if (accountErrors().email) {
+              <span class="field-error" id="new-email-error" role="alert">{{ accountErrors().email }}</span>
+            }
+            <label class="tk-label">
+              Passwort festlegen
+              <span class="password">
+                <input class="tk-input" [type]="showPassword() ? 'text' : 'password'" name="newPassword" autocomplete="new-password" required aria-describedby="new-password-hint" [attr.aria-invalid]="accountErrors().password ? 'true' : null" [(ngModel)]="newPassword" />
+                <button type="button" class="reveal" [attr.aria-pressed]="showPassword()" [attr.aria-label]="showPassword() ? 'Passwort verbergen' : 'Passwort anzeigen'" (click)="showPassword.set(!showPassword())">
+                  {{ showPassword() ? 'Verbergen' : 'Anzeigen' }}
+                </button>
+              </span>
+            </label>
+            <span class="field-hint" id="new-password-hint">Mindestens {{ minPassword }} Zeichen, mit Groß- und Kleinbuchstaben und einer Ziffer.</span>
+            @if (accountErrors().password) {
+              <span class="field-error" role="alert">{{ accountErrors().password }}</span>
+            }
+            <label class="tk-label">
+              Passwort wiederholen
+              <input class="tk-input" [type]="showPassword() ? 'text' : 'password'" name="newRepeat" autocomplete="new-password" required [attr.aria-invalid]="accountErrors().repeat ? 'true' : null" [(ngModel)]="newRepeat" />
+            </label>
+            @if (accountErrors().repeat) {
+              <span class="field-error" role="alert">{{ accountErrors().repeat }}</span>
+            }
             <button tkButton variant="primary" type="submit" [disabled]="auth.busy()" [attr.aria-busy]="auth.busy()">
               @if (auth.busy()) {
-                <span class="spinner" aria-hidden="true"></span> Zugang wird geöffnet …
+                <span class="spinner" aria-hidden="true"></span> Konto wird angelegt …
               } @else {
-                Zugang öffnen
+                Konto anlegen
               }
             </button>
           </form>
