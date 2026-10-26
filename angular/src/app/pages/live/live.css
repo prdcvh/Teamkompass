@@ -59,9 +59,62 @@ h1 {
   touch-action: manipulation;
 }
 
-.step strong {
-  margin-left: 8px;
-  font-size: 24px;
+.steps {
+  padding: 10px 0 0;
+}
+
+.step-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.step-row .step {
+  flex: 1 1 56px;
+  min-height: 56px;
+  font-size: 26px;
+  font-weight: 800;
+}
+
+.step-row .step.other {
+  flex: 2 1 110px;
+  font-size: 18px;
+}
+
+.step.active {
+  color: #fff;
+  background: #0a3fd1;
+  border-color: #0a3fd1;
+  box-shadow: 0 0 0 3px #fff, 0 0 0 6px #0a3fd1;
+}
+
+.custom {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.custom input {
+  flex: 1;
+  min-width: 0;
+  min-height: 48px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 22px;
+  color: #000;
+  background: #fff;
+  border: 3px solid #000;
+  border-radius: 12px;
+}
+
+.hint {
+  margin: 10px 0 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.hint.error {
+  color: #b00020;
 }
 
 .end {
@@ -127,7 +180,7 @@ h1 {
   min-height: 64px;
   padding: 0;
   font: inherit;
-  font-size: 48px;
+  font-size: 30px;
   font-weight: 800;
   line-height: 1;
   color: #fff;
@@ -151,6 +204,7 @@ h1 {
 }
 
 .step:focus-visible,
+.custom input:focus-visible,
 .end:focus-visible,
 .pad:focus-visible,
 .action:focus-visible,
@@ -214,7 +268,7 @@ summary:focus-visible {
   .pad {
     width: 88px;
     height: 88px;
-    font-size: 56px;
+    font-size: 36px;
   }
 
   .name {
@@ -231,7 +285,7 @@ summary:focus-visible {
   .pad {
     width: 72px;
     height: 72px;
-    font-size: 44px;
+    font-size: 30px;
   }
 
   .player {

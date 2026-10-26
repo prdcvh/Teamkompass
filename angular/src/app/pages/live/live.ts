@@ -4,7 +4,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
 import { WakeLockService } from '../../core/device/wake-lock.service';
 import { EventsService } from '../../core/events/events.service';
-import { LIVE_STEPS, isAway, liveRows, nextStep, pointsLabel } from '../../core/live/live';
+import { MAX_CUSTOM_STEP, MIN_CUSTOM_STEP, deviceStorage, isAway, liveRows, loadStepPrefs, parseCustomStep, pointsLabel, saveStepPrefs, stepOptions } from '../../core/live/live';
 import { SquadService } from '../../core/player/squad.service';
 import { RatingsService } from '../../core/ratings/ratings.service';
 import { SyncService } from '../../core/shell/sync.service';
@@ -30,7 +30,17 @@ export class Live implements OnInit, OnDestroy {
   private readonly wakeLock = inject(WakeLockService);
 
   protected readonly eventId = toSignal(this.route.paramMap.pipe(map((params) => params.get('id') ?? '')), { initialValue: '' });
-  protected readonly step = signal<number>(LIVE_STEPS[0]);
+  private readonly saved = loadStepPrefs(deviceStorage());
+  protected readonly step = signal<number>(this.saved.step);
+  private readonly custom = signal<number | null>(this.saved.custom);
+  protected readonly options = computed(() => stepOptions(this.custom()));
+  protected readonly customOpen = signal(false);
+  protected readonly customError = signal('');
+  protected readonly maxCustom = MAX_CUSTOM_STEP;
+  protected readonly minCustom = MIN_CUSTOM_STEP;
+  /** Kurzer Hinweis beim Start, wenn die gemerkte Schrittweite nicht 1 ist (kein versehentlich großer Schritt). */
+  protected readonly startHint = signal(this.saved.step !== 1);
+  private hintTimer: ReturnType<typeof setTimeout> | undefined;
   protected readonly event = this.ratings.event;
   protected readonly isTraining = computed(() => this.event()?.type === 'Training');
   protected readonly ready = computed(() => this.ratings.load() === 'ready' && this.squad.load() === 'ready' && this.eventsService.load() === 'ready');
@@ -55,10 +65,12 @@ export class Live implements OnInit, OnDestroy {
     this.squad.start();
     this.eventsService.start();
     void this.wakeLock.keepAwake();
+    if (this.startHint()) this.hintTimer = setTimeout(() => this.startHint.set(false), 4000);
   }
 
   ngOnDestroy(): void {
     this.wakeLock.release();
+    clearTimeout(this.hintTimer);
   }
 
   protected points(id: string): number {
@@ -73,8 +85,32 @@ export class Live implements OnInit, OnDestroy {
     this.ratings.addPoints(id, direction * this.step());
   }
 
-  protected cycleStep(): void {
-    this.step.set(nextStep(this.step()));
+  protected chooseStep(step: number): void {
+    this.step.set(step);
+    this.startHint.set(false);
+    this.customOpen.set(false);
+    this.customError.set('');
+    this.persist();
+  }
+
+  protected toggleCustom(): void {
+    this.customOpen.update((open) => !open);
+    this.customError.set('');
+  }
+
+  protected applyCustom(input: HTMLInputElement): void {
+    const value = parseCustomStep(input.value);
+    if (value === null) {
+      this.customError.set(`Bitte eine ganze Zahl von ${MIN_CUSTOM_STEP} bis ${MAX_CUSTOM_STEP} eingeben.`);
+      return;
+    }
+    this.custom.set(value);
+    input.value = '';
+    this.chooseStep(value);
+  }
+
+  private persist(): void {
+    saveStepPrefs(deviceStorage(), { step: this.step(), custom: this.custom() });
   }
 
   protected retry(): void {

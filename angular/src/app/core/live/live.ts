@@ -4,13 +4,62 @@
 import { type Player } from '../player/player';
 import { type Attendance } from '../ratings/rating';
 
-/** Wählbare Schrittweiten; die erste ist der Standard. */
-export const LIVE_STEPS = [1, 2, 5] as const;
+/** Feste Schrittweiten der Umschaltleiste (SCRUM-214); die erste ist der Standard. */
+export const LIVE_STEPS: readonly number[] = [1, 2, 3, 5];
+export const MIN_CUSTOM_STEP = 1;
+export const MAX_CUSTOM_STEP = 20;
+export const STEP_STORAGE_KEY = 'teamkompass-live-step';
 
-/** Nächste Schrittweite im Kreis (1 → 2 → 5 → 1). */
-export function nextStep(step: number): number {
-  const index = LIVE_STEPS.findIndex((value) => value === step);
-  return LIVE_STEPS[(index + 1) % LIVE_STEPS.length];
+/** Eigene Schrittweite prüfen: nur ganze Zahlen von 1 bis 20. Alles andere (leer, 0, negativ, Kommazahl, Text) ergibt null. */
+export function parseCustomStep(input: unknown): number | null {
+  const text = typeof input === 'number' ? String(input) : typeof input === 'string' ? input.trim() : '';
+  if (!/^\d{1,3}$/.test(text)) return null;
+  const value = Number(text);
+  return value >= MIN_CUSTOM_STEP && value <= MAX_CUSTOM_STEP ? value : null;
+}
+
+export interface StepPrefs {
+  readonly step: number;
+  /** Zuletzt eingegebene eigene Zahl; erscheint als eigener Knopf in der Leiste (nur wenn sie nicht schon fest ist). */
+  readonly custom: number | null;
+}
+
+export const DEFAULT_STEP_PREFS: StepPrefs = { step: LIVE_STEPS[0], custom: null };
+
+/** Knöpfe der Leiste: feste Werte, danach ggf. die eigene Zahl. */
+export function stepOptions(custom: number | null): number[] {
+  return custom !== null && !LIVE_STEPS.includes(custom) ? [...LIVE_STEPS, custom] : [...LIVE_STEPS];
+}
+
+/** Gespeicherte Einstellung lesen; Kaputtes oder Ungültiges fällt auf den Standard zurück. */
+export function loadStepPrefs(storage: Pick<Storage, 'getItem'> | null): StepPrefs {
+  try {
+    const raw = storage?.getItem(STEP_STORAGE_KEY);
+    if (!raw) return DEFAULT_STEP_PREFS;
+    const data = JSON.parse(raw) as { step?: unknown; custom?: unknown };
+    const custom = data.custom === null || data.custom === undefined ? null : parseCustomStep(data.custom);
+    const step = typeof data.step === 'number' && stepOptions(custom).includes(data.step) ? data.step : LIVE_STEPS[0];
+    return { step, custom };
+  } catch {
+    return DEFAULT_STEP_PREFS;
+  }
+}
+
+export function saveStepPrefs(storage: Pick<Storage, 'setItem'> | null, prefs: StepPrefs): void {
+  try {
+    storage?.setItem(STEP_STORAGE_KEY, JSON.stringify(prefs));
+  } catch {
+    // Speicher gesperrt (privater Modus): dann gilt die Wahl nur für diese Sitzung.
+  }
+}
+
+/** Zugriff auf den Gerätespeicher, der selbst im gesperrten Zustand nicht wirft. */
+export function deviceStorage(): Storage | null {
+  try {
+    return localStorage;
+  } catch {
+    return null;
+  }
 }
 
 /** Punkte als Text mit echtem Minuszeichen (U+2212), damit negative Werte auch draußen sofort auffallen. */

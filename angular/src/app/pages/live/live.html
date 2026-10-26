@@ -1,11 +1,29 @@
 <main class="live">
   <header class="bar">
     <h1>{{ event()?.title ?? 'Live-Modus' }}</h1>
-    <button type="button" class="step" (click)="cycleStep()" [attr.aria-label]="'Schrittweite ' + step() + ', antippen zum Ändern'">
-      Schritt <strong>{{ step() }}</strong>
-    </button>
     <a class="end" [routerLink]="eventId() ? ['/events', eventId()] : ['/events']">Beenden</a>
   </header>
+
+  <section class="steps" aria-label="Schrittweite">
+    <div class="step-row" role="group" aria-label="Punkte pro Tipp">
+      @for (option of options(); track option) {
+        <button type="button" class="step" [class.active]="option === step()" [attr.aria-pressed]="option === step()" [attr.aria-label]="'Schrittweite ' + option" (click)="chooseStep(option)">{{ option }}</button>
+      }
+      <button type="button" class="step other" [attr.aria-expanded]="customOpen()" (click)="toggleCustom()">Andere…</button>
+    </div>
+    @if (customOpen()) {
+      <form class="custom" (submit)="$event.preventDefault(); applyCustom(num)">
+        <input #num type="text" inputmode="numeric" autocomplete="off" aria-label="Eigene Schrittweite" [placeholder]="minCustom + '–' + maxCustom" (input)="customError.set('')" />
+        <button type="submit" class="action">OK</button>
+      </form>
+    }
+    @if (customError()) {
+      <p class="hint error" role="alert">{{ customError() }}</p>
+    }
+    @if (startHint()) {
+      <p class="hint" role="status">Schrittweite: {{ step() }}</p>
+    }
+  </section>
 
   @if (failed()) {
     <div class="notice" role="alert">
@@ -35,14 +53,14 @@
       @for (row of present(); track row.id) {
         <li class="player" [class.negative]="points(row.id) < 0">
           <button type="button" class="pad minus" [attr.aria-label]="'Minus ' + step() + ' für ' + row.label" (click)="add(row.id, -1)">
-            <span aria-hidden="true">&minus;</span>
+            <span aria-hidden="true">&minus;{{ step() }}</span>
           </button>
           <div class="who">
             <span class="name">{{ row.label }}</span>
             <span class="score" [attr.aria-label]="label(points(row.id)) + ' Punkte'">{{ label(points(row.id)) }}</span>
           </div>
           <button type="button" class="pad plus" [attr.aria-label]="'Plus ' + step() + ' für ' + row.label" (click)="add(row.id, 1)">
-            <span aria-hidden="true">+</span>
+            <span aria-hidden="true">+{{ step() }}</span>
           </button>
         </li>
       }

@@ -1,10 +1,37 @@
-import { LIVE_STEPS, isAway, liveRows, nextStep, pointsLabel } from './live';
+import { DEFAULT_STEP_PREFS, LIVE_STEPS, STEP_STORAGE_KEY, isAway, liveRows, loadStepPrefs, parseCustomStep, pointsLabel, saveStepPrefs, stepOptions } from './live';
 
 describe('Live-Modus (Logik)', () => {
-  it('Schrittweite wechselt im Kreis', () => {
-    expect(LIVE_STEPS[0]).toBe(1);
-    expect([1, 2, 5].map(nextStep)).toEqual([2, 5, 1]);
-    expect(nextStep(7)).toBe(1); // unbekannt → Standard
+  it('feste Schrittweiten 1, 2, 3, 5; Standard ist 1', () => {
+    expect([...LIVE_STEPS]).toEqual([1, 2, 3, 5]);
+    expect(DEFAULT_STEP_PREFS.step).toBe(1);
+  });
+
+  it('eigene Zahl: nur ganze Zahlen von 1 bis 20', () => {
+    for (const ok of ['1', '7', ' 12 ', '20', 20]) expect(parseCustomStep(ok)).not.toBeNull();
+    expect(parseCustomStep('7')).toBe(7);
+    for (const bad of ['', '  ', '0', '-3', '2.5', '2,5', '21', '100', 'abc', '3x', '1e1', null, undefined, 0, -1, 1.5, Number.NaN]) {
+      expect(parseCustomStep(bad), String(bad)).toBeNull();
+    }
+  });
+
+  it('eigene Zahl erscheint als eigener Knopf, feste Zahl nicht doppelt', () => {
+    expect(stepOptions(null)).toEqual([1, 2, 3, 5]);
+    expect(stepOptions(7)).toEqual([1, 2, 3, 5, 7]);
+    expect(stepOptions(3)).toEqual([1, 2, 3, 5]);
+  });
+
+  it('Schrittweite wird gespeichert und wieder gelesen; Ungültiges fällt auf den Standard', () => {
+    const data = new Map<string, string>();
+    const storage = { getItem: (key: string) => data.get(key) ?? null, setItem: (key: string, value: string) => void data.set(key, value) };
+    expect(loadStepPrefs(storage)).toEqual(DEFAULT_STEP_PREFS);
+    saveStepPrefs(storage, { step: 7, custom: 7 });
+    expect(loadStepPrefs(storage)).toEqual({ step: 7, custom: 7 });
+    data.set(STEP_STORAGE_KEY, JSON.stringify({ step: 9, custom: 99 }));
+    expect(loadStepPrefs(storage)).toEqual(DEFAULT_STEP_PREFS);
+    data.set(STEP_STORAGE_KEY, '{kaputt');
+    expect(loadStepPrefs(storage)).toEqual(DEFAULT_STEP_PREFS);
+    expect(loadStepPrefs(null)).toEqual(DEFAULT_STEP_PREFS);
+    expect(() => saveStepPrefs({ setItem: () => { throw new Error('gesperrt'); } }, DEFAULT_STEP_PREFS)).not.toThrow();
   });
 
   it('negative Punkte mit Minuszeichen', () => {

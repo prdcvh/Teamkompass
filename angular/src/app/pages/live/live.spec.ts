@@ -6,7 +6,8 @@ import { WakeLockService } from '../../core/device/wake-lock.service';
 import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
 import { Live } from './live';
 
-describe('Live (Live-Modus, SCRUM-213)', () => {
+describe('Live (Live-Modus, SCRUM-213/214)', () => {
+  beforeEach(() => localStorage.removeItem('teamkompass-live-step'));
   let firebase: FakeFirebase;
   const wakeLock = { keepAwake: vi.fn(() => Promise.resolve(true)), release: vi.fn() };
 
@@ -68,8 +69,7 @@ describe('Live (Live-Modus, SCRUM-213)', () => {
     expect(text(first.querySelector('.score'))).toBe('−2');
     expect(first.classList.contains('negative')).toBe(true);
     // Jonas K. bekommt viele Punkte, rutscht aber nicht nach oben.
-    root(fixture).querySelector<HTMLButtonElement>('.step')!.click();
-    fixture.detectChanges();
+    tap(fixture, 'Schrittweite 2');
     tap(fixture, 'Plus 2 für Jonas K.');
     tap(fixture, 'Plus 2 für Jonas K.');
     await vi.waitFor(() => expect(firebase.calls).toContain('addPoints:e1:p1:2'));
@@ -82,6 +82,58 @@ describe('Live (Live-Modus, SCRUM-213)', () => {
     tap(fixture, 'Plus 1 für Elias');
     await vi.waitFor(() => expect(firebase.calls).toContain('addPoints:e1:p2:1'));
     expect(firebase.calls.some((call) => call.startsWith('savePoints'))).toBe(false);
+  });
+
+  const stepButtons = (fixture: { nativeElement: unknown }) => qa(fixture, '.step-row .step:not(.other)').map(text);
+  const enterCustom = (fixture: { nativeElement: unknown; detectChanges: () => void }, value: string) => {
+    if (!root(fixture).querySelector('.custom')) {
+      root(fixture).querySelector<HTMLButtonElement>('.step.other')!.click();
+      fixture.detectChanges();
+    }
+    const input = root(fixture).querySelector<HTMLInputElement>('.custom input')!;
+    input.value = value;
+    input.dispatchEvent(new Event('input'));
+    root(fixture).querySelector<HTMLFormElement>('.custom')!.dispatchEvent(new Event('submit'));
+    fixture.detectChanges();
+  };
+
+  it('Umschaltleiste mit 1 2 3 5, gewählter Wert hervorgehoben, Plus/Minus zeigen die Schrittweite', async () => {
+    const fixture = await render();
+    expect(stepButtons(fixture)).toEqual(['1', '2', '3', '5']);
+    expect(qa(fixture, '.step.active').map(text)).toEqual(['1']);
+    tap(fixture, 'Schrittweite 3');
+    expect(qa(fixture, '.step.active').map(text)).toEqual(['3']);
+    expect(text(qa(fixture, '.pad.plus')[0])).toBe('+3');
+    expect(text(qa(fixture, '.pad.minus')[0])).toBe('−3');
+    tap(fixture, 'Plus 3 für Elias');
+    await vi.waitFor(() => expect(firebase.calls).toContain('addPoints:e1:p2:3'));
+  });
+
+  it('eigene Zahl: ungültige Eingaben werden mit Hinweis abgelehnt, gültige werden gewählt und als Knopf ergänzt', async () => {
+    const fixture = await render();
+    for (const bad of ['', '0', '-2', '2.5', '21']) {
+      enterCustom(fixture, bad);
+      expect(text(root(fixture).querySelector('.hint.error')), bad).toContain('ganze Zahl von 1 bis 20');
+      expect(stepButtons(fixture)).toEqual(['1', '2', '3', '5']);
+      expect(qa(fixture, '.step.active').map(text)).toEqual(['1']);
+    }
+    enterCustom(fixture, '7');
+    expect(stepButtons(fixture)).toEqual(['1', '2', '3', '5', '7']);
+    expect(qa(fixture, '.step.active').map(text)).toEqual(['7']);
+    expect(root(fixture).querySelector('.hint.error')).toBeNull();
+    expect(text(qa(fixture, '.pad.plus')[0])).toBe('+7');
+  });
+
+  it('merkt die Schrittweite (und die eigene Zahl) für den nächsten Start und zeigt dann kurz „Schrittweite: 7“', async () => {
+    const first = await render();
+    expect(root(first).querySelector('.hint')).toBeNull(); // Standard 1: kein Hinweis
+    enterCustom(first, '7');
+    first.destroy();
+    TestBed.resetTestingModule();
+    const second = await render();
+    expect(stepButtons(second)).toEqual(['1', '2', '3', '5', '7']);
+    expect(qa(second, '.step.active').map(text)).toEqual(['7']);
+    expect(text(root(second).querySelector('.hint'))).toBe('Schrittweite: 7');
   });
 
   it('bei einem Spiel gibt es keinen Live-Modus', async () => {
