@@ -80,6 +80,9 @@
           <tk-card>
             <div class="panel">
               <h2>Formation</h2>
+              @if (suggestion()) {
+                <button tkButton type="button" class="suggest" (click)="applySuggestion()" [disabled]="!lineup.canEdit()">Empfohlene Elf übernehmen</button>
+              }
               @if (mobile()) {
                 <label class="tk-label">
                   Formation wählen
