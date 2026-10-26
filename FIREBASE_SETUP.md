@@ -215,8 +215,19 @@ Die Angular-Neuentwicklung (Jira-Epic SCRUM-40) wird als eigene Hosting-Site
 - `.github/workflows/firebase-hosting-merge.yml`: Der Angular-Build laeuft bereits in
   `npm run verify`; danach deployt ein eigener Schritt `target: u14` (als letzter Schritt,
   damit ein Problem dort die Live-Teams nicht aufhaelt).
-- Fuer Pull-Request-Vorschauen wird das Target `u14` nicht gebaut (Vorschau des Angular-Builds gibt es
-  seit SCRUM-169 auf der Site `teamkompass-u17`, siehe Abschnitt 11).
+- Pull-Request-Vorschau (seit SCRUM-206): jeder PR bekommt eine Vorschau des Angular-Standard-Builds
+  (Testteam `U14`) auf `teamkompass-u14--pr<Nr>-<branch>.web.app`. Eine Vorschau darf nie den Build eines
+  Live-Teams (`U17`, `mein-team`, `U15`) ausliefern; `tests/preview-guard.test.mjs` prueft dafuer jeden
+  Deploy-Schritt in `firebase-hosting-pull-request.yml` (Ziel, Build, Team-ID, Projekt-ID), ohne Ausnahme.
+- Alt-App-Vorschau (SCRUM-218, seit SCRUM-208 fuer die U15): Die Vorschau der Alt-App auf
+  `teamkompass-u15--pr<Nr>-<branch>.web.app` (Ziel `u15`) laeuft mit dem Testteam `U14`, nicht mit `U15`. Der
+  Verify-Job baut mit `node scripts/legacy-preview.mjs outputs/u15` eine Kopie nach `dist/preview/u15`, in der nur
+  `firebase-config.js` geaendert ist (`teamId: "U14"`, Name mit Zusatz "(Vorschau)"). Der Vorschau-Job
+  leert `outputs/u15`, legt die Kopie dorthin und deployt in den Vorschau-Kanal. Der Live-Kanal
+  (Merge-Workflow) liefert weiter `outputs/u15` aus dem Repo (echte U15-Daten) aus. Fuer das Ziel `main`
+  (Haupt-Team, Angular) gibt es keine Vorschau mehr. Anmeldung in der Vorschau
+  mit einem Trainer-Konto, das unter `teams/U14/members` eingetragen ist (beim Kopieren aus mein-team mitkopiert).
+  Achtung: U14 liegt im selben Firebase-Projekt und enthaelt von `mein-team` kopierte Daten (Abschnitt 8).
 - PWA (SCRUM-76): Manifest `angular/public/manifest.webmanifest`, Service Worker von Angular
   (`angular/ngsw-config.json`, nur im Produktions-Build). `ngsw.json`/`ngsw-worker.js` fallen unter
   die `no-cache`-Regel `**`, Updates kommen also sofort an (Hinweis "Neue Version verfuegbar").
@@ -320,10 +331,10 @@ App `outputs/u17/` bleibt im Repo, nur für den Rückweg.
   SPA-Rewrite wie beim Ziel `u14`.
 - `.github/workflows/firebase-hosting-merge.yml`: der Verify-Job lädt `angular/dist/team-u17/browser`
   als Artefakt `angular-dist-u17` hoch, der Deploy-Job legt es dorthin zurück und deployt `target: u17`.
-- `.github/workflows/firebase-hosting-pull-request.yml`: jeder PR bekommt zusätzlich eine
-  **Vorschau der U17-Angular-App** auf `teamkompass-u17--pr<Nr>-<branch>.web.app` (eigener Bot-Kommentar
-  im PR). Achtung: die Vorschau arbeitet mit den **echten U17-Daten** – dort nur lesen bzw. gezielt testen.
-- Vorschaukanäle aller Sites mit PR-Vorschau räumt `firebase-preview-cleanup.yml` auf.
+- PR-Vorschau: **keine** U17-Vorschau mehr (SCRUM-206) – unfreigegebener Code soll nicht gegen echte
+  U17-Daten laufen. Die Angular-Vorschau je PR ist der Testteam-Build auf `teamkompass-u14` (Abschnitt 8).
+  Den Angular-Stand der U17 sieht man erst nach dem Merge live.
+- Alte U17-Vorschaukanäle (von vor SCRUM-206) räumt `firebase-preview-cleanup.yml` weiter mit auf.
 
 ### Rückweg auf die alte App
 
@@ -371,11 +382,12 @@ unverändert. Die alte App `outputs/team-manager/` bleibt im Repo, nur für den 
 - `firebase.json`, Eintrag `"target": "main"`: `"public": "angular/dist/team-mein-team/browser"`, Header und
   SPA-Rewrite wie bei `u14`/`u17`.
 - Merge-Workflow: Artefakt `angular-dist-mein-team` (Verify-Job) → Deploy-Job → `target: main`.
-- PR-Vorschau: Die Vorschau auf `teamkompass-b8aac--pr<Nr>-<branch>.web.app` zeigt jetzt den **Angular-Build
-  des Haupt-Teams** mit dessen **echten Daten** (vorher die alte App). Damit Änderungen an der alten App
-  (`outputs/*`) weiter eine Vorschau haben, gibt es zusätzlich eine Vorschau der **alten App der U15** auf
-  `teamkompass-u15--pr<Nr>-<branch>.web.app` (echte U15-Daten). Beide Sites räumt `firebase-preview-cleanup.yml`
-  mit auf. Wird die U15 später umgestellt, diese U15-Vorschau wieder auf den Angular-Build der U15 umbiegen.
+- PR-Vorschau: Fuer das Ziel `main` gibt es **keine** Vorschau mehr (Vorschauen laufen nie mit echten Daten,
+  SCRUM-206/218). PRs sehen weiter die Angular-Vorschau mit dem Testteam auf `teamkompass-u14` und – fuer
+  Aenderungen an der Alt-App – die U15-Kopie mit Testteam auf `teamkompass-u15` (Abschnitt 8). Das Haupt-Team
+  mit echten Daten sieht man erst nach dem Merge auf https://teamkompass-b8aac.web.app. Die Sites
+  `teamkompass-b8aac`, `-u14`, `-u15`, `-u17` räumt `firebase-preview-cleanup.yml` auf. Wird die U15 später
+  umgestellt, entfaellt die Alt-App-Vorschau (`legacy-preview` im PR-Workflow).
 
 **Rückweg sofort (Notfall):** Firebase Console → Hosting → Site `teamkompass-b8aac` → Versionsverlauf → letzte
 Version vor der Umstellung → „Zurücksetzen“. Wird beim nächsten Merge nach `main` wieder überschrieben.
@@ -391,8 +403,8 @@ Version vor der Umstellung → „Zurücksetzen“. Wird beim nächsten Merge na
    ```
 
 2. Den Test „Haupt-Team läuft auf dem Angular-Build …“ (SCRUM-208) in `tests/project.test.mjs` entfernen bzw.
-   umdrehen. Die Artefakt-Schritte `angular-dist-mein-team` in den Workflows dürfen bleiben (dann zeigt auch die
-   PR-Vorschau auf `teamkompass-b8aac` wieder die alte App).
+   umdrehen. Die Artefakt-Schritte `angular-dist-mein-team` in den Workflows dürfen bleiben (eine PR-Vorschau auf
+   `teamkompass-b8aac` gibt es trotzdem nicht, siehe oben).
 3. `npm run verify`, PR, Merge nach `main` → der Merge-Workflow deployt `outputs/team-manager` live.
 4. Prüfen: `https://teamkompass-b8aac.web.app` neu laden – die alte Oberfläche erscheint.
 

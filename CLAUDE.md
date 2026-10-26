@@ -32,7 +32,8 @@ build step, no bundler, no test suite.
   `.github/workflows/firebase-hosting-merge.yml` — check for new copies
   under `outputs/` rather than assuming the set is still just these three.
   Since SCRUM-208 `outputs/u15` is the **only** old-app copy still live; PR
-  previews of the old app run on the `u15` site (real U15 data).
+  previews of the old app run on the `u15` site as a test-team (`U14`) copy,
+  never with real U15 data (see below).
 - `firestore.rules`: deployed to the real `teamkompass-b8aac` Firebase
   project on every push to `main` that touches this file (see
   `.github/workflows/firestore-rules-deploy.yml`). Trainer role gets
@@ -49,12 +50,22 @@ build step, no bundler, no test suite.
   data** (`FIREBASE_SETUP.md` §11), and since SCRUM-208 the `mein-team`
   build (`ng build -c production,mein-team`, `teamId: mein-team`) to hosting
   target `main` → https://teamkompass-b8aac.web.app/, the **live main team
-  with real data** (`FIREBASE_SETUP.md` §11). So an Angular change is live
-  for real U17 and main-team users right after merge — say so. Every PR
-  gets Angular preview channels on the `main` site (real `mein-team` data)
-  and the `u17` site (real U17 data), plus an old-app preview on the `u15`
-  site. Only `U15` still runs on `outputs/*` until its own cutover
-  (SCRUM-169).
+  with real data**. So an Angular change is live for real U17 and main-team
+  users right after merge — say so. Every PR gets an Angular preview
+  channel of the **default build (test team `U14`) on target `u14`** — since
+  SCRUM-206 a PR preview must never ship a live-team build (`U17`,
+  `mein-team`, `U15` = real data); `tests/preview-guard.test.mjs` enforces
+  this for every deploy step in `firebase-hosting-pull-request.yml`, with no
+  exceptions. Target `main` (main team, Angular) therefore has **no** PR
+  preview. The legacy-app preview runs on target `u15` as a copy of
+  `outputs/u15` switched to `teamId: "U14"` (`scripts/legacy-preview.mjs`,
+  built in the verify job, swapped into `outputs/u15` only inside the
+  preview job; SCRUM-218/208) — the live channel still deploys `outputs/u15`
+  as-is. A new preview (e.g.
+  another `outputs/*` team or an Angular team build) must likewise use the
+  test team. Note U14 still lives in the production Firebase project with
+  data copied from `mein-team`. Only `U15` still runs on
+  `outputs/*` until its own cutover (SCRUM-169).
 
 **A feature request against "the app" almost always means every copy**
 (root + every `outputs/*` team folder **and `angular/`**, since U17 and the

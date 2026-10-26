@@ -86,15 +86,15 @@ kopieren. Dann gibt es keinen Datenumzug und keinen Stichtag, an dem zwei Ständ
    wird nach PO-Entscheid gelöscht.
 
 **Stand SCRUM-169 (23.10.2026):** U17 ist umgestellt – Hosting-Ziel `u17` liefert den Angular-Build
-`dist/team-u17/browser` aus (Team-ID `U17`), jeder PR hat eine U17-Vorschau. Rückweg und Hinweise:
+`dist/team-u17/browser` aus (Team-ID `U17`), PRs haben seit SCRUM-206 keine U17-Vorschau mehr. Rückweg und Hinweise:
 `FIREBASE_SETUP.md` §11. Noch offen: eine Woche beobachten, Rollback einmal üben, danach U15 und
 `mein-team` mit eigener Freigabe. Bekannte Lücke: Zu-/Absagen (SCRUM-175) gibt es in Angular noch nicht
 (SCRUM-205).
 
 **Stand SCRUM-208 (26.10.2026):** Abweichend von der Reihenfolge unten hat der PO am 26.10. das **Haupt-Team**
 (`mein-team`) als Nächstes freigegeben – vor der U15. Hosting-Ziel `main` (Site `teamkompass-b8aac`) liefert den
-Angular-Build `dist/team-mein-team/browser` aus. Die PR-Vorschau auf `teamkompass-b8aac` zeigt seitdem diesen
-Angular-Build; die alte App hat ihre PR-Vorschau auf `teamkompass-u15` (U15 läuft noch darauf). Rückweg:
+Angular-Build `dist/team-mein-team/browser` aus. Für `main` gibt es keine PR-Vorschau (nie echte Daten, SCRUM-206/218); PRs
+sehen den Testteam-Build auf `teamkompass-u14` und die Alt-App der U15 als Testteam-Kopie auf `teamkompass-u15`. Rückweg:
 `FIREBASE_SETUP.md` §11. Noch offen: U15, Rollback einmal üben.
 
 **Entscheidungen des PO (15.10.2026):**

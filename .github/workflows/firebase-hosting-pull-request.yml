@@ -4,6 +4,17 @@
 # Aufbau (SCRUM-57): Code des Pull Requests (npm ci, verify) laeuft nur im Job "verify" OHNE Zugriff auf das
 # Service-Account-Secret. Der Job "build_and_preview" mit dem Secret fuehrt keinen PR-Code und keine
 # npm-Install-Skripte aus, er laedt nur die statischen Dateien in den Vorschau-Kanal.
+#
+# SCRUM-206: Eine Vorschau zeigt noch nicht freigegebenen Code. Sie darf deshalb nie mit der Konfiguration eines
+# Live-Teams (U17, mein-team, U15 = echte Daten) laufen. Die Angular-Vorschau ist der Standard-Build (Testteam U14)
+# auf der Test-Site teamkompass-u14. tests/preview-guard.test.mjs prueft jeden Deploy-Schritt hier (Ziel, Build,
+# Team-ID, Projekt-ID), ohne Ausnahme.
+#
+# SCRUM-218/SCRUM-208: Seit der Umstellung des Haupt-Teams auf Angular (Ziel main) gibt es fuer main keine Vorschau
+# mehr. Die einzige noch laufende Alt-App ist die U15 (Ziel u15): ihre Vorschau ist eine Kopie von outputs/u15
+# mit dem Testteam U14 (scripts/legacy-preview.mjs, gebaut im Verify-Job). Der Vorschau-Job leert outputs/u15 und
+# legt genau diese Kopie dorthin, bevor er in den Vorschau-Kanal deployt. Der Live-Kanal (Merge-Workflow) ist davon
+# nicht beruehrt und liefert weiter outputs/u15 aus dem Repo aus.
 
 name: Deploy to Firebase Hosting on PR
 on: pull_request
@@ -28,19 +39,20 @@ jobs:
         run: npm ci --ignore-scripts --prefix angular
       - name: Verify application
         run: npm run verify
-      # SCRUM-169/SCRUM-208: Angular-Builds als Vorschau – Haupt-Team (echte Daten teams/mein-team) auf der Site teamkompass-b8aac,
-      # U17 (echte Daten teams/U17) auf der Site teamkompass-u17. Jede Vorschau zeigt genau das, was der Merge auf
-      # diesem Hosting-Ziel live stellen wuerde.
+      # Angular-Standard-Build (Testteam U14, kein Live-Team) als Vorschau auf der Site teamkompass-u14.
       - uses: actions/upload-artifact@v7
         with:
-          name: angular-dist-mein-team
-          path: angular/dist/team-mein-team/browser
+          name: angular-dist
+          path: angular/dist/teamkompass-angular/browser
           if-no-files-found: error
           retention-days: 1
+      # Alt-App-Vorschau: Kopie von outputs/u15, aber mit dem Testteam U14 statt U15 (echte Daten).
+      - name: Alt-App-Vorschau mit Testteam bauen
+        run: node scripts/legacy-preview.mjs outputs/u15
       - uses: actions/upload-artifact@v7
         with:
-          name: angular-dist-u17
-          path: angular/dist/team-u17/browser
+          name: legacy-preview
+          path: dist/preview/u15
           if-no-files-found: error
           retention-days: 1
   build_and_preview:
@@ -51,31 +63,27 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+      # Fuer das Haupt-Team (Ziel main, Angular) gibt es keine Vorschau mehr (echte Daten mein-team).
+      # Alt-App (U15): statt outputs/u15 aus dem Repo (echte Daten) nur die Vorschau-Kopie mit dem Testteam ausliefern.
+      - name: Alt-App-Ordner leeren
+        run: rm -rf outputs/u15
       - uses: actions/download-artifact@v8
         with:
-          name: angular-dist-mein-team
-          path: angular/dist/team-mein-team/browser
-      - uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TEAMKOMPASS_B8AAC }}
-          projectId: teamkompass-b8aac
-          target: main
-      - uses: actions/download-artifact@v8
-        with:
-          name: angular-dist-u17
-          path: angular/dist/team-u17/browser
-      - uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TEAMKOMPASS_B8AAC }}
-          projectId: teamkompass-b8aac
-          target: u17
-      # Die alte App laeuft (bis zu ihrer Umstellung) nur noch fuer die U15. Damit PRs an outputs/* weiter eine
-      # sinnvolle Vorschau haben, gibt es sie auf der Site teamkompass-u15 (statische Dateien aus outputs/u15).
+          name: legacy-preview
+          path: outputs/u15
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TEAMKOMPASS_B8AAC }}
           projectId: teamkompass-b8aac
           target: u15
+      - uses: actions/download-artifact@v8
+        with:
+          name: angular-dist
+          path: angular/dist/teamkompass-angular/browser
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TEAMKOMPASS_B8AAC }}
+          projectId: teamkompass-b8aac
+          target: u14
