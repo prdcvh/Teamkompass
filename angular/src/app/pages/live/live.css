@@ -10,7 +10,7 @@
   display: flex;
   flex-direction: column;
   min-height: 100dvh;
-  padding: 0 max(12px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  padding: 0 max(12px, env(safe-area-inset-right)) calc(max(16px, env(safe-area-inset-bottom)) + 140px) max(12px, env(safe-area-inset-left)); /* Platz für die Rückmeldeleiste unten */
 }
 
 .bar {
@@ -291,4 +291,63 @@ summary:focus-visible {
   .player {
     grid-template-columns: 72px minmax(0, 1fr) 72px;
   }
+}
+
+/* Rückmeldung und Rückgängig (SCRUM-215): feste Leiste unten, damit sie auch beim Scrollen erreichbar ist. */
+.dock {
+  position: fixed;
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  left: max(12px, env(safe-area-inset-left));
+  z-index: 2;
+  display: grid;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.dock > * {
+  pointer-events: auto;
+}
+
+.feedback {
+  margin: 0;
+  padding: 10px 14px;
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.15;
+  color: #fff;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  border-radius: 14px;
+}
+
+.feedback:empty {
+  display: none;
+}
+
+.feedback.up {
+  background: #0b6b2a;
+}
+
+.feedback.down {
+  background: #b00020;
+}
+
+.undo {
+  min-height: 64px;
+  padding: 0 16px;
+  font: inherit;
+  font-size: 24px;
+  font-weight: 800;
+  color: #fff;
+  background: #000;
+  border: 3px solid #fff;
+  border-radius: 16px;
+  outline: 3px solid #000;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.undo:focus-visible {
+  outline-color: #0a3fd1;
 }

@@ -98,3 +98,52 @@ export function liveRows(players: readonly Pick<Player, 'id' | 'name'>[]): LiveR
       return { id: player.id, label: duplicate && initial ? `${given} ${initial.toLocaleUpperCase('de')}.` : given };
     });
 }
+
+/** Zwei Tipps auf denselben Knopf innerhalb dieser Zeit gelten als Prellen und zählen nur einmal (SCRUM-215). */
+export const DOUBLE_TAP_MS = 300;
+/** So viele Änderungen lassen sich Schritt für Schritt zurücknehmen (Ticket: mindestens 10). */
+export const UNDO_LIMIT = 20;
+/** So lange bleibt der „Rückgängig“-Knopf nach einem Tipp sichtbar. */
+export const UNDO_VISIBLE_MS = 6000;
+
+/**
+ * Doppeltipp-Schutz: lässt einen Tipp nur durch, wenn der letzte durchgelassene Tipp auf denselben Knopf (`key`) mindestens
+ * `windowMs` zurückliegt. Verglichen wird mit dem letzten durchgelassenen Tipp, nicht mit dem letzten Versuch – bewusstes
+ * schnelles Tippen (alle ~300 ms oder langsamer) geht deshalb immer durch. Verschiedene Knöpfe stören sich nicht.
+ */
+export function createTapGuard(windowMs: number = DOUBLE_TAP_MS): (key: string, now: number) => boolean {
+  const last = new Map<string, number>();
+  return (key, now) => {
+    const previous = last.get(key);
+    if (previous !== undefined && now >= previous && now - previous < windowMs) return false;
+    last.set(key, now);
+    return true;
+  };
+}
+
+export interface LiveChange {
+  readonly playerId: string;
+  readonly label: string;
+  /** Vorzeichenbehaftete Änderung, z. B. 2 oder −2. */
+  readonly delta: number;
+}
+
+/** Text für Rückmeldung und Rückgängig-Knopf, z. B. „Max +2“ bzw. „Max −2“ (echtes Minuszeichen). */
+export function changeLabel(change: Pick<LiveChange, 'label' | 'delta'>): string {
+  return `${change.label} ${change.delta < 0 ? '−' : '+'}${Math.abs(change.delta)}`;
+}
+
+/** Große Rückmeldung nach einem Tipp, z. B. „Max +2 → 7“ bzw. „Max −2 → −1“. */
+export function feedbackText(change: Pick<LiveChange, 'label' | 'delta'>, total: number): string {
+  return `${changeLabel(change)} → ${pointsLabel(total)}`;
+}
+
+/** Rückgängig-Stapel: die letzten Änderungen; die neueste kommt zuerst wieder heraus, die ältesten fallen bei Überlauf weg. */
+export function pushChange(stack: readonly LiveChange[], change: LiveChange, limit: number = UNDO_LIMIT): LiveChange[] {
+  return [...stack, change].slice(-limit);
+}
+
+export function popChange(stack: readonly LiveChange[]): { readonly change: LiveChange | null; readonly rest: LiveChange[] } {
+  if (stack.length === 0) return { change: null, rest: [] };
+  return { change: stack[stack.length - 1] ?? null, rest: stack.slice(0, -1) };
+}

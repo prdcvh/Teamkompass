@@ -4,7 +4,25 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
 import { WakeLockService } from '../../core/device/wake-lock.service';
 import { EventsService } from '../../core/events/events.service';
-import { MAX_CUSTOM_STEP, MIN_CUSTOM_STEP, deviceStorage, isAway, liveRows, loadStepPrefs, parseCustomStep, pointsLabel, saveStepPrefs, stepOptions } from '../../core/live/live';
+import {
+  MAX_CUSTOM_STEP,
+  MIN_CUSTOM_STEP,
+  UNDO_VISIBLE_MS,
+  type LiveChange,
+  changeLabel,
+  createTapGuard,
+  deviceStorage,
+  feedbackText,
+  isAway,
+  liveRows,
+  loadStepPrefs,
+  parseCustomStep,
+  pointsLabel,
+  popChange,
+  pushChange,
+  saveStepPrefs,
+  stepOptions,
+} from '../../core/live/live';
 import { SquadService } from '../../core/player/squad.service';
 import { RatingsService } from '../../core/ratings/ratings.service';
 import { SyncService } from '../../core/shell/sync.service';
@@ -71,6 +89,7 @@ export class Live implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.wakeLock.release();
     clearTimeout(this.hintTimer);
+    clearTimeout(this.feedbackTimer);
   }
 
   protected points(id: string): number {
@@ -81,8 +100,59 @@ export class Live implements OnInit, OnDestroy {
     return pointsLabel(points);
   }
 
-  protected add(id: string, direction: 1 | -1): void {
-    this.ratings.addPoints(id, direction * this.step());
+  /** Rückgängig-Stapel dieser Sitzung (nur im Speicher; die Punkte selbst sind längst gespeichert). */
+  private readonly undoStack = signal<LiveChange[]>([]);
+  private readonly tapGuard = createTapGuard();
+  private feedbackTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Große Rückmeldung nach dem letzten Tipp, z. B. „Max +2 → 7“. */
+  protected readonly feedback = signal<{ text: string; direction: 1 | -1 } | null>(null);
+  protected readonly undoOffer = computed(() => {
+    const change = this.undoStack().at(-1);
+    return this.feedback() && change ? changeLabel(change) : null;
+  });
+
+  protected add(id: string, direction: 1 | -1, event?: Event): void {
+    if (!this.tapGuard(`${id}:${direction}`, Date.now())) return; // Prellen: zählt nur einmal
+    const delta = direction * this.step();
+    const before = this.points(id);
+    if (!this.ratings.addPoints(id, delta)) return;
+    const change: LiveChange = { playerId: id, label: this.labelOf(id), delta };
+    this.undoStack.update((stack) => pushChange(stack, change));
+    this.showFeedback(feedbackText(change, before + delta), direction);
+    this.flash(event, direction);
+  }
+
+  /** Nimmt die letzte Änderung zurück (wiederholt: Schritt für Schritt weiter zurück). */
+  protected undo(): void {
+    if (!this.tapGuard('undo', Date.now())) return;
+    const { change, rest } = popChange(this.undoStack());
+    if (!change) return;
+    const before = this.points(change.playerId);
+    if (!this.ratings.addPoints(change.playerId, -change.delta)) return;
+    this.undoStack.set(rest);
+    this.showFeedback(`Zurückgenommen: ${feedbackText(change, before - change.delta)}`, change.delta < 0 ? 1 : -1);
+  }
+
+  private labelOf(id: string): string {
+    return this.rows().find((row) => row.id === id)?.label ?? '';
+  }
+
+  private showFeedback(text: string, direction: 1 | -1): void {
+    this.feedback.set({ text, direction });
+    clearTimeout(this.feedbackTimer);
+    this.feedbackTimer = setTimeout(() => this.feedback.set(null), UNDO_VISIBLE_MS);
+    try {
+      navigator.vibrate?.(30);
+    } catch {
+      // Vibration nicht verfügbar oder gesperrt: nur die optische Rückmeldung.
+    }
+  }
+
+  /** Zeile blinkt kurz auf (Web Animations; ohne Unterstützung oder bei „weniger Bewegung“ bleibt nur der Text). */
+  private flash(event: Event | undefined, direction: 1 | -1): void {
+    const row = (event?.currentTarget as HTMLElement | null)?.closest('li');
+    if (!row?.animate || (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
+    row.animate([{ backgroundColor: direction > 0 ? '#9be3ae' : '#ffb3b3' }, { backgroundColor: 'transparent' }], { duration: 600, easing: 'ease-out' });
   }
 
   protected chooseStep(step: number): void {

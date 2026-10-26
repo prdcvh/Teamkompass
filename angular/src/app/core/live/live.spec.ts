@@ -1,4 +1,4 @@
-import { DEFAULT_STEP_PREFS, LIVE_STEPS, STEP_STORAGE_KEY, isAway, liveRows, loadStepPrefs, parseCustomStep, pointsLabel, saveStepPrefs, stepOptions } from './live';
+import { DEFAULT_STEP_PREFS, DOUBLE_TAP_MS, UNDO_LIMIT, changeLabel, createTapGuard, feedbackText, popChange, pushChange, LIVE_STEPS, STEP_STORAGE_KEY, isAway, liveRows, loadStepPrefs, parseCustomStep, pointsLabel, saveStepPrefs, stepOptions } from './live';
 
 describe('Live-Modus (Logik)', () => {
   it('feste Schrittweiten 1, 2, 3, 5; Standard ist 1', () => {
@@ -57,5 +57,37 @@ describe('Live-Modus (Logik)', () => {
     ]);
     expect(rows.map((row) => row.label)).toEqual(['Anna', 'Leon M.', 'Leon S.', 'Mo']);
     expect(rows.map((row) => row.id)).toEqual(['p1', 'p2', 'p3', 'p4']);
+  });
+
+  it('Doppeltipp-Schutz: gleicher Knopf innerhalb von 300 ms zählt einmal, verglichen mit dem letzten durchgelassenen Tipp', () => {
+    expect(DOUBLE_TAP_MS).toBe(300);
+    const accept = createTapGuard();
+    expect(accept('p1:1', 1000)).toBe(true);
+    expect(accept('p1:1', 1100)).toBe(false);
+    expect(accept('p1:1', 1299)).toBe(false);
+    expect(accept('p1:1', 1300)).toBe(true);
+    expect(accept('p1:1', 1600)).toBe(true); // bewusst schnelles Mehrfachtippen
+    expect(accept('p1:-1', 1610)).toBe(true); // anderer Knopf
+    expect(accept('p2:1', 1610)).toBe(true); // anderer Spieler
+  });
+
+  it('Texte: „Max +2“, „Max −2“ und Rückmeldung „Max −2 → −1“', () => {
+    expect(changeLabel({ label: 'Max', delta: 2 })).toBe('Max +2');
+    expect(changeLabel({ label: 'Max', delta: -2 })).toBe('Max −2');
+    expect(feedbackText({ label: 'Max', delta: 2 }, 7)).toBe('Max +2 → 7');
+    expect(feedbackText({ label: 'Max', delta: -2 }, -1)).toBe('Max −2 → −1');
+  });
+
+  it('Rückgängig-Stapel: neueste zuerst, mindestens die letzten 10, Überlauf wirft die ältesten weg', () => {
+    expect(UNDO_LIMIT).toBeGreaterThanOrEqual(10);
+    let stack = [] as ReturnType<typeof pushChange>;
+    expect(popChange(stack)).toEqual({ change: null, rest: [] });
+    for (let i = 1; i <= UNDO_LIMIT + 5; i++) stack = pushChange(stack, { playerId: 'p1', label: 'Max', delta: i });
+    expect(stack).toHaveLength(UNDO_LIMIT);
+    const popped: number[] = [];
+    for (let step = popChange(stack); step.change; step = popChange(step.rest)) popped.push(step.change.delta);
+    expect(popped[0]).toBe(UNDO_LIMIT + 5);
+    expect(popped).toHaveLength(UNDO_LIMIT);
+    expect(popped.at(-1)).toBe(6);
   });
 });

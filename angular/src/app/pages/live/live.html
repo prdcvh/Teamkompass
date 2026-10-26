@@ -52,14 +52,14 @@
     <ul class="players">
       @for (row of present(); track row.id) {
         <li class="player" [class.negative]="points(row.id) < 0">
-          <button type="button" class="pad minus" [attr.aria-label]="'Minus ' + step() + ' für ' + row.label" (click)="add(row.id, -1)">
+          <button type="button" class="pad minus" [attr.aria-label]="'Minus ' + step() + ' für ' + row.label" (click)="add(row.id, -1, $event)">
             <span aria-hidden="true">&minus;{{ step() }}</span>
           </button>
           <div class="who">
             <span class="name">{{ row.label }}</span>
             <span class="score" [attr.aria-label]="label(points(row.id)) + ' Punkte'">{{ label(points(row.id)) }}</span>
           </div>
-          <button type="button" class="pad plus" [attr.aria-label]="'Plus ' + step() + ' für ' + row.label" (click)="add(row.id, 1)">
+          <button type="button" class="pad plus" [attr.aria-label]="'Plus ' + step() + ' für ' + row.label" (click)="add(row.id, 1, $event)">
             <span aria-hidden="true">+{{ step() }}</span>
           </button>
         </li>
@@ -77,4 +77,11 @@
       </details>
     }
   }
+
+  <div class="dock" [class.shown]="feedback()">
+    <p class="feedback" [class.up]="feedback()?.direction === 1" [class.down]="feedback()?.direction === -1" role="status">{{ feedback()?.text }}</p>
+    @if (undoOffer(); as offer) {
+      <button type="button" class="undo" (click)="undo()">Rückgängig: {{ offer }}</button>
+    }
+  </div>
 </main>
