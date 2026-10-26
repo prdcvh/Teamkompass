@@ -153,7 +153,7 @@
               @for (event of list; track event.id) {
                 <tr>
                   <td class="date">{{ formatDate(event.date) }}</td>
-                  <td><strong>{{ event.title }}</strong>@if (fromSeries(event)) { <span class="series-mark" role="img" aria-label="Aus Trainingsserie" title="Aus Trainingsserie"><tk-icon name="repeat" /></span> }</td>
+                  <td><strong>{{ event.title }}</strong>@if (fromSeries(event)) { <span class="series-mark" role="img" aria-label="Aus Trainingsserie" title="Aus Trainingsserie"><tk-icon name="repeat" /></span> }@if (rsvpText(event); as rsvp) {<small class="rsvp-counts">{{ rsvp }}</small>}</td>
                   <td><span class="badge" [attr.data-type]="event.type">{{ event.type }}</span></td>
                   <td>{{ detail(event) || '–' }}<div class="weather"><tk-weather [event]="event" /></div></td>
                   <td>{{ intensityLabel(event) }}</td>
@@ -188,6 +188,7 @@
                   <span class="what">
                     <strong>{{ event.title }}@if (fromSeries(event)) { <span class="series-mark" role="img" aria-label="Aus Trainingsserie" title="Aus Trainingsserie"><tk-icon name="repeat" /></span> }</strong>
                     <small>{{ formatDate(event.date) }}@if (detail(event); as info) { · {{ info }}}</small>
+                    @if (rsvpText(event); as rsvp) {<small class="rsvp-counts">{{ rsvp }}</small>}
                   </span>
                   @if (resultText(event); as result) {
                     <span class="result">{{ result }}</span>

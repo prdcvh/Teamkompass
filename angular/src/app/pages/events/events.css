@@ -352,3 +352,11 @@ p.muted a {
   align-items: center;
   gap: var(--tk-space-2);
 }
+
+/* Zu-/Absagen kommender Termine (SCRUM-205). */
+.rsvp-counts {
+  display: block;
+  color: var(--tk-muted);
+  font-size: var(--tk-text-xs);
+  font-weight: 500;
+}

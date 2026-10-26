@@ -11,6 +11,7 @@ import { PlanningApi } from '../firebase/planning.api';
 import { PlayersApi } from '../firebase/players.api';
 import { RankingApi } from '../firebase/ranking.api';
 import { RatingsApi } from '../firebase/ratings.api';
+import { RsvpApi } from '../firebase/rsvp.api';
 import { ScoutApi } from '../firebase/scout.api';
 import { TeamSettingsApi } from '../firebase/team-settings.api';
 import { TeamsApi } from '../firebase/teams.api';
@@ -31,6 +32,7 @@ import { FakePlayerStatsApi } from './fake-player-stats.api';
 import { FakePlayersApi } from './fake-players.api';
 import { FakeRankingApi } from './fake-ranking.api';
 import { FakeRatingsApi } from './fake-ratings.api';
+import { FakeRsvpApi } from './fake-rsvp.api';
 import { FakeScoutApi } from './fake-scout.api';
 import { FakeTeamSettingsApi } from './fake-team-settings.api';
 
@@ -47,6 +49,7 @@ export class FakeFirebase {
   readonly lineup = new FakeLineupApi(this.calls);
   readonly opponents = new FakeOpponentsApi(this.calls);
   readonly ratings = new FakeRatingsApi(this.calls);
+  readonly rsvp = new FakeRsvpApi(this.calls);
   readonly ranking = new FakeRankingApi(this.calls, this.ratings.privateNotes);
   readonly records = new FakePlayerRecordsApi(this.calls);
   readonly settings = new FakeTeamSettingsApi(this.calls);
@@ -72,6 +75,7 @@ export function provideFakeFirebase(fake: FakeFirebase): Provider[] {
     { provide: LineupApi, useValue: fake.lineup },
     { provide: OpponentsApi, useValue: fake.opponents },
     { provide: RatingsApi, useValue: fake.ratings },
+    { provide: RsvpApi, useValue: fake.rsvp },
     { provide: RankingApi, useValue: fake.ranking },
     { provide: PlayerRecordsApi, useValue: fake.records },
     // Seiten zeigen Wetter; Tests sollen nie ins Netz (SCRUM-98).
