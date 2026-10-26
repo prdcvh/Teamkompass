@@ -303,8 +303,8 @@ steht (heute leer = aus). Zum Einschalten:
 3. Schluessel in `appCheckSiteKey` eintragen und in `firebase.json` (Ziel `u14`) die Content-Security-Policy
    erweitern: `script-src` um `https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/`,
    `frame-src https://www.google.com/recaptcha/`, `connect-src` um `https://content-firebaseappcheck.googleapis.com`.
-4. Einige Tage unter App Check → **Messwerte** beobachten. **Nicht „Erzwingen“ einschalten, solange die Alt-Apps
-   (`outputs/*`) laufen** – die senden kein App-Check-Token und waeren sonst ausgesperrt.
+4. Einige Tage unter App Check → **Messwerte** beobachten. **Nicht „Erzwingen“ einschalten, solange eine Alt-App
+   (`outputs/*`, seit SCRUM-208 nur noch die U15) läuft** – die senden kein App-Check-Token und waeren sonst ausgesperrt.
 
 Bis dahin begrenzt die Einladungspflicht neue Konten: ohne Code entsteht kein Verein und kein Team; ein Konto ohne
 Code sieht nichts.
@@ -323,7 +323,7 @@ App `outputs/u17/` bleibt im Repo, nur für den Rückweg.
 - `.github/workflows/firebase-hosting-pull-request.yml`: jeder PR bekommt zusätzlich eine
   **Vorschau der U17-Angular-App** auf `teamkompass-u17--pr<Nr>-<branch>.web.app` (eigener Bot-Kommentar
   im PR). Achtung: die Vorschau arbeitet mit den **echten U17-Daten** – dort nur lesen bzw. gezielt testen.
-- Vorschaukanäle beider Sites räumt `firebase-preview-cleanup.yml` auf.
+- Vorschaukanäle aller Sites mit PR-Vorschau räumt `firebase-preview-cleanup.yml` auf.
 
 ### Rückweg auf die alte App
 
@@ -360,3 +360,41 @@ Spieler (`teams/U17/playerStats`, SCRUM-201) nicht. Wurden sie in Angular einger
 Zusammenfassungen → Neu berechnen“), nach dem erneuten Umstieg sofort dort **„Neu berechnen“** drücken
 (oder vorher das Dokument `teams/U17/meta/playerStats` löschen – dann rechnet Angular wieder aus allen
 Bewertungen).
+
+### Haupt-Team (`mein-team`, Ziel `main`) – seit SCRUM-208
+
+Seit SCRUM-208 liefert auch das Hosting-Ziel `main` (Site `teamkompass-b8aac`, https://teamkompass-b8aac.web.app)
+den **Angular-Build des Haupt-Teams** aus (`ng build -c production,mein-team`, Team-ID `mein-team`, Ausgabe
+`angular/dist/team-mein-team/browser`). Daten (`teams/mein-team/...`), Anmeldungen und Firestore-Regeln bleiben
+unverändert. Die alte App `outputs/team-manager/` bleibt im Repo, nur für den Rückweg.
+
+- `firebase.json`, Eintrag `"target": "main"`: `"public": "angular/dist/team-mein-team/browser"`, Header und
+  SPA-Rewrite wie bei `u14`/`u17`.
+- Merge-Workflow: Artefakt `angular-dist-mein-team` (Verify-Job) → Deploy-Job → `target: main`.
+- PR-Vorschau: Die Vorschau auf `teamkompass-b8aac--pr<Nr>-<branch>.web.app` zeigt jetzt den **Angular-Build
+  des Haupt-Teams** mit dessen **echten Daten** (vorher die alte App). Damit Änderungen an der alten App
+  (`outputs/*`) weiter eine Vorschau haben, gibt es zusätzlich eine Vorschau der **alten App der U15** auf
+  `teamkompass-u15--pr<Nr>-<branch>.web.app` (echte U15-Daten). Beide Sites räumt `firebase-preview-cleanup.yml`
+  mit auf. Wird die U15 später umgestellt, diese U15-Vorschau wieder auf den Angular-Build der U15 umbiegen.
+
+**Rückweg sofort (Notfall):** Firebase Console → Hosting → Site `teamkompass-b8aac` → Versionsverlauf → letzte
+Version vor der Umstellung → „Zurücksetzen“. Wird beim nächsten Merge nach `main` wieder überschrieben.
+
+**Rückweg dauerhaft (per PR):**
+
+1. In `firebase.json` den Eintrag `"target": "main"` durch eine Kopie des `u15`-Eintrags ersetzen und darin nur
+   `target` und `public` ändern:
+
+   ```json
+   "target": "main",
+   "public": "outputs/team-manager",
+   ```
+
+2. Den Test „Haupt-Team läuft auf dem Angular-Build …“ (SCRUM-208) in `tests/project.test.mjs` entfernen bzw.
+   umdrehen. Die Artefakt-Schritte `angular-dist-mein-team` in den Workflows dürfen bleiben (dann zeigt auch die
+   PR-Vorschau auf `teamkompass-b8aac` wieder die alte App).
+3. `npm run verify`, PR, Merge nach `main` → der Merge-Workflow deployt `outputs/team-manager` live.
+4. Prüfen: `https://teamkompass-b8aac.web.app` neu laden – die alte Oberfläche erscheint.
+
+Service Worker auf den Geräten, Sync-Fehler nach dem Rückweg und die Zusammenfassungen (`teams/mein-team/playerStats`,
+„Neu berechnen“) verhalten sich genau wie oben für die U17 beschrieben.

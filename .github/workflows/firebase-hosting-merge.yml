@@ -25,12 +25,18 @@ jobs:
         run: npm ci --ignore-scripts --prefix angular
       - name: Verify application
         run: npm run verify
-      # Die Angular-Builds (Hosting-Ziel u14 = Testteam, u17 = Live-Team U17 seit SCRUM-169) entstehen hier ohne
-      # Secret und werden als fertige statische Dateien weitergegeben.
+      # Die Angular-Builds (Hosting-Ziel u14 = Testteam, u17 = Live-Team U17 seit SCRUM-169, main = Haupt-Team
+      # mein-team seit SCRUM-208) entstehen hier ohne Secret und werden als fertige statische Dateien weitergegeben.
       - uses: actions/upload-artifact@v7
         with:
           name: angular-dist
           path: angular/dist/teamkompass-angular/browser
+          if-no-files-found: error
+          retention-days: 1
+      - uses: actions/upload-artifact@v7
+        with:
+          name: angular-dist-mein-team
+          path: angular/dist/team-mein-team/browser
           if-no-files-found: error
           retention-days: 1
       - uses: actions/upload-artifact@v7
@@ -54,6 +60,10 @@ jobs:
         with:
           name: angular-dist-u17
           path: angular/dist/team-u17/browser
+      - uses: actions/download-artifact@v8
+        with:
+          name: angular-dist-mein-team
+          path: angular/dist/team-mein-team/browser
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}

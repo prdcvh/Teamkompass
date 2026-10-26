@@ -5,8 +5,8 @@
 # - workflow_dispatch (von Hand in GitHub -> Actions starten): loescht die Vorschauen aller PRs, die schon
 #   geschlossen sind. Vorschauen offener PRs und der Live-Kanal bleiben unangetastet.
 #
-# Vorschauen gibt es auf zwei Sites: teamkompass-b8aac (alte App, Ziel main) und seit SCRUM-169 teamkompass-u17
-# (Angular-Build der U17). Beide werden gleich behandelt.
+# Vorschauen gibt es auf drei Sites (SCRUM-169, SCRUM-208): teamkompass-b8aac (Angular-Build des Haupt-Teams, Ziel main),
+# teamkompass-u17 (Angular-Build der U17) und teamkompass-u15 (alte App, Ziel u15). Alle werden gleich behandelt.
 #
 # Sicherheit (wie SCRUM-57): Hier laeuft kein Code aus dem PR. Ausgecheckt wird nur der Standard-Branch (fuer
 # firebase.json/.firebaserc), es gibt kein npm install aus dem Repo; firebase-tools ist fest gepinnt.
@@ -27,7 +27,7 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     env:
-      SITES: teamkompass-b8aac teamkompass-u17
+      SITES: teamkompass-b8aac teamkompass-u17 teamkompass-u15
       PROJECT: teamkompass-b8aac
       FIREBASE_TOOLS: firebase-tools@15.32.1
     steps:

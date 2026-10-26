@@ -28,7 +28,15 @@ jobs:
         run: npm ci --ignore-scripts --prefix angular
       - name: Verify application
         run: npm run verify
-      # SCRUM-169: Angular-Build der U17 (echte Teamdaten teams/U17) als Vorschau auf der Site teamkompass-u17.
+      # SCRUM-169/SCRUM-208: Angular-Builds als Vorschau – Haupt-Team (echte Daten teams/mein-team) auf der Site teamkompass-b8aac,
+      # U17 (echte Daten teams/U17) auf der Site teamkompass-u17. Jede Vorschau zeigt genau das, was der Merge auf
+      # diesem Hosting-Ziel live stellen wuerde.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: angular-dist-mein-team
+          path: angular/dist/team-mein-team/browser
+          if-no-files-found: error
+          retention-days: 1
       - uses: actions/upload-artifact@v7
         with:
           name: angular-dist-u17
@@ -43,6 +51,10 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: angular-dist-mein-team
+          path: angular/dist/team-mein-team/browser
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
@@ -59,3 +71,11 @@ jobs:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TEAMKOMPASS_B8AAC }}
           projectId: teamkompass-b8aac
           target: u17
+      # Die alte App laeuft (bis zu ihrer Umstellung) nur noch fuer die U15. Damit PRs an outputs/* weiter eine
+      # sinnvolle Vorschau haben, gibt es sie auf der Site teamkompass-u15 (statische Dateien aus outputs/u15).
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TEAMKOMPASS_B8AAC }}
+          projectId: teamkompass-b8aac
+          target: u15
