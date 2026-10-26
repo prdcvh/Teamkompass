@@ -1,6 +1,6 @@
 # Angular-Cutover (SCRUM-76)
 
-Stand: 14.10.2026. Vergleich der Live-App (`outputs/team-manager`, gleich für `u15`/`u17`)
+Stand: 26.10.2026 (zuerst 14.10.2026). Vergleich der Live-App (`outputs/team-manager`, gleich für `u15`/`u17`)
 mit der Angular-Version (`angular/`, Site `teamkompass-u14`). **Kein Umstieg ohne ausdrückliche
 Freigabe des Product Owners.**
 
@@ -25,7 +25,7 @@ Legende: ✅ vorhanden · ≈ anders gelöst (gleicher Zweck) · ❌ fehlt → T
 | Teamanalyse | Teamform, Kennzahlen, Geburtsquartale, Positionsabdeckung, Trainingsfokus | `/teamanalyse` | ✅ |
 | Gegneranalyse | Gegner erfassen, Profile | `/gegneranalyse` | ✅ |
 | Aufstellung (Board) | Formationen, Bank, Auswechseln, Ziehen mit Maus/Finger | Antippen statt Ziehen | ≈ |
-| Aufstellung **pro Spiel**, „vom letzten Spiel übernehmen“, im Event sichtbar | SCRUM-29 (#159) | nur eine Team-Aufstellung | ❌ SCRUM-122 |
+| Aufstellung **pro Spiel**, „vom letzten Spiel übernehmen“, im Event sichtbar | SCRUM-29 (#159) | Aufstellung je Event (`meta/lineup`, `byEvent`) | ✅ SCRUM-122 |
 | Zugänge | Einladungscodes, Trainer-Konto, Scout- und Medizin-Zugang, getrennte Listen, widerrufen | `/zugaenge` (SCRUM-73, SCRUM-92) | ✅ |
 | Globale Suche | Strg/⌘+K, Spieler/Events/Gegner | `/suche` | ✅ |
 | Export | JSON, PDF | `/export` | ✅ |
@@ -37,8 +37,9 @@ Legende: ✅ vorhanden · ≈ anders gelöst (gleicher Zweck) · ❌ fehlt → T
 | Vereinslogo im Kopf | Vereinslogo-Bild | Vereinslogo in Seitenleiste und Anmeldeseite (statt „TK“) | ✅ |
 | Altdaten-Migration | Knopf „Daten migrieren“ (altes Ein-Dokument-Format → Sammlungen) | wird nicht übernommen (PO-Entscheid 15.10.) | ✂️ |
 | PWA | Manifest, Service Worker, offline startbar | **neu mit diesem Ticket** (siehe 2.) | ✅ |
-| Je Team ein Build | ein Ordner je Team (`outputs/<team>`) | fest auf U14 | ❌ SCRUM-124 |
-| Datenformat alt ↔ neu | – | für einen Rückweg nötig | ❌ SCRUM-125 |
+| Je Team ein Build | ein Ordner je Team (`outputs/<team>`) | `npm run build:teams` baut je Team (`mein-team`, `u15`, `u17`) nach `dist/team-<team>/` | ✅ SCRUM-124 |
+| Datenformat alt ↔ neu | – | beide Versionen nutzen dieselben Sammlungen; U17 läuft seit 24.10. damit live | ✅ SCRUM-125 |
+| Zu-/Absagen zu Terminen | Spieler/Eltern im Profil, Absage belegt „Fehlt“ vor (SCRUM-175) | fehlt noch | ❌ SCRUM-205 (in Arbeit) |
 
 **Gestrichen (✂️, PO-Entscheid 15.10.2026):** Die Altdaten-Migration war ein Einmal-Werkzeug für den Wechsel
 vom alten Ein-Dokument-Format auf Sammlungen. Alle Live-Teams sind längst umgestellt; Angular braucht
@@ -64,8 +65,9 @@ lege ich ein Ticket an.
 
 ## 3. Ablaufplan für den Umstieg (Entwurf – vor Umsetzung mit dem PO abstimmen)
 
-**Voraussetzungen:** SCRUM-122, SCRUM-123, SCRUM-124, SCRUM-125 erledigt; SCRUM-78 (U14-Testkonto)
-erledigt und ein vollständiger Durchlauf als Trainer, Spieler und Scout auf `teamkompass-u14`.
+**Voraussetzungen:** SCRUM-122, SCRUM-123, SCRUM-124, SCRUM-125 sind erledigt ✅. SCRUM-78 (U14-Testkonto)
+erledigt ✅. Der vollständige Durchlauf als Trainer, Spieler und Scout ist nicht belegt. Offen: Zu-/Absagen
+in Angular (SCRUM-205, in Arbeit).
 
 **Empfehlung: Angular liest direkt die bisherigen Team-Daten** (z. B. `mein-team`), statt Daten zu
 kopieren. Dann gibt es keinen Datenumzug und keinen Stichtag, an dem zwei Stände auseinanderlaufen.
@@ -91,11 +93,15 @@ kopieren. Dann gibt es keinen Datenumzug und keinen Stichtag, an dem zwei Ständ
 `mein-team` mit eigener Freigabe. Bekannte Lücke: Zu-/Absagen (SCRUM-175) gibt es in Angular noch nicht
 (SCRUM-205).
 
-**Stand SCRUM-208 (26.10.2026):** Abweichend von der Reihenfolge unten hat der PO am 26.10. das **Haupt-Team**
-(`mein-team`) als Nächstes freigegeben – vor der U15. Hosting-Ziel `main` (Site `teamkompass-b8aac`) liefert den
-Angular-Build `dist/team-mein-team/browser` aus. Für `main` gibt es keine PR-Vorschau (nie echte Daten, SCRUM-206/218); PRs
-sehen den Testteam-Build auf `teamkompass-u14` und die Alt-App der U15 als Testteam-Kopie auf `teamkompass-u15`. Rückweg:
-`FIREBASE_SETUP.md` §11. Noch offen: U15, Rollback einmal üben.
+**Stand 26.10.2026:** U17 läuft seit 24.10.2026 live auf Angular (SCRUM-169, PR #241). Das **Haupt-Team**
+(`mein-team`) hat der PO am 26.10. als Nächstes freigegeben – vor der U15 (SCRUM-208, PR #244). Hosting-Ziel `main`
+(Site `teamkompass-b8aac`) liefert den Angular-Build `dist/team-mein-team/browser` aus. Für `main` gibt es keine
+PR-Vorschau (nie echte Daten, SCRUM-206/218); PRs sehen den Testteam-Build auf `teamkompass-u14` und die Alt-App der
+U15 als Testteam-Kopie auf `teamkompass-u15`. Rückweg: `FIREBASE_SETUP.md` §11. Zu-/Absagen gibt es in Angular seit
+SCRUM-205. Offen:
+- U15: SCRUM-210, wartet auf Freigabe des PO.
+- Rückweg einmal üben: SCRUM-209.
+- Alt-App abschalten und aufräumen (Schritt 6): SCRUM-211.
 
 **Entscheidungen des PO (15.10.2026):**
 - Angular nutzt direkt die bisherigen Daten, keine Kopie. ✅
@@ -105,5 +111,5 @@ sehen den Testteam-Build auf `teamkompass-u14` und die Alt-App der U15 als Testt
 - Die Altdaten-Migration wird nicht übernommen. ✅
 - Antippen statt Ziehen, Monatsgruppen bei vergangenen Events: in Ordnung. Das Vereinslogo muss statt „TK“ erscheinen
   (umgesetzt). ✅
-- Noch offen vor dem Umschalten von U17: SCRUM-122, SCRUM-123 (Funktionen der Live-App, die in Angular noch fehlen),
-  SCRUM-78 (Testkonto) und ein Testlauf gegen die echten U17-Daten auf einer Vorschau-Adresse.
+- Vor dem Umschalten von U17 offen (damals): SCRUM-122, SCRUM-123 (inzwischen erledigt), SCRUM-78 (Testkonto, inzwischen erledigt)
+  und ein Testlauf gegen die echten U17-Daten auf einer Vorschau-Adresse (U17 ist seit 24.10. umgestellt).
