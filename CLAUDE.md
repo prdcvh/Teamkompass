@@ -45,9 +45,14 @@ build step, no bundler, no test suite.
   channel of the **default build (test team `U14`) on target `u14`** — since
   SCRUM-206 a PR preview must never ship a live-team build (`U17`,
   `mein-team`, `U15` = real data); `tests/preview-guard.test.mjs` enforces
-  this for every deploy step in `firebase-hosting-pull-request.yml` (only
-  known exception: the legacy `outputs/team-manager` preview on `main`,
-  SCRUM-218). Note U14 still lives in the production Firebase project with
+  this for every deploy step in `firebase-hosting-pull-request.yml`, with no
+  exceptions. The legacy-app preview on target `main` is a copy of
+  `outputs/team-manager` switched to `teamId: "U14"`
+  (`scripts/legacy-preview.mjs`, built in the verify job, swapped into
+  `outputs/team-manager` only inside the preview job; SCRUM-218) — the live
+  channel still deploys `outputs/team-manager` as-is. A new preview (e.g.
+  another `outputs/*` team or an Angular team build) must likewise use the
+  test team. Note U14 still lives in the production Firebase project with
   data copied from `mein-team`. `mein-team`/`U15` still run on
   `outputs/*` until their own cutover (SCRUM-169).
 

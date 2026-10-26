@@ -218,8 +218,14 @@ Die Angular-Neuentwicklung (Jira-Epic SCRUM-40) wird als eigene Hosting-Site
 - Pull-Request-Vorschau (seit SCRUM-206): jeder PR bekommt eine Vorschau des Angular-Standard-Builds
   (Testteam `U14`) auf `teamkompass-u14--pr<Nr>-<branch>.web.app`. Eine Vorschau darf nie den Build eines
   Live-Teams (`U17`, `mein-team`, `U15`) ausliefern; `tests/preview-guard.test.mjs` prueft dafuer jeden
-  Deploy-Schritt in `firebase-hosting-pull-request.yml` (Ziel, Build, Team-ID, Projekt-ID). Einzige bekannte
-  Ausnahme: die Alt-App-Vorschau auf Ziel `main` (`outputs/team-manager`, echte mein-team-Daten) bis SCRUM-218.
+  Deploy-Schritt in `firebase-hosting-pull-request.yml` (Ziel, Build, Team-ID, Projekt-ID), ohne Ausnahme.
+- Alt-App-Vorschau (seit SCRUM-218): Die Vorschau der Alt-App auf `teamkompass-b8aac--pr<Nr>-<branch>.web.app`
+  (Ziel `main`) laeuft ebenfalls mit dem Testteam `U14`, nicht mehr mit `mein-team`. Der Verify-Job baut mit
+  `node scripts/legacy-preview.mjs outputs/team-manager` eine Kopie nach `dist/preview/team-manager`, in der nur
+  `firebase-config.js` geaendert ist (`teamId: "U14"`, Name mit Zusatz "Vorschau · Testteam U14"). Der Vorschau-Job
+  leert `outputs/team-manager`, legt die Kopie dorthin und deployt in den Vorschau-Kanal. Der Live-Kanal
+  (Merge-Workflow) liefert weiter `outputs/team-manager` aus dem Repo (mein-team) aus. Anmeldung in der Vorschau
+  mit einem Trainer-Konto, das unter `teams/U14/members` eingetragen ist (beim Kopieren aus mein-team mitkopiert).
   Achtung: U14 liegt im selben Firebase-Projekt und enthaelt von `mein-team` kopierte Daten (Abschnitt 8).
 - PWA (SCRUM-76): Manifest `angular/public/manifest.webmanifest`, Service Worker von Angular
   (`angular/ngsw-config.json`, nur im Produktions-Build). `ngsw.json`/`ngsw-worker.js` fallen unter

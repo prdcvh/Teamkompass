@@ -4,22 +4,16 @@
 // Live-Teams (echte Mannschaftsdaten) laufen, sondern nur mit dem Testteam. Fuer jeden Deploy-Schritt im
 // Vorschau-Job wird ermittelt: Hosting-Ziel -> public-Ordner (firebase.json) -> welcher Build dort liegt
 // (Angular-Build-Konfiguration bzw. Alt-App-Ordner) -> Team-ID und Firebase-Projekt dieses Builds.
-// Unbekanntes wird abgelehnt (fail closed).
+// Unbekanntes wird abgelehnt (fail closed). Ausnahmen gibt es keine (die letzte, Alt-App auf main, ist seit
+// SCRUM-218 eine Vorschau-Kopie mit dem Testteam, siehe scripts/legacy-preview-lib.mjs).
+
+import { legacyPreviewConfig, legacyPreviewDir } from "./legacy-preview-lib.mjs";
 
 /** Team-IDs, mit denen eine Vorschau laufen darf (Testteam, siehe angular/src/environments/environment.ts). */
 export const PREVIEW_TEAM_IDS = ["U14"];
 
 /** Live-Teams mit echten Daten – nur fuer klarere Fehlermeldungen; abgelehnt wird alles ausser PREVIEW_TEAM_IDS. */
 export const LIVE_TEAM_IDS = ["mein-team", "U15", "U17"];
-
-/**
- * Bekannte Altlast, bewusst nicht in SCRUM-206 geaendert: die Vorschau der Alt-App auf Ziel main (echte
- * mein-team-Daten). Gilt nur fuer genau diese Kombination; eine Angular-Vorschau von mein-team faellt nicht darunter.
- * Entfernen mit SCRUM-218.
- */
-export const LEGACY_PREVIEW_EXCEPTIONS = [
-  { target: "main", public: "outputs/team-manager", teamId: "mein-team", ticket: "SCRUM-218" },
-];
 
 const DEPLOY_ACTION = /^FirebaseExtended\/action-hosting-deploy@/;
 
@@ -116,7 +110,7 @@ const teamIdIn = (source) => /teamId:\s*['"]([^'"]+)['"]/.exec(source)?.[1] ?? n
 const projectIdIn = (source) => /projectId:\s*['"]([^'"]+)['"]/.exec(source)?.[1] ?? null;
 
 /** Team-ID(s) und Firebase-Projekt(e) des Builds, der in publicDir liegt. */
-async function buildsFor(publicDir, angularJson, readText) {
+async function buildsFor(publicDir, angularJson, readText, { legacyPreview = false } = {}) {
   if (publicDir.startsWith("angular/")) {
     const builds = [];
     for (const file of angularEnvironmentsFor(publicDir, angularJson)) {
@@ -130,7 +124,16 @@ async function buildsFor(publicDir, angularJson, readText) {
     return builds;
   }
   const file = `${publicDir}/firebase-config.js`;
-  const source = await readText(file);
+  let source = await readText(file);
+  if (legacyPreview) {
+    // Ausgeliefert wird die Vorschau-Kopie aus scripts/legacy-preview.mjs: dieselbe Umstellung hier nachrechnen.
+    try {
+      source = legacyPreviewConfig(source);
+    } catch (error) {
+      return [{ source: `${file} (Vorschau-Kopie)`, teamId: null, projectId: projectIdIn(source), error: error.message }];
+    }
+    return [{ source: `${file} (Vorschau-Kopie ${legacyPreviewDir(publicDir)})`, teamId: teamIdIn(source), projectId: projectIdIn(source) }];
+  }
   return [{ source: file, teamId: teamIdIn(source), projectId: projectIdIn(source) }];
 }
 
@@ -149,11 +152,18 @@ export async function checkPreviewWorkflow({ workflow, firebaseJson, firebaserc,
   const rawDeploys = (workflow.match(/action-hosting-deploy@/g) ?? []).length;
   if (parsedDeploys !== rawDeploys) problems.push(`Nur ${parsedDeploys} von ${rawDeploys} Deploy-Schritten erkannt – Workflow-Format wird nicht verstanden.`);
 
-  // Artefakt-Name -> hochgeladener Pfad (aus allen Jobs, i. d. R. dem Verify-Job).
+  // Artefakt-Name -> hochgeladener Pfad (aus allen Jobs, i. d. R. dem Verify-Job). Dazu je Upload, welche
+  // Alt-App-Vorschau-Kopien (node scripts/legacy-preview.mjs <ordner>) vorher im selben Job gebaut wurden.
   const uploads = new Map();
+  const legacyBuiltBefore = new Map(); // Artefakt-Name -> Set der gebauten Quell-Ordner
   for (const text of Object.values(jobs)) {
+    const built = new Set();
     for (const step of parseSteps(text)) {
-      if (/^actions\/upload-artifact@/.test(step.uses ?? "")) uploads.set(step.with.name, step.with.path);
+      for (const match of step.run.matchAll(/^node scripts\/legacy-preview\.mjs (\S+)\s*$/gm)) built.add(match[1].replace(/\/+$/, ""));
+      if (/^actions\/upload-artifact@/.test(step.uses ?? "")) {
+        uploads.set(step.with.name, step.with.path);
+        legacyBuiltBefore.set(step.with.name, new Set(built));
+      }
     }
   }
 
@@ -161,11 +171,28 @@ export async function checkPreviewWorkflow({ workflow, firebaseJson, firebaserc,
     const downloaded = new Map(); // Pfad -> Artefakt-Name
     for (const step of parseSteps(text)) {
       if (/^actions\/download-artifact@/.test(step.uses ?? "")) {
-        downloaded.set(step.with.path, step.with.name);
+        const path = (step.with.path ?? "").replace(/\/+$/, "");
+        downloaded.set(path, step.with.name);
+        // Ein Download in einen Ober- oder Unterordner eines public-Ordners wuerde ausgelieferte Dateien
+        // ungeprueft ueberschreiben – erlaubt ist nur genau der public-Pfad eines Ziels.
+        const inside = (a, b) => a === b || a.startsWith(`${b}/`);
+        for (const entry of firebaseJson.hosting ?? []) {
+          if (path !== entry.public && (inside(path, entry.public) || inside(entry.public, path))) {
+            problems.push(`${jobName}: Artefakt "${step.with.name}" wird nach ${path || "(Repo-Wurzel)"} geladen und ueberschneidet sich mit dem public-Ordner ${entry.public} – nicht pruefbar.`);
+          }
+        }
         continue;
       }
       if (/firebase(-tools)?\b.*\b(deploy|hosting:channel)/.test(step.run)) {
         problems.push(`${jobName}: Vorschau per "run: firebase …" wird nicht geprueft – bitte FirebaseExtended/action-hosting-deploy verwenden.`);
+        continue;
+      }
+      if (step.run.trim()) {
+        // Im Vorschau-Job ist nur das Leeren eines Alt-App-Ordners vor dem Laden der Vorschau-Kopie erlaubt; alles
+        // andere koennte ausgelieferte Dateien unbemerkt veraendern.
+        const lines = step.run.split("\n").map((line) => line.trim()).filter((line) => line && !/^[|>][-+]?$/.test(line));
+        const unknown = lines.find((line) => !/^rm -rf outputs\/[A-Za-z0-9_-]+\/?$/.test(line));
+        if (unknown) problems.push(`${jobName}: run-Schritt im Vorschau-Job wird nicht geprueft: ${unknown}`);
         continue;
       }
       if (!DEPLOY_ACTION.test(step.uses ?? "")) continue;
@@ -194,12 +221,32 @@ export async function checkPreviewWorkflow({ workflow, firebaseJson, firebaserc,
         else if (uploads.get(artifact) !== publicDir) problems.push(`${where}: Artefakt "${artifact}" wurde aus ${uploads.get(artifact) ?? "(nirgends)"} hochgeladen, ausgeliefert wird es als ${publicDir}.`);
       }
 
-      const builds = await buildsFor(publicDir, angularJson, readText);
+      // Alt-App: entweder der Ordner aus dem Repo (dann zaehlt dessen firebase-config.js) oder die Vorschau-Kopie
+      // mit dem Testteam, gebaut im Verify-Job und als Artefakt genau an den public-Pfad gelegt.
+      let legacyPreview = false;
+      const legacyArtifact = publicDir.startsWith("angular/") ? null : downloaded.get(publicDir);
+      if (legacyArtifact) {
+        let expected = null;
+        try {
+          expected = legacyPreviewDir(publicDir);
+        } catch (error) {
+          problems.push(`${where}: ${error.message}`);
+        }
+        if (expected && uploads.get(legacyArtifact) !== expected) {
+          problems.push(`${where}: Artefakt "${legacyArtifact}" wurde aus ${uploads.get(legacyArtifact) ?? "(nirgends)"} hochgeladen, erwartet wird die Vorschau-Kopie ${expected}.`);
+        } else if (expected && !legacyBuiltBefore.get(legacyArtifact)?.has(publicDir)) {
+          problems.push(`${where}: ${expected} wird vor dem Hochladen nicht mit "node scripts/legacy-preview.mjs ${publicDir}" gebaut.`);
+        } else if (expected) {
+          legacyPreview = true;
+        }
+      }
+
+      const builds = await buildsFor(publicDir, angularJson, readText, { legacyPreview });
       if (builds.length === 0) problems.push(`${where}: keine Build-Konfiguration fuer ${publicDir} gefunden.`);
       for (const build of builds) {
-        deployments.push({ job: jobName, target, publicDir, deployProjectId: projectId, teamId: build.teamId, buildProjectId: build.projectId, source: build.source });
-        const exception = LEGACY_PREVIEW_EXCEPTIONS.find((entry) => entry.target === target && entry.public === publicDir && entry.teamId === build.teamId);
-        if (!PREVIEW_TEAM_IDS.includes(build.teamId) && !exception) {
+        deployments.push({ job: jobName, target, publicDir, legacyPreview, deployProjectId: projectId, teamId: build.teamId, buildProjectId: build.projectId, source: build.source });
+        if (build.error) problems.push(`${where}: Vorschau-Kopie nicht berechenbar (${build.error}).`);
+        else if (!PREVIEW_TEAM_IDS.includes(build.teamId)) {
           const kind = LIVE_TEAM_IDS.includes(build.teamId) ? "Live-Team mit echten Daten" : "kein freigegebenes Testteam";
           problems.push(`${where}: Vorschau liefert ${publicDir} mit Team-ID "${build.teamId}" aus (${build.source}) – ${kind}. Erlaubt: ${PREVIEW_TEAM_IDS.join(", ")}.`);
         }
