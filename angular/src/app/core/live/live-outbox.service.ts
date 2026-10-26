@@ -15,7 +15,8 @@ const FINAL_ERRORS = ['permission-denied', 'invalid-argument', 'unauthenticated'
  * Postausgang für Live-Punkte (SCRUM-216, Funkloch auf dem Platz). Legt jede Änderung zuerst im Gerätespeicher ab und
  * schickt sie dann an die Datenbank; erst die Bestätigung des Servers entfernt sie wieder. Beim Start (bzw. sobald ein
  * Trainer angemeldet ist) wird alles noch Offene erneut geschickt – ohne Doppelzählung, weil jede Änderung unter ihrer
- * eigenen Kennung gespeichert wird. Beim Abmelden wird der Postausgang wie der übrige lokale Speicher geleert.
+ * eigenen Kennung gespeichert wird. Beim Abmelden wird der Postausgang wie der übrige lokale Speicher geleert – die Seite
+ * „Abmelden“ warnt vorher, solange hier noch etwas wartet (SCRUM-220).
  */
 @Injectable({ providedIn: 'root' })
 export class LiveOutboxService {
@@ -81,6 +82,17 @@ export class LiveOutboxService {
     const change: PendingLiveChange = { id: newChangeId(), uid, teamId: this.team.id(), eventId, playerId, delta, at: Date.now() };
     this.update((entries) => [...entries, change]);
     return { change, sent: this.send(change) };
+  }
+
+  /**
+   * Alle noch nicht bestätigten Änderungen des angemeldeten Kontos, auch aus seinen anderen Teams (SCRUM-220): das
+   * Abmelden leert den ganzen Postausgang, also muss die Warnung davor auch alles zählen. Liest den Gerätespeicher frisch
+   * (ein anderer Tab kann gerade etwas aufgenommen haben).
+   */
+  pendingForAccount(): number {
+    const uid = this.session.uid();
+    if (!uid) return 0;
+    return this.merged(this.entries()).filter((entry) => entry.uid === uid).length;
   }
 
   /** Leert den Postausgang (Abmelden: keine Teamdaten im Browser). */

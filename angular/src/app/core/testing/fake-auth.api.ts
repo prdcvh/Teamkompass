@@ -62,6 +62,13 @@ export class FakeAuthApi implements Pick<AuthApi, keyof AuthApi> {
     this.emit(null);
   }
 
+  /** Test-Hilfe: wartet in Firestore noch etwas auf den Server (Funkloch, SCRUM-220)? */
+  pendingWrites = false;
+
+  async hasPendingWrites(): Promise<boolean> {
+    return this.pendingWrites;
+  }
+
   /** Test-Hilfe: wie oft der lokale Speicher geleert wurde (Datenschutz beim Abmelden). */
   cacheClears = 0;
   clearCacheResult = true;
