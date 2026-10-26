@@ -112,3 +112,8 @@ bewusst von 4 kB auf 6 kB angehoben: Login (~5,4 kB) und Profil (~4,4 kB) sind
 Seiten mit vielen Zuständen und Mobil-/Desktop-Varianten; das CSS ließ sich ohne Risiko
 für das Erscheinungsbild nicht ohne Weiteres kürzen. Wächst eine Komponente über 6 kB,
 zuerst gemeinsame Regeln in Tokens/Basis-Komponenten verschieben, bevor das Budget erneut steigt.
+
+## Wetter, Kleidung, Erinnerung
+
+Architektur, Blaze-/Budget-Hinweis, geplantes Function-Deployment und die Schwellenwerte der Kleidungsempfehlung:
+[`docs/wetter-kleidung-erinnerung.md`](../docs/wetter-kleidung-erinnerung.md).
