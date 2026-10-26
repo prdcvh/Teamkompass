@@ -1180,6 +1180,10 @@ let measurementListeners = {};
 // Zu-/Absagen (SCRUM-175): Trainer je Event die ganze Unter-Collection, Spieler/Eltern nur das eigene Dokument.
 let responseListeners = {};
 let legacyBlobMode = false;
+// SCRUM-166: Ladezustand der Event-Abfrage ("idle" | "loading" | "ready" | "error"), damit die Liste
+// waehrend der ersten Firestore-Abfrage nicht "Noch keine Events angelegt" meldet. Nur Lesezustand.
+let eventsLoadState = "idle";
+function getEventsLoadState() { return eventsLoadState; }
 let legacyCloudSaveTimer = null;
 const cloudCache = { players: [], events: [], ratings: {}, privateNotes: {}, responses: {}, developmentPlans: {}, absences: {}, measurements: {}, opponents: [], lineup: null };
 
@@ -1354,6 +1358,7 @@ function startCloudSync() {
   cloudCache.measurements = {};
   cloudCache.opponents = [];
   cloudCache.lineup = null;
+  eventsLoadState = currentRole === "scout" ? "idle" : "loading";
 
   // Scouts lesen ausschliesslich die bereinigte Scout-Sicht - keine Events, Spieler oder Bewertungen.
   if (currentRole === "scout") {
@@ -1369,6 +1374,7 @@ function startCloudSync() {
   cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("events"), (snapshot) => {
     cloudCache.events = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
     scoutPublish.eventsLoaded = true;
+    eventsLoadState = "ready";
     const eventIds = cloudCache.events.map((event) => event.id);
     if (currentRole === "trainer") {
       syncRatingListeners(eventIds);
@@ -1380,7 +1386,11 @@ function startCloudSync() {
     if (["player", "parent"].includes(currentRole) && currentPlayerId) syncResponseListeners(rsvpListenerEventIds(cloudCache.events, localIsoDate(), 0));
     rebuildStateFromCloudCache();
     cloudListenerRecovered("events");
-  }, (error) => cloudListenerFailed("events", error)));
+  }, (error) => {
+    eventsLoadState = "error";
+    cloudListenerFailed("events", error);
+    requestCloudRender();
+  }));
 
   if (currentRole === "trainer") {
     cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("players"), (snapshot) => {
@@ -1835,6 +1845,7 @@ async function publishScoutProfiles() {
 }
 
 function stopCloudSync() {
+  eventsLoadState = "idle";
   resetScoutPublish();
   cloudUnsubscribers.forEach((unsubscribe) => unsubscribe());
   cloudUnsubscribers = [];
@@ -2093,7 +2104,14 @@ function hideAuthGate() {
   document.body.classList.remove("auth-locked");
 }
 
+// SCRUM-24: Ursprüngliche Bereichsauswahl merken, damit ein Rollenwechsel ohne Neuladen
+// (z. B. Spieler meldet sich ab, Trainer meldet sich an) die Einschränkungen nicht erbt.
+let fullMobileViewOptions = null;
+let mobileViewRestricted = false;
+
 function applyRoleRestrictions() {
+  const mobileSelect = $("#mobileViewSelect");
+  if (fullMobileViewOptions === null) fullMobileViewOptions = mobileSelect.innerHTML;
   document.body.classList.toggle("role-player", currentRole === "player");
   document.body.classList.toggle("role-parent", currentRole === "parent");
   document.body.classList.toggle("role-physio", currentRole === "physio");
@@ -2107,19 +2125,28 @@ function applyRoleRestrictions() {
   $("#addPhysioBtn").hidden = !isCloudTrainer();
   $("#changePasswordBtn").hidden = !(isCloudActive() && ["trainer", "physio", "scout"].includes(currentRole));
   if (["player", "parent"].includes(currentRole)) {
+    mobileViewRestricted = true;
     $("#mobileViewSelect").innerHTML = '<option value="profiles">Profile</option>';
     $("#profilePlayer").disabled = true;
     setView("profiles");
   } else if (currentRole === "physio") {
+    mobileViewRestricted = true;
     $("#mobileViewSelect").innerHTML = '<option value="squad">Kader</option><option value="profiles">Profile</option>';
     $("#profilePlayer").disabled = false;
     setView("squad");
   } else if (currentRole === "scout") {
+    mobileViewRestricted = true;
     $("#mobileViewSelect").innerHTML = '<option value="profiles">Profile</option>';
     $("#profilePlayer").disabled = false;
     setView("profiles");
   } else {
     $("#profilePlayer").disabled = false;
+    if (mobileViewRestricted) {
+      // Vorherige Rolle war eingeschränkt: volle Auswahl wiederherstellen und auf das Dashboard.
+      mobileSelect.innerHTML = fullMobileViewOptions;
+      mobileViewRestricted = false;
+      setView("dashboard");
+    }
     renderAccessManager();
   }
   syncLoadReportButton();
@@ -4314,21 +4341,33 @@ function renderPitchBench() {
     : `<p class="muted">Alle Spieler stehen auf dem Feld.</p>`;
 }
 
+// Index der Formation mit der besten Durchschnittsnote (-1, wenn keine passt).
+function bestFormationIndex() {
+  const candidates = eligibleLineupCandidates();
+  const previews = FORMATION_PRESETS.map((preset) => formationPreview(preset, candidates));
+  let bestIndex = -1;
+  previews.forEach((preview, index) => {
+    if (preview.grade !== null && (bestIndex === -1 || preview.grade < previews[bestIndex].grade)) bestIndex = index;
+  });
+  return bestIndex;
+}
+
+// Button "Empfohlene Elf uebernehmen" (SCRUM-26): setzt die Empfehlung und speichert sie.
+function applySuggestedLineup() {
+  const index = bestFormationIndex();
+  if (index < 0) return;
+  applyFormationPreset(index);
+}
+
 function renderPitch() {
   state.lineup ||= normalizeLineup({});
   const target = lineupTargetEvent();
   const storedForTarget = target && state.eventLineups?.[target.id];
   if (storedForTarget) state.lineup = { assignments: structuredClone(storedForTarget.assignments) };
   renderLineupTarget(target, Boolean(storedForTarget));
-  if (lineupIsEmpty(state.lineup)) {
-    const candidates = eligibleLineupCandidates();
-    const previews = FORMATION_PRESETS.map((preset) => formationPreview(preset, candidates));
-    let bestIndex = -1;
-    previews.forEach((preview, index) => {
-      if (preview.grade !== null && (bestIndex === -1 || preview.grade < previews[bestIndex].grade)) bestIndex = index;
-    });
-    if (bestIndex >= 0) state.lineup = { assignments: assignedToAssignments(previews[bestIndex].assigned) };
-  }
+  // SCRUM-26: Eine leere Aufstellung bleibt leer. Die Empfehlung wird nur ueber den Button angeboten.
+  const suggestBtn = $("#suggestLineupBtn");
+  if (suggestBtn) suggestBtn.hidden = !lineupIsEmpty(state.lineup) || bestFormationIndex() < 0;
 
   const assignments = state.lineup.assignments;
   $("#pitch").innerHTML = Object.keys(PITCH_ZONES).map((zone) => {
@@ -4610,8 +4649,12 @@ function renderEvents() {
 
   // SCRUM-131: leerer Datenbestand und Suche ohne Treffer sind zwei verschiedene Faelle.
   const filterEmpty = state.events.length > 0 && !events.length;
+  // SCRUM-166: "Noch keine Events angelegt" erst nach abgeschlossener, leerer Abfrage.
+  const loadState = getEventsLoadState();
   $("#eventList").innerHTML = eventCardsHtml(upcoming) || (
-    !state.events.length ? `<p class="muted">Noch keine Events angelegt.</p>`
+    !state.events.length && loadState === "loading" ? `<p class="muted" role="status">Events werden geladen …</p>`
+      : !state.events.length && loadState === "error" ? `<p class="muted" role="status">Events konnten nicht geladen werden.</p>`
+      : !state.events.length ? `<p class="muted">Noch keine Events angelegt.</p>`
       : filterEmpty ? `<p class="muted">Keine Events für diese Suche gefunden.</p><button class="ghost-button" type="button" data-reset-event-filter>Filter zurücksetzen</button>`
       : `<p class="muted">Keine anstehenden Events.</p>`
   );
@@ -4887,6 +4930,12 @@ function nextNumber() {
   return 99;
 }
 
+// SCRUM-25: Meldet "wirklich gespeichert" (Validierung bestanden, lokal abgelegt) an next-level.js,
+// das daraus den Aktivitaetsverlauf speist. Abgebrochene Speicherungen melden nichts.
+function announceSaved(form) {
+  document.dispatchEvent(new CustomEvent("teamkompass:saved", { detail: { form } }));
+}
+
 function savePlayer(event) {
   event.preventDefault();
   const id = $("#playerId").value || `p${crypto.randomUUID()}`;
@@ -4923,6 +4972,7 @@ function savePlayer(event) {
   else state.players.push(player);
   $("#playerDialog").close();
   persist();
+  announceSaved("playerForm");
   cloudSavePlayer(player);
   // "Verletzt" ohne Datum wirkt nur ab heute; wird es zurueckgenommen, bleibt vergangenes "Fehlt" (SCRUM-164).
   const wasOpen = isOpenInjury(previous);
@@ -5040,6 +5090,7 @@ function saveEvent(event) {
   state.selectedEventId = newEvent.id;
   $("#eventDialog").close();
   persist();
+  announceSaved("eventForm");
   cloudSaveEvent(newEvent);
   renderAll();
   if (!existing) {
@@ -5192,6 +5243,7 @@ function saveDevelopmentPlan(event) {
   else state.developmentPlans[playerId].push(plan);
   resetDevelopmentPlanForm();
   persist();
+  announceSaved("developmentPlanForm");
   cloudSaveDevelopmentPlan(playerId, plan);
   drawProfile();
 }
@@ -5404,6 +5456,7 @@ function saveAbsence(event) {
   else state.absences[playerId].push(absence);
   resetAbsenceForm();
   persist();
+  announceSaved("absenceForm");
   cloudSaveAbsence(playerId, absence);
   reconcileAbsences();
   drawProfile();
@@ -5483,6 +5536,7 @@ function saveMeasurement(event) {
   else state.measurements[playerId].push(measurement);
   resetMeasurementForm();
   persist();
+  announceSaved("measurementForm");
   cloudSaveMeasurement(playerId, measurement);
   drawProfile();
   renderSquad();
@@ -6558,6 +6612,7 @@ function saveOpponent(event) {
   else state.opponents.push(opponent);
   resetOpponentForm();
   persist();
+  announceSaved("opponentForm");
   cloudSaveOpponent(opponent);
   renderOpponentAnalysis();
 }
@@ -6639,6 +6694,7 @@ window.addEventListener("resize", () => {
   }, 180);
 });
 on("#copyLineupBtn", "click", copyLineupFromPreviousGame);
+on("#suggestLineupBtn", "click", applySuggestedLineup);
 on("#formationPicker", "click", (event) => {
   const button = event.target.closest(".formation-option");
   if (!button) return;
