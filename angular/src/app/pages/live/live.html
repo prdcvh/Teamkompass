@@ -2,6 +2,9 @@
   <header class="bar">
     <h1>{{ event()?.title ?? 'Live-Modus' }}</h1>
     <a class="end" [routerLink]="eventId() ? ['/events', eventId()] : ['/events']">Beenden</a>
+    @if (ready() && isTraining()) {
+      <p class="save" [class]="saveStatus().kind" role="status" aria-live="polite">{{ saveStatus().text }}</p>
+    }
   </header>
 
   <section class="steps" aria-label="Schrittweite">
@@ -58,6 +61,9 @@
           <div class="who">
             <span class="name">{{ row.label }}</span>
             <span class="score" [attr.aria-label]="label(points(row.id)) + ' Punkte'">{{ label(points(row.id)) }}</span>
+            @if (waiting(row.id); as count) {
+              <span class="waiting">noch nicht gesendet ({{ count }})</span>
+            }
           </div>
           <button type="button" class="pad plus" [attr.aria-label]="'Plus ' + step() + ' für ' + row.label" (click)="add(row.id, 1, $event)">
             <span aria-hidden="true">+{{ step() }}</span>

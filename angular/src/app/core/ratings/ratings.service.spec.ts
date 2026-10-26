@@ -4,6 +4,7 @@ import { RatingsService } from './ratings.service';
 import { SessionService } from '../auth/session.service';
 import { SyncService } from '../shell/sync.service';
 import { FakeFirebase, provideFakeFirebase } from '../testing/fake-firebase';
+import { pointsFromDoc } from '../points/points';
 
 describe('RatingsService', () => {
   let firebase: FakeFirebase;
@@ -15,6 +16,7 @@ describe('RatingsService', () => {
     firebase.ratings.privateNotes.set('e1', new Map([['p1', { playerId: 'p1', note: 'Nur für uns' }]]));
     TestBed.configureTestingModule({ providers: [...provideFakeFirebase(firebase)] });
     TestBed.inject(SessionService).role.set(role);
+    if (role) TestBed.inject(SessionService).uid.set('uid-trainer');
     const events = TestBed.inject(EventsService);
     events.start();
     await vi.waitFor(() => expect(events.load()).toBe('ready'));
@@ -179,9 +181,9 @@ describe('RatingsService', () => {
       expect(ratings.addPoints('p2', 0)).toBe(false);
       await vi.waitFor(() => expect(firebase.calls).toContain('addPoints:e1:p2:-2'));
       expect(firebase.calls).toContain('addPoints:e1:p2:-1');
-      expect(firebase.ratings.privateNotes.get('e1')?.get('p2')).toMatchObject({ points: -2 });
+      await vi.waitFor(() => expect(pointsFromDoc(firebase.ratings.privateNotes.get('e1')?.get('p2'))).toBe(-2));
       // Ein zweiter Trainer erhöht gleichzeitig: nichts geht verloren.
-      await firebase.ratings.addPoints('e1', 'p2', 5);
+      await firebase.ratings.addPoints('e1', 'p2', 'andererTrainer01', 5);
       await vi.waitFor(() => expect(ratings.pointsFor('p2')).toBe(3));
     });
 

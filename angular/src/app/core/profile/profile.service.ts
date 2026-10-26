@@ -4,7 +4,7 @@ import { EventsService } from '../events/events.service';
 import { RatingsApi } from '../firebase/ratings.api';
 import { type EventRating } from './profile';
 import { type Rating, ratingFromDoc } from '../ratings/rating';
-import { type PointsEntry, normalizePoints } from '../points/points';
+import { type PointsEntry, pointsFromDoc } from '../points/points';
 import { SessionService } from '../auth/session.service';
 import { SyncService } from '../shell/sync.service';
 
@@ -150,7 +150,7 @@ export class ProfileService {
         playerId,
         (data, meta) => {
           if (generation !== this.generation) return;
-          this.pointsByEvent.update((map) => new Map(map).set(eventId, normalizePoints(data?.['points'])));
+          this.pointsByEvent.update((map) => new Map(map).set(eventId, pointsFromDoc(data)));
           this.pending.delete(key);
           this.waiting.set([...this.pending].filter((entry) => !entry.startsWith('open:')).length);
           this.sync.applySnapshot(meta);

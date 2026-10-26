@@ -3,7 +3,8 @@ import { authErrorMessage, errorCode } from '../auth/auth-errors';
 import { EventsService } from '../events/events.service';
 import { RatingsApi } from '../firebase/ratings.api';
 import type { RawDoc, SnapshotMeta } from '../firebase/types';
-import { countsPoints, normalizePoints } from '../points/points';
+import { LiveOutboxService } from '../live/live-outbox.service';
+import { LIVE_POINTS_FIELD, countsPoints, livePointsSum, normalizePoints, pointsFromDoc } from '../points/points';
 import { RankingService } from '../points/ranking.service';
 import { MAX_NOTE_LENGTH, type Rating, type RatingField, BLANK_RATING, applyChange, docFromRating, ratingFromDoc } from './rating';
 import { SessionService } from '../auth/session.service';
@@ -24,12 +25,17 @@ export class RatingsService {
   private readonly sync = inject(SyncService);
   private readonly events = inject(EventsService);
   private readonly ranking = inject(RankingService);
+  private readonly outbox = inject(LiveOutboxService);
 
   readonly eventId = signal<string | null>(null);
   readonly ratings = signal<ReadonlyMap<string, Rating>>(new Map());
   readonly notes = signal<ReadonlyMap<string, string>>(new Map());
   /** Trainingspunkte je Spieler (SCRUM-104), unabhängig davon, ob das Event sie zählt. Nur Trainer bekommen sie geladen. */
   readonly points = signal<ReadonlyMap<string, number>>(new Map());
+  /** Summe der Live-Änderungen je Spieler (SCRUM-216); `points` enthält sie schon, das Formular braucht sie für den Grundwert. */
+  private readonly liveSums = signal<ReadonlyMap<string, number>>(new Map());
+  /** Snapshot-Angaben der Punkte (Trainer-Dokumente): Grundlage für den Speicherhinweis im Live-Modus. */
+  readonly pointsMeta = signal<SnapshotMeta>({ fromCache: false, hasPendingWrites: false });
   readonly load = signal<RatingsLoad>('idle');
   readonly error = signal('');
   readonly canWrite = computed(() => this.session.role() === 'trainer');
@@ -93,9 +99,11 @@ export class RatingsService {
         (onData, onError) => this.ratingsApi.watchPrivateNotes(eventId, onData, onError),
         (docs) => {
           this.notes.set(new Map(docs.map((entry) => [entry.id, typeof entry.data['note'] === 'string' ? entry.data['note'] : ''])));
-          this.points.set(new Map(docs.map((entry) => [entry.id, normalizePoints(entry.data['points'])])));
+          this.points.set(new Map(docs.map((entry) => [entry.id, pointsFromDoc(entry.data)])));
+          this.liveSums.set(new Map(docs.map((entry) => [entry.id, livePointsSum(entry.data[LIVE_POINTS_FIELD])])));
           finish('notes');
         },
+        (meta) => this.pointsMeta.set(meta),
       );
     }
   }
@@ -108,6 +116,8 @@ export class RatingsService {
     this.ratings.set(new Map());
     this.notes.set(new Map());
     this.points.set(new Map());
+    this.liveSums.set(new Map());
+    this.pointsMeta.set({ fromCache: false, hasPendingWrites: false });
     this.load.set('idle');
     this.error.set('');
   }
@@ -157,8 +167,9 @@ export class RatingsService {
     if (points === this.pointsFor(playerId)) return false;
     this.points.update((map) => new Map(map).set(playerId, points));
     this.markSyncing();
+    // Gespeichert wird der Grundwert: Live-Änderungen (SCRUM-216) bleiben als Einträge stehen und kommen dazu.
     void this.ratingsApi
-      .savePoints(eventId, playerId, points)
+      .savePoints(eventId, playerId, normalizePoints(points - (this.liveSums().get(playerId) ?? 0)))
       .then(() => {
         this.sync.clearError();
         this.ranking.invalidate();
@@ -168,23 +179,21 @@ export class RatingsService {
   }
 
   /**
-   * Ändert die Punkte eines Spielers um `delta` (Live-Modus, SCRUM-213; auch unter 0). Lokal sofort sichtbar, geschrieben
-   * wird die Änderung selbst (nicht der Endwert), damit gleichzeitige Tipps mehrerer Trainer addiert werden.
+   * Ändert die Punkte eines Spielers um `delta` (Live-Modus, SCRUM-213; auch unter 0). Lokal sofort sichtbar. Geschrieben
+   * wird die Änderung selbst unter einer eigenen Kennung (nicht der Endwert): gleichzeitige Tipps mehrerer Trainer werden
+   * addiert, und über den Postausgang (SCRUM-216) geht ohne Netz nichts verloren und nichts zählt doppelt.
    */
   addPoints(playerId: string, delta: number): boolean {
     const eventId = this.eventId();
     if (!eventId || !this.canWrite() || this.load() !== 'ready' || !this.pointsActive()) return false;
     const step = Math.round(delta);
     if (!Number.isFinite(step) || step === 0) return false;
+    if (!this.outbox.canRecord()) return false;
+    // Erst lokal anzeigen, dann aufnehmen: der Snapshot mit der neuen Änderung ersetzt den Wert danach durch den echten Stand.
     this.points.update((map) => new Map(map).set(playerId, this.pointsFor(playerId) + step));
+    this.liveSums.update((map) => new Map(map).set(playerId, (map.get(playerId) ?? 0) + step));
     this.markSyncing();
-    void this.ratingsApi
-      .addPoints(eventId, playerId, step)
-      .then(() => {
-        this.sync.clearError();
-        this.ranking.invalidate();
-      })
-      .catch((error) => this.failWrite(error, 'Punkte konnten nicht gespeichert werden.'));
+    this.outbox.record(eventId, playerId, step);
     return true;
   }
 
@@ -192,11 +201,13 @@ export class RatingsService {
     generation: number,
     open: (onData: (docs: RawDoc[], meta: SnapshotMeta) => void, onError: (error: unknown) => void) => Promise<() => void>,
     apply: (docs: RawDoc[]) => void,
+    onMeta?: (meta: SnapshotMeta) => void,
   ): void {
     open(
       (docs, meta) => {
         if (generation !== this.generation) return;
         apply(docs);
+        onMeta?.(meta);
         this.sync.applySnapshot(meta);
       },
       (error) => {

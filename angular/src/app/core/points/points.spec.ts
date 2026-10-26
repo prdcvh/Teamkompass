@@ -1,5 +1,5 @@
 import { type TeamEvent } from '../events/event';
-import { countedPoints, countsPoints, normalizePoints, pointsHistory, totalPoints } from './points';
+import { countedPoints, countsPoints, livePointsSum, normalizePoints, pointsFromDoc, pointsHistory, totalPoints } from './points';
 
 function event(id: string, type: 'Training' | 'Spiel', date: string, pointsEnabled?: boolean): TeamEvent {
   return {
@@ -78,5 +78,26 @@ describe('Trainingspunkte (Logik)', () => {
 
   it('ungültige gespeicherte Werte werden beim Zählen zu 0, negative zählen mit', () => {
     expect(totalPoints([{ event: event('t1', 'Training', '2026-10-01'), points: -5 }, { event: event('t2', 'Training', '2026-10-02'), points: Number.NaN }])).toBe(-5);
+  });
+
+  it('Punkte eines Trainer-Dokuments: Grundwert plus alle Live-Änderungen (SCRUM-216)', () => {
+    expect(pointsFromDoc(null)).toBe(0);
+    expect(pointsFromDoc({ points: 4 })).toBe(4);
+    expect(pointsFromDoc({ live: { a1: 2, b2: -3 } })).toBe(-1);
+    expect(pointsFromDoc({ points: 4, live: { a1: 2, b2: -3 } })).toBe(3);
+    // Kaputtes zählt 0 statt die Summe zu verderben.
+    expect(livePointsSum({ a: 'x', b: Number.NaN, c: 2, d: null })).toBe(2);
+    expect(livePointsSum([1, 2])).toBe(0);
+    expect(livePointsSum('5')).toBe(0);
+  });
+
+  it('dieselbe Live-Änderung zweimal gesendet zählt einmal, zwei Trainer zählen beide (SCRUM-216)', () => {
+    // Firestore „merge“ legt jede Änderung unter ihrer Kennung ab: erneutes Senden setzt denselben Schlüssel.
+    const merge = (doc: Record<string, unknown>, id: string, delta: number) => ({ ...doc, live: { ...(doc['live'] as object), [id]: delta } });
+    let doc: Record<string, unknown> = { points: 1 };
+    doc = merge(doc, 'trainerA1', 2);
+    doc = merge(doc, 'trainerA1', 2); // erneuter Versuch nach Funkloch
+    doc = merge(doc, 'trainerB1', 3); // zweiter Trainer
+    expect(pointsFromDoc(doc)).toBe(6);
   });
 });

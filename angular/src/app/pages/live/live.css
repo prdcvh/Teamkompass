@@ -18,6 +18,7 @@
   top: 0;
   z-index: 1;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   padding: max(10px, env(safe-area-inset-top)) 0 10px;
@@ -218,6 +219,43 @@ summary:focus-visible {
   margin: 16px 0;
   font-size: 20px;
   font-weight: 600;
+}
+
+/* Speicherhinweis (SCRUM-216): immer oben sichtbar; Offline deutlich gelb, Gespeichert ruhig grün. */
+.save {
+  flex: 1 1 100%;
+  margin: 0;
+  padding: 6px 10px;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.25;
+  border: 2px solid #000;
+  border-radius: 10px;
+}
+
+.save.saved {
+  background: #d6f5df;
+}
+
+.save.saving {
+  background: #fff;
+}
+
+.save.offline {
+  background: #ffd84d;
+}
+
+.save.error {
+  color: #fff;
+  background: #b00020;
+  border-color: #b00020;
+}
+
+.waiting {
+  flex-basis: 100%;
+  font-size: 15px;
+  font-weight: 700;
+  color: #6b4e00;
 }
 
 .sync-error {

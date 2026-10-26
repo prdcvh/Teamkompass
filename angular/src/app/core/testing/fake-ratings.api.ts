@@ -45,7 +45,7 @@ export class FakeRatingsApi implements Pick<RatingsApi, keyof RatingsApi> {
 
   private emitSub(name: 'ratings' | 'privateNotes', eventId: string): void {
     const docs = [...(this.subStore(name).get(eventId) ?? new Map())].map(([id, data]) => ({ id, data }));
-    this.subListeners.get(`${name}:${eventId}`)?.onData(docs, { fromCache: false, hasPendingWrites: false });
+    this.subListeners.get(`${name}:${eventId}`)?.onData(docs, { fromCache: this.offline, hasPendingWrites: this.offline && this.parked.length > 0 });
   }
 
   /** Test-Hilfe: Abo-Fehler eines Unterpfads (z. B. permission-denied). */
@@ -85,15 +85,53 @@ export class FakeRatingsApi implements Pick<RatingsApi, keyof RatingsApi> {
     this.pushPrivateDoc(eventId, playerId);
   }
 
-  async addPoints(eventId: string, playerId: string, delta: number): Promise<void> {
+  /** Wie Firestore mit merge: der Eintrag `live.<changeId>` wird gesetzt (erneutes Senden überschreibt ihn nur). */
+  addPointsError: unknown = null;
+  /**
+   * Funkloch nachstellen (wie Firestore ohne Netz): Änderungen erscheinen sofort lokal (Snapshot mit `fromCache` und
+   * `hasPendingWrites`), das Versprechen bleibt aber offen, bis `goOnline()` sie „überträgt“.
+   */
+  offline = false;
+  private parked: (() => void)[] = [];
+
+  goOffline(): void {
+    this.offline = true;
+    for (const key of this.subListeners.keys()) {
+      const [name, eventId] = key.split(':') as ['ratings' | 'privateNotes', string];
+      this.emitSub(name, eventId);
+    }
+  }
+
+  /** App im Funkloch beendet: offene Sendeversuche verschwinden unbestätigt (das Netz ist danach wieder da). */
+  killPending(): void {
+    this.parked = [];
+    this.offline = false;
+  }
+
+  goOnline(): void {
+    this.offline = false;
+    const parked = this.parked;
+    this.parked = [];
+    parked.forEach((release) => release());
+    for (const key of this.subListeners.keys()) {
+      const [name, eventId] = key.split(':') as ['ratings' | 'privateNotes', string];
+      this.emitSub(name, eventId);
+    }
+  }
+
+  async addPoints(eventId: string, playerId: string, changeId: string, delta: number): Promise<void> {
     this.calls.push(`addPoints:${eventId}:${playerId}:${delta}`);
+    if (this.addPointsError) throw this.addPointsError;
     if (this.savePointsError) throw this.savePointsError;
     const store = this.privateNotes.get(eventId) ?? new Map<string, Record<string, unknown>>();
     const current = store.get(playerId);
-    store.set(playerId, { ...current, playerId, points: (typeof current?.['points'] === 'number' ? current['points'] : 0) + delta });
+    const live = current?.['live'] && typeof current['live'] === 'object' ? (current['live'] as Record<string, unknown>) : {};
+    store.set(playerId, { ...current, playerId, live: { ...live, [changeId]: delta } });
     this.privateNotes.set(eventId, store);
+    const sent = this.offline ? new Promise<void>((resolve) => this.parked.push(resolve)) : Promise.resolve();
     this.emitSub('privateNotes', eventId);
     this.pushPrivateDoc(eventId, playerId);
+    await sent;
   }
 
   // --- Trainer-Dokument (Notiz + Punkte) eines einzelnen Spielers je Event (Profil) ---

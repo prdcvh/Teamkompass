@@ -32,6 +32,28 @@ export function normalizePoints(value: unknown): number {
   return Math.max(Math.min(rounded, Number.MAX_SAFE_INTEGER), -Number.MAX_SAFE_INTEGER);
 }
 
+/**
+ * Feld im Trainer-Dokument, in dem der Live-Modus jede einzelne Änderung unter einer eigenen Kennung ablegt (SCRUM-216):
+ * `{ [änderungsId]: +2 | −1 | … }`. Ein erneutes Senden derselben Änderung (Funkloch, App neu geöffnet) schreibt denselben
+ * Schlüssel mit demselben Wert und zählt deshalb nie doppelt; Änderungen eines zweiten Trainers haben eigene Schlüssel
+ * und werden addiert. Schlüssel werden nie gelöscht.
+ */
+export const LIVE_POINTS_FIELD = 'live';
+
+/** Summe aller Live-Änderungen eines Trainer-Dokuments (Ungültiges zählt 0). */
+export function livePointsSum(value: unknown): number {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return 0;
+  let sum = 0;
+  for (const delta of Object.values(value as Record<string, unknown>)) sum += typeof delta === 'number' ? normalizePoints(delta) : 0;
+  return normalizePoints(sum);
+}
+
+/** Punkte eines Trainer-Dokuments: eingetragener Grundwert (`points`) plus alle Live-Änderungen. */
+export function pointsFromDoc(data: Readonly<Record<string, unknown>> | null | undefined): number {
+  if (!data) return 0;
+  return normalizePoints(normalizePoints(data['points']) + livePointsSum(data[LIVE_POINTS_FIELD]));
+}
+
 /** Zählen die Punkte dieses Events? Training immer, Spiel nur mit „Punkte vergeben: ja“. */
 export function countsPoints(event: Pick<TeamEvent, 'type' | 'pointsEnabled'>): boolean {
   return event.type === 'Training' || event.pointsEnabled === true;

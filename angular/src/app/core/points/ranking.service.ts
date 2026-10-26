@@ -5,7 +5,7 @@ import { EventsService } from '../events/events.service';
 import { RankingApi } from '../firebase/ranking.api';
 import { SquadService } from '../player/squad.service';
 import { todayIso } from '../shared/dates';
-import { countsPoints, normalizePoints } from './points';
+import { countsPoints, pointsFromDoc } from './points';
 import {
   RANKING_SHOWS_POINTS_TO_PLAYERS,
   type Ranking,
@@ -115,7 +115,7 @@ export class RankingService {
         const sums = new Map<string, number>();
         for (const { event, docs } of notes) {
           if (!inPeriod(event.date, { from, to })) continue;
-          for (const doc of docs) sums.set(doc.id, (sums.get(doc.id) ?? 0) + normalizePoints(doc.data['points']));
+          for (const doc of docs) sums.set(doc.id, (sums.get(doc.id) ?? 0) + pointsFromDoc(doc.data));
         }
         return rankPlayers([...sums].flatMap(([id, points]) => (names.has(id) ? [{ name: names.get(id) ?? '', points }] : [])));
       };

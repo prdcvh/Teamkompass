@@ -3,6 +3,7 @@ import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/route
 import { BehaviorSubject } from 'rxjs';
 import { SessionService } from '../../core/auth/session.service';
 import { WakeLockService } from '../../core/device/wake-lock.service';
+import { pointsFromDoc } from '../../core/points/points';
 import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
 import { Live } from './live';
 
@@ -11,6 +12,7 @@ describe('Live (Live-Modus, SCRUM-213/214/215)', () => {
   let clock = 1_000_000;
   beforeEach(() => {
     localStorage.removeItem('teamkompass-live-step');
+    localStorage.removeItem('teamkompass-live-outbox');
     clock = 1_000_000;
     vi.spyOn(Date, 'now').mockImplementation(() => clock);
   });
@@ -39,6 +41,7 @@ describe('Live (Live-Modus, SCRUM-213/214/215)', () => {
       ],
     });
     TestBed.inject(SessionService).role.set('trainer');
+    TestBed.inject(SessionService).uid.set('uid-trainer');
     const fixture = TestBed.createComponent(Live);
     await fixture.whenStable();
     await vi.waitFor(() => {
@@ -72,7 +75,7 @@ describe('Live (Live-Modus, SCRUM-213/214/215)', () => {
     tap(fixture, 'Minus 1 für Elias');
     tap(fixture, 'Minus 1 für Elias');
     tap(fixture, 'Minus 1 für Elias');
-    await vi.waitFor(() => expect(firebase.ratings.privateNotes.get('e1')?.get('p2')).toMatchObject({ points: -2 }));
+    await vi.waitFor(() => expect(pointsFromDoc(firebase.ratings.privateNotes.get('e1')?.get('p2'))).toBe(-2));
     const first = qa(fixture, '.player')[0]!;
     expect(text(first.querySelector('.score'))).toBe('−2');
     expect(first.classList.contains('negative')).toBe(true);
@@ -242,5 +245,35 @@ describe('Live (Live-Modus, SCRUM-213/214/215)', () => {
     const fixture = await render({ game: true });
     expect(text(root(fixture).querySelector('.notice'))).toContain('nur bei Trainings');
     expect(qa(fixture, '.pad')).toHaveLength(0);
+  });
+
+  it('Funkloch (SCRUM-216): Hinweis oben zeigt „Gespeichert“ bzw. „Offline“ mit Anzahl, Zeilen zeigen „noch nicht gesendet“', async () => {
+    const fixture = await render();
+    const status = () => root(fixture).querySelector('.bar .save');
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(text(status())).toBe('Gespeichert');
+    });
+    firebase.ratings.goOffline();
+    tap(fixture, 'Plus 1 für Elias');
+    tap(fixture, 'Plus 1 für Elias');
+    tap(fixture, 'Minus 1 für Jonas K.');
+    fixture.detectChanges();
+    // Weiter tippen geht, die Punkte erscheinen sofort.
+    expect(text(qa(fixture, '.player')[0]!.querySelector('.score'))).toBe('3');
+    expect(text(status())).toBe('Offline – wird gespeichert, sobald Netz da ist (3 Änderungen warten)');
+    expect(status()!.classList.contains('offline')).toBe(true);
+    expect(text(qa(fixture, '.player')[0]!.querySelector('.waiting'))).toBe('noch nicht gesendet (2)');
+    expect(text(qa(fixture, '.player')[2]!.querySelector('.waiting'))).toBe('noch nicht gesendet (1)');
+    expect(qa(fixture, '.player')[1]!.querySelector('.waiting')).toBeNull();
+
+    firebase.ratings.goOnline();
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(text(status())).toBe('Gespeichert');
+    });
+    expect(qa(fixture, '.waiting')).toHaveLength(0);
+    expect(text(qa(fixture, '.player')[0]!.querySelector('.score'))).toBe('3');
+    expect(pointsFromDoc(firebase.ratings.privateNotes.get('e1')?.get('p2'))).toBe(3);
   });
 });

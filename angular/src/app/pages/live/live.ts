@@ -23,6 +23,8 @@ import {
   saveStepPrefs,
   stepOptions,
 } from '../../core/live/live';
+import { LiveOutboxService } from '../../core/live/live-outbox.service';
+import { liveSaveStatus } from '../../core/live/live-outbox';
 import { SquadService } from '../../core/player/squad.service';
 import { RatingsService } from '../../core/ratings/ratings.service';
 import { SyncService } from '../../core/shell/sync.service';
@@ -46,6 +48,7 @@ export class Live implements OnInit, OnDestroy {
   private readonly eventsService = inject(EventsService);
   protected readonly sync = inject(SyncService);
   private readonly wakeLock = inject(WakeLockService);
+  private readonly outbox = inject(LiveOutboxService);
 
   protected readonly eventId = toSignal(this.route.paramMap.pipe(map((params) => params.get('id') ?? '')), { initialValue: '' });
   private readonly saved = loadStepPrefs(deviceStorage());
@@ -64,6 +67,21 @@ export class Live implements OnInit, OnDestroy {
   protected readonly ready = computed(() => this.ratings.load() === 'ready' && this.squad.load() === 'ready' && this.eventsService.load() === 'ready');
   protected readonly failed = computed(() => this.ratings.load() === 'error' || this.squad.load() === 'error' || this.eventsService.load() === 'error');
   protected readonly errorText = computed(() => this.ratings.error() || this.squad.error() || this.eventsService.error());
+
+  /** Meldet der Browser eine Verbindung? (Funkloch, SCRUM-216; die Snapshot-Angaben ergänzen das.) */
+  private readonly online = signal(typeof navigator === 'undefined' || navigator.onLine !== false);
+  private readonly onConnectivity = () => this.online.set(navigator.onLine !== false);
+  /** Hinweis oben: „Gespeichert“ / „Offline – wird gespeichert, sobald Netz da ist (n Änderungen warten)“. */
+  protected readonly saveStatus = computed(() => {
+    const meta = this.ratings.pointsMeta();
+    return liveSaveStatus({
+      pending: this.outbox.pending().length,
+      online: this.online(),
+      fromCache: meta.fromCache,
+      hasPendingWrites: meta.hasPendingWrites,
+      failed: this.sync.state() === 'error',
+    });
+  });
 
   /** Namen und Reihenfolge ergeben sich nur aus dem Kader: Punkte und Anwesenheit ändern nichts an der Reihenfolge. */
   private readonly rows = computed(() => liveRows(this.squad.players()));
@@ -86,17 +104,26 @@ export class Live implements OnInit, OnDestroy {
     this.squad.start();
     this.eventsService.start();
     void this.wakeLock.keepAwake();
+    window.addEventListener('online', this.onConnectivity);
+    window.addEventListener('offline', this.onConnectivity);
     if (this.startHint()) this.hintTimer = setTimeout(() => this.startHint.set(false), 4000);
   }
 
   ngOnDestroy(): void {
     this.wakeLock.release();
+    window.removeEventListener('online', this.onConnectivity);
+    window.removeEventListener('offline', this.onConnectivity);
     clearTimeout(this.hintTimer);
     clearTimeout(this.feedbackTimer);
   }
 
   protected points(id: string): number {
     return this.ratings.pointsFor(id);
+  }
+
+  /** Änderungen dieses Spielers, die der Server noch nicht bestätigt hat (0 = alles angekommen). */
+  protected waiting(id: string): number {
+    return this.outbox.pendingFor(this.eventId(), id);
   }
 
   protected label(points: number): string {
