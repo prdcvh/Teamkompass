@@ -73,6 +73,11 @@ export interface Rating {
   readonly note: string;
   /** Von der Abwesenheits-Automatik gesetzt und seither nicht angefasst. Eine Handänderung nimmt die Markierung weg. */
   readonly autoAbsence: boolean;
+  /**
+   * Von einer Absage gesetzt (SCRUM-175/205, siehe `rsvpAbsenceRating`) und seither nicht angefasst. Eine Handänderung
+   * nimmt die Markierung weg (false); dann setzt eine spätere Zusage die Bewertung nicht mehr zurück. Fehlt = nie gesetzt.
+   */
+  readonly rsvpAbsence?: boolean;
 }
 
 export const BLANK_RATING: Rating = {
@@ -138,6 +143,7 @@ export function ratingFromDoc(data: Readonly<Record<string, unknown>> | undefine
     assists: count(data['assists'], MAX_GOALS_OR_ASSISTS),
     note: typeof data['note'] === 'string' ? data['note'] : '',
     autoAbsence: data['autoAbsence'] === true,
+    ...(data['rsvpAbsence'] === true ? { rsvpAbsence: true } : {}),
   };
 }
 
@@ -161,12 +167,14 @@ export function docFromRating(rating: Rating, options: { clearAuto?: boolean } =
   };
   if (rating.autoAbsence) doc['autoAbsence'] = true;
   else if (options.clearAuto) doc['autoAbsence'] = false;
+  // Markierung einer Absage (SCRUM-205): nur geschrieben, wenn gesetzt (true) oder gerade zurückgenommen (false).
+  if (rating.rsvpAbsence !== undefined) doc['rsvpAbsence'] = rating.rsvpAbsence;
   return doc;
 }
 
 export interface RatingChange {
   readonly rating: Rating;
-  /** Die Handänderung hat eine automatisch gesetzte Abwesenheit zur normalen gemacht. */
+  /** Die Handänderung hat eine automatisch (oder durch eine Absage) gesetzte Abwesenheit zur normalen gemacht. */
   readonly clearedAuto: boolean;
 }
 
@@ -178,8 +186,9 @@ export interface RatingChange {
  * - Eine Handänderung macht aus einer automatisch gesetzten Abwesenheit eine normale.
  */
 export function applyChange(rating: Rating, field: RatingField, value: string, matchDuration: number): RatingChange {
-  const clearedAuto = rating.autoAbsence;
-  let next: Rating = { ...rating, autoAbsence: false };
+  // Auch eine von einer Absage gesetzte Abwesenheit wird durch die Handänderung zu einer normalen (SCRUM-205).
+  const clearedAuto = rating.autoAbsence || rating.rsvpAbsence === true;
+  let next: Rating = { ...rating, autoAbsence: false, ...(rating.rsvpAbsence ? { rsvpAbsence: false } : {}) };
   switch (field) {
     case 'attendance': {
       const attendance = ATTENDANCES.find((entry) => entry === value);

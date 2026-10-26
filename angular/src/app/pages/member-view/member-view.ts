@@ -24,6 +24,7 @@ import { HomeRanking } from '../home/home-ranking/home-ranking';
 import { LoadReportAction } from '../profile/load-report-action';
 import { ProfileExtras } from '../profile/profile-extras';
 import { ConnectEmail } from './connect-email';
+import { RsvpPanel } from './rsvp-panel';
 
 /**
  * Die eine Ansicht für Spieler, Eltern, Medizin und Scouts (Figma 01c/01d). Sie zeigt nur, was die Firestore-Regeln
@@ -38,10 +39,11 @@ import { ConnectEmail } from './connect-email';
  *   Rückmeldungen oder Notizen.
  * Es gibt keine Navigation zu Trainer-Bereichen; die Trainer-Routen sperrt `trainerGuard`.
  * Spieler-Zugänge ohne E-Mail können sich hier nachträglich mit E-Mail und Passwort verbinden (SCRUM-114).
+ * Spieler und Eltern sagen hier für die nächsten Termine zu oder ab (SCRUM-205).
  */
 @Component({
   selector: 'app-member-view',
-  imports: [RouterLink, Button, Card, InstallHint, Status, ProfileExtras, BreakNotice, LoadReportAction, HomeRanking, ConnectEmail],
+  imports: [RouterLink, Button, Card, InstallHint, Status, ProfileExtras, BreakNotice, LoadReportAction, HomeRanking, ConnectEmail, RsvpPanel],
   templateUrl: './member-view.html',
   styleUrls: ['../profile/profile.css', './member-view.css', '../../ui/chart/chart.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,

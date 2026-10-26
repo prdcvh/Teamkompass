@@ -92,16 +92,18 @@ export class EventsApi {
   }
 
   /**
-   * Löscht das Event samt Bewertungen und internen Notizen (in Blöcken, Limit 500 je Schreibvorgang). Der Eintrag des
+   * Löscht das Event samt Bewertungen, internen Notizen und Zu-/Absagen (in Blöcken, Limit 500 je Schreibvorgang). Der Eintrag des
    * Events in der Zusammenfassung jedes bewerteten Spielers geht im selben Block wie seine Bewertung mit (SCRUM-201).
    */
   async deleteEvent(id: string): Promise<void> {
     const { db } = await this.connection.get();
     const { collection, deleteField, doc, getDocs, writeBatch } = await import('firebase/firestore');
     const base = ['teams', this.team.id(), 'events', id] as const;
-    const [ratings, privateNotes, withSummary] = await Promise.all([
+    const [ratings, privateNotes, responses, withSummary] = await Promise.all([
       getDocs(collection(db, ...base, 'ratings')),
       getDocs(collection(db, ...base, 'privateNotes')),
+      // Zu-/Absagen (SCRUM-205): der Grund kann ein Gesundheitsdatum sein und darf nicht verwaist liegen bleiben.
+      getDocs(collection(db, ...base, 'responses')),
       this.statsMode.writesSummary(),
     ]);
     type Op = (batch: ReturnType<typeof writeBatch>) => void;
@@ -121,6 +123,7 @@ export class EventsApi {
           : []),
       ]),
       ...privateNotes.docs.map((entry) => remove(entry.ref)),
+      ...responses.docs.map((entry) => remove(entry.ref)),
       remove(doc(db, ...base)), // zuletzt: bricht ein Block ab, bleibt das Event sichtbar und der Löschversuch wiederholbar
     ];
     for (let offset = 0; offset < ops.length; offset += 450) {

@@ -63,7 +63,7 @@ export class PlayersApi {
     await setDoc(doc(db, 'teams', this.team.id(), 'players', id), data, { merge: true });
   }
 
-  /** Löscht den Spieler samt Unterdaten, Bewertungen, internen Notizen in allen Events und Zusammenfassung (in Blöcken, Limit 500 je Schreibvorgang). */
+  /** Löscht den Spieler samt Unterdaten, Bewertungen, internen Notizen und Zu-/Absagen in allen Events und Zusammenfassung (in Blöcken, Limit 500 je Schreibvorgang). */
   async deletePlayer(id: string): Promise<void> {
     const { db } = await this.connection.get();
     const { collection, doc, getDocs, query, where, writeBatch } = await import('firebase/firestore');
@@ -79,6 +79,8 @@ export class PlayersApi {
       ...events.docs.map((event) => doc(db, ...base, 'events', event.id, 'ratings', id)),
       // Interne Trainer-Notizen (SCRUM-14) liegen getrennt von der Bewertung.
       ...events.docs.map((event) => doc(db, ...base, 'events', event.id, 'privateNotes', id)),
+      // Zu-/Absagen des Spielers (SCRUM-205), wie in der bisherigen App.
+      ...events.docs.map((event) => doc(db, ...base, 'events', event.id, 'responses', id)),
       // Einladungscodes und Zugänge des Spielers (SCRUM-53): sonst zeigen sie auf einen gelöschten Spieler.
       ...invites.docs.map((entry) => entry.ref),
       ...members.docs.map((entry) => entry.ref),
