@@ -4887,6 +4887,12 @@ function nextNumber() {
   return 99;
 }
 
+// SCRUM-25: Meldet "wirklich gespeichert" (Validierung bestanden, lokal abgelegt) an next-level.js,
+// das daraus den Aktivitaetsverlauf speist. Abgebrochene Speicherungen melden nichts.
+function announceSaved(form) {
+  document.dispatchEvent(new CustomEvent("teamkompass:saved", { detail: { form } }));
+}
+
 function savePlayer(event) {
   event.preventDefault();
   const id = $("#playerId").value || `p${crypto.randomUUID()}`;
@@ -4923,6 +4929,7 @@ function savePlayer(event) {
   else state.players.push(player);
   $("#playerDialog").close();
   persist();
+  announceSaved("playerForm");
   cloudSavePlayer(player);
   // "Verletzt" ohne Datum wirkt nur ab heute; wird es zurueckgenommen, bleibt vergangenes "Fehlt" (SCRUM-164).
   const wasOpen = isOpenInjury(previous);
@@ -5040,6 +5047,7 @@ function saveEvent(event) {
   state.selectedEventId = newEvent.id;
   $("#eventDialog").close();
   persist();
+  announceSaved("eventForm");
   cloudSaveEvent(newEvent);
   renderAll();
   if (!existing) {
@@ -5192,6 +5200,7 @@ function saveDevelopmentPlan(event) {
   else state.developmentPlans[playerId].push(plan);
   resetDevelopmentPlanForm();
   persist();
+  announceSaved("developmentPlanForm");
   cloudSaveDevelopmentPlan(playerId, plan);
   drawProfile();
 }
@@ -5404,6 +5413,7 @@ function saveAbsence(event) {
   else state.absences[playerId].push(absence);
   resetAbsenceForm();
   persist();
+  announceSaved("absenceForm");
   cloudSaveAbsence(playerId, absence);
   reconcileAbsences();
   drawProfile();
@@ -5483,6 +5493,7 @@ function saveMeasurement(event) {
   else state.measurements[playerId].push(measurement);
   resetMeasurementForm();
   persist();
+  announceSaved("measurementForm");
   cloudSaveMeasurement(playerId, measurement);
   drawProfile();
   renderSquad();
@@ -6558,6 +6569,7 @@ function saveOpponent(event) {
   else state.opponents.push(opponent);
   resetOpponentForm();
   persist();
+  announceSaved("opponentForm");
   cloudSaveOpponent(opponent);
   renderOpponentAnalysis();
 }
