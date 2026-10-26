@@ -1180,6 +1180,10 @@ let measurementListeners = {};
 // Zu-/Absagen (SCRUM-175): Trainer je Event die ganze Unter-Collection, Spieler/Eltern nur das eigene Dokument.
 let responseListeners = {};
 let legacyBlobMode = false;
+// SCRUM-166: Ladezustand der Event-Abfrage ("idle" | "loading" | "ready" | "error"), damit die Liste
+// waehrend der ersten Firestore-Abfrage nicht "Noch keine Events angelegt" meldet. Nur Lesezustand.
+let eventsLoadState = "idle";
+function getEventsLoadState() { return eventsLoadState; }
 let legacyCloudSaveTimer = null;
 const cloudCache = { players: [], events: [], ratings: {}, privateNotes: {}, responses: {}, developmentPlans: {}, absences: {}, measurements: {}, opponents: [], lineup: null };
 
@@ -1354,6 +1358,7 @@ function startCloudSync() {
   cloudCache.measurements = {};
   cloudCache.opponents = [];
   cloudCache.lineup = null;
+  eventsLoadState = currentRole === "scout" ? "idle" : "loading";
 
   // Scouts lesen ausschliesslich die bereinigte Scout-Sicht - keine Events, Spieler oder Bewertungen.
   if (currentRole === "scout") {
@@ -1369,6 +1374,7 @@ function startCloudSync() {
   cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("events"), (snapshot) => {
     cloudCache.events = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
     scoutPublish.eventsLoaded = true;
+    eventsLoadState = "ready";
     const eventIds = cloudCache.events.map((event) => event.id);
     if (currentRole === "trainer") {
       syncRatingListeners(eventIds);
@@ -1380,7 +1386,11 @@ function startCloudSync() {
     if (["player", "parent"].includes(currentRole) && currentPlayerId) syncResponseListeners(rsvpListenerEventIds(cloudCache.events, localIsoDate(), 0));
     rebuildStateFromCloudCache();
     cloudListenerRecovered("events");
-  }, (error) => cloudListenerFailed("events", error)));
+  }, (error) => {
+    eventsLoadState = "error";
+    cloudListenerFailed("events", error);
+    requestCloudRender();
+  }));
 
   if (currentRole === "trainer") {
     cloudUnsubscribers.push(firestoreModule.onSnapshot(teamCollection("players"), (snapshot) => {
@@ -1835,6 +1845,7 @@ async function publishScoutProfiles() {
 }
 
 function stopCloudSync() {
+  eventsLoadState = "idle";
   resetScoutPublish();
   cloudUnsubscribers.forEach((unsubscribe) => unsubscribe());
   cloudUnsubscribers = [];
@@ -4610,8 +4621,12 @@ function renderEvents() {
 
   // SCRUM-131: leerer Datenbestand und Suche ohne Treffer sind zwei verschiedene Faelle.
   const filterEmpty = state.events.length > 0 && !events.length;
+  // SCRUM-166: "Noch keine Events angelegt" erst nach abgeschlossener, leerer Abfrage.
+  const loadState = getEventsLoadState();
   $("#eventList").innerHTML = eventCardsHtml(upcoming) || (
-    !state.events.length ? `<p class="muted">Noch keine Events angelegt.</p>`
+    !state.events.length && loadState === "loading" ? `<p class="muted" role="status">Events werden geladen …</p>`
+      : !state.events.length && loadState === "error" ? `<p class="muted" role="status">Events konnten nicht geladen werden.</p>`
+      : !state.events.length ? `<p class="muted">Noch keine Events angelegt.</p>`
       : filterEmpty ? `<p class="muted">Keine Events für diese Suche gefunden.</p><button class="ghost-button" type="button" data-reset-event-filter>Filter zurücksetzen</button>`
       : `<p class="muted">Keine anstehenden Events.</p>`
   );
