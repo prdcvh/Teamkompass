@@ -356,13 +356,8 @@ export class AuthService {
    */
   private purgeLocalCache(): Promise<void> {
     this.purging ??= (async () => {
-      try {
-        // Wie die Firestore-Warteschlange: noch nicht gesendete Live-Punkte (SCRUM-216) bleiben nach dem Abmelden nicht liegen.
-        // Erst hier (nicht beim Start) geholt, damit der Postausgang keine Abhängigkeit beim Anlegen des AuthService wird.
-        this.injector.get(LiveOutboxService).clear();
-      } catch (error) {
-        console.error(error);
-      }
+      // Wie die Firestore-Warteschlange: ungesendete Live-Punkte (SCRUM-216) bleiben nicht liegen. Erst hier geholt (keine Startabhängigkeit).
+      try { this.injector.get(LiveOutboxService).clear(); } catch (error) { console.error(error); }
       try {
         if (!(await this.authApi.clearLocalCache())) {
           await new Promise((resolve) => setTimeout(resolve, CACHE_CLEAR_RETRY_MS));

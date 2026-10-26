@@ -116,6 +116,10 @@ fake.teams.metas.set('Team0000000000000002', { name: 'FC Beispiel U15', label: '
 // schon mit E-Mail verbundener Spieler-Zugang.
 fake.access.invites.set('e2e-einladung', { role: 'player', playerId: 'p1', expiresAt: null, expiresAtRaw: null });
 fake.access.members.set('e2e-player-email', { role: 'player', playerId: 'p1' });
+// Funkloch (SCRUM-216): Browser „offline“ (DevTools bzw. Playwright `setOffline`) hält Live-Punkte wie Firestore ohne
+// Netz zurück, bis der Browser wieder online ist.
+window.addEventListener('offline', () => fake.ratings.goOffline());
+window.addEventListener('online', () => fake.ratings.goOnline());
 if (new URLSearchParams(location.search).get('as') === 'fresh') {
   fake.players.players.clear();
   fake.events.events.clear();
