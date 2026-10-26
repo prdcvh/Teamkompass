@@ -66,7 +66,7 @@ lege ich ein Ticket an.
 ## 3. Ablaufplan für den Umstieg (Entwurf – vor Umsetzung mit dem PO abstimmen)
 
 **Voraussetzungen:** SCRUM-122, SCRUM-123, SCRUM-124, SCRUM-125 sind erledigt ✅. SCRUM-78 (U14-Testkonto)
-und der vollständige Durchlauf als Trainer, Spieler und Scout: ungeprüft (hier nicht belegbar). Offen: Zu-/Absagen
+erledigt ✅. Der vollständige Durchlauf als Trainer, Spieler und Scout ist nicht belegt. Offen: Zu-/Absagen
 in Angular (SCRUM-205, in Arbeit).
 
 **Empfehlung: Angular liest direkt die bisherigen Team-Daten** (z. B. `mein-team`), statt Daten zu
@@ -108,5 +108,5 @@ kopieren. Dann gibt es keinen Datenumzug und keinen Stichtag, an dem zwei Ständ
 - Die Altdaten-Migration wird nicht übernommen. ✅
 - Antippen statt Ziehen, Monatsgruppen bei vergangenen Events: in Ordnung. Das Vereinslogo muss statt „TK“ erscheinen
   (umgesetzt). ✅
-- Vor dem Umschalten von U17 offen (damals): SCRUM-122, SCRUM-123 (inzwischen erledigt), SCRUM-78 (Testkonto, ungeprüft)
+- Vor dem Umschalten von U17 offen (damals): SCRUM-122, SCRUM-123 (inzwischen erledigt), SCRUM-78 (Testkonto, inzwischen erledigt)
   und ein Testlauf gegen die echten U17-Daten auf einer Vorschau-Adresse (U17 ist seit 24.10. umgestellt).
