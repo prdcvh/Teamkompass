@@ -41,8 +41,14 @@ build step, no bundler, no test suite.
   `u17` build (`ng build -c production,u17`, `teamId: U17`) to hosting target
   `u17` → https://teamkompass-u17.web.app/, the **live U17 team with real
   data** (`FIREBASE_SETUP.md` §11). So an Angular change is live for real
-  U17 users right after merge — say so. Every PR also gets a U17 Angular
-  preview channel (real U17 data). `mein-team`/`U15` still run on
+  U17 users right after merge — say so. Every PR gets an Angular preview
+  channel of the **default build (test team `U14`) on target `u14`** — since
+  SCRUM-206 a PR preview must never ship a live-team build (`U17`,
+  `mein-team`, `U15` = real data); `tests/preview-guard.test.mjs` enforces
+  this for every deploy step in `firebase-hosting-pull-request.yml` (only
+  known exception: the legacy `outputs/team-manager` preview on `main`,
+  SCRUM-218). Note U14 still lives in the production Firebase project with
+  data copied from `mein-team`. `mein-team`/`U15` still run on
   `outputs/*` until their own cutover (SCRUM-169).
 
 **A feature request against "the app" almost always means every copy**

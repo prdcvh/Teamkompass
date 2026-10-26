@@ -215,8 +215,12 @@ Die Angular-Neuentwicklung (Jira-Epic SCRUM-40) wird als eigene Hosting-Site
 - `.github/workflows/firebase-hosting-merge.yml`: Der Angular-Build laeuft bereits in
   `npm run verify`; danach deployt ein eigener Schritt `target: u14` (als letzter Schritt,
   damit ein Problem dort die Live-Teams nicht aufhaelt).
-- Fuer Pull-Request-Vorschauen wird das Target `u14` nicht gebaut (Vorschau des Angular-Builds gibt es
-  seit SCRUM-169 auf der Site `teamkompass-u17`, siehe Abschnitt 11).
+- Pull-Request-Vorschau (seit SCRUM-206): jeder PR bekommt eine Vorschau des Angular-Standard-Builds
+  (Testteam `U14`) auf `teamkompass-u14--pr<Nr>-<branch>.web.app`. Eine Vorschau darf nie den Build eines
+  Live-Teams (`U17`, `mein-team`, `U15`) ausliefern; `tests/preview-guard.test.mjs` prueft dafuer jeden
+  Deploy-Schritt in `firebase-hosting-pull-request.yml` (Ziel, Build, Team-ID, Projekt-ID). Einzige bekannte
+  Ausnahme: die Alt-App-Vorschau auf Ziel `main` (`outputs/team-manager`, echte mein-team-Daten) bis SCRUM-218.
+  Achtung: U14 liegt im selben Firebase-Projekt und enthaelt von `mein-team` kopierte Daten (Abschnitt 8).
 - PWA (SCRUM-76): Manifest `angular/public/manifest.webmanifest`, Service Worker von Angular
   (`angular/ngsw-config.json`, nur im Produktions-Build). `ngsw.json`/`ngsw-worker.js` fallen unter
   die `no-cache`-Regel `**`, Updates kommen also sofort an (Hinweis "Neue Version verfuegbar").
@@ -320,10 +324,10 @@ App `outputs/u17/` bleibt im Repo, nur für den Rückweg.
   SPA-Rewrite wie beim Ziel `u14`.
 - `.github/workflows/firebase-hosting-merge.yml`: der Verify-Job lädt `angular/dist/team-u17/browser`
   als Artefakt `angular-dist-u17` hoch, der Deploy-Job legt es dorthin zurück und deployt `target: u17`.
-- `.github/workflows/firebase-hosting-pull-request.yml`: jeder PR bekommt zusätzlich eine
-  **Vorschau der U17-Angular-App** auf `teamkompass-u17--pr<Nr>-<branch>.web.app` (eigener Bot-Kommentar
-  im PR). Achtung: die Vorschau arbeitet mit den **echten U17-Daten** – dort nur lesen bzw. gezielt testen.
-- Vorschaukanäle beider Sites räumt `firebase-preview-cleanup.yml` auf.
+- PR-Vorschau: **keine** U17-Vorschau mehr (SCRUM-206) – unfreigegebener Code soll nicht gegen echte
+  U17-Daten laufen. Die Angular-Vorschau je PR ist der Testteam-Build auf `teamkompass-u14` (Abschnitt 8).
+  Den Angular-Stand der U17 sieht man erst nach dem Merge live.
+- Alte U17-Vorschaukanäle (von vor SCRUM-206) räumt `firebase-preview-cleanup.yml` weiter mit auf.
 
 ### Rückweg auf die alte App
 

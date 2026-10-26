@@ -379,14 +379,12 @@ test("Live-Team U17 läuft auf dem Angular-Build mit Team-ID U17, Rückweg outpu
   assert.match(mergeDeploy, /download-artifact[\s\S]*?name: angular-dist-u17\n\s+path: angular\/dist\/team-u17\/browser/);
   assert.ok(mergeDeploy.indexOf("angular-dist-u17") < mergeDeploy.indexOf("target: u17"), "Build muss vor dem u17-Deploy da sein");
 
-  // Vorschau je PR auf der Site teamkompass-u17, damit der PO den Angular-Build vor dem Merge sieht.
+  // Seit SCRUM-206 keine PR-Vorschau mehr auf der Live-Site der U17 (echte Daten); die Angular-Vorschau ist der
+  // Testteam-Build auf u14 (Pruefung: tests/preview-guard.test.mjs). Alte U17-Vorschaukanaele raeumt weiter
+  // firebase-preview-cleanup.yml auf (SCRUM-132).
   const preview = await read(".github/workflows/firebase-hosting-pull-request.yml");
-  const [previewVerify, previewDeploy] = preview.split(/\n  build_and_preview:/);
-  assert.match(previewVerify, /name: angular-dist-u17\n\s+path: angular\/dist\/team-u17\/browser/);
-  assert.match(previewDeploy, /download-artifact[\s\S]*?name: angular-dist-u17[\s\S]*?target: u17/);
-  assert.doesNotMatch(previewDeploy, /channelId: live/, "PR-Vorschau darf nie live deployen");
-  // Die Vorschaukanaele der U17-Site werden wie die der Haupt-Site aufgeraeumt (SCRUM-132).
-  assert.match(await read(".github/workflows/firebase-preview-cleanup.yml"), /SITES: teamkompass-b8aac teamkompass-u17/);
+  assert.doesNotMatch(preview, /target: u17|team-u17/);
+  assert.match(await read(".github/workflows/firebase-preview-cleanup.yml"), /SITES: teamkompass-b8aac teamkompass-u14 teamkompass-u17/);
 
   // Rückweg: die alte U17-App bleibt vollständig im Repo (firebase.json-Eintrag zurück auf outputs/u17).
   for (const file of ["index.html", "app.js", "firebase-config.js", "service-worker.js", "assets/club-logo.png"]) await read(`outputs/u17/${file}`);

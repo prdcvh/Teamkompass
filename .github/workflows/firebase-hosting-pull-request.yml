@@ -4,6 +4,11 @@
 # Aufbau (SCRUM-57): Code des Pull Requests (npm ci, verify) laeuft nur im Job "verify" OHNE Zugriff auf das
 # Service-Account-Secret. Der Job "build_and_preview" mit dem Secret fuehrt keinen PR-Code und keine
 # npm-Install-Skripte aus, er laedt nur die statischen Dateien in den Vorschau-Kanal.
+#
+# SCRUM-206: Eine Vorschau zeigt noch nicht freigegebenen Code. Sie darf deshalb nie mit der Konfiguration eines
+# Live-Teams (U17, mein-team, U15 = echte Daten) laufen. Die Angular-Vorschau ist der Standard-Build (Testteam U14)
+# auf der Test-Site teamkompass-u14. tests/preview-guard.test.mjs prueft jeden Deploy-Schritt hier (Ziel, Build,
+# Team-ID, Projekt-ID). Bekannte Ausnahme bis SCRUM-218: die Alt-App-Vorschau auf Ziel main.
 
 name: Deploy to Firebase Hosting on PR
 on: pull_request
@@ -28,11 +33,11 @@ jobs:
         run: npm ci --ignore-scripts --prefix angular
       - name: Verify application
         run: npm run verify
-      # SCRUM-169: Angular-Build der U17 (echte Teamdaten teams/U17) als Vorschau auf der Site teamkompass-u17.
+      # Angular-Standard-Build (Testteam U14, kein Live-Team) als Vorschau auf der Site teamkompass-u14.
       - uses: actions/upload-artifact@v7
         with:
-          name: angular-dist-u17
-          path: angular/dist/team-u17/browser
+          name: angular-dist
+          path: angular/dist/teamkompass-angular/browser
           if-no-files-found: error
           retention-days: 1
   build_and_preview:
@@ -51,11 +56,11 @@ jobs:
           target: main
       - uses: actions/download-artifact@v8
         with:
-          name: angular-dist-u17
-          path: angular/dist/team-u17/browser
+          name: angular-dist
+          path: angular/dist/teamkompass-angular/browser
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TEAMKOMPASS_B8AAC }}
           projectId: teamkompass-b8aac
-          target: u17
+          target: u14
