@@ -88,7 +88,7 @@ test("Vorschau-Kopie der Alt-App: nur teamId (Testteam) und Name aendern sich (S
     const preview = legacyPreviewConfig(original);
     assert.match(preview, new RegExp(`teamId: "${LEGACY_PREVIEW_TEAM_ID}"`), dir);
     assert.doesNotMatch(preview, /teamId: "(mein-team|U15|U17)"/, dir);
-    assert.match(preview, /teamName: "[^"]*\(Vorschau · Testteam U14\)"/, dir);
+    assert.match(preview, /teamName: "[^"]*\(Vorschau\)"/, dir);
     assert.equal(strip(preview), strip(original), `${dir}: sonst unveraendert`);
   }
   assert.throws(() => legacyPreviewConfig("window.TEAMKOMPASS_CONFIG = {};"), /genau eine teamId/);

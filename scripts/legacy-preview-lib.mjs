@@ -7,8 +7,8 @@
 /** Testteam der Vorschau (gleiches Team wie der Angular-Standard-Build, angular/src/environments/environment.ts). */
 export const LEGACY_PREVIEW_TEAM_ID = "U14";
 
-/** Hinweis im App-Kopf, damit die Vorschau nie mit der Live-App verwechselt wird. */
-export const LEGACY_PREVIEW_LABEL = `Vorschau · Testteam ${LEGACY_PREVIEW_TEAM_ID}`;
+/** Hinweis im App-Kopf, damit die Vorschau nie mit der Live-App verwechselt wird (kurz: passt auch auf 390 px). */
+export const LEGACY_PREVIEW_LABEL = "Vorschau";
 
 /** Zielordner der Vorschau-Kopie fuer einen Alt-App-Ordner: outputs/team-manager -> dist/preview/team-manager. */
 export function legacyPreviewDir(sourceDir) {

@@ -222,7 +222,7 @@ Die Angular-Neuentwicklung (Jira-Epic SCRUM-40) wird als eigene Hosting-Site
 - Alt-App-Vorschau (seit SCRUM-218): Die Vorschau der Alt-App auf `teamkompass-b8aac--pr<Nr>-<branch>.web.app`
   (Ziel `main`) laeuft ebenfalls mit dem Testteam `U14`, nicht mehr mit `mein-team`. Der Verify-Job baut mit
   `node scripts/legacy-preview.mjs outputs/team-manager` eine Kopie nach `dist/preview/team-manager`, in der nur
-  `firebase-config.js` geaendert ist (`teamId: "U14"`, Name mit Zusatz "Vorschau · Testteam U14"). Der Vorschau-Job
+  `firebase-config.js` geaendert ist (`teamId: "U14"`, Name mit Zusatz "(Vorschau)"). Der Vorschau-Job
   leert `outputs/team-manager`, legt die Kopie dorthin und deployt in den Vorschau-Kanal. Der Live-Kanal
   (Merge-Workflow) liefert weiter `outputs/team-manager` aus dem Repo (mein-team) aus. Anmeldung in der Vorschau
   mit einem Trainer-Konto, das unter `teams/U14/members` eingetragen ist (beim Kopieren aus mein-team mitkopiert).
