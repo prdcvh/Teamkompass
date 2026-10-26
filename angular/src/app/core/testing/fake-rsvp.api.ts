@@ -14,12 +14,12 @@ export class FakeRsvpApi implements Pick<RsvpApi, keyof RsvpApi> {
   private listeners = new Map<string, Set<Listener>>();
   private ownListeners = new Map<string, Set<OwnListener>>();
 
-  async watchResponses(eventId: string, onData: Listener, _onError: (error: unknown) => void): Promise<() => void> {
+  async watchResponses(eventId: string, onData: Listener): Promise<() => void> {
     this.calls.push(`watchResponses:${eventId}`);
     return this.add(this.listeners, eventId, onData, () => onData(this.docs(eventId)));
   }
 
-  async watchOwnResponse(eventId: string, playerId: string, onData: OwnListener, _onError: (error: unknown) => void): Promise<() => void> {
+  async watchOwnResponse(eventId: string, playerId: string, onData: OwnListener): Promise<() => void> {
     this.calls.push(`watchOwnResponse:${eventId}:${playerId}`);
     return this.add(this.ownListeners, `${eventId}/${playerId}`, onData, () => onData(this.responses.get(eventId)?.get(playerId) ?? null));
   }

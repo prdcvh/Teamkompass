@@ -127,10 +127,9 @@ export class RsvpService {
     if (!sameMode(mode, this.mode)) {
       this.stop();
       this.mode = mode;
-      if (mode) {
-        this.events.start();
-        if (mode.kind === 'trainer') this.squad.start();
-      }
+      // Nur starten, was noch gar nicht läuft (ein laufendes oder gerade geladenes Abo bleibt unangetastet).
+      if (mode && this.events.load() === 'idle') this.events.start();
+      if (mode?.kind === 'trainer' && this.squad.load() === 'idle') this.squad.start();
     }
     if (!mode) return;
     const ids =
