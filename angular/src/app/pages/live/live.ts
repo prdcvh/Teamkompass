@@ -74,6 +74,9 @@ export class Live implements OnInit, OnDestroy {
     effect(() => {
       const id = this.eventId();
       untracked(() => {
+        // Anderes Event (Route wiederverwendet): der Rückgängig-Stapel gehört zum alten Event und wird verworfen.
+        this.undoStack.set([]);
+        this.feedback.set(null);
         if (id) this.ratings.start(id);
       });
     });
