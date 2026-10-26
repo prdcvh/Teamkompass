@@ -112,6 +112,10 @@ fake.teams.memberships.set('e2e-multi', [
 ]);
 fake.teams.metas.set('U14', { name: 'Test-Team U14 (Angular)', label: 'U14 Test', clubId: 'test-verein', clubName: 'Test-Verein (Angular-Test)', logoUrl: null });
 fake.teams.metas.set('Team0000000000000002', { name: 'FC Beispiel U15', label: 'U15', clubId: 'c2', clubName: 'FC Beispiel', logoUrl: null });
+// Spieler-Konto mit Einladungscode + E-Mail (SCRUM-114): ein offener Code für Spieler p1; ?as=player-email ist ein
+// schon mit E-Mail verbundener Spieler-Zugang.
+fake.access.invites.set('e2e-einladung', { role: 'player', playerId: 'p1', expiresAt: null, expiresAtRaw: null });
+fake.access.members.set('e2e-player-email', { role: 'player', playerId: 'p1' });
 if (new URLSearchParams(location.search).get('as') === 'fresh') {
   fake.players.players.clear();
   fake.events.events.clear();
@@ -125,11 +129,12 @@ bootstrapApplication(App, {
     // Meldet nach dem Start der Anmeldeprüfung einen angemeldeten Trainer.
     provideAppInitializer(() => {
       inject(AuthApi);
-      // ?as=player | physio | scout | medical | none wählt eine andere Rolle bzw. „nicht angemeldet“ (Anmeldeseite).
+      // ?as=player | player-email | physio | scout | medical | none wählt eine andere Rolle bzw. „nicht angemeldet“ (Anmeldeseite).
       const as = new URLSearchParams(location.search).get('as');
       const user =
         as === 'none' ? null
         : as === 'player' ? { uid: 'e2e-player', isAnonymous: true, email: null }
+        : as === 'player-email' ? { uid: 'e2e-player-email', isAnonymous: false, email: 'kind@example.org' }
         : as === 'physio' ? { uid: 'e2e-physio', isAnonymous: false, email: 'physio@example.org' }
         : as === 'scout' || as === 'medical' ? { uid: 'e2e-scout', isAnonymous: false, email: 'scout@example.org' }
         : as === 'multi' ? { uid: 'e2e-multi', isAnonymous: false, email: 'multi@example.org' }

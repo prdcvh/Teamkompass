@@ -25,12 +25,21 @@ describe('Login – Einladungslink mit Team', () => {
   }
 
   const root = (fixture: { nativeElement: unknown }) => fixture.nativeElement as HTMLElement;
+  /** E-Mail und Passwort des neuen Spieler-Kontos (SCRUM-114). */
+  const fillAccount = (fixture: { nativeElement: unknown }) => {
+    for (const [name, value] of [['newEmail', 'kind@familie.de'], ['newPassword', 'Sicher-Passwort-1'], ['newRepeat', 'Sicher-Passwort-1']]) {
+      const input = root(fixture).querySelector(`input[name="${name}"]`) as HTMLInputElement;
+      input.value = value;
+      input.dispatchEvent(new Event('input'));
+    }
+  };
   afterEach(() => vi.restoreAllMocks());
 
   it('füllt den Code ein und löst ihn im Team aus dem Link ein', async () => {
     const fixture = await render({ team: 'U17', code: 'c0de' });
-    expect(root(fixture).querySelector('h3')?.textContent).toBe('Spieler- oder Elternzugang');
+    expect(root(fixture).querySelector('h3')?.textContent).toBe('Neu hier? Code einlösen');
     firebase.access.invites.set('c0de', { role: 'player', playerId: 'p1', expiresAt: null });
+    fillAccount(fixture);
     (root(fixture).querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit'));
     await vi.waitFor(() => expect(firebase.calls).toContain('claim:c0de'));
     expect(TestBed.inject(CurrentTeam).id()).toBe('U17');
@@ -41,6 +50,7 @@ describe('Login – Einladungslink mit Team', () => {
   it('ignoriert ein Team mit unzulässigen Zeichen', async () => {
     const fixture = await render({ team: '../x', code: 'c0de' });
     firebase.access.invites.set('c0de', { role: 'player', playerId: 'p1', expiresAt: null });
+    fillAccount(fixture);
     (root(fixture).querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit'));
     await vi.waitFor(() => expect(firebase.calls).toContain('claim:c0de'));
     expect(TestBed.inject(CurrentTeam).id()).toBe(TestBed.inject(CurrentTeam).fallbackId);

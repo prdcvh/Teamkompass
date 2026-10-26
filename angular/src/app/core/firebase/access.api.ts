@@ -20,7 +20,12 @@ export class AccessApi {
     // Bisherige Scout-Konten tragen noch „medical“ und werden hier zu Scouts (SCRUM-170).
     const role = normalizeRole(data['role']);
     if (!role) return null;
-    return { role, playerId: typeof data['playerId'] === 'string' ? data['playerId'] : null };
+    const expires = data['expiresAt'] as { toDate?: () => Date } | null | undefined;
+    return {
+      role,
+      playerId: typeof data['playerId'] === 'string' ? data['playerId'] : null,
+      expiresAt: expires?.toDate ? expires.toDate() : null,
+    };
   }
 
   async readInvite(code: string): Promise<InviteRecord | null> {

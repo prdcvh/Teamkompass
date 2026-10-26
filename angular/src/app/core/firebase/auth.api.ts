@@ -36,6 +36,22 @@ export class AuthApi {
     return credential.user.uid;
   }
 
+  /**
+   * Verbindet das angemeldete anonyme Spieler-Konto mit E-Mail und Passwort (SCRUM-114). Firebase behält dabei die
+   * Benutzer-ID: das members-Dokument und damit Rolle, Spielerprofil, Befristung und Sperre bleiben unverändert, und
+   * die Firestore-Regeln müssen nichts Neues erlauben. Verknüpft wird nur, wenn noch genau das erwartete Konto
+   * angemeldet ist (kein Verknüpfen eines inzwischen gewechselten Kontos).
+   */
+  async linkEmail(expectedUid: string, email: string, password: string): Promise<FirebaseUser> {
+    const { auth } = await this.connection.get();
+    const { EmailAuthProvider, linkWithCredential } = await import('firebase/auth');
+    const current = auth.currentUser;
+    if (!current || current.uid !== expectedUid) throw Object.assign(new Error('user-changed'), { code: 'auth/requires-recent-login' });
+    if (!current.isAnonymous) throw Object.assign(new Error('already-linked'), { code: 'auth/provider-already-linked' });
+    const { user } = await linkWithCredential(current, EmailAuthProvider.credential(email, password));
+    return { uid: user.uid, isAnonymous: user.isAnonymous, email: user.email, emailVerified: user.emailVerified };
+  }
+
   /** Schickt die Mail zum Zurücksetzen des Passworts (der Nutzer setzt es selbst über den Link in der Mail). */
   async sendPasswordReset(email: string): Promise<void> {
     const { auth } = await this.connection.get();

@@ -1,12 +1,15 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
-import { INVITE_ROLES, type InviteRole, parseExpiryDays, playerInviteLink } from '../../core/access/access';
+import { parseExpiryDays, playerInviteLink } from '../../core/access/access';
 import { CurrentTeam } from '../../core/team/current-team.service';
 import { AccessService } from '../../core/access/access.service';
 import { consentRevokedMessage, isConsentRevoked, type Player } from '../../core/player/player';
 import { Button } from '../../ui/button/button';
 import { Dialog } from '../../ui/dialog/dialog';
 
-/** Einladungscode für einen Spieler oder ein Elternteil erzeugen; der Code wird danach einmalig angezeigt. */
+/**
+ * Einladungscode für einen Spieler erzeugen; der Code wird danach einmalig angezeigt. Seit SCRUM-114 gibt es keine Wahl
+ * Spieler/Eltern mehr: Eltern und Spieler teilen sich einen Zugang, für ein weiteres Konto gibt es einen weiteren Code.
+ */
 @Component({
   selector: 'tk-invite-dialog',
   imports: [Dialog, Button],
@@ -22,14 +25,12 @@ export class InviteDialog {
   readonly players = input<readonly Player[]>([]);
   readonly closed = output<void>();
 
-  protected readonly roles = INVITE_ROLES;
   protected readonly playerId = signal('');
-  protected readonly role = signal<InviteRole>('player');
   protected readonly days = signal('');
   protected readonly errors = signal<{ player?: string; days?: string }>({});
   protected readonly busy = signal(false);
   protected readonly failure = signal('');
-  protected readonly created = signal<{ code: string; expiresAt: Date | null; player: string; role: InviteRole } | null>(null);
+  protected readonly created = signal<{ code: string; expiresAt: Date | null; player: string } | null>(null);
   protected readonly copied = signal(false);
 
   protected readonly selected = computed(() => this.players().find((player) => player.id === this.playerId()) ?? null);
@@ -49,7 +50,6 @@ export class InviteDialog {
 
   private reset(): void {
     this.playerId.set('');
-    this.role.set('player');
     this.days.set('');
     this.errors.set({});
     this.busy.set(false);
@@ -60,10 +60,6 @@ export class InviteDialog {
 
   protected value(event: Event): string {
     return (event.target as HTMLInputElement | HTMLSelectElement).value;
-  }
-
-  protected roleName(role: InviteRole): string {
-    return role === 'parent' ? 'Eltern' : 'Spieler';
   }
 
   protected async submit(event: Event): Promise<void> {
@@ -79,8 +75,8 @@ export class InviteDialog {
     this.busy.set(true);
     this.failure.set('');
     try {
-      const result = await this.access.createInvite(player.id, this.role(), days);
-      if (result.ok) this.created.set({ code: result.code, expiresAt: result.expiresAt, player: player.name, role: this.role() });
+      const result = await this.access.createInvite(player.id, days);
+      if (result.ok) this.created.set({ code: result.code, expiresAt: result.expiresAt, player: player.name });
       else this.failure.set(result.message);
     } finally {
       this.busy.set(false);

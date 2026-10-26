@@ -9,15 +9,13 @@ export const MIN_PASSWORD_LENGTH = 12;
 export const MAX_PASSWORD_LENGTH = 128;
 export const MAX_EXPIRY_DAYS = 365;
 
-/** Rollen, für die ein Einladungscode erzeugt werden kann. */
+/**
+ * Rollen in Einladungscodes. Neue Codes sind seit SCRUM-114 immer `player` (PO: eine Art Zugang pro Spieler, Eltern und
+ * Spieler teilen sich einen Zugang); `parent` gibt es nur noch in bestehenden Codes und Zugängen.
+ */
 export type InviteRole = 'player' | 'parent';
 /** Konten mit E-Mail und Passwort: Trainer, Scout (Leistungsdaten) und Medizin (Gesundheitsdaten), SCRUM-170. */
 export type StaffRole = 'trainer' | 'scout' | 'physio';
-
-export const INVITE_ROLES: readonly { readonly value: InviteRole; readonly label: string }[] = [
-  { value: 'player', label: 'Spieler' },
-  { value: 'parent', label: 'Eltern' },
-];
 
 /** Ein Zugang aus der Liste: bestehendes Mitglied (members) oder noch offener Einladungscode (invites). */
 export interface AccessEntry {
@@ -125,7 +123,8 @@ export function inviteEntry(doc: RawDoc): AccessEntry | null {
 export function roleLabel(role: Role): string {
   switch (role) {
     case 'parent':
-      return 'Eltern';
+      // Bestehende Eltern-Zugänge laufen weiter wie Spieler-Zugänge (SCRUM-114); der Zusatz hilft beim Wiedererkennen.
+      return 'Spieler (bisher Eltern-Zugang)';
     case 'scout':
       return 'Scout (Leistungsdaten, keine Gesundheitsdaten)';
     case 'physio':

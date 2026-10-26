@@ -28,7 +28,7 @@ describe('AccessService', () => {
     await access.reload();
     expect(access.load()).toBe('idle');
     expect(firebase.calls).not.toContain('readMembers');
-    expect(await access.createInvite('p1', 'player', null)).toMatchObject({ ok: false });
+    expect(await access.createInvite('p1', null)).toMatchObject({ ok: false });
     expect(await access.createStaff('trainer', 'a@b.de', 'langgenug1')).toMatchObject({ ok: false });
     expect(firebase.calls.filter((call) => call.startsWith('create'))).toEqual([]);
   });
@@ -48,14 +48,15 @@ describe('AccessService', () => {
   it('erzeugt einen Einladungscode mit Ablauf und lädt die Liste neu', async () => {
     const access = setup();
     await access.reload();
-    const result = await access.createInvite('p3', 'parent', 7);
+    const result = await access.createInvite('p3', 7);
     if (!result.ok) throw new Error('erwartet: ok');
     expect(result.code).toMatch(/^[0-9a-f]{48}$/);
     expect(result.expiresAt!.getTime()).toBeGreaterThan(Date.now() + 6.9 * 86400000);
-    expect(firebase.access.inviteDocs.get(result.code)).toMatchObject({ playerId: 'p3', role: 'parent' });
+    // Seit SCRUM-114 immer ein Spieler-Zugang (keine Wahl Spieler/Eltern mehr).
+    expect(firebase.access.inviteDocs.get(result.code)).toMatchObject({ playerId: 'p3', role: 'player' });
     expect(access.entries().some((entry) => entry.id === result.code)).toBe(true);
 
-    const unlimited = await access.createInvite('p3', 'player', null);
+    const unlimited = await access.createInvite('p3', null);
     expect(unlimited).toMatchObject({ ok: true, expiresAt: null });
   });
 
@@ -63,7 +64,7 @@ describe('AccessService', () => {
     const access = setup();
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     firebase.access.createInviteError = { code: 'permission-denied' };
-    const result = await access.createInvite('p1', 'player', null);
+    const result = await access.createInvite('p1', null);
     expect(result).toMatchObject({ ok: false });
     expect(JSON.stringify(result)).not.toMatch(/[0-9a-f]{48}/);
   });
