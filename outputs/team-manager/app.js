@@ -4314,21 +4314,33 @@ function renderPitchBench() {
     : `<p class="muted">Alle Spieler stehen auf dem Feld.</p>`;
 }
 
+// Index der Formation mit der besten Durchschnittsnote (-1, wenn keine passt).
+function bestFormationIndex() {
+  const candidates = eligibleLineupCandidates();
+  const previews = FORMATION_PRESETS.map((preset) => formationPreview(preset, candidates));
+  let bestIndex = -1;
+  previews.forEach((preview, index) => {
+    if (preview.grade !== null && (bestIndex === -1 || preview.grade < previews[bestIndex].grade)) bestIndex = index;
+  });
+  return bestIndex;
+}
+
+// Button "Empfohlene Elf uebernehmen" (SCRUM-26): setzt die Empfehlung und speichert sie.
+function applySuggestedLineup() {
+  const index = bestFormationIndex();
+  if (index < 0) return;
+  applyFormationPreset(index);
+}
+
 function renderPitch() {
   state.lineup ||= normalizeLineup({});
   const target = lineupTargetEvent();
   const storedForTarget = target && state.eventLineups?.[target.id];
   if (storedForTarget) state.lineup = { assignments: structuredClone(storedForTarget.assignments) };
   renderLineupTarget(target, Boolean(storedForTarget));
-  if (lineupIsEmpty(state.lineup)) {
-    const candidates = eligibleLineupCandidates();
-    const previews = FORMATION_PRESETS.map((preset) => formationPreview(preset, candidates));
-    let bestIndex = -1;
-    previews.forEach((preview, index) => {
-      if (preview.grade !== null && (bestIndex === -1 || preview.grade < previews[bestIndex].grade)) bestIndex = index;
-    });
-    if (bestIndex >= 0) state.lineup = { assignments: assignedToAssignments(previews[bestIndex].assigned) };
-  }
+  // SCRUM-26: Eine leere Aufstellung bleibt leer. Die Empfehlung wird nur ueber den Button angeboten.
+  const suggestBtn = $("#suggestLineupBtn");
+  if (suggestBtn) suggestBtn.hidden = !lineupIsEmpty(state.lineup) || bestFormationIndex() < 0;
 
   const assignments = state.lineup.assignments;
   $("#pitch").innerHTML = Object.keys(PITCH_ZONES).map((zone) => {
@@ -6639,6 +6651,7 @@ window.addEventListener("resize", () => {
   }, 180);
 });
 on("#copyLineupBtn", "click", copyLineupFromPreviousGame);
+on("#suggestLineupBtn", "click", applySuggestedLineup);
 on("#formationPicker", "click", (event) => {
   const button = event.target.closest(".formation-option");
   if (!button) return;

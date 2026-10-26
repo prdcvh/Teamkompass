@@ -81,11 +81,17 @@ export class Lineup implements OnInit {
   private readonly eligible = computed(() => eligibleCandidates(this.entries()));
   private readonly byId = computed(() => new Map(this.entries().map((entry) => [entry.player.id, entry])));
 
-  /** Gespeicherte Aufstellung des Ziels; ist noch nichts gespeichert, zeigt das Board den besten Vorschlag. */
+  /** Gespeicherte Aufstellung des Ziels. Eine leere Aufstellung bleibt leer (SCRUM-26); der Vorschlag kommt nur per Button. */
   protected readonly assignments = computed<Assignments>(() => {
     // Für ein Spiel: dessen gespeicherte Aufstellung; sonst die allgemeine Startelf (wie in der bisherigen App).
     const stored = this.storedForTarget()?.assignments ?? this.lineup.assignments();
-    return lineupIsEmpty(stored) ? suggestedLineup(this.eligible()) : stored;
+    return stored;
+  });
+  /** Empfohlene Elf, nur wenn das Feld leer ist und es einen Vorschlag gibt. */
+  protected readonly suggestion = computed<Assignments | null>(() => {
+    if (!lineupIsEmpty(this.assignments())) return null;
+    const suggested = suggestedLineup(this.eligible());
+    return lineupIsEmpty(suggested) ? null : suggested;
   });
   protected readonly name = computed(() => formationName(this.assignments()));
   protected readonly teamGrade = computed(() => lineupGrade(this.assignments(), this.entries()));
@@ -198,6 +204,11 @@ export class Lineup implements OnInit {
     const target = this.target();
     if (target?.kind !== 'zone' || !target.playerId) return;
     this.apply(removeFromPitch(this.assignments(), target.playerId));
+  }
+
+  protected applySuggestion(): void {
+    const suggested = this.suggestion();
+    if (suggested) this.apply(suggested);
   }
 
   protected applyFormation(index: number): void {
