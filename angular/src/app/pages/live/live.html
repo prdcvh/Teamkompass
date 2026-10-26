@@ -1,12 +1,59 @@
 <main class="live">
   <header class="bar">
     <h1>{{ event()?.title ?? 'Live-Modus' }}</h1>
-    <a class="end" [routerLink]="eventId() ? ['/events', eventId()] : ['/events']">Beenden</a>
+    @if (ready() && isTraining() && !failed()) {
+      @if (!summary()) {
+        <button type="button" class="end" (click)="finish()">Beenden</button>
+      }
+    } @else {
+      <a class="end" [routerLink]="eventId() ? ['/events', eventId()] : ['/events']">Beenden</a>
+    }
     @if (ready() && isTraining()) {
       <p class="save" [class]="saveStatus().kind" role="status" aria-live="polite">{{ saveStatus().text }}</p>
     }
   </header>
 
+  @if (summary(); as result) {
+    <section class="summary" aria-labelledby="summary-title">
+      <h2 id="summary-title">Zusammenfassung</h2>
+      @if (sync.state() === 'error') {
+        <p class="sync-error" role="alert">Nicht gespeichert: {{ sync.detail() }}</p>
+      }
+      @if (result.changed.length === 0) {
+        <p class="note">In dieser Sitzung wurden keine Punkte vergeben.</p>
+      } @else {
+        <ul class="sum-list">
+          @for (entry of result.changed; track entry.id) {
+            <li class="sum-row">
+              <span class="name">{{ entry.label }}</span>
+              <span class="given" [class.negative]="sessionDelta(entry.id) < 0" [attr.aria-label]="'Diese Sitzung ' + signed(sessionDelta(entry.id))">{{ signed(sessionDelta(entry.id)) }}</span>
+              <label class="total"><span class="total-label">Stand</span>
+                <input class="tk-input" type="number" inputmode="numeric" step="1" placeholder="0" [attr.aria-label]="'Punkte: ' + entry.label" [value]="points(entry.id)" (change)="correct(entry.id, $any($event.target))" />
+              </label>
+            </li>
+          }
+        </ul>
+      }
+      @if (result.untouched.length > 0) {
+        <h3>Keine Punkte in dieser Sitzung</h3>
+        <ul class="sum-list">
+          @for (row of result.untouched; track row.id) {
+            <li class="sum-row">
+              <span class="name">{{ row.label }}</span>
+              <span class="given" aria-hidden="true">0</span>
+              <label class="total"><span class="total-label">Stand</span>
+                <input class="tk-input" type="number" inputmode="numeric" step="1" placeholder="0" [attr.aria-label]="'Punkte: ' + row.label" [value]="points(row.id)" (change)="correct(row.id, $any($event.target))" />
+              </label>
+            </li>
+          }
+        </ul>
+      }
+      <div class="sum-actions">
+        <button type="button" class="action" (click)="resume()">Weiter live</button>
+        <button type="button" class="action primary" (click)="done()">Fertig</button>
+      </div>
+    </section>
+  } @else {
   <section class="steps" aria-label="Schrittweite">
     <div class="step-row" role="group" aria-label="Punkte pro Tipp">
       @for (option of options(); track option) {
@@ -82,6 +129,8 @@
         </p>
       </details>
     }
+  }
+
   }
 
   <div class="dock" [class.shown]="feedback()">

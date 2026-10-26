@@ -389,3 +389,87 @@ summary:focus-visible {
 .undo:focus-visible {
   outline-color: #0a3fd1;
 }
+
+/* Zusammenfassung nach „Beenden“ (SCRUM-217) */
+.summary h2 {
+  margin: 16px 0 8px;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.summary h3 {
+  margin: 24px 0 8px;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.sum-list {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.sum-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 96px;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 6px 12px;
+  border: 3px solid #000;
+  border-radius: 12px;
+}
+
+.sum-row .name {
+  overflow: hidden;
+  font-size: 22px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+}
+
+.sum-row .given {
+  font-size: 22px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.sum-row .given.negative {
+  color: #b00020;
+}
+
+.sum-row .total {
+  display: grid;
+  gap: 2px;
+}
+
+.sum-row .total-label {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sum-row input {
+  width: 100%;
+  min-height: 44px;
+  font-size: 20px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.sum-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.sum-actions .action {
+  flex: 1 1 140px;
+  min-height: 56px;
+}
+
+.action.primary {
+  color: #fff;
+  background: #000;
+}
