@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { WeatherSnapshot } from './weather/weather';
-import { clothingFor, clothingItems, clothingText, effectiveTemperature } from './clothing';
+import {
+  CHILD_MARGIN_DEGREES, CLOTHING_THRESHOLDS, RAIN_JACKET_FROM_PERCENT, WIND_PENALTY_DEGREES, WIND_PENALTY_FROM_KMH,
+  clothingFor, clothingItems, clothingText, effectiveTemperature,
+} from './clothing';
 
 const snap = (felt: number | null, patch: Partial<WeatherSnapshot> = {}): WeatherSnapshot => ({
   time: '2026-10-17T18:00', temperature: felt ?? 10, apparentTemperature: felt, precipitationProbability: 0,
@@ -47,5 +50,16 @@ describe('Text', () => {
     expect(clothingText(a)).toBe('Heute: lange Hose, Pulli und Regenjacke');
     expect(clothingText(clothingFor(snap(25)), 'Am Samstag')).toBe('Am Samstag: kurze Hose und T-Shirt');
     expect(clothingText(clothingFor(snap(0)))).toBe('Heute: lange Hose, Pulli, Mütze und Handschuhe');
+  });
+});
+
+// docs/wetter-kleidung-erinnerung.md nennt diese Werte; ändert jemand sie, muss die Doku mit.
+describe('Schwellenwerte', () => {
+  it('entsprechen den dokumentierten Werten', () => {
+    expect(CLOTHING_THRESHOLDS).toEqual({ warm: 20, mild: 12, cold: 5 });
+    expect(RAIN_JACKET_FROM_PERCENT).toBe(50);
+    expect(WIND_PENALTY_FROM_KMH).toBe(30);
+    expect(WIND_PENALTY_DEGREES).toBe(1);
+    expect(CHILD_MARGIN_DEGREES).toBe(1);
   });
 });
