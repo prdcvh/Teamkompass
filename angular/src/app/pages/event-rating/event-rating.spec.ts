@@ -70,12 +70,12 @@ describe('EventRating (Event bewerten)', () => {
       await vi.waitFor(() => expect(firebase.calls).toContain('savePoints:e1:p1:0'));
     });
 
-    it('verwirft negative Punkte und leert das Feld', async () => {
+    it('erlaubt negative Punkte (SCRUM-213) und zeigt sie im Feld', async () => {
       const fixture = await render({ game: false });
       const input = q<HTMLInputElement>(fixture, 'input[aria-label="Punkte: Elias Wagner"]')!;
       pick(input, '-4');
-      expect(input.value).toBe('');
-      expect(firebase.calls.some((call) => call.startsWith('savePoints:e1:p2'))).toBe(false); // 0 war schon 0
+      await vi.waitFor(() => expect(firebase.calls).toContain('savePoints:e1:p2:-4'));
+      expect(input.value).toBe('-4');
     });
 
     it('Spiel mit „Punkte vergeben: nein“ zeigt kein Punktefeld', async () => {

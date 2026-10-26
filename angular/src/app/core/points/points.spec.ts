@@ -10,7 +10,7 @@ function event(id: string, type: 'Training' | 'Spiel', date: string, pointsEnabl
 }
 
 describe('Trainingspunkte (Logik)', () => {
-  it('normalisiert: nur ganze Zahlen ab 0, leer/ungültig/negativ = 0, keine Obergrenze', () => {
+  it('normalisiert: ganze Zahlen auch negativ, leer/ungültig = 0, keine Obergrenze', () => {
     expect(normalizePoints(5)).toBe(5);
     expect(normalizePoints('12')).toBe(12);
     expect(normalizePoints('')).toBe(0);
@@ -18,9 +18,21 @@ describe('Trainingspunkte (Logik)', () => {
     expect(normalizePoints(null)).toBe(0);
     expect(normalizePoints(undefined)).toBe(0);
     expect(normalizePoints('abc')).toBe(0);
-    expect(normalizePoints(-3)).toBe(0);
+    expect(normalizePoints(-3)).toBe(-3);
+    expect(normalizePoints('-2')).toBe(-2);
+    expect(normalizePoints(-0.2)).toBe(0);
+    expect(Object.is(normalizePoints(-0.2), 0)).toBe(true);
     expect(normalizePoints(2.6)).toBe(3);
     expect(normalizePoints(250000)).toBe(250000);
+  });
+
+  it('negative Punkte zählen in Summe und Verlauf mit (SCRUM-213)', () => {
+    const entries = [
+      { event: event('t1', 'Training', '2026-10-01'), points: 3 },
+      { event: event('t2', 'Training', '2026-10-05'), points: -5 },
+    ];
+    expect(totalPoints(entries)).toBe(-2);
+    expect(pointsHistory(entries).map((row) => [row.points, row.total])).toEqual([[3, 3], [-5, -2]]);
   });
 
   it('Training zählt immer, Spiel nur mit „ja“ (fehlende Angabe = nein)', () => {
@@ -64,7 +76,7 @@ describe('Trainingspunkte (Logik)', () => {
     ]);
   });
 
-  it('ungültige gespeicherte Werte werden beim Zählen zu 0', () => {
-    expect(totalPoints([{ event: event('t1', 'Training', '2026-10-01'), points: -5 }, { event: event('t2', 'Training', '2026-10-02'), points: Number.NaN }])).toBe(0);
+  it('ungültige gespeicherte Werte werden beim Zählen zu 0, negative zählen mit', () => {
+    expect(totalPoints([{ event: event('t1', 'Training', '2026-10-01'), points: -5 }, { event: event('t2', 'Training', '2026-10-02'), points: Number.NaN }])).toBe(-5);
   });
 });

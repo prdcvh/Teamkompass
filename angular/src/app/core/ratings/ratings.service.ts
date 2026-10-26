@@ -146,7 +146,7 @@ export class RatingsService {
   }
 
   /**
-   * Trägt die Punkte eines Spielers ein (Text aus dem Formular; leer, negativ oder ungültig = 0). Geschrieben wird nur,
+   * Trägt die Punkte eines Spielers ein (Text aus dem Formular; ganze Zahl, auch negativ; leer oder ungültig = 0). Geschrieben wird nur,
    * wenn dieses Event Punkte vergibt und sich der Wert ändert; bereits gespeicherte Punkte eines Spiels auf „nein“
    * bleiben unangetastet.
    */
@@ -159,6 +159,27 @@ export class RatingsService {
     this.markSyncing();
     void this.ratingsApi
       .savePoints(eventId, playerId, points)
+      .then(() => {
+        this.sync.clearError();
+        this.ranking.invalidate();
+      })
+      .catch((error) => this.failWrite(error, 'Punkte konnten nicht gespeichert werden.'));
+    return true;
+  }
+
+  /**
+   * Ändert die Punkte eines Spielers um `delta` (Live-Modus, SCRUM-213; auch unter 0). Lokal sofort sichtbar, geschrieben
+   * wird die Änderung selbst (nicht der Endwert), damit gleichzeitige Tipps mehrerer Trainer addiert werden.
+   */
+  addPoints(playerId: string, delta: number): boolean {
+    const eventId = this.eventId();
+    if (!eventId || !this.canWrite() || this.load() !== 'ready' || !this.pointsActive()) return false;
+    const step = Math.round(delta);
+    if (!Number.isFinite(step) || step === 0) return false;
+    this.points.update((map) => new Map(map).set(playerId, this.pointsFor(playerId) + step));
+    this.markSyncing();
+    void this.ratingsApi
+      .addPoints(eventId, playerId, step)
       .then(() => {
         this.sync.clearError();
         this.ranking.invalidate();

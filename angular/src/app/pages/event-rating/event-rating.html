@@ -8,6 +8,9 @@
           {{ ev.type }} · {{ formatDate(ev.date) }}@if (resultText(ev); as result) { · Ergebnis {{ result }}} · Anstrengung {{ intensity() }}@if (ev.location) { · {{ ev.location }}}@if (isGame()) { · {{ ratings.matchDuration() }} Min.}
         </p>
         <tk-weather [event]="ev" [showSource]="true" [showClothing]="true" />
+        @if (ev.type === 'Training' && ratings.canWrite()) {
+          <a tkButton variant="primary" class="live-start" [routerLink]="['/events', ev.id, 'live']">Live-Modus</a>
+        }
       } @else {
         <h1>Event bewerten</h1>
       }
@@ -135,7 +138,7 @@
 
             @if (ratings.pointsActive()) {
               <label class="field"><span class="label">Punkte</span>
-                <input class="tk-input" type="number" inputmode="numeric" min="0" step="1" placeholder="0" [attr.aria-label]="'Punkte: ' + player.name" [value]="pointsText(player)" (change)="setPoints(player, $event)" />
+                <input class="tk-input" type="number" inputmode="numeric" step="1" placeholder="0" [attr.aria-label]="'Punkte: ' + player.name" [value]="pointsText(player)" (change)="setPoints(player, $event)" />
               </label>
             }
 
@@ -216,7 +219,7 @@
                     </td>
                   }
                   @if (ratings.pointsActive()) {
-                    <td><input class="tk-input small" type="number" min="0" step="1" placeholder="0" [attr.aria-label]="'Punkte: ' + player.name" [value]="pointsText(player)" (change)="setPoints(player, $event)" /></td>
+                    <td><input class="tk-input small" type="number" step="1" placeholder="0" [attr.aria-label]="'Punkte: ' + player.name" [value]="pointsText(player)" (change)="setPoints(player, $event)" /></td>
                   }
                   @if (isGame()) {
                     <td><input class="tk-input small" type="number" min="0" [max]="ratings.matchDuration()" [attr.aria-label]="'Minuten: ' + player.name" [value]="ratings.ratingFor(player.id).minutes ?? ''" (change)="set(player, 'minutes', valueOf($event))" /></td>

@@ -29,6 +29,13 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/sign-out/sign-out').then((m) => m.SignOut),
   },
   {
+    // Live-Modus (SCRUM-213): Vollbild ohne Shell (kein Menü, keine Kopfzeile), nur für Trainer.
+    path: '',
+    canActivate: [authGuard],
+    canActivateChild: [trainerGuard],
+    children: [{ path: 'events/:id/live', loadComponent: () => import('./pages/live/live').then((m) => m.Live) }],
+  },
+  {
     path: '',
     component: Shell,
     canActivate: [authGuard],

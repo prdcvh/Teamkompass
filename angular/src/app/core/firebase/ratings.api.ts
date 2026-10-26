@@ -125,6 +125,16 @@ export class RatingsApi {
     await setDoc(doc(db, 'teams', this.team.id(), 'events', eventId, 'privateNotes', playerId), { playerId, points }, { merge: true });
   }
 
+  /**
+   * Ändert die Trainingspunkte um `delta` (SCRUM-213, Live-Modus). Serverseitig addiert (`increment`), nicht überschrieben:
+   * tippen zwei Trainer gleichzeitig, gehen keine Punkte verloren. Die Regeln bleiben unverändert (Trainer-Pfad, merge).
+   */
+  async addPoints(eventId: string, playerId: string, delta: number): Promise<void> {
+    const { db } = await this.connection.get();
+    const { doc, setDoc, increment } = await import('firebase/firestore');
+    await setDoc(doc(db, 'teams', this.team.id(), 'events', eventId, 'privateNotes', playerId), { playerId, points: increment(delta) }, { merge: true });
+  }
+
   /** Schreibt die interne Notiz. Sie liegt bewusst getrennt von der Bewertung, die Spieler und Eltern lesen dürfen. */
   async savePrivateNote(eventId: string, playerId: string, note: string): Promise<void> {
     const { db } = await this.connection.get();

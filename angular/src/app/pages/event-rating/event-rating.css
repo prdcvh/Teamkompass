@@ -351,3 +351,8 @@ tr[data-tone='grey'] td,
   color: var(--tk-muted);
   font-size: var(--tk-text-sm);
 }
+
+.live-start {
+  justify-self: start;
+  margin-top: var(--tk-space-3);
+}

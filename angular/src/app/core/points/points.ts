@@ -1,6 +1,6 @@
 /**
  * Trainingspunkte (SCRUM-104): Der Trainer trägt je Spieler und Event eine freie Punktzahl ein (ganze Zahl,
- * 0 oder mehr, keine Obergrenze, leer = 0). Die Punkte liegen bewusst im Trainer-Pfad `privateNotes` des Events
+ * auch negativ (SCRUM-213), keine Obergrenze, leer = 0). Die Punkte liegen bewusst im Trainer-Pfad `privateNotes` des Events
  * (Spieler und Eltern können ihn nicht lesen, die Firestore-Regeln bleiben unverändert).
  *
  * Trainings zählen immer. Bei Spielen entscheidet der Trainer am Event („Punkte vergeben: ja/nein“,
@@ -23,12 +23,13 @@ export interface PointsHistoryRow {
   readonly total: number;
 }
 
-/** Gespeicherter Wert → Punkte: nur ganze Zahlen ab 0; alles andere (leer, Text, negativ, NaN) ist 0. */
+/** Gespeicherter Wert → Punkte: ganze Zahlen, auch negative (SCRUM-213); alles andere (leer, Text, NaN) ist 0. */
 export function normalizePoints(value: unknown): number {
   if (typeof value === 'string' && value.trim() === '') return 0;
   const number = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : Number.NaN;
-  if (!Number.isFinite(number) || number <= 0) return 0;
-  return Math.min(Math.round(number), Number.MAX_SAFE_INTEGER);
+  if (!Number.isFinite(number)) return 0;
+  const rounded = Math.round(number) + 0; // + 0 macht aus -0 eine 0
+  return Math.max(Math.min(rounded, Number.MAX_SAFE_INTEGER), -Number.MAX_SAFE_INTEGER);
 }
 
 /** Zählen die Punkte dieses Events? Training immer, Spiel nur mit „Punkte vergeben: ja“. */

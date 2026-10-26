@@ -85,6 +85,17 @@ export class FakeRatingsApi implements Pick<RatingsApi, keyof RatingsApi> {
     this.pushPrivateDoc(eventId, playerId);
   }
 
+  async addPoints(eventId: string, playerId: string, delta: number): Promise<void> {
+    this.calls.push(`addPoints:${eventId}:${playerId}:${delta}`);
+    if (this.savePointsError) throw this.savePointsError;
+    const store = this.privateNotes.get(eventId) ?? new Map<string, Record<string, unknown>>();
+    const current = store.get(playerId);
+    store.set(playerId, { ...current, playerId, points: (typeof current?.['points'] === 'number' ? current['points'] : 0) + delta });
+    this.privateNotes.set(eventId, store);
+    this.emitSub('privateNotes', eventId);
+    this.pushPrivateDoc(eventId, playerId);
+  }
+
   // --- Trainer-Dokument (Notiz + Punkte) eines einzelnen Spielers je Event (Profil) ---
   privateDocWatchers = 0;
   private privateDocListeners = new Map<string, { onData: (data: Readonly<Record<string, unknown>> | null, meta: SnapshotMeta) => void; onError: (error: unknown) => void }>();
