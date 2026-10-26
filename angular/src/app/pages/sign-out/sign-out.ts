@@ -83,10 +83,19 @@ export function unsentHeadline(changes: UnsentChanges): string {
     h1 {
       font-size: var(--tk-text-title);
     }
+    .panel > * {
+      min-width: 0;
+    }
     .actions {
       display: flex;
       flex-wrap: wrap;
       gap: var(--tk-space-2);
+    }
+    /* Lange Beschriftung („Trotzdem abmelden …“) darf am Handy umbrechen statt die Karte zu sprengen. */
+    .actions button {
+      white-space: normal;
+      text-align: center;
+      max-width: 100%;
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
