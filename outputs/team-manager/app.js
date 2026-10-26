@@ -2093,7 +2093,14 @@ function hideAuthGate() {
   document.body.classList.remove("auth-locked");
 }
 
+// SCRUM-24: Ursprüngliche Bereichsauswahl merken, damit ein Rollenwechsel ohne Neuladen
+// (z. B. Spieler meldet sich ab, Trainer meldet sich an) die Einschränkungen nicht erbt.
+let fullMobileViewOptions = null;
+let mobileViewRestricted = false;
+
 function applyRoleRestrictions() {
+  const mobileSelect = $("#mobileViewSelect");
+  if (fullMobileViewOptions === null) fullMobileViewOptions = mobileSelect.innerHTML;
   document.body.classList.toggle("role-player", currentRole === "player");
   document.body.classList.toggle("role-parent", currentRole === "parent");
   document.body.classList.toggle("role-physio", currentRole === "physio");
@@ -2107,19 +2114,28 @@ function applyRoleRestrictions() {
   $("#addPhysioBtn").hidden = !isCloudTrainer();
   $("#changePasswordBtn").hidden = !(isCloudActive() && ["trainer", "physio", "scout"].includes(currentRole));
   if (["player", "parent"].includes(currentRole)) {
+    mobileViewRestricted = true;
     $("#mobileViewSelect").innerHTML = '<option value="profiles">Profile</option>';
     $("#profilePlayer").disabled = true;
     setView("profiles");
   } else if (currentRole === "physio") {
+    mobileViewRestricted = true;
     $("#mobileViewSelect").innerHTML = '<option value="squad">Kader</option><option value="profiles">Profile</option>';
     $("#profilePlayer").disabled = false;
     setView("squad");
   } else if (currentRole === "scout") {
+    mobileViewRestricted = true;
     $("#mobileViewSelect").innerHTML = '<option value="profiles">Profile</option>';
     $("#profilePlayer").disabled = false;
     setView("profiles");
   } else {
     $("#profilePlayer").disabled = false;
+    if (mobileViewRestricted) {
+      // Vorherige Rolle war eingeschränkt: volle Auswahl wiederherstellen und auf das Dashboard.
+      mobileSelect.innerHTML = fullMobileViewOptions;
+      mobileViewRestricted = false;
+      setView("dashboard");
+    }
     renderAccessManager();
   }
   syncLoadReportButton();
