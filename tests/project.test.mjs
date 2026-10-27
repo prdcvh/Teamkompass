@@ -420,12 +420,11 @@ test("Haupt-Team läuft auf dem Angular-Build mit Team-ID mein-team, Rückweg ou
   assert.match(mergeDeploy, /download-artifact[\s\S]*?name: angular-dist-mein-team\n\s+path: angular\/dist\/team-mein-team\/browser/);
   assert.ok(mergeDeploy.indexOf("angular-dist-mein-team") < mergeDeploy.indexOf("target: main"), "Build muss vor dem main-Deploy da sein");
 
-  // Keine PR-Vorschau fuer Ziel main (echte mein-team-Daten, SCRUM-206/218); die Alt-App (U15) behaelt ihre Vorschau
-  // als Testteam-Kopie (Pruefung: tests/preview-guard.test.mjs), sonst hätten PRs an outputs/* keine mehr.
+  // Keine PR-Vorschau fuer Ziel main (echte mein-team-Daten, SCRUM-206/218); seit SCRUM-210 auch keine Alt-App-Vorschau
+  // mehr (Pruefung: tests/preview-guard.test.mjs).
   const preview = await read(".github/workflows/firebase-hosting-pull-request.yml");
   const [, previewDeploy] = preview.split(/\n  build_and_preview:/);
   assert.doesNotMatch(preview, /target: main|angular-dist-mein-team|team-mein-team/, "keine Vorschau mit dem Haupt-Team (echte Daten)");
-  assert.match(previewDeploy, /target: u15/);
   assert.doesNotMatch(previewDeploy, /channelId: live/, "PR-Vorschau darf nie live deployen");
   // Jede Site mit PR-Vorschau wird aufgeräumt (SCRUM-132), sonst läuft das Kanal-Kontingent voll.
   const cleanup = await read(".github/workflows/firebase-preview-cleanup.yml");
@@ -438,6 +437,54 @@ test("Haupt-Team läuft auf dem Angular-Build mit Team-ID mein-team, Rückweg ou
   for (const file of ["index.html", "app.js", "firebase-config.js", "service-worker.js", "assets/club-logo.png"]) await read(`outputs/team-manager/${file}`);
   assert.match(await read("outputs/team-manager/firebase-config.js"), /teamId: "mein-team"/);
   assert.match(await read("FIREBASE_SETUP.md"), /"public": "outputs\/team-manager"/, "Rollback-Anleitung fehlt");
+});
+
+test("Live-Team U15 läuft auf dem Angular-Build mit Team-ID U15, Rückweg outputs/u15 bleibt (SCRUM-210)", async () => {
+  const config = JSON.parse(await read("firebase.json"));
+  const u15 = config.hosting.find((entry) => entry.target === "u15");
+  const u14 = config.hosting.find((entry) => entry.target === "u14");
+  assert.ok(u15, "Hosting-Target u15 fehlt");
+
+  // Public = Ausgabe der Build-Konfiguration u15, nie der Standard-Build (Testteam U14) oder ein anderes Team.
+  const angular = JSON.parse(await read("angular/angular.json"));
+  const build = angular.projects["teamkompass-angular"].architect.build.configurations.u15;
+  assert.equal(u15.public, `angular/${build.outputPath}/browser`);
+  const others = config.hosting.filter((entry) => entry.target !== "u15").map((entry) => entry.public);
+  assert.ok(!others.includes(u15.public), "U15 braucht einen eigenen Ausgabeordner");
+  const env = await read("angular/src/environments/environment.u15.ts");
+  assert.match(env, /teamId: 'U15'/);
+  // Gleiche Team-ID wie die alte App, also dieselben Daten (teams/U15/...) und Zugänge.
+  assert.match(await read("outputs/u15/firebase-config.js"), /teamId: "U15"/);
+
+  // Gleiche Header (CSP, Caching) und SPA-Rewrite wie das erprobte Angular-Ziel u14.
+  assert.deepEqual(u15.headers, u14.headers);
+  assert.deepEqual(u15.rewrites, [{ source: "**", destination: "/index.html" }]);
+  assert.deepEqual(u15.ignore, u14.ignore);
+  const firebaserc = JSON.parse(await read(".firebaserc"));
+  assert.deepEqual(firebaserc.targets["teamkompass-b8aac"].hosting.u15, ["teamkompass-u15"], "kein neues Hosting-Ziel, nur umgebogen");
+
+  // Seit SCRUM-210 liefert kein Hosting-Ziel mehr die Alt-App (outputs/*) aus.
+  assert.deepEqual(config.hosting.filter((entry) => !entry.public.startsWith("angular/")).map((entry) => entry.target), []);
+
+  // Deploy beim Merge: Build aus dem Verify-Job wird hochgeladen, im Deploy-Job an genau den public-Pfad gelegt.
+  const merge = await read(".github/workflows/firebase-hosting-merge.yml");
+  const [mergeVerify, mergeDeploy] = merge.split(/\n  build_and_deploy:/);
+  assert.match(mergeVerify, /name: angular-dist-u15\n\s+path: angular\/dist\/team-u15\/browser\n\s+if-no-files-found: error/);
+  assert.match(mergeDeploy, /download-artifact[\s\S]*?name: angular-dist-u15\n\s+path: angular\/dist\/team-u15\/browser/);
+  assert.ok(mergeDeploy.indexOf("angular-dist-u15") < mergeDeploy.indexOf("target: u15"), "Build muss vor dem u15-Deploy da sein");
+  assert.match(await read("angular/package.json"), /ng build -c production,u15/, "U15-Build entsteht in verify");
+
+  // Keine PR-Vorschau mehr auf der Live-Site der U15 (echte Daten), auch nicht als Alt-App-Kopie (SCRUM-206/218).
+  const preview = (await read(".github/workflows/firebase-hosting-pull-request.yml")).replace(/^\s*#.*$/gm, "");
+  assert.doesNotMatch(preview, /target: u15|team-u15|legacy-preview|outputs\/u15/);
+  // Alte U15-Vorschaukanäle räumt firebase-preview-cleanup.yml weiter auf (SCRUM-132).
+  assert.match(await read(".github/workflows/firebase-preview-cleanup.yml"), /SITES: .*teamkompass-u15/);
+
+  // Rückweg: die alte U15-App bleibt vollständig im Repo; die Anleitung enthält den kompletten Alt-App-Eintrag.
+  for (const file of ["index.html", "app.js", "firebase-config.js", "service-worker.js", "assets/club-logo.png"]) await read(`outputs/u15/${file}`);
+  const setup = await read("FIREBASE_SETUP.md");
+  assert.match(setup, /"public": "outputs\/u15"/, "Rollback-Anleitung fehlt");
+  assert.match(setup, /https:\/\/www\.gstatic\.com\/firebasejs\/10\.12\.5\//, "Rollback-Anleitung ohne CSP der alten App");
 });
 
 test("Angular-PWA (SCRUM-76): Manifest, Service Worker im Produktions-Build, Update-Dateien nie lange gecacht", async () => {

@@ -101,6 +101,12 @@ U15 als Testteam-Kopie auf `teamkompass-u15`. Rückweg: `FIREBASE_SETUP.md` §11
 SCRUM-205. Offen:
 - U15: SCRUM-210, wartet auf Freigabe des PO.
 - Rückweg einmal üben: SCRUM-209.
+
+**Stand SCRUM-210 (27.10.2026, gilt ab dem Merge von SCRUM-210):** Die **U15** läuft auf Angular – Hosting-Ziel `u15`
+(Site `teamkompass-u15`) liefert `dist/team-u15/browser` aus (Team-ID `U15`, dieselben Daten und Zugänge). Damit läuft
+keine Alt-App (`outputs/*`) mehr live; die Ordner bleiben nur als Rückweg (`FIREBASE_SETUP.md` §11). Die Alt-App-Vorschau
+(U15-Kopie mit Testteam) entfällt; einzige PR-Vorschau ist der Testteam-Build auf `teamkompass-u14`. Offen:
+- Rückweg einmal üben: SCRUM-209.
 - Alt-App abschalten und aufräumen (Schritt 6): SCRUM-211.
 
 **Entscheidungen des PO (15.10.2026):**

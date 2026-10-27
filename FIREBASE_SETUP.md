@@ -219,14 +219,13 @@ Die Angular-Neuentwicklung (Jira-Epic SCRUM-40) wird als eigene Hosting-Site
   (Testteam `U14`) auf `teamkompass-u14--pr<Nr>-<branch>.web.app`. Eine Vorschau darf nie den Build eines
   Live-Teams (`U17`, `mein-team`, `U15`) ausliefern; `tests/preview-guard.test.mjs` prueft dafuer jeden
   Deploy-Schritt in `firebase-hosting-pull-request.yml` (Ziel, Build, Team-ID, Projekt-ID), ohne Ausnahme.
-- Alt-App-Vorschau (SCRUM-218, seit SCRUM-208 fuer die U15): Die Vorschau der Alt-App auf
-  `teamkompass-u15--pr<Nr>-<branch>.web.app` (Ziel `u15`) laeuft mit dem Testteam `U14`, nicht mit `U15`. Der
-  Verify-Job baut mit `node scripts/legacy-preview.mjs outputs/u15` eine Kopie nach `dist/preview/u15`, in der nur
-  `firebase-config.js` geaendert ist (`teamId: "U14"`, Name mit Zusatz "(Vorschau)"). Der Vorschau-Job
-  leert `outputs/u15`, legt die Kopie dorthin und deployt in den Vorschau-Kanal. Der Live-Kanal
-  (Merge-Workflow) liefert weiter `outputs/u15` aus dem Repo (echte U15-Daten) aus. Fuer das Ziel `main`
-  (Haupt-Team, Angular) gibt es keine Vorschau mehr. Anmeldung in der Vorschau
-  mit einem Trainer-Konto, das unter `teams/U14/members` eingetragen ist (beim Kopieren aus mein-team mitkopiert).
+- Alt-App-Vorschau: gibt es seit SCRUM-210 **nicht mehr**. Bis dahin lief die Vorschau der Alt-App auf dem Ziel
+  `u15` als Kopie von `outputs/u15` mit dem Testteam `U14` (SCRUM-218, `scripts/legacy-preview.mjs`). Seit die U15 auf
+  Angular läuft, liefert kein Ziel mehr die Alt-App aus; `main`, `u15` und `u17` sind Live-Sites mit echten Daten und
+  bekommen keine Vorschau. Das Skript und die Prüfung in `scripts/preview-guard-lib.mjs` bleiben für den Rückweg
+  erhalten (Abschnitt 11): Fällt ein Team auf die Alt-App zurück und soll es wieder eine Alt-App-Vorschau geben, dann
+  nur auf diese Art (Kopie mit Testteam), nie `outputs/<team>` direkt. Anmeldung in der U14-Vorschau mit einem
+  Trainer-Konto, das unter `teams/U14/members` eingetragen ist (beim Kopieren aus mein-team mitkopiert).
   Achtung: U14 liegt im selben Firebase-Projekt und enthaelt von `mein-team` kopierte Daten (Abschnitt 8).
 - PWA (SCRUM-76): Manifest `angular/public/manifest.webmanifest`, Service Worker von Angular
   (`angular/ngsw-config.json`, nur im Produktions-Build). `ngsw.json`/`ngsw-worker.js` fallen unter
@@ -315,7 +314,8 @@ steht (heute leer = aus). Zum Einschalten:
    erweitern: `script-src` um `https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/`,
    `frame-src https://www.google.com/recaptcha/`, `connect-src` um `https://content-firebaseappcheck.googleapis.com`.
 4. Einige Tage unter App Check → **Messwerte** beobachten. **Nicht „Erzwingen“ einschalten, solange eine Alt-App
-   (`outputs/*`, seit SCRUM-208 nur noch die U15) läuft** – die senden kein App-Check-Token und waeren sonst ausgesperrt.
+   (`outputs/*`) läuft** – die senden kein App-Check-Token und waeren sonst ausgesperrt. Seit SCRUM-210 läuft keine
+   Alt-App mehr live; nach einem Rückweg (Abschnitt 11) wäre das aber wieder so.
 
 Bis dahin begrenzt die Einladungspflicht neue Konten: ohne Code entsteht kein Verein und kein Team; ein Konto ohne
 Code sieht nichts.
@@ -345,8 +345,8 @@ gehen.
 
 **Dauerhaft (per PR):**
 
-1. In `firebase.json` den Eintrag `"target": "u17"` durch eine Kopie des `u15`-Eintrags ersetzen und darin
-   nur `target` und `public` ändern:
+1. In `firebase.json` den Eintrag `"target": "u17"` durch den Hosting-Eintrag der alten App ersetzen (siehe
+   unten „Hosting-Eintrag der alten App“) und darin `target` und `public` setzen:
 
    ```json
    "target": "u17",
@@ -383,19 +383,18 @@ unverändert. Die alte App `outputs/team-manager/` bleibt im Repo, nur für den 
   SPA-Rewrite wie bei `u14`/`u17`.
 - Merge-Workflow: Artefakt `angular-dist-mein-team` (Verify-Job) → Deploy-Job → `target: main`.
 - PR-Vorschau: Fuer das Ziel `main` gibt es **keine** Vorschau mehr (Vorschauen laufen nie mit echten Daten,
-  SCRUM-206/218). PRs sehen weiter die Angular-Vorschau mit dem Testteam auf `teamkompass-u14` und – fuer
-  Aenderungen an der Alt-App – die U15-Kopie mit Testteam auf `teamkompass-u15` (Abschnitt 8). Das Haupt-Team
+  SCRUM-206/218). PRs sehen die Angular-Vorschau mit dem Testteam auf `teamkompass-u14` (Abschnitt 8). Das Haupt-Team
   mit echten Daten sieht man erst nach dem Merge auf https://teamkompass-b8aac.web.app. Die Sites
-  `teamkompass-b8aac`, `-u14`, `-u15`, `-u17` räumt `firebase-preview-cleanup.yml` auf. Wird die U15 später
-  umgestellt, entfaellt die Alt-App-Vorschau (`legacy-preview` im PR-Workflow).
+  `teamkompass-b8aac`, `-u14`, `-u15`, `-u17` räumt `firebase-preview-cleanup.yml` auf. Seit SCRUM-210 (U15 auf
+  Angular) gibt es auch die Alt-App-Vorschau nicht mehr.
 
 **Rückweg sofort (Notfall):** Firebase Console → Hosting → Site `teamkompass-b8aac` → Versionsverlauf → letzte
 Version vor der Umstellung → „Zurücksetzen“. Wird beim nächsten Merge nach `main` wieder überschrieben.
 
 **Rückweg dauerhaft (per PR):**
 
-1. In `firebase.json` den Eintrag `"target": "main"` durch eine Kopie des `u15`-Eintrags ersetzen und darin nur
-   `target` und `public` ändern:
+1. In `firebase.json` den Eintrag `"target": "main"` durch den Hosting-Eintrag der alten App ersetzen (siehe unten
+   „Hosting-Eintrag der alten App“) und darin `target` und `public` setzen:
 
    ```json
    "target": "main",
@@ -410,3 +409,179 @@ Version vor der Umstellung → „Zurücksetzen“. Wird beim nächsten Merge na
 
 Service Worker auf den Geräten, Sync-Fehler nach dem Rückweg und die Zusammenfassungen (`teams/mein-team/playerStats`,
 „Neu berechnen“) verhalten sich genau wie oben für die U17 beschrieben.
+
+### U15 (Ziel `u15`) – seit SCRUM-210
+
+Seit SCRUM-210 liefert auch das Hosting-Ziel `u15` (Site `teamkompass-u15`, https://teamkompass-u15.web.app) den
+**Angular-Build der U15** aus (`ng build -c production,u15`, Team-ID `U15`, Ausgabe `angular/dist/team-u15/browser`).
+Daten (`teams/U15/...`), Anmeldungen und Firestore-Regeln bleiben unverändert. Die alte App `outputs/u15/` bleibt im
+Repo, nur für den Rückweg. Damit läuft **keine Alt-App (`outputs/*`) mehr live**.
+
+- `firebase.json`, Eintrag `"target": "u15"`: `"public": "angular/dist/team-u15/browser"`, Header und SPA-Rewrite
+  wie bei `u14`/`u17`/`main`.
+- Merge-Workflow: Artefakt `angular-dist-u15` (Verify-Job) → Deploy-Job → `target: u15`.
+- PR-Vorschau: Für das Ziel `u15` gibt es **keine** Vorschau mehr – weder den U15-Build (echte Daten) noch die
+  frühere Alt-App-Kopie mit Testteam (SCRUM-218). Einzige Vorschau ist der Testteam-Build auf `teamkompass-u14`
+  (Abschnitt 8). Änderungen an `outputs/*` haben damit keine Vorschau mehr; sie betreffen nur noch die Rückweg-Kopien.
+  Alte U15-Vorschaukanäle räumt `firebase-preview-cleanup.yml` weiter auf.
+
+**Rückweg sofort (Notfall):** Firebase Console → Hosting → Site `teamkompass-u15` → Versionsverlauf → letzte Version
+vor der Umstellung → „Zurücksetzen“. Wird beim nächsten Merge nach `main` wieder überschrieben.
+
+**Rückweg dauerhaft (per PR):**
+
+1. In `firebase.json` den Eintrag `"target": "u15"` durch den Hosting-Eintrag der alten App ersetzen (siehe unten)
+   und darin `target` und `public` setzen:
+
+   ```json
+   "target": "u15",
+   "public": "outputs/u15",
+   ```
+
+2. Den Test „Live-Team U15 läuft auf dem Angular-Build …“ (SCRUM-210) in `tests/project.test.mjs` entfernen bzw.
+   umdrehen, ebenso in `tests/preview-guard.test.mjs` die Erwartung „kein Ziel liefert die Alt-App aus“. Die
+   Artefakt-Schritte `angular-dist-u15` im Merge-Workflow dürfen bleiben.
+3. Optional wieder eine Alt-App-Vorschau mit dem Testteam: die Schritte aus `LEGACY_UPLOAD`/`LEGACY_STEPS` in
+   `tests/preview-guard.test.mjs` in den PR-Workflow übernehmen (nie `outputs/u15` direkt, das wären echte Daten).
+4. `npm run verify`, PR, Merge nach `main` → der Merge-Workflow deployt `outputs/u15` live.
+5. Prüfen: `https://teamkompass-u15.web.app` neu laden – die alte Oberfläche erscheint.
+
+Service Worker auf den Geräten, Sync-Fehler nach dem Rückweg und die Zusammenfassungen (`teams/U15/playerStats`,
+„Neu berechnen“) verhalten sich genau wie oben für die U17 beschrieben.
+
+### Hosting-Eintrag der alten App (für alle Rückwege)
+
+Seit SCRUM-210 steht in `firebase.json` kein Eintrag der alten App mehr. Für einen Rückweg diesen Eintrag einsetzen
+und nur `target` (`main`, `u15` oder `u17`) und `public` (`outputs/team-manager`, `outputs/u15` bzw. `outputs/u17`)
+anpassen:
+
+```json
+{
+  "target": "<ziel>",
+  "public": "outputs/<ordner>",
+  "ignore": [
+    "firebase.json",
+    "**/.*",
+    "**/node_modules/**",
+    "**/*.md",
+    "**/*.example.js"
+  ],
+  "headers": [
+    {
+      "source": "**",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' https://www.gstatic.com/firebasejs/10.12.5/; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        },
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin-allow-popups"
+        }
+      ]
+    },
+    {
+      "source": "/firebase-config.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/app.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/styles.css",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/base.css",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/mobile.css",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/next-level.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/service-worker.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/manifest.webmanifest",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/index.html",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    }
+  ]
+}
+```
