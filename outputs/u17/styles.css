@@ -2269,3 +2269,32 @@ menu {
 .opponent-games { margin: 6px 0 0; padding-left: 18px; }
 #eventOpponentPlan .opponent-detail-grid { margin-bottom: 10px; }
 @media (max-width: 640px) { #eventOpponentPlan .opponent-detail-grid { grid-template-columns: 1fr; } }
+
+/* Einklappbare Eventhistorie im Spielerprofil (SCRUM-226): Kopfzeile = Tippfläche >= 44 px */
+.profile-fold > summary {
+  min-height: 44px;
+  cursor: pointer;
+  list-style: none;
+  align-items: center;
+}
+
+.profile-fold > summary::-webkit-details-marker {
+  display: none;
+}
+
+.profile-fold > summary h2::before {
+  content: "▸ ";
+}
+
+.profile-fold[open] > summary h2::before {
+  content: "▾ ";
+}
+
+.profile-fold > summary:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.profile-fold[open] > summary {
+  margin-bottom: 12px;
+}

@@ -30,6 +30,38 @@ h2 {
   margin: var(--tk-space-2) 0 calc(var(--tk-space-2) * -1);
 }
 
+/* Einklappbare Listen (SCRUM-226): Überschrift ist die Tippfläche (>= 44 px), Pfeil zeigt den Zustand. */
+.fold > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--tk-space-2);
+  min-height: 44px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.fold > summary::-webkit-details-marker {
+  display: none;
+}
+
+.fold > summary::before {
+  content: '▸';
+  color: var(--tk-muted);
+}
+
+.fold[open] > summary::before {
+  content: '▾';
+}
+
+.fold > summary .section-title {
+  margin: 0;
+}
+
+.fold > summary:focus-visible {
+  outline: 2px solid var(--tk-primary, currentColor);
+  outline-offset: 2px;
+}
+
 .muted,
 .sync {
   margin: 0;

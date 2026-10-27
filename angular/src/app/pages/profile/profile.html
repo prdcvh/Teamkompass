@@ -131,7 +131,8 @@
       </section>
 
       @if (pointsVisible()) {
-        <h2 class="section-title">Trainingspunkte</h2>
+        <details class="fold points-fold">
+        <summary><h2 class="section-title">Trainingspunkte · {{ pointsRows().length }}</h2></summary>
         <tk-card>
           <section class="points" aria-label="Trainingspunkte (nur für Trainer sichtbar)">
             <p class="points-total"><strong>{{ pointsTotal() }}</strong> Punkte gesamt <small class="muted">· nur für Trainer sichtbar</small></p>
@@ -152,9 +153,11 @@
             }
           </section>
         </tk-card>
+        </details>
       }
 
-      <h2 class="section-title">Eventhistorie</h2>
+      <details class="fold history-fold">
+      <summary><h2 class="section-title">Eventhistorie · {{ history().length }}</h2></summary>
       <tk-card>
         @if (history().length === 0) {
           <div class="empty"><p>Für diesen Spieler gibt es noch keine Bewertungen.</p></div>
@@ -175,6 +178,7 @@
           </ul>
         }
       </tk-card>
+      </details>
 
       <tk-profile-extras [editable]="true" [consentWarning]="consentWarning()" />
     }
