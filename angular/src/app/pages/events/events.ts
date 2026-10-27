@@ -15,6 +15,9 @@ import {
 } from '../../core/events/event';
 import { groupByMonth, sectionEvents } from '../../core/events/event-sections';
 import { EventsService } from '../../core/events/events.service';
+import { SquadService } from '../../core/player/squad.service';
+import { isUpcoming, rsvpCounts, rsvpCountsText } from '../../core/rsvp/rsvp';
+import { RsvpService } from '../../core/rsvp/rsvp.service';
 import { isSeriesEvent } from '../../core/planning/series-events';
 import { SyncService } from '../../core/shell/sync.service';
 import { Button } from '../../ui/button/button';
@@ -40,6 +43,8 @@ export class Events implements OnInit {
   protected readonly sync = inject(SyncService);
   protected readonly mobile = inject(LayoutService).isMobile;
   private readonly weather = inject(WeatherService);
+  private readonly rsvp = inject(RsvpService);
+  private readonly squad = inject(SquadService);
   private readonly narrow = injectNarrowViewport();
   /** Kartenliste statt Tabelle: auf dem Handy und überall, wo die Tabelle nicht neben das Seitenmenü passt (SCRUM-134). */
   protected readonly cards = computed(() => this.mobile() || this.narrow());
@@ -94,6 +99,16 @@ export class Events implements OnInit {
 
   protected intensityLabel(event: TeamEvent): string {
     return exertionLabel(event.exertion);
+  }
+
+  /**
+   * Zu-/Absagen eines kommenden Termins (SCRUM-205): „x zugesagt · y abgesagt · z offen“. Leer bei vergangenen
+   * Terminen und solange Rückmeldungen oder Kader noch laden.
+   */
+  protected rsvpText(event: TeamEvent): string {
+    if (!this.events.canWrite() || this.squad.load() !== 'ready' || !isUpcoming(event, berlinNow(this.weather.now()).date)) return '';
+    const responses = this.rsvp.responsesFor(event.id);
+    return responses ? rsvpCountsText(rsvpCounts(responses, this.squad.players())) : '';
   }
 
   /** Das Training stammt aus einer Trainingsserie (SCRUM-146). */

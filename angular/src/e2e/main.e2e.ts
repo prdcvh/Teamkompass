@@ -59,6 +59,9 @@ function seed(): FakeFirebase {
   // Pausen (SCRUM-148): ein unbewertetes Training der Serie s2 am 12.11. (fällt weg, wenn dort eine Pause angelegt wird).
   fake.events.events.set('serie-s2-2026-11-12', { type: 'Training', title: 'Torwart- und Athletiktraining im Wechsel', date: '2026-11-12', intensity: 3, location: 'Sporthalle am Hang mit sehr langem Namen', trainingFocus: 'Umschalten', startTime: '18:00', durationMinutes: 75 });
   fake.ratings.ratings.set('serie-s1-2026-10-27', new Map([['p1', { attendance: 'present', playerId: 'p1' }]]));
+  // Zu-/Absagen (SCRUM-205) zum Training morgen: eine Absage der Eltern mit langem Grund, eine Zusage.
+  fake.rsvp.set('e4', 'p2', { playerId: 'p2', status: 'no', reason: 'Familienfeier bei den Großeltern in Norddeutschland, wir sind erst Sonntag zurück', by: 'parent' });
+  fake.rsvp.set('e4', 'p3', { playerId: 'p3', status: 'yes', reason: '', by: 'player' });
   const ratings = new Map<string, Record<string, unknown>>();
   const attendances = ['present', 'absent', 'excused', 'late'];
   names.forEach((_, i) => ratings.set(`p${i + 1}`, { attendance: attendances[i % 4], effort: 2, technique: 3, tactics: 2, comprehension: 4, grade: 2.8, note: 'Gute Einstellung im Training, weiter so', playerId: `p${i + 1}` }));

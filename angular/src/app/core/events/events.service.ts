@@ -61,7 +61,8 @@ export class EventsService {
 
   /** Startet das Echtzeit-Abo (mehrfacher Aufruf ist harmlos). */
   start(): void {
-    if (this.unsubscribe || this.load() === 'loading') return;
+    // Auch „ready“ ohne Abmeldefunktion zählt als laufend: die ersten Daten können vor dem Abo-Handle ankommen (SCRUM-205).
+    if (this.unsubscribe || this.load() === 'loading' || this.load() === 'ready') return;
     const generation = ++this.generation;
     this.load.set('loading');
     this.error.set('');

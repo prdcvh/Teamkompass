@@ -74,3 +74,6 @@ service-account*.json
 
 # SessionStart-Hook: installierte Entwicklungswerkzeuge (Version/Integrität stehen in .claude/hooks/tools/package-lock.json)
 .claude/hooks/tools/node_modules/
+
+# Vorschau-Kopie der Alt-App fuer PR-Vorschauen (SCRUM-218, scripts/legacy-preview.mjs)
+/dist/

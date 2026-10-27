@@ -29,14 +29,14 @@ App-Manifest (`teams/<team>/manifest.webmanifest`) austauscht:
 | Konfiguration | Team-ID     | heute live in            | Ausgabe              |
 | ------------- | ----------- | ------------------------ | -------------------- |
 | (Standard)    | `U14`       | – (Test, teamkompass-u14) | `dist/teamkompass-angular/` |
-| `mein-team`   | `mein-team` | `outputs/team-manager`   | `dist/team-mein-team/` |
+| `mein-team`   | `mein-team` | **diese Angular-App** (seit SCRUM-208, Rückweg `outputs/team-manager`) | `dist/team-mein-team/` |
 | `u15`         | `U15`       | `outputs/u15`            | `dist/team-u15/`     |
 | `u17`         | `U17`       | **diese Angular-App** (seit SCRUM-169, Rückweg `outputs/u17`) | `dist/team-u17/`     |
 
 Bauen: `ng build -c production,u17`. Diese Builds sprechen **echte Teamdaten** an; es gibt
 bewusst keine `ng serve`-Konfiguration dafür. Das Hosting-Ziel `u17` zeigt seit SCRUM-169 auf
-`dist/team-u17/browser` (Rückweg: `FIREBASE_SETUP.md` §11); `mein-team` und `u15` laufen noch auf der alten
-App. Umstellen weiterer Live-Teams nur mit PO-Freigabe (Ablaufplan in SCRUM-76). Ein neues Team braucht eine Zeile mehr
+`dist/team-u17/browser`, das Hosting-Ziel `main` (Haupt-Team) seit SCRUM-208 auf `dist/team-mein-team/browser`
+(Rückweg jeweils: `FIREBASE_SETUP.md` §11); nur `u15` läuft noch auf der alten App. Umstellen weiterer Live-Teams nur mit PO-Freigabe (Ablaufplan in SCRUM-76). Ein neues Team braucht eine Zeile mehr
 in `angular.json`, `environment.<team>.ts`, `teams/<team>/manifest.webmanifest` und `build:teams`.
 
 ## Code-Struktur: eine Datei = ein Thema
@@ -112,3 +112,8 @@ bewusst von 4 kB auf 6 kB angehoben: Login (~5,4 kB) und Profil (~4,4 kB) sind
 Seiten mit vielen Zuständen und Mobil-/Desktop-Varianten; das CSS ließ sich ohne Risiko
 für das Erscheinungsbild nicht ohne Weiteres kürzen. Wächst eine Komponente über 6 kB,
 zuerst gemeinsame Regeln in Tokens/Basis-Komponenten verschieben, bevor das Budget erneut steigt.
+
+## Wetter, Kleidung, Erinnerung
+
+Architektur, Blaze-/Budget-Hinweis, geplantes Function-Deployment und die Schwellenwerte der Kleidungsempfehlung:
+[`docs/wetter-kleidung-erinnerung.md`](../docs/wetter-kleidung-erinnerung.md).
