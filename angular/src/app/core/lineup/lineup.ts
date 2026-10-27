@@ -1,7 +1,7 @@
 /**
  * Startelf bearbeiten: Aufstellung je Zone, Umwandlung von/nach `teams/{teamId}/meta/lineup`
  * (`{ assignments: { <Zone>: [playerId, …] } }`), Verschieben, Tauschen, Auswechseln, Bank und Mannschaftsnote
- * (wie outputs/team-manager/app.js: movePlayerToZone, swapPlayers). Noten sind Schulnoten: kleiner ist besser.
+ * (wie Alt-App app.js: movePlayerToZone, swapPlayers). Noten sind Schulnoten: kleiner ist besser.
  */
 import { roundGrade } from '../ratings/rating';
 import { MAX_ON_PITCH, PITCH_BANDS, PITCH_ZONES, ZONES, type Zone } from './pitch';

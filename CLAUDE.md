@@ -1,79 +1,75 @@
 # TeamKompass
 
-Static, framework-free HTML/CSS/JS app for managing a youth football team
-(squad, events with player ratings, player profiles, opponent analysis). No
-build step, no bundler, no test suite.
+Angular app for managing youth football teams (squad, events with player
+ratings, player profiles, opponent analysis, lineup, planning, roles and
+access), backed by Firebase (Auth + Firestore) and hosted on Firebase Hosting.
+One code base in `angular/`, one build configuration and one hosting target
+per team.
 
 ## Repo layout — read this before editing
 
-- `index.html` / `app.js` / `styles.css` (repo root): a **simpler reference
-  copy**. It is *not* what's actually hosted — see `firebase.json`.
-- `outputs/team-manager/`: the old app of the main team (`teamId:
-  mein-team`, "1. FC Königstein U14"). **No longer hosted** since SCRUM-208
-  (target `main` serves the Angular `mein-team` build, see `angular/`
-  below); it stays, in sync, as the rollback copy (`FIREBASE_SETUP.md` §11)
-  and as the reference the other `outputs/*` copies are diffed against —
-  don't delete it. Includes features
-  the root copy doesn't (auth/role mode, opponent analysis, development
-  plans, absences, measurements, formation board, mobile stepper UI) and
-  syncs to Firestore per-collection (see `cloudCache`/`cloudSave*` in
-  `app.js`), not as one JSON blob.
-- `outputs/u17/` and `outputs/u15/`: one copy per additional team. Both
-  are **no longer hosted**: `outputs/u17` since SCRUM-169 (target `u17`
-  serves the Angular U17 build), `outputs/u15` since SCRUM-210 (target `u15`
-  serves the Angular U15 build, see `angular/` below); they stay, in sync,
-  only as rollback copies (`FIREBASE_SETUP.md` §11) — don't delete them.
-  Near-byte-identical to
-  `outputs/team-manager` — only team-branding strings (name/logo alt text)
-  and `firebase-config.js` (`teamId: "U17"` / `"U15"`) differ. Diff against
-  `outputs/team-manager` before assuming a change only needs to land once.
-  Check for new copies under `outputs/` rather than assuming the set is
-  still just these three. Since SCRUM-210 **no `outputs/*` copy is live
-  any more** — every hosting target serves an Angular build, and there is
-  no old-app PR preview any more (the SCRUM-218 test-team copy via
-  `scripts/legacy-preview.mjs` is kept only for a rollback). A new team
-  today means an Angular build configuration (`angular/README.md`), one
-  more hosting target in `.firebaserc` + `firebase.json`, and one more
-  deploy step in `.github/workflows/firebase-hosting-merge.yml`
-  (`FIREBASE_SETUP.md` §6 still describes the old `outputs/<team>/` way).
+- `angular/`: **the app** (Jira epic SCRUM-40). Own `package.json`; from the
+  repo root `npm run verify` runs the root tests and lints, builds (default
+  build + every team build) and tests it. It is deployed on every merge to
+  `main`, four times — same code, different build configuration:
+  - default build → hosting target `u14` → https://teamkompass-u14.web.app/
+    (test team `teamId: U14`, data copied from `mein-team` — never write to
+    `mein-team` from there; `FIREBASE_SETUP.md` §8);
+  - `ng build -c production,mein-team` (`teamId: mein-team`) → target `main`
+    → https://teamkompass-b8aac.web.app/, the **live main team with real
+    data** (since SCRUM-208);
+  - `ng build -c production,u17` (`teamId: U17`) → target `u17` →
+    https://teamkompass-u17.web.app/, the **live U17 team with real data**
+    (since SCRUM-169);
+  - `ng build -c production,u15` (`teamId: U15`) → target `u15` →
+    https://teamkompass-u15.web.app/, the **live U15 team with real data**
+    (since SCRUM-210).
+
+  So an Angular change is live for real U17, U15 and main-team users right
+  after merge — say so. Every PR gets a preview channel of the **default
+  build (test team `U14`) on target `u14`** only — since SCRUM-206 a PR
+  preview must never ship a live-team build (`U17`, `mein-team`, `U15` =
+  real data); `tests/preview-guard.test.mjs` enforces this for every deploy
+  step in `firebase-hosting-pull-request.yml`, with no exceptions, and
+  rejects any preview target that is not an Angular build. Targets `main`,
+  `u15` and `u17` therefore have **no** PR preview. A new preview (e.g.
+  another team build) must likewise use the test team. Note U14 still lives
+  in the production Firebase project with data copied from `mein-team`.
+  Team builds only swap `src/environments/environment.<team>.ts` and
+  `teams/<team>/manifest.webmanifest` (`angular/README.md`, "Builds je
+  Team"). A new team with its own hosting target means a build
+  configuration there, one more hosting target in `.firebaserc` +
+  `firebase.json`, and one more artifact + deploy step in
+  `.github/workflows/firebase-hosting-merge.yml` (`FIREBASE_SETUP.md` §6).
 - `firestore.rules`: deployed to the real `teamkompass-b8aac` Firebase
   project on every push to `main` that touches this file (see
   `.github/workflows/firestore-rules-deploy.yml`). Trainer role gets
   full read/write; player role is restricted to their own profile/ratings.
   Already generic per `teamId`, so a new team never needs rule changes.
-- `angular/`: the in-progress Angular rewrite (see Jira epic SCRUM-40). Own
-  `package.json`, built separately; `npm run verify` also lints, builds and
-  tests it. It **is deployed** on every merge to `main`, four times: the default
-  build to hosting target `u14` → https://teamkompass-u14.web.app/ (test
-  team `teamId: U14`, data copied from `mein-team` — never write to
-  `mein-team` from there; `FIREBASE_SETUP.md` §8), and since SCRUM-169 the
-  `u17` build (`ng build -c production,u17`, `teamId: U17`) to hosting target
-  `u17` → https://teamkompass-u17.web.app/, the **live U17 team with real
-  data** (`FIREBASE_SETUP.md` §11), and since SCRUM-208 the `mein-team`
-  build (`ng build -c production,mein-team`, `teamId: mein-team`) to hosting
-  target `main` → https://teamkompass-b8aac.web.app/, the **live main team
-  with real data**, and since SCRUM-210 the `u15` build
-  (`ng build -c production,u15`, `teamId: U15`) to hosting target `u15` →
-  https://teamkompass-u15.web.app/, the **live U15 team with real data**.
-  So an Angular change is live for real U17, U15 and main-team users right
-  after merge — say so. Every PR gets an Angular preview
-  channel of the **default build (test team `U14`) on target `u14`** — since
-  SCRUM-206 a PR preview must never ship a live-team build (`U17`,
-  `mein-team`, `U15` = real data); `tests/preview-guard.test.mjs` enforces
-  this for every deploy step in `firebase-hosting-pull-request.yml`, with no
-  exceptions. Targets `main`, `u15` and `u17` (live teams, Angular)
-  therefore have **no** PR preview; since SCRUM-210 there is no old-app
-  preview either (it used to run on `u15` as a test-team copy of
-  `outputs/u15`, SCRUM-218). A new preview (e.g. another Angular team build,
-  or an old-app preview after a rollback) must likewise use the test team.
-  Note U14 still lives in the production Firebase project with data copied
-  from `mein-team`.
+  Emulator tests in `tests/rules/` (`rules-tests.yml`).
+- `tests/*.test.mjs` (root, `node --test`): repo-level checks — hosting
+  config, workflows, preview guard, scripts, plus source checks on
+  `angular/`. Unit tests of the app itself live next to the code in
+  `angular/src/**/*.spec.ts`.
+- `scripts/`: one-off admin scripts run by the PO (`copy-team`,
+  `assign-clubs`, `create-club-invite`) and the preview guard
+  (`preview-guard-lib.mjs`).
+- `.github/workflows/`: `firebase-hosting-merge.yml` (verify + deploy all
+  four targets on merge), `firebase-hosting-pull-request.yml` (verify + U14
+  preview), `firebase-preview-cleanup.yml`, `firestore-rules-deploy.yml`,
+  `rules-tests.yml`, `quality.yml`.
+- **Archived old app.** The former framework-free app (`outputs/team-manager`,
+  `outputs/u15`, `outputs/u17` and the simpler root copy `index.html` /
+  `app.js` / `styles.css`) was removed from `main` in SCRUM-211. It only
+  lives in git history (archive commit and rollback steps:
+  `FIREBASE_SETUP.md` §11). Don't build features for it; comments in
+  `angular/` that say "wie Alt-App app.js: …" refer to that archived code.
 
-**A feature request against "the app" almost always means every copy**
-(root + every `outputs/*` team folder **and `angular/`**, since every live
-team runs on Angular and `outputs/*` are the rollback copies), not just root — root being out of
-sync has caused silently-no-op ships before (see git history: #61/#62,
-#59/#63). When only one copy is touched, say so explicitly and why.
+**One code base.** A feature request against "the app" means a change in
+`angular/`; every team build picks it up automatically. Team-specific
+behaviour belongs in the team's environment file, not in a copy of the code.
+If a change only affects one team's build or one hosting target, say so
+explicitly and why.
 
 ## PR / merge workflow
 
@@ -90,8 +86,8 @@ Firebase Hosting target + Firestore rules) with no staging step — there
 is no "merge but don't deploy". Treat that as the standing cost of this
 default, not a reason to ask each time.
 
-Exception: a PR that adds a *new* hosting target (new `outputs/<team>/`
-copy, new entry in `.firebaserc`/`firebase.json`/
+Exception: a PR that adds a *new* hosting target (new team build with a
+new entry in `.firebaserc`/`firebase.json`/
 `firebase-hosting-merge.yml`) needs the corresponding Firebase Hosting site
 created first (`firebase hosting:sites:create <site-id>` or via Firebase
 Console — not possible from here without Firebase credentials). Merging
@@ -145,8 +141,8 @@ keeps the board current, reports at sprint end).
   prototype in Figma (Figma connector) and send the PO a screenshot of it
   (ticket comment and/or chat). It is for information and as a template; the
   PO does not need to approve it before the build continues.
-- **Definition of Done:** acceptance criteria met; change applied to every
-  app copy (see "Repo layout"); `npm run verify` green, with a test for the
+- **Definition of Done:** acceptance criteria met; change made in `angular/`
+  (one code base for every team build, see "Repo layout"); `npm run verify` green, with a test for the
   fix where the logic is testable; PR merged per the merge workflow below;
   ticket updated as above.
 - **Working hours (standing instruction from the PO, 2026-10-01).** The PO
@@ -177,11 +173,11 @@ keeps the board current, reports at sprint end).
 - **One sub-agent per ticket (standing instruction from the PO,
   2026-10-15).** In the night session, the main session only orchestrates:
   for each ticket it sends a separate sub-agent (Agent tool, one ticket at a
-  time) that does the whole ticket — status `In Bearbeitung`, the change in
-  every app copy, test, `npm run verify` green, commit, push, PR, the PO
+  time) that does the whole ticket — status `In Bearbeitung`, the change (in `angular/`),
+  test, `npm run verify` green, commit, push, PR, the PO
   ticket comment, status `In Überprüfung`. The sub-agent never merges. The
   main session then checks the result: diff against the acceptance
-  criteria, every app copy touched, test present, verify/CI green, ticket
+  criteria, the change in `angular/`, test present, verify/CI green, ticket
   comment as required above. If something is off, the sub-agent fixes it
   (via SendMessage, or a new sub-agent given a concrete list of the
   problems). Only after that check passes is the PR ready; it is merged and

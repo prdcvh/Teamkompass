@@ -1,8 +1,9 @@
 # TeamKompass (Angular)
 
-Angular-Neubau von TeamKompass (Jira-Epic SCRUM-40). Wird getrennt von den Live-Kopien
-(Repo-Root, `outputs/*`) gebaut und bei jedem Merge nach `main` auf https://teamkompass-u14.web.app/
-veröffentlicht (Hosting-Target `u14`). Testteam: `teamId: U14`.
+TeamKompass (Jira-Epic SCRUM-40). Die einzige App im Repo: Bei jedem Merge nach `main` wird sie je Team gebaut
+und auf alle vier Hosting-Ziele veröffentlicht (Tabelle unten), der Standard-Build (Testteam `teamId: U14`) auf
+https://teamkompass-u14.web.app/. Die frühere Alt-App (`outputs/*`, Repo-Root) ist seit SCRUM-211 archiviert
+(`FIREBASE_SETUP.md` §11).
 
 ## Befehle
 
@@ -14,9 +15,9 @@ npm run build:teams # Builds je Live-Team (mein-team, U15, U17) nach dist/team-<
 npm test           # Unit-Tests (Vitest), einmalig: npm test -- --watch=false
 ```
 
-Aus dem Repo-Root prüft `npm run verify` Live-Kopien und Angular zusammen (Lint, Build, Tests).
+Aus dem Repo-Root prüft `npm run verify` die Repo-Tests (`tests/*.test.mjs`) und Angular zusammen (Lint, Build, Tests).
 
-Paritätsliste, PWA/Update-Verhalten und Ablaufplan für den Umstieg der Live-Teams: [CUTOVER.md](CUTOVER.md).
+Paritätsliste, PWA/Update-Verhalten und Ablauf des (abgeschlossenen) Umstiegs der Live-Teams: [CUTOVER.md](CUTOVER.md).
 Der Service Worker ist nur im Produktions-Build aktiv (`npm start` läuft ohne).
 
 ## Builds je Team
@@ -29,16 +30,17 @@ App-Manifest (`teams/<team>/manifest.webmanifest`) austauscht:
 | Konfiguration | Team-ID     | heute live in            | Ausgabe              |
 | ------------- | ----------- | ------------------------ | -------------------- |
 | (Standard)    | `U14`       | – (Test, teamkompass-u14) | `dist/teamkompass-angular/` |
-| `mein-team`   | `mein-team` | **diese Angular-App** (seit SCRUM-208, Rückweg `outputs/team-manager`) | `dist/team-mein-team/` |
-| `u15`         | `U15`       | **diese Angular-App** (seit SCRUM-210, Rückweg `outputs/u15`) | `dist/team-u15/`     |
-| `u17`         | `U17`       | **diese Angular-App** (seit SCRUM-169, Rückweg `outputs/u17`) | `dist/team-u17/`     |
+| `mein-team`   | `mein-team` | Ziel `main`, teamkompass-b8aac (seit SCRUM-208) | `dist/team-mein-team/` |
+| `u15`         | `U15`       | Ziel `u15`, teamkompass-u15 (seit SCRUM-210) | `dist/team-u15/`     |
+| `u17`         | `U17`       | Ziel `u17`, teamkompass-u17 (seit SCRUM-169) | `dist/team-u17/`     |
 
 Bauen: `ng build -c production,u17`. Diese Builds sprechen **echte Teamdaten** an; es gibt
 bewusst keine `ng serve`-Konfiguration dafür. Das Hosting-Ziel `u17` zeigt seit SCRUM-169 auf
 `dist/team-u17/browser`, das Hosting-Ziel `main` (Haupt-Team) seit SCRUM-208 auf `dist/team-mein-team/browser`
-und das Hosting-Ziel `u15` seit SCRUM-210 auf `dist/team-u15/browser` (Rückweg jeweils: `FIREBASE_SETUP.md` §11);
-keine alte App (`outputs/*`) läuft mehr live. Umstellen weiterer Live-Teams nur mit PO-Freigabe (Ablaufplan in SCRUM-76). Ein neues Team braucht eine Zeile mehr
-in `angular.json`, `environment.<team>.ts`, `teams/<team>/manifest.webmanifest` und `build:teams`.
+und das Hosting-Ziel `u15` seit SCRUM-210 auf `dist/team-u15/browser` (Rückweg: `FIREBASE_SETUP.md` §11).
+Ein neues Team braucht eine Zeile mehr in `angular.json`, `environment.<team>.ts`,
+`teams/<team>/manifest.webmanifest` und `build:teams`, dazu Hosting-Ziel und Deploy-Schritt
+(`FIREBASE_SETUP.md` §6).
 
 ## Code-Struktur: eine Datei = ein Thema
 

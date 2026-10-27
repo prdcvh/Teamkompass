@@ -1,6 +1,6 @@
 /**
  * Teamanalyse: Auswertungen über alle Events und Spieler. Rechnet wie die bisherige App
- * (outputs/team-manager/app.js: teamStats, teamAverageGradeForEvent, birthQuarterCounts, positionCoverage,
+ * (Alt-App app.js: teamStats, teamAverageGradeForEvent, birthQuarterCounts, positionCoverage,
  * trainingFocusCounts, renderTeamAnalysis). Noten sind Schulnoten: kleiner ist besser.
  */
 import { type TeamEvent, TRAINING_FOCUSES } from '../events/event';

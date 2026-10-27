@@ -1,7 +1,7 @@
 /**
  * Spielerdaten des Kaders: Modell, Status, Einwilligung, Umwandlung von/nach Firestore und die Prüfung des
  * Formulars. Das Dokument `teams/{teamId}/players/{id}` ist mit der bisherigen App identisch (siehe
- * outputs/team-manager/app.js, savePlayer/normalizePlayer).
+ * Alt-App app.js, savePlayer/normalizePlayer).
  */
 import { isIsoDate, todayIso } from '../shared/dates';
 

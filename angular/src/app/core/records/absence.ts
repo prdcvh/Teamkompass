@@ -1,6 +1,6 @@
 /**
  * Abwesenheiten und Verletzungen eines Spielers (`players/{id}/absences`): Modell, Prüfung, Umwandlung und
- * Zeitraum-Logik (wie outputs/team-manager/app.js: absenceCoversDate). Daten sind ISO-Datum-Texte (JJJJ-MM-TT).
+ * Zeitraum-Logik (wie Alt-App app.js: absenceCoversDate). Daten sind ISO-Datum-Texte (JJJJ-MM-TT).
  */
 import { formatDate, isIsoDate } from '../shared/dates';
 

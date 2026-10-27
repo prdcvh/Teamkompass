@@ -1,7 +1,7 @@
 /**
  * Gegnerprofile: Modell, Umwandlung von/nach Firestore und die reine Logik für Prüfung, Filter und Sortierung.
  * Das Dokument `teams/{teamId}/opponents/{id}` ist mit der bisherigen App identisch
- * (siehe outputs/team-manager/app.js: normalizeOpponent, saveOpponent). Nur Trainer dürfen Gegner lesen und schreiben.
+ * (siehe Alt-App app.js: normalizeOpponent, saveOpponent). Nur Trainer dürfen Gegner lesen und schreiben.
  */
 import type { TeamEvent } from '../events/event';
 import { formatDate, isIsoDate, todayIso } from '../shared/dates';

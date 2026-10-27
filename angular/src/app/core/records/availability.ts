@@ -1,6 +1,6 @@
 /**
  * Verfügbarkeit eines Spielers aus Status und Abwesenheiten: Grund der Nichtverfügbarkeit, Anzeige-Status und
- * die automatische „Fehlt“-Bewertung (wie outputs/team-manager/app.js: unavailabilityReason, applyAutoAbsence).
+ * die automatische „Fehlt“-Bewertung (wie Alt-App app.js: unavailabilityReason, applyAutoAbsence).
  */
 import { formatDate } from '../shared/dates';
 import type { Player } from '../player/player';

@@ -1,5 +1,5 @@
 /**
- * Sicherung einspielen (JSON-Export wieder importieren), Parität zur Live-App (SCRUM-28, outputs/team-manager/app.js,
+ * Sicherung einspielen (JSON-Export wieder importieren), Parität zur Live-App (SCRUM-28, Alt-App app.js,
  * Block BACKUP-IMPORT): gleiche strenge Dateiprüfung, gleiches Dateiformat, gleiche Schreibliste. Gleiche Kennungen
  * werden überschrieben, neue ergänzt, alles andere bleibt unangetastet – es wird nie etwas gelöscht.
  * Reine Funktionen ohne Datenbankzugriff. Sicherungen der Live-App und dieser App sind gegenseitig einspielbar.

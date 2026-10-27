@@ -1,7 +1,7 @@
 # Wetter, Kleidungsempfehlung und E-Mail-Erinnerung (nur `angular/`, SCRUM-102)
 
 Stand der drei Funktionen und was noch fehlt. Gilt nur für die Angular-App; die Kopien unter
-`outputs/*` und die Wurzel-Kopie haben diese Funktionen nicht.
+Die frühere Alt-App (`outputs/*` und die Wurzel-Kopie, seit SCRUM-211 archiviert) hatte diese Funktionen nicht.
 
 ## Architektur
 

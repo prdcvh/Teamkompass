@@ -1,6 +1,6 @@
 /**
  * Globale Suche (Trainer): Bereiche, Spieler, Events und Gegner in einer Liste. Gleiche Regeln wie die bisherige
- * Suche (Strg/⌘ + K in outputs/team-manager/next-level.js): Treffer sind Teilstrings von „Name + Zusatz“ ohne
+ * Suche (Strg/⌘ + K in Alt-App next-level.js): Treffer sind Teilstrings von „Name + Zusatz“ ohne
  * Beachtung der Groß-/Kleinschreibung, höchstens 12 Treffer, Reihenfolge Bereiche → Spieler → Events → Gegner.
  */
 import { type TeamEvent } from '../events/event';

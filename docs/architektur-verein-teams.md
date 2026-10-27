@@ -22,8 +22,8 @@ umgesetzt in SCRUM-180: `firestore.rules`, Regeltests `tests/rules/clubs.test.mj
 | Punkt | Heute |
 |---|---|
 | Datenablage | Alles unter `teams/{teamId}/…` (Spieler, Termine, Bewertungen, Zugänge, Einstellungen). |
-| Teams | `mein-team` (Live-U14, `outputs/team-manager`), `U15`, `U17` (`outputs/u15`, `outputs/u17`), `U14` (Angular-Testkopie von `mein-team`). Alle: 1. FC Königstein, ein Firebase-Projekt. |
-| Team-ID | Fest im Build: `firebase-config.js` (Alt-App) bzw. `angular/src/environments/environment.<team>.ts`. 15 Angular-Dateien lesen `environment.teamId`. |
+| Teams | `mein-team` (Live-U14), `U15`, `U17` (bei Erstellung noch Alt-App `outputs/*`, heute Angular; Alt-App seit SCRUM-211 archiviert), `U14` (Angular-Testkopie von `mein-team`). Alle: 1. FC Königstein, ein Firebase-Projekt. |
+| Team-ID | Fest im Build: `firebase-config.js` (Alt-App, seit SCRUM-211 archiviert) bzw. `angular/src/environments/environment.<team>.ts`. 15 Angular-Dateien lesen `environment.teamId`. |
 | Vereinsname/Logo | Fest im Build (`clubName`, `assets/club-logo.png`). |
 | Zugriff | `teams/{teamId}/members/{uid}` mit `role` (`trainer`, `player`, `parent`, `physio`, `scout`, alt `medical`), bei Spielern/Eltern `playerId`, optional `expiresAt`. Alle Regeln prüfen nur dieses Dokument. |
 | Trennung der Teams | Schon heute vollständig: ohne `members`-Eintrag im Team kein Zugriff. |

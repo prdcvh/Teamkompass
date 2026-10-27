@@ -9,7 +9,7 @@
  * Inhalt: Name, Nummer, Positionen, Geburtsdatum und je Termin Datum/Art/Titel (Spiel: Gegner, Ergebnis, Spieldauer),
  * die Anwesenheit ohne Grund („Teilweise“ zählt als anwesend), die vier Teilnoten, Minuten, Tore und Vorlagen.
  * Keine Rückmeldungen, Notizen, Status, Abwesenheiten, Messwerte oder Förderpläne. Spieler mit widerrufener
- * Einwilligung (SCRUM-51) erscheinen nicht. Gleiches Format wie `buildScoutProfiles` in outputs/team-manager/app.js.
+ * Einwilligung (SCRUM-51) erscheinen nicht. Gleiches Format wie `buildScoutProfiles` in Alt-App app.js.
  */
 import { type TeamEvent, eventFromDoc } from '../events/event';
 import { type Player, playerFromDoc } from '../player/player';

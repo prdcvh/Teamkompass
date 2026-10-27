@@ -1,7 +1,7 @@
 /**
  * Events (Training/Spiel): Modell, Umwandlung von/nach Firestore und die reine Logik für Prüfung,
  * Filter und Sortierung. Das Dokument `teams/{teamId}/events/{id}` ist mit der bisherigen App
- * identisch (siehe outputs/team-manager/app.js, saveEvent/normalizeEvent). Bewertungen und
+ * identisch (siehe Alt-App app.js, saveEvent/normalizeEvent). Bewertungen und
  * interne Notizen liegen in Unterkollektionen und gehören nie ins Event-Dokument.
  */
 import { formatDate, isIsoDate } from '../shared/dates';

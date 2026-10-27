@@ -1,6 +1,3 @@
-/// <reference types="node" />
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { type CurrentIds, backupOperations, isBackupId, overwriteCount, parseBackup, summarizeBackup, summaryLines, validateBackup } from './backup-import';
 import { buildExport } from './export';
 import type { TeamEvent } from '../events/event';
@@ -10,17 +7,6 @@ import { BLANK_RATING } from '../ratings/rating';
 import type { DevelopmentPlan } from '../records/plan';
 
 const TODAY = '2026-10-15';
-
-/** Der Einspiel-Kern der bisherigen App (outputs/team-manager/app.js), unverändert aus der Quelldatei geladen. */
-function liveBackupApi(): {
-  validateBackupData: (raw: unknown) => { ok: boolean; error?: string };
-  summarizeBackupImport: (current: unknown, incoming: unknown) => Record<string, unknown>;
-  backupCloudOperations: (incoming: unknown) => { path: string[]; data: Record<string, unknown>; merge: boolean }[];
-} {
-  const source = readFileSync(resolve(process.cwd(), '../outputs/team-manager/app.js'), 'utf8');
-  const block = source.split('// BACKUP-IMPORT START')[1].split('\n').slice(1).join('\n').split('// BACKUP-IMPORT END')[0];
-  return new Function(`${block}\nreturn { validateBackupData, summarizeBackupImport, backupCloudOperations };`)();
-}
 
 /** Eine Sicherung so, wie die bisherige App sie schreibt (JSON.stringify(state)): inkl. Startelf, privateNotes und Ergänzungen. */
 const liveBackup = () => ({
@@ -68,10 +54,8 @@ describe('Sicherung einspielen: Dateiprüfung', () => {
       { players: [{ id: 'p1', name: 'A' }], events: [], measurements: { p1: [{ id: 'a/b' }] } },
       { players: [{ id: 'p1', name: 'A' }], events: [], opponents: [{ id: '..' }] },
     ];
-    const live = liveBackupApi();
     for (const raw of bad) {
       expect(validateBackup(raw).ok, JSON.stringify(raw)).toBe(false);
-      expect(live.validateBackupData(raw).ok, JSON.stringify(raw)).toBe(false);
     }
   });
 
@@ -140,7 +124,7 @@ describe('Sicherung einspielen: Zusammenfassung und Schreibliste', () => {
   });
 });
 
-describe('Sicherung einspielen: Live-App und Angular gegenseitig', () => {
+describe('Sicherung einspielen: Sicherungen der bisherigen App und dieser App', () => {
   const player = (id: string, name: string): Player => ({ id, name, positions: ['ST'], number: 9, birthdate: '2012-02-05', status: 'Fit', injuryUntil: '', injuredSince: '', consentStatus: 'granted', consentDate: '' });
   const event = (id: string, title: string): TeamEvent =>
     ({ id, title, date: '2026-09-01', type: 'Training', intensity: 2, exertion: 5, location: '', trainingFocus: 'Umschalten', opponent: '', goalsFor: null, goalsAgainst: null, matchDuration: null, notes: '' }) as TeamEvent;
@@ -168,24 +152,6 @@ describe('Sicherung einspielen: Live-App und Angular gegenseitig', () => {
     expect(ops.find((op) => op.path.join('/') === 'players/p1')!.data).toEqual(raw.players[0]);
     expect(ops.find((op) => op.path.join('/') === 'events/e1')!.data).toMatchObject({ id: 'e1', title: 'Spiel gegen Eppstein', goalsFor: 3, matchDuration: 70 });
     expect(ops.find((op) => op.path.join('/') === 'players/p1/measurements/m1')!.data).toMatchObject({ height: '151', weight: '40', playerId: 'p1' });
-  });
-
-  it('Angular → Live: die Sicherung dieser App besteht die Prüfung der bisherigen App', () => {
-    const exported = angularExport();
-    expect(liveBackupApi().validateBackupData(exported)).toEqual({ ok: true });
-    expect(validateBackup(exported).ok).toBe(true);
-  });
-
-  it('Angular → Angular und Live: gleiche Schreibliste (Pfade, Felder, merge) wie die bisherige App', () => {
-    const exported = angularExport();
-    const live = liveBackupApi();
-    const liveOps = live.backupCloudOperations({ ...exported, lineup: { assignments: {} } });
-    const ours = backupOperations(parseBackup(exported, TODAY));
-    expect(ours.map((op) => op.path.join('/'))).toEqual(liveOps.map((op) => op.path.join('/')));
-    for (const [index, op] of ours.entries()) {
-      expect(op.data, op.path.join('/')).toEqual(liveOps[index].data);
-      expect(op.merge, op.path.join('/')).toBe(liveOps[index].merge);
-    }
   });
 
   it('das Einspielen ist wiederholbar: gleiche Sicherung zweimal ergibt dieselben Dokumente', () => {

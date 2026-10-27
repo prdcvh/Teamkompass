@@ -1,5 +1,5 @@
 /**
- * Zu- und Absagen für Termine (SCRUM-205, gleiches Verhalten wie SCRUM-175 in outputs/team-manager/app.js, Abschnitt
+ * Zu- und Absagen für Termine (SCRUM-205, gleiches Verhalten wie SCRUM-175 in Alt-App app.js, Abschnitt
  * „RSVP“). Spieler und Eltern sagen für den eigenen Spieler zu („yes“) oder ab („no“), optional mit Grund.
  * Gespeichert in `teams/{teamId}/events/{eventId}/responses/{playerId}` mit genau den Feldern playerId, status, reason,
  * by und updatedAt (Server-Zeitstempel) – so lesen und schreiben Alt-App und Angular-App dieselben Daten, und die

@@ -1,5 +1,5 @@
 /**
- * Belastungsampel eines Spielers (SCRUM-137). Rechnet wie die bisherige App (outputs/team-manager/app.js:
+ * Belastungsampel eines Spielers (SCRUM-137). Rechnet wie die bisherige App (Alt-App app.js:
  * `assessLoad`) und ist eine Kernzahl (CLAUDE.md „wrong core numbers“).
  *
  * - Belastung pro Termin = Minuten × Anstrengung (0–10). Minuten: bei Spielen die gespielten Minuten, sonst die Dauer
