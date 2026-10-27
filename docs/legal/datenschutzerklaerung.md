@@ -47,11 +47,11 @@ Die App speichert Einstellungen (z. B. Darkmode, Arbeitsbereich, Aufbewahrungsda
 
 ### 2.5 Wettervorhersage (nur Angular-App)
 
-Bei Terminen mit Ort fragt Ihr Gerät den Dienst **Open-Meteo** (open-meteo.com) ab. Übertragen werden der Ort des Termins (als Koordinaten bzw. Ortsname bei der Ortssuche) und Ihre IP-Adresse. Es werden keine Spieler- oder Teamdaten übertragen. Open-Meteo speichert Server-Logs nach eigenen Angaben 90 Tage. Rechtsgrundlage: Art. 6 Abs. 1 lit. f DSGVO (Komfortfunktion, Interesse an Wetterinformation zur Trainingsplanung). [Anbieter, Sitz und Drittlandbezug von Open-Meteo juristisch prüfen.]
+Bei Terminen mit Ort fragt Ihr Gerät den Dienst **Open-Meteo** (open-meteo.com) ab. Übertragen werden der Ort des Termins (als Koordinaten bzw. Ortsname bei der Ortssuche) und Ihre IP-Adresse. Dasselbe gilt für die Ortssuche (geocoding-api.open-meteo.com): Der eingetippte Suchbegriff und Ihre IP-Adresse gehen an Open-Meteo. Es werden keine Spieler- oder Teamdaten und keine Daten von Minderjährigen übertragen. Die Kleidungsempfehlung wird ausschließlich auf Ihrem Gerät aus der Vorhersage berechnet; dafür geht nichts zusätzlich an Dritte. Open-Meteo speichert Server-Logs nach eigenen Angaben 90 Tage. Rechtsgrundlage: Art. 6 Abs. 1 lit. f DSGVO (Komfortfunktion, Interesse an Wetterinformation zur Trainingsplanung). [Anbieter, Sitz und Drittlandbezug von Open-Meteo juristisch prüfen.]
 
 ### 2.6 E-Mail-Erinnerung (optional, nur Trainer)
 
-Trainer können in den Einstellungen eine E-Mail-Erinnerung an offene Bewertungen aktivieren (Standard: aus). Gespeichert wird die Wahl (an/aus) zum Konto. **Hinweis zum Entwurf:** Nach dem derzeitigen Stand der App wird noch keine E-Mail versendet. Sobald ein Versanddienst angebunden wird, muss dieser hier und im Auftragsverarbeitungsvertrag ergänzt werden: [VERSANDDIENST, falls eingeführt].
+Trainer können in den Einstellungen eine E-Mail-Erinnerung an offene Bewertungen aktivieren (Standard: aus). Gespeichert wird die Wahl (an/aus) zum Konto. Die E-Mail-Adresse wird dafür nicht zusätzlich gespeichert; sie stammt aus dem Konto (Firebase Authentication). Die Erinnerung enthält nur den Hinweis, dass Bewertungen offen sind, und einen Link in die App – keine Namen, Noten oder sonstigen Daten von Spielern (Minderjährigen). **Hinweis zum Entwurf:** Nach dem derzeitigen Stand der App wird noch keine E-Mail versendet. Sobald ein Versanddienst angebunden wird, empfängt dieser die E-Mail-Adresse des Trainers; er muss dann hier und im Auftragsverarbeitungsvertrag ergänzt werden: [VERSANDDIENST, falls eingeführt]. Wer die Erinnerung abbestellt (Schalter aus), erhält keine weiteren Mails.
 
 ### 2.7 Was nicht stattfindet
 

@@ -65,12 +65,36 @@ describe('Lineup (Aufstellung)', () => {
   const saved = () => (firebase.lineup.lineup as { assignments: Record<string, string[]> } | null)?.assignments;
   const full = { assignments: { TW: ['tw'], LV: ['lv'], IV: ['iv1', 'iv2'], RV: ['rv'], ZM: ['zm1', 'zm2', 'zm3'], LA: ['la'], ST: ['st'], RA: ['ra'] } };
 
-  it('zeigt ohne gespeicherte Startelf den besten Vorschlag mit Formation, Bank und Mannschaftsnote', async () => {
+  it('lässt ohne gespeicherte Startelf das Feld leer und bietet die empfohlene Elf per Button an (SCRUM-26)', async () => {
     const fixture = await render();
+    expect(qa(fixture, '.pitch .chip')).toHaveLength(0);
+    expect(firebase.calls).not.toContain('saveLineup'); // nichts geschrieben, nichts automatisch gesetzt
+    q<HTMLButtonElement>(fixture, 'button.suggest')!.click();
+    await vi.waitFor(() => expect(firebase.calls).toContain('saveLineup'));
+    await flush(fixture);
     expect(text(q(fixture, '.meta'))).toMatch(/^\d(-\d)+ · 11\/11 auf dem Feld · Mannschaftsnote Ø \d,\d$/);
     expect(qa(fixture, '.pitch .chip')).toHaveLength(11);
     expect(qa(fixture, '.bench li')).toHaveLength(1); // 12 Spieler, 11 auf dem Feld
-    expect(firebase.calls).not.toContain('saveLineup'); // nur Anzeige, nichts geschrieben
+    expect(Object.values(saved()!).flat()).toHaveLength(11); // angezeigt = gespeichert
+    expect(q(fixture, 'button.suggest')).toBeNull();
+  });
+
+  it('lässt eine bewusst geleerte Startelf leer (SCRUM-26)', async () => {
+    const fixture = await render('trainer', false, { assignments: { TW: [], LV: [], IV: [], RV: [], ZM: [], LA: [], ST: [], RA: [] } });
+    expect(qa(fixture, '.pitch .chip')).toHaveLength(0);
+    expect(text(q(fixture, '.meta'))).toContain('0/11 auf dem Feld');
+    expect(firebase.calls).not.toContain('saveLineup');
+  });
+
+  it('füllt das Feld nach dem Entfernen des letzten Spielers nicht wieder auf (SCRUM-26)', async () => {
+    const fixture = await render('trainer', false, { assignments: { TW: ['tw'] } });
+    qa<HTMLButtonElement>(fixture, '.chip')[0].click();
+    await flush(fixture);
+    q<HTMLButtonElement>(fixture, '.actions button')!.click();
+    await vi.waitFor(() => expect(saved()?.['TW']).toEqual([]));
+    await flush(fixture);
+    expect(qa(fixture, '.pitch .chip')).toHaveLength(0);
+    expect(Object.values(saved()!).flat()).toHaveLength(0);
   });
 
   it('zeigt eine gespeicherte Startelf wie gespeichert (4-3-3, Bankspieler unten)', async () => {

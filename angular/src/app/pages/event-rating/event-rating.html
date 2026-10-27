@@ -65,6 +65,15 @@
       </tk-card>
     }
 
+    @if (rsvpSummary(); as counts) {
+      <p class="rsvp-summary" aria-label="Rückmeldungen">
+        <strong>Rückmeldungen:</strong>
+        <tk-chip tone="green">{{ counts.yes }} zugesagt</tk-chip>
+        <tk-chip tone="red">{{ counts.no }} abgesagt</tk-chip>
+        <tk-chip>{{ counts.open }} offen</tk-chip>
+      </p>
+    }
+
     <div class="toolbar">
       <div class="progress" [attr.data-complete]="progress().total > 0 && progress().done === progress().total">
         <span class="progress-label">{{ progress().done }} von {{ progress().total }} Spielern erfasst</span>
@@ -108,6 +117,9 @@
                 <strong>{{ player.name }}</strong>
                 @if (revoked(player)) {
                   <span class="consent-chip" role="alert" [title]="revokedMessage(player)">⚠ Einwilligung widerrufen – {{ revokedMessage(player) }}</span>
+                }
+                @if (rsvpBadge(player); as badge) {
+                  <tk-chip class="rsvp-badge" [tone]="badge.tone">{{ badge.label }}</tk-chip>
                 }
                 <span class="grade">Gesamtnote {{ total(player) }}</span>
               </div>
@@ -196,6 +208,9 @@
                     <span class="number">{{ player.number }}</span> <strong>{{ player.name }}</strong>
                     @if (revoked(player)) {
                       <span class="consent-chip" [title]="revokedMessage(player)">⚠ Einwilligung widerrufen</span>
+                    }
+                    @if (rsvpBadge(player); as badge) {
+                      <tk-chip class="rsvp-badge" [tone]="badge.tone">{{ badge.label }}</tk-chip>
                     }
                   </td>
                   <td>

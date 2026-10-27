@@ -8,8 +8,12 @@ build step, no bundler, no test suite.
 
 - `index.html` / `app.js` / `styles.css` (repo root): a **simpler reference
   copy**. It is *not* what's actually hosted — see `firebase.json`.
-- `outputs/team-manager/`: the app actually deployed to the `main` Firebase
-  Hosting target (the live "1. FC Königstein U14" site). Includes features
+- `outputs/team-manager/`: the old app of the main team (`teamId:
+  mein-team`, "1. FC Königstein U14"). **No longer hosted** since SCRUM-208
+  (target `main` serves the Angular `mein-team` build, see `angular/`
+  below); it stays, in sync, as the rollback copy (`FIREBASE_SETUP.md` §11)
+  and as the reference the other `outputs/*` copies are diffed against —
+  don't delete it. Includes features
   the root copy doesn't (auth/role mode, opponent analysis, development
   plans, absences, measurements, formation board, mobile stepper UI) and
   syncs to Firestore per-collection (see `cloudCache`/`cloudSave*` in
@@ -27,6 +31,9 @@ build step, no bundler, no test suite.
   `firebase.json`, and one more deploy step in
   `.github/workflows/firebase-hosting-merge.yml` — check for new copies
   under `outputs/` rather than assuming the set is still just these three.
+  Since SCRUM-208 `outputs/u15` is the **only** old-app copy still live; PR
+  previews of the old app run on the `u15` site as a test-team (`U14`) copy,
+  never with real U15 data (see below).
 - `firestore.rules`: deployed to the real `teamkompass-b8aac` Firebase
   project on every push to `main` that touches this file (see
   `.github/workflows/firestore-rules-deploy.yml`). Trainer role gets
@@ -34,20 +41,35 @@ build step, no bundler, no test suite.
   Already generic per `teamId`, so a new team never needs rule changes.
 - `angular/`: the in-progress Angular rewrite (see Jira epic SCRUM-40). Own
   `package.json`, built separately; `npm run verify` also lints, builds and
-  tests it. It **is deployed** on every merge to `main`, twice: the default
+  tests it. It **is deployed** on every merge to `main`, three times: the default
   build to hosting target `u14` → https://teamkompass-u14.web.app/ (test
   team `teamId: U14`, data copied from `mein-team` — never write to
   `mein-team` from there; `FIREBASE_SETUP.md` §8), and since SCRUM-169 the
   `u17` build (`ng build -c production,u17`, `teamId: U17`) to hosting target
   `u17` → https://teamkompass-u17.web.app/, the **live U17 team with real
-  data** (`FIREBASE_SETUP.md` §11). So an Angular change is live for real
-  U17 users right after merge — say so. Every PR also gets a U17 Angular
-  preview channel (real U17 data). `mein-team`/`U15` still run on
-  `outputs/*` until their own cutover (SCRUM-169).
+  data** (`FIREBASE_SETUP.md` §11), and since SCRUM-208 the `mein-team`
+  build (`ng build -c production,mein-team`, `teamId: mein-team`) to hosting
+  target `main` → https://teamkompass-b8aac.web.app/, the **live main team
+  with real data**. So an Angular change is live for real U17 and main-team
+  users right after merge — say so. Every PR gets an Angular preview
+  channel of the **default build (test team `U14`) on target `u14`** — since
+  SCRUM-206 a PR preview must never ship a live-team build (`U17`,
+  `mein-team`, `U15` = real data); `tests/preview-guard.test.mjs` enforces
+  this for every deploy step in `firebase-hosting-pull-request.yml`, with no
+  exceptions. Target `main` (main team, Angular) therefore has **no** PR
+  preview. The legacy-app preview runs on target `u15` as a copy of
+  `outputs/u15` switched to `teamId: "U14"` (`scripts/legacy-preview.mjs`,
+  built in the verify job, swapped into `outputs/u15` only inside the
+  preview job; SCRUM-218/208) — the live channel still deploys `outputs/u15`
+  as-is. A new preview (e.g.
+  another `outputs/*` team or an Angular team build) must likewise use the
+  test team. Note U14 still lives in the production Firebase project with
+  data copied from `mein-team`. Only `U15` still runs on
+  `outputs/*` until its own cutover (SCRUM-169).
 
 **A feature request against "the app" almost always means every copy**
-(root + every `outputs/*` team folder **and `angular/`**, since U17 runs on
-Angular), not just root — root being out of
+(root + every `outputs/*` team folder **and `angular/`**, since U17 and the
+main team run on Angular), not just root — root being out of
 sync has caused silently-no-op ships before (see git history: #61/#62,
 #59/#63). When only one copy is touched, say so explicitly and why.
 
