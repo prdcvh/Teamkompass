@@ -193,7 +193,7 @@ test("Abmelden entfernt den lokalen Teamstand; Nicht-Trainer-Rollen cachen nicht
     assert.match(app, /if \(!user\) \{[\s\S]{0,200}clearLocalTeamData\(\);/, `${team}: fehlende Anmeldung raeumt den Cache nicht auf`);
     assert.match(app, /const READ_ONLY_ROLES = \["player", "parent", "physio", "scout"\];/, `${team}: Nicht-Trainer-Rollen duerfen nicht cachen`);
     assert.match(app, /function canCacheLocally\(\) \{\s*return !READ_ONLY_ROLES\.includes\(currentRole\);/, `${team}: Cache-Sperre fehlt`);
-    assert.equal((app.match(/localStorage\.setItem\(storageKey/g) || []).length, 2, `${team}: ungeschuetzter Schreibzugriff auf den Cache`);
+    assert.equal((app.match(/localStorage\.setItem\(storageKey/g) || []).length, 1, `${team}: ungeschuetzter Schreibzugriff auf den Cache`);
   }
 });
 
@@ -1280,4 +1280,18 @@ test("Vereinslogo-Alt-Text und Teamname in index.html passen zum teamName der fi
     checked += 1;
   }
   assert.ok(checked >= 3, "zu wenige Team-Ordner geprueft");
+});
+
+test("Alt-App: kein Legacy-Blob-Modus mehr, firestoreModule ist deklariert (SCRUM-36)", async () => {
+  for (const team of teams) {
+    const app = await read(`outputs/${team}/app.js`);
+    const html = await read(`outputs/${team}/index.html`);
+    assert.match(app, /^let firestoreModule = null;$/m, `${team}: firestoreModule ist nicht deklariert`);
+    for (const dead of ["legacyBlobMode", "initLegacyBlobSync", "scheduleLegacyCloudSave", "migrateLegacyBlobToCollections", "migrateLegacyState", "scoreToGrade", "ageGroupCounts", "migrateDataBtn"]) {
+      assert.ok(!app.includes(dead) && !html.includes(dead), `${team}: ${dead} ist toter Code und sollte entfernt bleiben`);
+    }
+    assert.ok(!/appState/.test(app), `${team}: app.js darf das alte appState-Dokument nicht mehr nutzen`);
+    // Ohne Rollen-Modus bleibt die App lokal; es gibt kein gemeinsames Cloud-Dokument ohne Login.
+    assert.match(app, /config\.storage !== "firebase" \|\| !config\.enableRoles/, `${team}: Firebase ohne enableRoles muss lokal bleiben`);
+  }
 });

@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
 import { WakeLockService } from '../../core/device/wake-lock.service';
 import { EventsService } from '../../core/events/events.service';
@@ -9,6 +9,8 @@ import {
   MIN_CUSTOM_STEP,
   UNDO_VISIBLE_MS,
   type LiveChange,
+  type SessionSummary,
+  addSessionDelta,
   changeLabel,
   createTapGuard,
   deviceStorage,
@@ -21,6 +23,8 @@ import {
   popChange,
   pushChange,
   saveStepPrefs,
+  sessionSummary,
+  signedLabel,
   stepOptions,
 } from '../../core/live/live';
 import { LiveOutboxService } from '../../core/live/live-outbox.service';
@@ -43,6 +47,7 @@ import { SyncService } from '../../core/shell/sync.service';
 })
 export class Live implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   protected readonly ratings = inject(RatingsService);
   private readonly squad = inject(SquadService);
   private readonly eventsService = inject(EventsService);
@@ -94,6 +99,8 @@ export class Live implements OnInit, OnDestroy {
       untracked(() => {
         // Anderes Event (Route wiederverwendet): der Rückgängig-Stapel gehört zum alten Event und wird verworfen.
         this.undoStack.set([]);
+        this.sessionDeltas.set(new Map());
+        this.summary.set(null);
         this.feedback.set(null);
         if (id) this.ratings.start(id);
       });
@@ -130,6 +137,45 @@ export class Live implements OnInit, OnDestroy {
     return pointsLabel(points);
   }
 
+  protected signed(points: number): string {
+    return signedLabel(points);
+  }
+
+  /** In dieser Sitzung vergebene Punkte je Spieler (alle Tipps, Rücknahmen und Korrekturen); nur im Speicher. */
+  private readonly sessionDeltas = signal<ReadonlyMap<string, number>>(new Map());
+  /** Zusammenfassung nach „Beenden“ (null = Live-Ansicht). Die Reihenfolge wird beim Öffnen festgelegt und springt beim Korrigieren nicht. */
+  protected readonly summary = signal<SessionSummary | null>(null);
+
+  protected sessionDelta(id: string): number {
+    return this.sessionDeltas().get(id) ?? 0;
+  }
+
+  /** Tipp auf „Beenden“: Zusammenfassung zeigen. Die Punkte sind längst gespeichert, hier geht nichts verloren. */
+  protected finish(): void {
+    clearTimeout(this.feedbackTimer);
+    this.feedback.set(null);
+    const present = new Set(this.present().map((row) => row.id));
+    this.summary.set(sessionSummary(this.rows(), this.sessionDeltas(), present));
+  }
+
+  /** „Weiter live“: zurück zu Plus/Minus. */
+  protected resume(): void {
+    this.summary.set(null);
+  }
+
+  /** „Fertig“: Zusammenfassung schließen und zurück zum Training. */
+  protected done(): void {
+    this.summary.set(null);
+    void this.router.navigate(this.eventId() ? ['/events', this.eventId()] : ['/events']);
+  }
+
+  /** Punktzahl in der Zusammenfassung direkt korrigieren (wie in der Bewertung: ganze Zahl, auch negativ). */
+  protected correct(id: string, input: HTMLInputElement): void {
+    const before = this.points(id);
+    if (this.ratings.setPoints(id, input.value)) this.sessionDeltas.update((map) => addSessionDelta(map, id, this.points(id) - before));
+    input.value = String(this.points(id));
+  }
+
   /** Rückgängig-Stapel dieser Sitzung (nur im Speicher; die Punkte selbst sind längst gespeichert). */
   private readonly undoStack = signal<LiveChange[]>([]);
   private readonly tapGuard = createTapGuard();
@@ -148,6 +194,7 @@ export class Live implements OnInit, OnDestroy {
     if (!this.ratings.addPoints(id, delta)) return;
     const change: LiveChange = { playerId: id, label: this.labelOf(id), delta };
     this.undoStack.update((stack) => pushChange(stack, change));
+    this.sessionDeltas.update((map) => addSessionDelta(map, id, delta));
     this.showFeedback(feedbackText(change, before + delta), direction);
     this.flash(event, direction);
   }
@@ -160,6 +207,7 @@ export class Live implements OnInit, OnDestroy {
     const before = this.points(change.playerId);
     if (!this.ratings.addPoints(change.playerId, -change.delta)) return;
     this.undoStack.set(rest);
+    this.sessionDeltas.update((map) => addSessionDelta(map, change.playerId, -change.delta));
     this.showFeedback(`Zurückgenommen: ${feedbackText(change, before - change.delta)}`, change.delta < 0 ? 1 : -1);
   }
 

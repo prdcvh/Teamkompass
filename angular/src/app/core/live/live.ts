@@ -147,3 +147,44 @@ export function popChange(stack: readonly LiveChange[]): { readonly change: Live
   if (stack.length === 0) return { change: null, rest: [] };
   return { change: stack[stack.length - 1] ?? null, rest: stack.slice(0, -1) };
 }
+
+/** Summe der in dieser Live-Sitzung vergebenen Punkte je Spieler (SCRUM-217); Rücknahmen und Korrekturen laufen hier mit ein. */
+export function addSessionDelta(deltas: ReadonlyMap<string, number>, playerId: string, delta: number): Map<string, number> {
+  return new Map(deltas).set(playerId, (deltas.get(playerId) ?? 0) + delta);
+}
+
+/** Vorzeichenbehaftete Punkte für die Zusammenfassung: „+7“, „−2“ (echtes Minuszeichen), „0“. */
+export function signedLabel(points: number): string {
+  return points > 0 ? `+${points}` : pointsLabel(points);
+}
+
+export interface SummaryEntry {
+  readonly id: string;
+  readonly label: string;
+  /** In dieser Sitzung vergebene Punkte (Summe aller Tipps, Rücknahmen und Korrekturen). */
+  readonly delta: number;
+}
+
+export interface SessionSummary {
+  /** Spieler mit Punkten in dieser Sitzung, nach vergebenen Punkten absteigend (bei Gleichstand in Kaderreihenfolge). */
+  readonly changed: readonly SummaryEntry[];
+  /** Anwesende Spieler ohne Punkte in dieser Sitzung („wen habe ich vergessen?“), in Kaderreihenfolge. */
+  readonly untouched: readonly LiveRow[];
+}
+
+/**
+ * Zusammenfassung beim Beenden. `rows` ist der Kader in fester Reihenfolge, `deltas` die Sitzungs-Summen, `presentIds` die
+ * anwesenden Spieler. Ein Spieler, dessen Tipps sich aufheben (+2, dann −2), hat keine Punkte vergeben und steht unten.
+ * Abwesende erscheinen nur, wenn sie in der Sitzung Punkte bekommen haben.
+ */
+export function sessionSummary(rows: readonly LiveRow[], deltas: ReadonlyMap<string, number>, presentIds: ReadonlySet<string>): SessionSummary {
+  const changed: SummaryEntry[] = [];
+  const untouched: LiveRow[] = [];
+  for (const row of rows) {
+    const delta = deltas.get(row.id) ?? 0;
+    if (delta !== 0) changed.push({ id: row.id, label: row.label, delta });
+    else if (presentIds.has(row.id)) untouched.push(row);
+  }
+  changed.sort((a, b) => b.delta - a.delta); // stabil: gleiche Werte bleiben in Kaderreihenfolge
+  return { changed, untouched };
+}
