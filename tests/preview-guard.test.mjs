@@ -1,4 +1,7 @@
-// SCRUM-206/SCRUM-218: PR-Vorschauen duerfen keinen Build mit Live-Team-Konfiguration (echte Daten) ausliefern.
+// SCRUM-206/SCRUM-218/SCRUM-210: PR-Vorschauen duerfen keinen Build mit Live-Team-Konfiguration (echte Daten) ausliefern.
+// Seit SCRUM-210 laeuft keine Alt-App (outputs/*) mehr live und es gibt keine Alt-App-Vorschau mehr. Die Pruefung der
+// Alt-App-Vorschau-Kopie (scripts/legacy-preview.mjs) bleibt fuer den Rueckweg erhalten und wird hier an einem
+// Rueckweg-Stand getestet (legacyRepo: Ziel u15 wieder auf outputs/u15, Vorschau-Kopie mit Testteam im Workflow).
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { readdir, readFile } from "node:fs/promises";
@@ -23,26 +26,101 @@ async function repo() {
   };
 }
 
-test("PR-Vorschauen laufen nur mit dem Testteam U14, nie mit einem Live-Team – ohne Ausnahme (SCRUM-206, SCRUM-218)", async () => {
-  const { deployments, problems } = await checkPreviewWorkflow(await repo());
+function withPreviewSteps(workflow, steps, upload = "") {
+  const [verify, deploy] = workflow.split(/\n {2}build_and_preview:/);
+  return `${verify.replace(/\n$/, "")}${upload}\n  build_and_preview:${deploy.replace(/\n*$/, "")}${steps}`;
+}
+
+// Alt-App-Vorschau, wie sie bis SCRUM-210 im PR-Workflow stand (Kopie von outputs/u15 mit dem Testteam).
+const LEGACY_UPLOAD = `
+      - name: Alt-App-Vorschau mit Testteam bauen
+        run: node scripts/legacy-preview.mjs outputs/u15
+      - uses: actions/upload-artifact@v7
+        with:
+          name: legacy-preview
+          path: dist/preview/u15
+          if-no-files-found: error
+          retention-days: 1`;
+const LEGACY_STEPS = `
+      - name: Alt-App-Ordner leeren
+        run: rm -rf outputs/u15
+      - uses: actions/download-artifact@v8
+        with:
+          name: legacy-preview
+          path: outputs/u15
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: \${{ secrets.GITHUB_TOKEN }}
+          projectId: teamkompass-b8aac
+          target: u15
+`;
+
+/** Rueckweg-Stand: Ziel u15 liefert wieder outputs/u15 aus, die Vorschau ist die Alt-App-Kopie mit dem Testteam. */
+async function legacyRepo() {
+  const base = await repo();
+  const firebaseJson = structuredClone(base.firebaseJson);
+  firebaseJson.hosting.find((entry) => entry.target === "u15").public = "outputs/u15";
+  return { ...base, firebaseJson, workflow: withPreviewSteps(base.workflow, LEGACY_STEPS, LEGACY_UPLOAD) };
+}
+
+test("PR-Vorschauen laufen nur mit dem Testteam U14, nie mit einem Live-Team – ohne Ausnahme (SCRUM-206, SCRUM-218, SCRUM-210)", async () => {
+  const base = await repo();
+  const { deployments, problems } = await checkPreviewWorkflow(base);
   assert.deepEqual(problems, []);
   assert.equal(guard.LEGACY_PREVIEW_EXCEPTIONS, undefined, "keine Ausnahmen mehr in der Pruefung");
 
+  // Einzige Vorschau: Angular-Standard-Build (Testteam U14) auf der Test-Site u14 (SCRUM-206). Seit SCRUM-210 keine
+  // Alt-App-Vorschau mehr (Ziel u15 ist der Angular-Build der U15 mit echten Daten).
   assert.deepEqual(deployments.map(({ target, publicDir, teamId, legacyPreview }) => ({ target, publicDir, teamId, legacyPreview })), [
-    // Alt-App: Vorschau-Kopie von outputs/u15 mit dem Testteam (SCRUM-218).
-    { target: "u15", publicDir: "outputs/u15", teamId: "U14", legacyPreview: true },
-    // Angular: Standard-Build (Testteam U14) auf der Test-Site u14 (SCRUM-206).
     { target: "u14", publicDir: "angular/dist/teamkompass-angular/browser", teamId: "U14", legacyPreview: false },
   ]);
   for (const entry of deployments) {
     assert.ok(PREVIEW_TEAM_IDS.includes(entry.teamId), `${entry.target}: ${entry.teamId}`);
     assert.equal(entry.buildProjectId, entry.deployProjectId, `${entry.target}: Projekt-ID`);
   }
-  assert.ok(!deployments.some((entry) => ["main", "u17"].includes(entry.target)), "keine Vorschau auf den Live-Sites des Haupt-Teams (main) und der U17");
+  assert.ok(!deployments.some((entry) => ["main", "u15", "u17"].includes(entry.target)), "keine Vorschau auf den Live-Sites main, u15, u17");
+  assert.doesNotMatch(base.workflow.replace(/^\s*#.*$/gm, ""), /legacy-preview|outputs\//, "keine Alt-App-Vorschau mehr (SCRUM-210)");
+  // Kein Hosting-Ziel liefert mehr die Alt-App aus (sonst braeuchte es wieder eine Testteam-Vorschau-Kopie).
+  assert.deepEqual(base.firebaseJson.hosting.filter((entry) => !entry.public.startsWith("angular/")).map((entry) => entry.target), []);
+});
+
+test("Rueckweg-Stand: Alt-App-Vorschau-Kopie mit Testteam wird weiter akzeptiert (SCRUM-218, fuer FIREBASE_SETUP.md §11)", async () => {
+  const { deployments, problems } = await checkPreviewWorkflow(await legacyRepo());
+  assert.deepEqual(problems, []);
+  assert.deepEqual(deployments.map(({ target, publicDir, teamId, legacyPreview }) => ({ target, publicDir, teamId, legacyPreview })), [
+    { target: "u14", publicDir: "angular/dist/teamkompass-angular/browser", teamId: "U14", legacyPreview: false },
+    { target: "u15", publicDir: "outputs/u15", teamId: "U14", legacyPreview: true },
+  ]);
+});
+
+test("Pruefung schlaegt an, wenn eine Vorschau auf Ziel u15 (Angular-Build der U15, echte Daten) entsteht (SCRUM-210)", async () => {
+  const base = await repo();
+  // Die bisherige Alt-App-Vorschau unveraendert gegen das umgestellte Ziel u15: dort liegt jetzt der U15-Build.
+  let result = await checkPreviewWorkflow({ ...base, workflow: withPreviewSteps(base.workflow, LEGACY_STEPS, LEGACY_UPLOAD) });
+  assert.ok(result.problems.some((text) => /Ziel u15.*Team-ID "U15".*Live-Team/.test(text)), result.problems.join("\n"));
+
+  // Der U15-Build selbst als Vorschau.
+  const upload = `
+      - uses: actions/upload-artifact@v7
+        with:
+          name: angular-dist-u15
+          path: angular/dist/team-u15/browser`;
+  const steps = `
+      - uses: actions/download-artifact@v8
+        with:
+          name: angular-dist-u15
+          path: angular/dist/team-u15/browser
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          projectId: teamkompass-b8aac
+          target: u15
+`;
+  result = await checkPreviewWorkflow({ ...base, workflow: withPreviewSteps(base.workflow, steps, upload) });
+  assert.ok(result.problems.some((text) => /Ziel u15.*Team-ID "U15".*Live-Team/.test(text)), result.problems.join("\n"));
 });
 
 test("Pruefung schlaegt an, wenn die Alt-App wieder direkt aus dem Repo (U15) in die Vorschau geht (SCRUM-218)", async () => {
-  const base = await repo();
+  const base = await legacyRepo();
   // Stand vor SCRUM-218 (damals mein-team): kein Leeren/Laden der Vorschau-Kopie, deployt wird outputs/u15 aus dem Repo.
   const workflow = base.workflow
     .replace(/\n {6}- name: Alt-App-Ordner leeren\n {8}run: rm -rf outputs\/u15/, "")
@@ -53,7 +131,7 @@ test("Pruefung schlaegt an, wenn die Alt-App wieder direkt aus dem Repo (U15) in
 });
 
 test("Pruefung schlaegt an, wenn die Alt-App-Vorschau-Kopie nicht sauber gebaut oder ausgetauscht wird", async () => {
-  const base = await repo();
+  const base = await legacyRepo();
   // Artefakt aus dem Repo-Ordner statt aus der Vorschau-Kopie hochgeladen.
   const wrongUpload = base.workflow.replace("path: dist/preview/u15", "path: outputs/u15");
   let result = await checkPreviewWorkflow({ ...base, workflow: wrongUpload });
@@ -81,11 +159,11 @@ test("Pruefung schlaegt an, wenn die Alt-App-Vorschau-Kopie nicht sauber gebaut 
   assert.ok(result.problems.some((text) => /nach outputs geladen.*outputs\/u15/.test(text)), result.problems.join("\n"));
 });
 
-test("Pruefung schlaegt an, wenn wieder eine Vorschau auf Ziel main (Angular mein-team, echte Daten) oder u17 entsteht (SCRUM-208)", async () => {
+test("Pruefung schlaegt an, wenn wieder eine Vorschau auf Ziel main (Angular mein-team, echte Daten) u17 oder u15 entsteht (SCRUM-208, SCRUM-210)", async () => {
   const base = await repo();
   const step = (target, artifact, path) =>
     `      - uses: actions/download-artifact@v8\n        with:\n          name: ${artifact}\n          path: ${path}\n      - uses: FirebaseExtended/action-hosting-deploy@v0\n        with:\n          projectId: teamkompass-b8aac\n          target: ${target}\n`;
-  for (const [target, path, team] of [["main", "angular/dist/team-mein-team/browser", "mein-team"], ["u17", "angular/dist/team-u17/browser", "U17"]]) {
+  for (const [target, path, team] of [["main", "angular/dist/team-mein-team/browser", "mein-team"], ["u17", "angular/dist/team-u17/browser", "U17"], ["u15", "angular/dist/team-u15/browser", "U15"]]) {
     const workflow = `${base.workflow}${step(target, "angular-dist", path)}`;
     const { problems } = await checkPreviewWorkflow({ ...base, workflow });
     assert.ok(problems.some((text) => new RegExp(`Ziel ${target}.*Team-ID "${team}".*Live-Team`).test(text)), problems.join("\n"));
@@ -140,11 +218,6 @@ const U17_PREVIEW_STEPS = `
           projectId: teamkompass-b8aac
           target: u17
 `;
-
-function withPreviewSteps(workflow, steps, upload = "") {
-  const [verify, deploy] = workflow.split(/\n {2}build_and_preview:/);
-  return `${verify.replace(/\n$/, "")}${upload}\n  build_and_preview:${deploy.replace(/\n*$/, "")}${steps}`;
-}
 
 test("Pruefung schlaegt an, wenn eine Vorschau den U17-Build (echte Daten) ausliefert", async () => {
   const base = await repo();

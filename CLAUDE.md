@@ -18,22 +18,24 @@ build step, no bundler, no test suite.
   plans, absences, measurements, formation board, mobile stepper UI) and
   syncs to Firestore per-collection (see `cloudCache`/`cloudSave*` in
   `app.js`), not as one JSON blob.
-- `outputs/u17/` and `outputs/u15/`: one copy per additional team.
-  `outputs/u15` is deployed to hosting target `u15`. `outputs/u17` is **no
-  longer hosted** since SCRUM-169 (target `u17` serves the Angular U17 build,
-  see `angular/` below); it stays, in sync, only as the rollback copy
-  (`FIREBASE_SETUP.md` §11) — don't delete it. Near-byte-identical to
+- `outputs/u17/` and `outputs/u15/`: one copy per additional team. Both
+  are **no longer hosted**: `outputs/u17` since SCRUM-169 (target `u17`
+  serves the Angular U17 build), `outputs/u15` since SCRUM-210 (target `u15`
+  serves the Angular U15 build, see `angular/` below); they stay, in sync,
+  only as rollback copies (`FIREBASE_SETUP.md` §11) — don't delete them.
+  Near-byte-identical to
   `outputs/team-manager` — only team-branding strings (name/logo alt text)
   and `firebase-config.js` (`teamId: "U17"` / `"U15"`) differ. Diff against
   `outputs/team-manager` before assuming a change only needs to land once.
-  Adding another team (see `FIREBASE_SETUP.md` §6) means one more
-  `outputs/<team>/` copy, one more hosting target in `.firebaserc` +
-  `firebase.json`, and one more deploy step in
-  `.github/workflows/firebase-hosting-merge.yml` — check for new copies
-  under `outputs/` rather than assuming the set is still just these three.
-  Since SCRUM-208 `outputs/u15` is the **only** old-app copy still live; PR
-  previews of the old app run on the `u15` site as a test-team (`U14`) copy,
-  never with real U15 data (see below).
+  Check for new copies under `outputs/` rather than assuming the set is
+  still just these three. Since SCRUM-210 **no `outputs/*` copy is live
+  any more** — every hosting target serves an Angular build, and there is
+  no old-app PR preview any more (the SCRUM-218 test-team copy via
+  `scripts/legacy-preview.mjs` is kept only for a rollback). A new team
+  today means an Angular build configuration (`angular/README.md`), one
+  more hosting target in `.firebaserc` + `firebase.json`, and one more
+  deploy step in `.github/workflows/firebase-hosting-merge.yml`
+  (`FIREBASE_SETUP.md` §6 still describes the old `outputs/<team>/` way).
 - `firestore.rules`: deployed to the real `teamkompass-b8aac` Firebase
   project on every push to `main` that touches this file (see
   `.github/workflows/firestore-rules-deploy.yml`). Trainer role gets
@@ -41,7 +43,7 @@ build step, no bundler, no test suite.
   Already generic per `teamId`, so a new team never needs rule changes.
 - `angular/`: the in-progress Angular rewrite (see Jira epic SCRUM-40). Own
   `package.json`, built separately; `npm run verify` also lints, builds and
-  tests it. It **is deployed** on every merge to `main`, three times: the default
+  tests it. It **is deployed** on every merge to `main`, four times: the default
   build to hosting target `u14` → https://teamkompass-u14.web.app/ (test
   team `teamId: U14`, data copied from `mein-team` — never write to
   `mein-team` from there; `FIREBASE_SETUP.md` §8), and since SCRUM-169 the
@@ -50,26 +52,26 @@ build step, no bundler, no test suite.
   data** (`FIREBASE_SETUP.md` §11), and since SCRUM-208 the `mein-team`
   build (`ng build -c production,mein-team`, `teamId: mein-team`) to hosting
   target `main` → https://teamkompass-b8aac.web.app/, the **live main team
-  with real data**. So an Angular change is live for real U17 and main-team
-  users right after merge — say so. Every PR gets an Angular preview
+  with real data**, and since SCRUM-210 the `u15` build
+  (`ng build -c production,u15`, `teamId: U15`) to hosting target `u15` →
+  https://teamkompass-u15.web.app/, the **live U15 team with real data**.
+  So an Angular change is live for real U17, U15 and main-team users right
+  after merge — say so. Every PR gets an Angular preview
   channel of the **default build (test team `U14`) on target `u14`** — since
   SCRUM-206 a PR preview must never ship a live-team build (`U17`,
   `mein-team`, `U15` = real data); `tests/preview-guard.test.mjs` enforces
   this for every deploy step in `firebase-hosting-pull-request.yml`, with no
-  exceptions. Target `main` (main team, Angular) therefore has **no** PR
-  preview. The legacy-app preview runs on target `u15` as a copy of
-  `outputs/u15` switched to `teamId: "U14"` (`scripts/legacy-preview.mjs`,
-  built in the verify job, swapped into `outputs/u15` only inside the
-  preview job; SCRUM-218/208) — the live channel still deploys `outputs/u15`
-  as-is. A new preview (e.g.
-  another `outputs/*` team or an Angular team build) must likewise use the
-  test team. Note U14 still lives in the production Firebase project with
-  data copied from `mein-team`. Only `U15` still runs on
-  `outputs/*` until its own cutover (SCRUM-169).
+  exceptions. Targets `main`, `u15` and `u17` (live teams, Angular)
+  therefore have **no** PR preview; since SCRUM-210 there is no old-app
+  preview either (it used to run on `u15` as a test-team copy of
+  `outputs/u15`, SCRUM-218). A new preview (e.g. another Angular team build,
+  or an old-app preview after a rollback) must likewise use the test team.
+  Note U14 still lives in the production Firebase project with data copied
+  from `mein-team`.
 
 **A feature request against "the app" almost always means every copy**
-(root + every `outputs/*` team folder **and `angular/`**, since U17 and the
-main team run on Angular), not just root — root being out of
+(root + every `outputs/*` team folder **and `angular/`**, since every live
+team runs on Angular and `outputs/*` are the rollback copies), not just root — root being out of
 sync has caused silently-no-op ships before (see git history: #61/#62,
 #59/#63). When only one copy is touched, say so explicitly and why.
 

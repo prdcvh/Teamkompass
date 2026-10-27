@@ -10,11 +10,12 @@
 # auf der Test-Site teamkompass-u14. tests/preview-guard.test.mjs prueft jeden Deploy-Schritt hier (Ziel, Build,
 # Team-ID, Projekt-ID), ohne Ausnahme.
 #
-# SCRUM-218/SCRUM-208: Seit der Umstellung des Haupt-Teams auf Angular (Ziel main) gibt es fuer main keine Vorschau
-# mehr. Die einzige noch laufende Alt-App ist die U15 (Ziel u15): ihre Vorschau ist eine Kopie von outputs/u15
-# mit dem Testteam U14 (scripts/legacy-preview.mjs, gebaut im Verify-Job). Der Vorschau-Job leert outputs/u15 und
-# legt genau diese Kopie dorthin, bevor er in den Vorschau-Kanal deployt. Der Live-Kanal (Merge-Workflow) ist davon
-# nicht beruehrt und liefert weiter outputs/u15 aus dem Repo aus.
+# SCRUM-218/SCRUM-208/SCRUM-210: Seit der Umstellung des Haupt-Teams (Ziel main) und der U15 (Ziel u15) auf Angular
+# wird keine Alt-App mehr ausgeliefert. main, u15 und u17 sind Live-Sites mit echten Daten und bekommen deshalb keine
+# Vorschau; die einzige Vorschau ist der Angular-Standard-Build (Testteam U14) auf u14. Die fruehere Alt-App-Vorschau
+# (Kopie von outputs/u15 mit dem Testteam, scripts/legacy-preview.mjs) ist entfallen: outputs/* ist nur noch die
+# Rueckweg-Kopie (FIREBASE_SETUP.md §11). Faellt ein Team auf die Alt-App zurueck, kann sie wieder eingebaut werden
+# (Pruefung kennt sie weiter).
 
 name: Deploy to Firebase Hosting on PR
 on: pull_request
@@ -46,15 +47,6 @@ jobs:
           path: angular/dist/teamkompass-angular/browser
           if-no-files-found: error
           retention-days: 1
-      # Alt-App-Vorschau: Kopie von outputs/u15, aber mit dem Testteam U14 statt U15 (echte Daten).
-      - name: Alt-App-Vorschau mit Testteam bauen
-        run: node scripts/legacy-preview.mjs outputs/u15
-      - uses: actions/upload-artifact@v7
-        with:
-          name: legacy-preview
-          path: dist/preview/u15
-          if-no-files-found: error
-          retention-days: 1
   build_and_preview:
     needs: verify
     if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
@@ -63,20 +55,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      # Fuer das Haupt-Team (Ziel main, Angular) gibt es keine Vorschau mehr (echte Daten mein-team).
-      # Alt-App (U15): statt outputs/u15 aus dem Repo (echte Daten) nur die Vorschau-Kopie mit dem Testteam ausliefern.
-      - name: Alt-App-Ordner leeren
-        run: rm -rf outputs/u15
-      - uses: actions/download-artifact@v8
-        with:
-          name: legacy-preview
-          path: outputs/u15
-      - uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TEAMKOMPASS_B8AAC }}
-          projectId: teamkompass-b8aac
-          target: u15
+      # Keine Vorschau fuer die Live-Teams (Ziele main, u15, u17 = echte Daten), nur der Testteam-Build auf u14.
       - uses: actions/download-artifact@v8
         with:
           name: angular-dist
