@@ -1,6 +1,6 @@
 import type { FirebaseApp } from 'firebase/app';
 import type { Firestore } from 'firebase/firestore';
-import { type FirestoreSdk, openFirestore, wipeFirestore } from './firestore-cache';
+import { type FirestoreSdk, openFirestore, stillPendingAfter, wipeFirestore } from './firestore-cache';
 
 describe('Lokaler Firestore-Speicher (SCRUM-199)', () => {
   const app = { name: 'test' } as FirebaseApp;
@@ -60,5 +60,28 @@ describe('Lokaler Firestore-Speicher (SCRUM-199)', () => {
       }),
     });
     expect(await wipeFirestore(db, fake)).toBe(false);
+  });
+});
+
+describe('stillPendingAfter (Abmelden ohne Netz, SCRUM-220)', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('alles abgeliefert: nichts steht aus', async () => {
+    expect(await stillPendingAfter(Promise.resolve(), 1000)).toBe(false);
+  });
+
+  it('ohne Netz kommt die Bestätigung nie: nach Ablauf der Zeit steht noch etwas aus', async () => {
+    vi.useFakeTimers();
+    let done = false;
+    const result = stillPendingAfter(new Promise(() => undefined), 1500);
+    void result.then(() => (done = true));
+    await vi.advanceTimersByTimeAsync(1499);
+    expect(done).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await result).toBe(true);
+  });
+
+  it('reicht Fehler weiter (der Aufrufer entscheidet)', async () => {
+    await expect(stillPendingAfter(Promise.reject(new Error('weg')), 1000)).rejects.toThrow('weg');
   });
 });

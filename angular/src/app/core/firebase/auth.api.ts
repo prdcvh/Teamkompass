@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { FirebaseConnection } from './firebase-connection';
+import { stillPendingAfter } from './firestore-cache';
 import type { FirebaseUser } from './types';
 
 /** Anmelden, Abmelden und Passwort (Firebase Auth). */
@@ -73,6 +74,16 @@ export class AuthApi {
     const { auth } = await this.connection.get();
     const { signOut } = await import('firebase/auth');
     await signOut(auth);
+  }
+
+  /**
+   * Warten noch Änderungen auf dem Gerät auf den Server (z. B. im Funkloch gespeicherte Bewertungen)? Wartet höchstens
+   * `timeoutMs` darauf, dass Firestore alles abgeliefert hat; ohne Netz kommt diese Bestätigung nie, dann: true (SCRUM-220).
+   */
+  async hasPendingWrites(timeoutMs: number): Promise<boolean> {
+    const { db } = await this.connection.get();
+    const { waitForPendingWrites } = await import('firebase/firestore');
+    return stillPendingAfter(waitForPendingWrites(db), timeoutMs);
   }
 
   /** Leert den lokalen Firestore-Speicher des Browsers (Datenschutz beim Abmelden, SCRUM-199). Rückgabe: konnte geleert werden? */

@@ -47,3 +47,17 @@ export async function wipeFirestore(db: Firestore, sdk: FirestoreSdk): Promise<b
     return false;
   }
 }
+
+/**
+ * Wartet höchstens `timeoutMs` auf `settled` (z. B. `waitForPendingWrites`, das ohne Netz nie fertig wird). Rückgabe:
+ * true = nach Ablauf der Zeit steht noch etwas aus (SCRUM-220, Warnung vor dem Abmelden). Ein Fehler wird weitergereicht.
+ */
+export async function stillPendingAfter(settled: Promise<unknown>, timeoutMs: number): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<boolean>((resolve) => (timer = setTimeout(() => resolve(true), timeoutMs)));
+  try {
+    return await Promise.race([settled.then(() => false), timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}

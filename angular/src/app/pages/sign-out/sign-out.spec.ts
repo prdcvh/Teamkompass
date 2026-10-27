@@ -3,23 +3,31 @@ import { provideRouter, Router } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import type { Role } from '../../core/auth/role';
 import { SessionService } from '../../core/auth/session.service';
-import { SignOut } from './sign-out';
+import { NOTHING_UNSENT, type UnsentChanges, UnsentChangesService } from '../../core/auth/unsent-changes.service';
+import { SignOut, unsentHeadline } from './sign-out';
 
 describe('SignOut (Abmelden)', () => {
   let signOut: ReturnType<typeof vi.fn>;
   let navigate: ReturnType<typeof vi.spyOn>;
 
-  async function render(role: Role | null, email: string | null = null) {
+  async function render(role: Role | null, email: string | null = null, unsent: UnsentChanges = NOTHING_UNSENT) {
     signOut = vi.fn().mockResolvedValue(undefined);
     TestBed.configureTestingModule({
-      providers: [provideRouter([]), { provide: AuthService, useValue: { signOut } }],
+      providers: [
+        provideRouter([]),
+        { provide: AuthService, useValue: { signOut } },
+        { provide: UnsentChangesService, useValue: { check: vi.fn().mockResolvedValue(unsent) } },
+      ],
     });
     TestBed.inject(SessionService).role.set(role);
     TestBed.inject(SessionService).email.set(email);
     navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
     const fixture = TestBed.createComponent(SignOut);
     await fixture.whenStable();
-    fixture.detectChanges();
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(root(fixture).textContent).not.toContain('Prüfe, ob alles gespeichert ist');
+    });
     return fixture;
   }
   const root = (fixture: { nativeElement: unknown }) => fixture.nativeElement as HTMLElement;
@@ -52,5 +60,52 @@ describe('SignOut (Abmelden)', () => {
     await render('player', 'kind@familie.de');
     await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith('/anmelden'));
     expect(signOut).toHaveBeenCalledOnce();
+  });
+
+  describe('noch nicht gesendete Änderungen (SCRUM-220)', () => {
+    it('warnt den Trainer mit der Zahl der Änderungen und meldet nicht ab', async () => {
+      const fixture = await render('trainer', 'trainer@verein.de', { live: 3, waiting: true });
+      expect(root(fixture).textContent).toContain('3 Änderungen sind noch nicht gespeichert – erst wieder Netz abwarten?');
+      expect(root(fixture).textContent).toContain('gehen dann verloren');
+      expect(signOut).not.toHaveBeenCalled();
+      expect(navigate).not.toHaveBeenCalled();
+    });
+
+    it('„Warten“ lässt angemeldet und führt zurück zur Startseite', async () => {
+      const fixture = await render('trainer', 'trainer@verein.de', { live: 1, waiting: false });
+      button(fixture, 'Warten').click();
+      expect(signOut).not.toHaveBeenCalled();
+      expect(navigate).toHaveBeenCalledWith('/');
+    });
+
+    it('„Trotzdem abmelden“ meldet genau einmal ab, auch bei Doppel-Tippen', async () => {
+      const fixture = await render('trainer', 'trainer@verein.de', { live: 2, waiting: true });
+      const leave = button(fixture, 'Trotzdem abmelden (Änderungen gehen verloren)');
+      leave.click();
+      leave.click();
+      await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith('/anmelden'));
+      expect(signOut).toHaveBeenCalledOnce();
+    });
+
+    it('warnt auch, wenn nur andere Eingaben (z. B. Bewertungen) noch warten', async () => {
+      const fixture = await render('physio', 'medizin@verein.de', { live: 0, waiting: true });
+      expect(root(fixture).textContent).toContain('Einige Änderungen sind noch nicht gespeichert');
+      expect(signOut).not.toHaveBeenCalled();
+    });
+
+    it('nennt Spielern ohne E-Mail zusätzlich den verlorenen Zugang', async () => {
+      const fixture = await render('player', null, { live: 0, waiting: true });
+      expect(root(fixture).textContent).toContain('noch nicht gespeichert');
+      expect(root(fixture).textContent).toContain('neuen Einladungscode');
+      button(fixture, 'Warten').click();
+      expect(navigate).toHaveBeenCalledWith('/ansicht');
+      expect(signOut).not.toHaveBeenCalled();
+    });
+  });
+
+  it('Überschrift: Einzahl, Mehrzahl, ohne Zahl', () => {
+    expect(unsentHeadline({ live: 1, waiting: true })).toBe('1 Änderung ist noch nicht gespeichert – erst wieder Netz abwarten?');
+    expect(unsentHeadline({ live: 4, waiting: false })).toBe('4 Änderungen sind noch nicht gespeichert – erst wieder Netz abwarten?');
+    expect(unsentHeadline({ live: 0, waiting: true })).toBe('Einige Änderungen sind noch nicht gespeichert – erst wieder Netz abwarten?');
   });
 });

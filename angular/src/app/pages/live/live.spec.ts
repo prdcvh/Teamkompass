@@ -237,7 +237,7 @@ describe('Live (Live-Modus, SCRUM-213/214/215)', () => {
     expect(text(qa(fixture, '.player')[2]!.querySelector('.score'))).toBe('0');
     expect(text(qa(fixture, '.player')[0]!.querySelector('.score'))).toBe('2');
     // „Beenden“ fragt nicht nach und es gibt keine Lösch-Knöpfe.
-    expect(root(fixture).querySelector('.end')!.getAttribute('href')).toBe('/events/e1');
+    expect(root(fixture).querySelector('.end')!.tagName).toBe('BUTTON');
     expect(qa(fixture, 'button').some((button) => /lösch|entfern|zurücksetzen/i.test(text(button)))).toBe(false);
   });
 
