@@ -74,9 +74,9 @@ export function totalPoints(entries: readonly PointsEntry[]): number {
 /**
  * Punkteverlauf: nur Events, die Punkte vergeben, älteste zuerst, mit laufender Summe. Events ohne Punkte
  * (Spiel auf „nein“) tauchen nicht auf; ein Event, das Punkte vergibt, aber 0 hat, bleibt als 0 sichtbar.
- * Events, an denen der Spieler nicht bewertet wurde (`rated === false`), werden nicht gelistet (SCRUM-226). Die laufende
- * Summe rechnet trotzdem über ALLE zählenden Events weiter, damit sie mit `totalPoints` übereinstimmt, auch wenn für ein
- * unbewertetes Event doch Punkte eingetragen sind.
+ * Events, an denen der Spieler nicht bewertet wurde (`rated === false`) und die 0 Punkte haben, werden nicht gelistet
+ * (SCRUM-226). Hat er dort Punkte ≠ 0 (z. B. live vergeben, ohne Note), bleibt die Zeile sichtbar. So ist die laufende
+ * Summe der letzten Zeile immer gleich `totalPoints`.
  */
 export function pointsHistory(entries: readonly PointsEntry[]): PointsHistoryRow[] {
   const counted = entries
@@ -87,7 +87,7 @@ export function pointsHistory(entries: readonly PointsEntry[]): PointsHistoryRow
   for (const entry of counted) {
     const points = normalizePoints(entry.points);
     total += points;
-    if (entry.rated !== false) rows.push({ event: entry.event, points, total });
+    if (entry.rated !== false || points !== 0) rows.push({ event: entry.event, points, total });
   }
   return rows;
 }

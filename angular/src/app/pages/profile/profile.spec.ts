@@ -84,7 +84,7 @@ describe('Profile (Spielerprofil)', () => {
       expect(qa(fixture, 'details.fold')).toHaveLength(1);
     });
 
-    it('Trainingspunkte listen nur Events mit Bewertung des Spielers, die Gesamtsumme bleibt unverändert', async () => {
+    it('Trainingspunkte listen unbewertete Events nur, wenn dort Punkte stehen; die Gesamtsumme bleibt unverändert', async () => {
       const fixture = await render();
       firebase.events.events.set('e4', { type: 'Training', title: 'Training ohne Bewertung', date: '2026-09-15' });
       firebase.events.events.set('e5', { type: 'Training', title: 'Training nur Punkte', date: '2026-09-16' });
@@ -96,10 +96,11 @@ describe('Profile (Spielerprofil)', () => {
         expect(text(q(fixture, '.points-total'))).toContain('7 Punkte gesamt');
       });
       const rows = qa(fixture, '.points-history li').map(text);
-      expect(rows).toHaveLength(2); // e1 und e3 (Fehlt); e4 und e5 ohne Bewertung fehlen
+      expect(rows).toHaveLength(3); // e1, e3 (Fehlt) und e5 (unbewertet, aber 3 Punkte); e4 (unbewertet, 0 Punkte) fehlt
       expect(rows.join()).not.toContain('ohne Bewertung');
-      expect(rows.join()).not.toContain('nur Punkte');
-      expect(text(q(fixture, '.points-fold summary'))).toBe('Trainingspunkte · 2');
+      expect(rows[1]).toContain('nur Punkte');
+      expect(rows[1]).toContain('Summe 7');
+      expect(text(q(fixture, '.points-fold summary'))).toBe('Trainingspunkte · 3');
     });
   });
 

@@ -101,14 +101,17 @@ describe('Trainingspunkte (Logik)', () => {
     expect(pointsFromDoc(doc)).toBe(6);
   });
 
-  it('unbewertete Events stehen nicht im Verlauf, ihre Punkte zählen aber in Summe und laufender Summe (SCRUM-226)', () => {
+  it('unbewertete Events mit 0 Punkten fehlen im Verlauf, mit Punkten bleiben sie sichtbar; letzte Summe == totalPoints (SCRUM-226)', () => {
     const entries = [
       { event: event('t1', 'Training', '2026-10-01'), points: 3, rated: true },
       { event: event('t2', 'Training', '2026-10-05'), points: 2, rated: false },
       { event: event('t3', 'Training', '2026-10-08'), points: 0, rated: false },
       { event: event('t4', 'Training', '2026-10-10'), points: 1, rated: true },
+      { event: event('t5', 'Training', '2026-10-12'), points: -1, rated: false },
     ];
-    expect(totalPoints(entries)).toBe(6);
-    expect(pointsHistory(entries).map((row) => [row.event.id, row.points, row.total])).toEqual([['t1', 3, 3], ['t4', 1, 6]]);
+    const rows = pointsHistory(entries);
+    expect(totalPoints(entries)).toBe(5);
+    expect(rows.map((row) => [row.event.id, row.points, row.total])).toEqual([['t1', 3, 3], ['t2', 2, 5], ['t4', 1, 6], ['t5', -1, 5]]);
+    expect(rows.at(-1)?.total).toBe(totalPoints(entries));
   });
 });
