@@ -1,5 +1,4 @@
 const storageKey = "teamkompass-data-v2";
-const legacyStorageKey = "teamkompass-data-v1";
 const themeStorageKey = "teamkompass-theme";
 
 const sampleData = {
