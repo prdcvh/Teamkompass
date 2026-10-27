@@ -1,4 +1,4 @@
-import { DEFAULT_STEP_PREFS, DOUBLE_TAP_MS, UNDO_LIMIT, changeLabel, createTapGuard, feedbackText, popChange, pushChange, LIVE_STEPS, STEP_STORAGE_KEY, isAway, liveRows, loadStepPrefs, parseCustomStep, pointsLabel, saveStepPrefs, stepOptions } from './live';
+import { addSessionDelta, sessionSummary, signedLabel, DEFAULT_STEP_PREFS, DOUBLE_TAP_MS, UNDO_LIMIT, changeLabel, createTapGuard, feedbackText, popChange, pushChange, LIVE_STEPS, STEP_STORAGE_KEY, isAway, liveRows, loadStepPrefs, parseCustomStep, pointsLabel, saveStepPrefs, stepOptions } from './live';
 
 describe('Live-Modus (Logik)', () => {
   it('feste Schrittweiten 1, 2, 3, 5; Standard ist 1', () => {
@@ -89,5 +89,45 @@ describe('Live-Modus (Logik)', () => {
     expect(popped[0]).toBe(UNDO_LIMIT + 5);
     expect(popped).toHaveLength(UNDO_LIMIT);
     expect(popped.at(-1)).toBe(6);
+  });
+});
+
+describe('Live-Modus: Zusammenfassung (SCRUM-217)', () => {
+  const rows = [
+    { id: 'a', label: 'Anna' },
+    { id: 'b', label: 'Ben' },
+    { id: 'c', label: 'Cem' },
+    { id: 'd', label: 'Dana' },
+    { id: 'e', label: 'Eli' },
+  ];
+  const present = new Set(['a', 'b', 'c', 'd']); // Eli fehlt
+
+  it('Sitzungs-Summen: Tipps, auch negative und Rücknahmen, addieren sich je Spieler', () => {
+    let deltas: ReadonlyMap<string, number> = new Map();
+    for (const [id, delta] of [['a', 2], ['a', 5], ['b', -2], ['b', -1], ['a', -2], ['c', 3], ['c', -3]] as const) deltas = addSessionDelta(deltas, id, delta);
+    expect(deltas.get('a')).toBe(5);
+    expect(deltas.get('b')).toBe(-3);
+    expect(deltas.get('c')).toBe(0);
+    expect(deltas.get('d')).toBeUndefined();
+  });
+
+  it('sortiert nach vergebenen Punkten absteigend, Negative unten, Gleichstand in Kaderreihenfolge', () => {
+    const deltas = new Map([['a', -2], ['b', 7], ['c', 7], ['d', 1]]);
+    const { changed } = sessionSummary(rows, deltas, present);
+    expect(changed.map((entry) => `${entry.label}:${entry.delta}`)).toEqual(['Ben:7', 'Cem:7', 'Dana:1', 'Anna:-2']);
+  });
+
+  it('Spieler ohne Punkte (auch Summe 0) stehen gesammelt unten; Abwesende nur, wenn sie Punkte bekamen', () => {
+    const none = sessionSummary(rows, new Map([['a', 2], ['b', 0]]), present);
+    expect(none.untouched.map((row) => row.label)).toEqual(['Ben', 'Cem', 'Dana']);
+    const away = sessionSummary(rows, new Map([['e', -1]]), present);
+    expect(away.changed.map((entry) => entry.label)).toEqual(['Eli']);
+    expect(away.untouched.map((row) => row.label)).toEqual(['Anna', 'Ben', 'Cem', 'Dana']);
+  });
+
+  it('Beschriftung mit Vorzeichen und echtem Minuszeichen', () => {
+    expect(signedLabel(7)).toBe('+7');
+    expect(signedLabel(-2)).toBe('−2');
+    expect(signedLabel(0)).toBe('0');
   });
 });
