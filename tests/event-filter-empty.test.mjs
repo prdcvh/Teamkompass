@@ -2,10 +2,11 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
+// SCRUM-166: Ladephase, leerer Bestand und Suche ohne Treffer sind drei getrennte Faelle.
 // SCRUM-131: Eventsuche ohne Treffer darf nicht "Noch keine Events angelegt" melden.
 const teams = ["team-manager", "u15", "u17"];
 
-async function setup(team, events) {
+async function setup(team, events, loadState = "ready") {
   const source = await readFile(new URL(`../outputs/${team}/app.js`, import.meta.url), "utf8");
   const listPart = source.slice(source.indexOf("let eventFilter"), source.indexOf("function ratingPlayersForEvent"));
   const resetStart = source.indexOf("function resetEventFilter");
@@ -20,7 +21,7 @@ async function setup(team, events) {
     return dom.get(id);
   };
   const state = { events, selectedEventId: events[0]?.id };
-  const factory = new Function("state", "$", `
+  const factory = new Function("state", "$", "getEventsLoadState", `
     const localIsoDate = () => "2026-10-15";
     const escapeHtml = (v) => String(v);
     const gameResult = () => null;
@@ -37,7 +38,7 @@ async function setup(team, events) {
     ${resetPart}
     return { renderEvents, resetEventFilter, setFilter: (f) => { eventFilter = f; } };
   `);
-  return { api: factory(state, (sel) => el(sel.slice(1))), el };
+  return { api: factory(state, (sel) => el(sel.slice(1)), () => loadState), el };
 }
 
 const events = [
@@ -81,5 +82,47 @@ for (const team of teams) {
     api.setFilter({ query: "", type: "all" });
     api.renderEvents();
     assert.equal(el("eventOutsideFilterNote").hidden, true);
+  });
+}
+
+for (const team of teams) {
+  test(`${team}: SCRUM-166 Ladephase zeigt Statusmeldung statt "Noch keine Events angelegt"`, async () => {
+    const { api, el } = await setup(team, [], "loading");
+    api.renderEvents();
+    const html = el("eventList").innerHTML;
+    assert.match(html, /Events werden geladen/);
+    assert.doesNotMatch(html, /Noch keine Events angelegt/);
+    assert.doesNotMatch(html, /Keine Events für diese Suche/);
+  });
+
+  test(`${team}: SCRUM-166 Ladefehler meldet weder leeren Bestand noch Laden`, async () => {
+    const { api, el } = await setup(team, [], "error");
+    api.renderEvents();
+    const html = el("eventList").innerHTML;
+    assert.match(html, /konnten nicht geladen werden/);
+    assert.doesNotMatch(html, /Noch keine Events angelegt/);
+  });
+
+  test(`${team}: SCRUM-166 nach abgeschlossener leerer Abfrage erscheint "Noch keine Events angelegt"`, async () => {
+    const { api, el } = await setup(team, [], "ready");
+    api.renderEvents();
+    const html = el("eventList").innerHTML;
+    assert.match(html, /Noch keine Events angelegt/);
+    assert.doesNotMatch(html, /werden geladen/);
+  });
+
+  test(`${team}: SCRUM-166 geladener Bestand mit Suche ohne Treffer bleibt unveraendert`, async () => {
+    const { api, el } = await setup(team, events, "ready");
+    api.setFilter({ query: "kein-treffer", type: "all" });
+    api.renderEvents();
+    assert.match(el("eventList").innerHTML, /Keine Events für diese Suche gefunden/);
+    assert.doesNotMatch(el("eventList").innerHTML, /werden geladen/);
+  });
+
+  test(`${team}: SCRUM-166 vorhandene Events werden auch waehrend des Ladens (Cache) angezeigt`, async () => {
+    const { api, el } = await setup(team, events, "loading");
+    api.renderEvents();
+    assert.doesNotMatch(el("eventList").innerHTML + el("pastEventsList").innerHTML, /werden geladen/);
+    assert.match(el("pastEventsList").innerHTML, /Training Dienstag/);
   });
 }

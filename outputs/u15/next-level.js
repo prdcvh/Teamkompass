@@ -76,10 +76,13 @@
       ["developmentPlanForm", "Entwicklungsziel gespeichert"], ["absenceForm", "Abwesenheit gespeichert"],
       ["measurementForm", "Messwert gespeichert"], ["opponentForm", "Gegnerprofil gespeichert"]
     ]);
-    document.addEventListener("submit", (event) => {
-      const action = actions.get(event.target.id);
+    // Erst nach erfolgreichem Speichern (SCRUM-25): app.js meldet "teamkompass:saved",
+    // nachdem die Validierung bestanden und lokal gespeichert ist. Ein reines "submit"
+    // wuerde auch abgebrochene Speicherungen (doppelte Rueckennummer, fehlende Position) protokollieren.
+    document.addEventListener("teamkompass:saved", (event) => {
+      const action = actions.get(event.detail?.form);
       if (action) saveWorkspace(action);
-    }, true);
+    });
   }
 
   function installCommandPalette() {
@@ -149,8 +152,13 @@
     summary.className = "sr-only";
     document.body.append(summary);
     document.querySelectorAll("canvas[aria-label]").forEach((canvas) => canvas.setAttribute("aria-describedby", summary.id));
-    const state = appState();
-    summary.textContent = `Textzusammenfassung der Diagramme: ${state.players.length} Spieler, ${state.events.length} Events. Detaillierte Werte stehen zusätzlich in den Profil-, Kader- und Eventlisten.`;
+    // Bei jedem Rendern neu berechnen (SCRUM-25): beim Start sind die Cloud-Daten noch nicht da.
+    const update = () => {
+      const state = appState();
+      summary.textContent = `Textzusammenfassung der Diagramme: ${state.players.length} Spieler, ${state.events.length} Events. Detaillierte Werte stehen zusätzlich in den Profil-, Kader- und Eventlisten.`;
+    };
+    document.addEventListener("teamkompass:render", update);
+    update();
   }
 
   installPrivacyDialog();

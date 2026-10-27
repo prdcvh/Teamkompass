@@ -50,7 +50,8 @@ export class SquadService {
    * abfragen: für sie besteht der „Kader“ nur aus dem eigenen Spielerdokument (Regeln: `isPlayerFor`).
    */
   start(): void {
-    if (this.unsubscribe || this.load() === 'loading') return;
+    // Auch „ready“ ohne Abmeldefunktion zählt als laufend: die ersten Daten können vor dem Abo-Handle ankommen (SCRUM-205).
+    if (this.unsubscribe || this.load() === 'loading' || this.load() === 'ready') return;
     const generation = ++this.generation;
     this.sync.clearError();
     this.load.set('loading');

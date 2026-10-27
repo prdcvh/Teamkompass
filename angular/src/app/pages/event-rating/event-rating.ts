@@ -28,10 +28,13 @@ import {
   progress,
 } from '../../core/ratings/rating';
 import { RatingsService } from '../../core/ratings/ratings.service';
+import { rsvpCounts, rsvpReason } from '../../core/rsvp/rsvp';
+import { RsvpService } from '../../core/rsvp/rsvp.service';
 import { SquadService } from '../../core/player/squad.service';
 import { SyncService } from '../../core/shell/sync.service';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
+import { Chip, type Tone } from '../../ui/chip/chip';
 import { Weather } from '../../ui/weather/weather';
 
 const GRADE_OPTIONS = [1, 2, 3, 4, 5, 6] as const;
@@ -50,7 +53,7 @@ const GRADE_HEADERS: Readonly<Record<GradeField, string>> = {
  */
 @Component({
   selector: 'app-event-rating',
-  imports: [RouterLink, Button, Card, Weather],
+  imports: [RouterLink, Button, Card, Chip, Weather],
   templateUrl: './event-rating.html',
   styleUrl: './event-rating.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -62,6 +65,7 @@ export class EventRating implements OnInit {
   protected readonly eventsService = inject(EventsService);
   protected readonly sync = inject(SyncService);
   private readonly lineupService = inject(LineupService);
+  private readonly rsvp = inject(RsvpService);
   private readonly layoutMobile = inject(LayoutService).isMobile;
   private readonly narrow = injectNarrowViewport();
   /** Einzelkarten-Ansicht (Handy und alles unter TABLE_MIN_WIDTH); sonst die Matrix mit allen Spalten. */
@@ -100,6 +104,13 @@ export class EventRating implements OnInit {
   protected readonly current = computed(() => this.players()[Math.min(this.index(), Math.max(0, this.players().length - 1))] ?? null);
   protected readonly currentIndex = computed(() => Math.min(this.index(), Math.max(0, this.players().length - 1)));
 
+  /** Zu-/Absagen zu diesem Termin (SCRUM-205); nur für kommende und kürzlich vergangene Termine geladen. */
+  private readonly responses = computed(() => this.rsvp.responsesFor(this.eventId()));
+  protected readonly rsvpSummary = computed(() => {
+    const responses = this.responses();
+    return responses ? rsvpCounts(responses, this.allPlayers()) : null;
+  });
+
   constructor() {
     // Das Event wechselt mit der Adresse: Abos neu starten, Stepper und Filter zurücksetzen.
     effect(() => {
@@ -128,6 +139,18 @@ export class EventRating implements OnInit {
 
   protected revokedMessage(player: Player): string {
     return consentRevokedMessage(player.name);
+  }
+
+  /** Schild „Zugesagt“, „Abgesagt (Eltern): Grund“ oder „Offen“ je Spieler; null, solange keine Rückmeldungen geladen sind. */
+  protected rsvpBadge(player: Player): { readonly label: string; readonly tone: Tone } | null {
+    const responses = this.responses();
+    if (!responses) return null;
+    const response = responses.get(player.id);
+    if (!response) return { label: 'Offen', tone: 'neutral' };
+    const by = response.by === 'parent' ? ' (Eltern)' : '';
+    if (response.status === 'yes') return { label: `Zugesagt${by}`, tone: 'green' };
+    const reason = rsvpReason(response.reason);
+    return { label: `Abgesagt${by}${reason ? `: ${reason}` : ''}`, tone: 'red' };
   }
 
   protected total(player: Player): string {
