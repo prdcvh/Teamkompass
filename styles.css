@@ -1470,3 +1470,32 @@ menu {
 .load-report-custom[hidden] { display: none; }
 .checkbox-row { display: flex; align-items: center; gap: 8px; color: var(--ink); }
 .checkbox-row input { width: auto; margin: 0; }
+
+/* Einklappbare Eventhistorie im Spielerprofil (SCRUM-226): Kopfzeile = Tippfläche >= 44 px */
+.profile-fold > summary {
+  min-height: 44px;
+  cursor: pointer;
+  list-style: none;
+  align-items: center;
+}
+
+.profile-fold > summary::-webkit-details-marker {
+  display: none;
+}
+
+.profile-fold > summary h2::before {
+  content: "▸ ";
+}
+
+.profile-fold[open] > summary h2::before {
+  content: "▾ ";
+}
+
+.profile-fold > summary:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.profile-fold[open] > summary {
+  margin-bottom: 12px;
+}

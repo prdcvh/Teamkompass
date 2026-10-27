@@ -1628,6 +1628,7 @@ function renderProfileChart(player, ratings) {
 }
 
 function renderProfileHistory(ratings) {
+  $("#profileHistoryCount").textContent = ratings.length;
   $("#profileHistory").innerHTML = ratings.map(({ event, rating }) => `
     <article class="record-item">
       <div>

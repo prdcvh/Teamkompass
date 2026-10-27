@@ -3,7 +3,7 @@ import { authErrorMessage, errorCode } from '../auth/auth-errors';
 import { EventsService } from '../events/events.service';
 import { RatingsApi } from '../firebase/ratings.api';
 import { type EventRating } from './profile';
-import { type Rating, ratingFromDoc } from '../ratings/rating';
+import { type Rating, isRated, ratingFromDoc } from '../ratings/rating';
 import { type PointsEntry, pointsFromDoc } from '../points/points';
 import { SessionService } from '../auth/session.service';
 import { SyncService } from '../shell/sync.service';
@@ -39,7 +39,10 @@ export class ProfileService {
 
   /** Alle Events mit den gespeicherten Punkten des Spielers (ob das Event sie zählt, entscheidet `points.ts`). Nur Trainer. */
   readonly pointItems = computed<PointsEntry[]>(() =>
-    this.session.role() === 'trainer' ? this.events.events().map((event) => ({ event, points: this.pointsByEvent().get(event.id) ?? 0 })) : [],
+    this.session.role() === 'trainer' ? this.events.events().map((event) => {
+        const rating = this.byEvent().get(event.id) ?? null;
+        return { event, points: this.pointsByEvent().get(event.id) ?? 0, rated: rating !== null && isRated(rating) };
+      }) : [],
   );
 
   private unsubscribers = new Map<string, () => void>();

@@ -209,13 +209,13 @@
               <div id="profileHeader"></div>
               <canvas id="trendChart" width="980" height="360" aria-label="Notenentwicklung"></canvas>
             </section>
-            <section class="panel">
-              <div class="panel-head">
-                <h2>Eventhistorie</h2>
+            <details class="panel profile-fold" id="profileHistoryFold">
+              <summary class="panel-head">
+                <h2>Eventhistorie · <span id="profileHistoryCount">0</span></h2>
                 <span class="muted">Schulnoten 1 bis 6</span>
-              </div>
+              </summary>
               <div class="record-list" id="profileHistory"></div>
-            </section>
+            </details>
           </div>
           <div class="profile-deep-grid">
             <section class="panel">

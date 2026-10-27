@@ -13,6 +13,8 @@ import { type TeamEvent } from '../events/event';
 export interface PointsEntry {
   readonly event: TeamEvent;
   readonly points: number;
+  /** Hat dieser Spieler für das Event eine Bewertung (Note, „Fehlt“ oder „Nicht im Kader“)? Fehlt die Angabe, gilt es als bewertet. */
+  readonly rated?: boolean;
 }
 
 /** Eine Zeile des Punkteverlaufs. */
@@ -72,15 +74,20 @@ export function totalPoints(entries: readonly PointsEntry[]): number {
 /**
  * Punkteverlauf: nur Events, die Punkte vergeben, älteste zuerst, mit laufender Summe. Events ohne Punkte
  * (Spiel auf „nein“) tauchen nicht auf; ein Event, das Punkte vergibt, aber 0 hat, bleibt als 0 sichtbar.
+ * Events, an denen der Spieler nicht bewertet wurde (`rated === false`), werden nicht gelistet (SCRUM-226). Die laufende
+ * Summe rechnet trotzdem über ALLE zählenden Events weiter, damit sie mit `totalPoints` übereinstimmt, auch wenn für ein
+ * unbewertetes Event doch Punkte eingetragen sind.
  */
 export function pointsHistory(entries: readonly PointsEntry[]): PointsHistoryRow[] {
   const counted = entries
     .filter((entry) => countsPoints(entry.event))
     .sort((a, b) => a.event.date.localeCompare(b.event.date) || a.event.title.localeCompare(b.event.title, 'de'));
   let total = 0;
-  return counted.map((entry) => {
+  const rows: PointsHistoryRow[] = [];
+  for (const entry of counted) {
     const points = normalizePoints(entry.points);
     total += points;
-    return { event: entry.event, points, total };
-  });
+    if (entry.rated !== false) rows.push({ event: entry.event, points, total });
+  }
+  return rows;
 }

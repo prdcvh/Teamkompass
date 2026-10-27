@@ -65,6 +65,44 @@ describe('Profile (Spielerprofil)', () => {
     expect(text(rows[1])).toContain('Passspiel'); // Event-Notiz, wenn kein Feedback da ist
   });
 
+  describe('Einklappbare Listen (SCRUM-226)', () => {
+    it('Eventhistorie und Trainingspunkte sind eingeklappt und zeigen die Anzahl in der Überschrift', async () => {
+      const fixture = await render();
+      const folds = qa<HTMLDetailsElement>(fixture, 'details.fold');
+      expect(folds).toHaveLength(2);
+      expect(folds.every((fold) => !fold.open)).toBe(true);
+      expect(text(q(fixture, '.history-fold summary'))).toBe('Eventhistorie · 2');
+      expect(text(q(fixture, '.points-fold summary'))).toBe('Trainingspunkte · 2');
+      q<HTMLElement>(fixture, '.history-fold summary')!.click();
+      expect(q<HTMLDetailsElement>(fixture, '.history-fold')!.open).toBe(true);
+    });
+
+    it('Nicht-Trainer sehen nur die Eventhistorie', async () => {
+      const fixture = await render();
+      TestBed.inject(SessionService).role.set('physio');
+      fixture.detectChanges();
+      expect(qa(fixture, 'details.fold')).toHaveLength(1);
+    });
+
+    it('Trainingspunkte listen nur Events mit Bewertung des Spielers, die Gesamtsumme bleibt unverändert', async () => {
+      const fixture = await render();
+      firebase.events.events.set('e4', { type: 'Training', title: 'Training ohne Bewertung', date: '2026-09-15' });
+      firebase.events.events.set('e5', { type: 'Training', title: 'Training nur Punkte', date: '2026-09-16' });
+      firebase.events.emitEvents();
+      await firebase.ratings.savePoints('e1', 'p1', 4);
+      await firebase.ratings.savePoints('e5', 'p1', 3); // Punkte, aber keine Bewertung des Spielers
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(text(q(fixture, '.points-total'))).toContain('7 Punkte gesamt');
+      });
+      const rows = qa(fixture, '.points-history li').map(text);
+      expect(rows).toHaveLength(2); // e1 und e3 (Fehlt); e4 und e5 ohne Bewertung fehlen
+      expect(rows.join()).not.toContain('ohne Bewertung');
+      expect(rows.join()).not.toContain('nur Punkte');
+      expect(text(q(fixture, '.points-fold summary'))).toBe('Trainingspunkte · 2');
+    });
+  });
+
   describe('Trainingspunkte (SCRUM-104)', () => {
     it('zeigt Summe und Verlauf; ein Spiel ohne „Punkte vergeben“ zählt nicht, Punkte bleiben gespeichert', async () => {
       const fixture = await render();
