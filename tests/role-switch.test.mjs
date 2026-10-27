@@ -22,12 +22,12 @@ async function load(team) {
   const state = { views: [], trainer: false };
   const body = { classList: { toggle() {} } };
   const factory = new Function(
-    "$", "document", "state", "isCloudTrainer", "isCloudActive", "canManageRecords", "legacyBlobMode",
+    "$", "document", "state", "isCloudTrainer", "isCloudActive", "canManageRecords",
     "setView", "renderAccessManager", "syncLoadReportButton",
     `let currentRole = null; ${code}
      return (role) => { currentRole = role; applyRoleRestrictions(); };`
   );
-  const apply = factory($, { body }, state, () => state.trainer, () => true, () => true, false,
+  const apply = factory($, { body }, state, () => state.trainer, () => true, () => true,
     (v) => { state.views.push(v); select.value = v; }, () => {}, () => {});
   return { apply, select, state };
 }

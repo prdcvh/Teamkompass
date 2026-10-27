@@ -765,15 +765,6 @@ function loadState() {
     }
   }
 
-  const legacy = localStorage.getItem(legacyStorageKey);
-  if (legacy) {
-    try {
-      return migrateLegacyState(JSON.parse(legacy));
-    } catch {
-      return normalizeState(sampleData);
-    }
-  }
-
   return normalizeState(sampleData);
 }
 
@@ -1012,50 +1003,6 @@ function calculatedGrade(rating) {
   return roundGrade(Number(rating.effort) * 0.3 + Number(rating.technique) * 0.3 + Number(rating.tactics) * 0.25 + Number(rating.comprehension) * 0.15);
 }
 
-function migrateLegacyState(data) {
-  const migrated = {
-    players: Array.isArray(data.players) ? data.players.map(normalizePlayer) : structuredClone(sampleData.players),
-    events: structuredClone(sampleData.events),
-    selectedEventId: sampleData.selectedEventId
-  };
-  if (Array.isArray(data.records) && data.records.length) {
-    const legacyEvent = {
-      id: "e-legacy",
-      type: "Training",
-      title: "Importierte Leistungsdaten",
-      date: data.records.at(-1)?.date || localIsoDate(),
-      intensity: 2,
-      location: "",
-      opponent: "",
-      notes: "Aus der alten Leistungserfassung übernommen.",
-      ratings: {}
-    };
-    data.records.forEach((record) => {
-      legacyEvent.ratings[record.playerId] = {
-        attendance: "present",
-        effort: scoreToGrade({ fitness: record.stamina || record.fitness }),
-        technique: scoreToGrade({ fitness: record.passes || record.fitness }),
-        tactics: scoreToGrade({ fitness: record.passes || record.duels }),
-        comprehension: scoreToGrade(record),
-        note: record.note || ""
-      };
-    });
-    migrated.events.unshift(legacyEvent);
-    migrated.selectedEventId = legacyEvent.id;
-  }
-  return normalizeState(migrated);
-}
-
-function scoreToGrade(record) {
-  const score = record.fitness || 70;
-  if (score >= 90) return 1;
-  if (score >= 78) return 2;
-  if (score >= 64) return 3;
-  if (score >= 50) return 4;
-  if (score >= 35) return 5;
-  return 6;
-}
-
 // Rollen ohne Schreibrecht und ohne lokalen Zwischenspeicher (SCRUM-170: Medizin = "physio", Scout = "scout").
 const READ_ONLY_ROLES = ["player", "parent", "physio", "scout"];
 
@@ -1090,9 +1037,7 @@ function persist() {
   state = normalizeState(state);
   writeLocalCache();
   if (isCloudTrainer()) setSyncState("pending", "Wird gespeichert …");
-  if (legacyBlobMode) {
-    scheduleLegacyCloudSave();
-  } else if (!isCloudActive()) {
+  if (!isCloudActive()) {
     $("#storageState").textContent = `Gespeichert ${new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}`;
   }
 }
@@ -1148,13 +1093,10 @@ function cloudListenerRecovered(key) {
 }
 
 // ---------------------------------------------------------------------------
-// Cloud-Sync. Zwei Modi:
-// - Legacy-Blob (Standard, unveraendert seit je her): ein gemeinsames Dokument,
-//   kein Login. So verhaelt sich die App weiterhin, solange "enableRoles" in
-//   firebase-config.js nicht auf true steht.
-// - Rollen-Modus (config.enableRoles === true): echte Anmeldung, Trainer sieht
-//   alles, Spieler nur das eigene Profil. Datenmodell + Zugriffsregeln siehe
-//   firestore.rules im Repo-Root.
+// Cloud-Sync. Es gibt nur noch den Rollen-Modus (config.enableRoles === true):
+// echte Anmeldung, Trainer sieht alles, Spieler nur das eigene Profil. Datenmodell
+// + Zugriffsregeln siehe firestore.rules im Repo-Root. Ohne enableRoles bleibt die
+// App lokal (kein gemeinsames Cloud-Dokument ohne Login mehr, SCRUM-36).
 // ---------------------------------------------------------------------------
 let currentUser = null;
 let currentRole = null; // "trainer" | "player" | "parent" | "physio" | "scout" | null (siehe normalizeRole)
@@ -1162,6 +1104,7 @@ let currentPlayerId = null;
 let authModule = null;
 let authInstance = null;
 let firestoreDb = null;
+let firestoreModule = null;
 // Schutz gegen doppeltes Absenden des Spieler-Login-Formulars (z.B. Doppel-Tap auf
 // mobilen Geraeten): ein zweiter, fast gleichzeitiger Schreibversuch auf denselben
 // members/{uid}-Pfad wuerde, nachdem der erste das Dokument schon angelegt hat, als
@@ -1179,12 +1122,10 @@ let absenceListeners = {};
 let measurementListeners = {};
 // Zu-/Absagen (SCRUM-175): Trainer je Event die ganze Unter-Collection, Spieler/Eltern nur das eigene Dokument.
 let responseListeners = {};
-let legacyBlobMode = false;
 // SCRUM-166: Ladezustand der Event-Abfrage ("idle" | "loading" | "ready" | "error"), damit die Liste
 // waehrend der ersten Firestore-Abfrage nicht "Noch keine Events angelegt" meldet. Nur Lesezustand.
 let eventsLoadState = "idle";
 function getEventsLoadState() { return eventsLoadState; }
-let legacyCloudSaveTimer = null;
 const cloudCache = { players: [], events: [], ratings: {}, privateNotes: {}, responses: {}, developmentPlans: {}, absences: {}, measurements: {}, opponents: [], lineup: null };
 
 function isCloudActive() {
@@ -1220,7 +1161,7 @@ function teamCollection(...segments) {
 
 async function initDataStore() {
   const config = window.TEAMKOMPASS_CONFIG || {};
-  if (config.storage !== "firebase") {
+  if (config.storage !== "firebase" || !config.enableRoles) {
     $("#storageState").textContent = "Lokal gespeichert";
     return;
   }
@@ -1230,11 +1171,6 @@ async function initDataStore() {
     firestoreModule = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js");
     const app = appModule.initializeApp(config.firebase);
     firestoreDb = firestoreModule.getFirestore(app);
-
-    if (!config.enableRoles) {
-      await initLegacyBlobSync();
-      return;
-    }
 
     authModule = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js");
     authInstance = authModule.getAuth(app);
@@ -1247,44 +1183,6 @@ async function initDataStore() {
     console.error(error);
     if (isRoleModeConfigured()) showAuthGateError("Die Anmeldung ist gerade nicht erreichbar (offline oder Netzwerkfehler). Es werden keine Teamdaten angezeigt. Bitte Verbindung pruefen und die Seite neu laden.");
   }
-}
-
-// Unveraendertes Verhalten von frueher: ein Dokument, keine Rollen, kein Login.
-async function initLegacyBlobSync() {
-  legacyBlobMode = true;
-  const ref = teamDoc("appState", "current");
-  try {
-    const snapshot = await firestoreModule.getDoc(ref);
-    if (!snapshot.exists()) {
-      await firestoreModule.setDoc(ref, { ...normalizeState(state), updatedAt: firestoreModule.serverTimestamp() });
-    }
-  } catch (error) {
-    console.error(error);
-  }
-  firestoreModule.onSnapshot(ref, (snapshot) => {
-    if (!snapshot.exists()) return;
-    state = normalizeState(snapshot.data());
-    localStorage.setItem(storageKey, JSON.stringify(state));
-    renderAll();
-    $("#storageState").textContent = "Cloud aktuell";
-  }, (error) => {
-    console.error(error);
-    setSyncState("error", "Verbindung unterbrochen – Daten evtl. nicht aktuell");
-  });
-  $("#storageState").textContent = "Cloud verbunden";
-}
-
-function scheduleLegacyCloudSave() {
-  clearTimeout(legacyCloudSaveTimer);
-  legacyCloudSaveTimer = setTimeout(async () => {
-    try {
-      await firestoreModule.setDoc(teamDoc("appState", "current"), { ...state, updatedAt: firestoreModule.serverTimestamp() });
-      $("#storageState").textContent = `Cloud synchronisiert ${new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}`;
-    } catch (error) {
-      $("#storageState").textContent = "Cloud-Sync fehlgeschlagen";
-      console.error(error);
-    }
-  }, 350);
 }
 
 // ---- Rollen-Modus: Auth-Status, Ansicht je nach Rolle ----
@@ -1882,14 +1780,7 @@ function rebuildStateFromCloudCache() {
     reconcileRsvp((eventId) => Boolean(cloudCache.ratings[eventId] && cloudCache.responses[eventId]));
   }
   writeLocalCache();
-  // Sobald einmal echte Spieler in der neuen Struktur angekommen sind, macht die
-  // Migration aus dem alten Blob-Dokument keinen Sinn mehr - im Gegenteil, sie wuerde
-  // neuere Aenderungen wieder mit dem laengst veralteten alten Dokument ueberschreiben.
-  // Den Button dann ausblenden schuetzt vor einem versehentlichen erneuten Klick.
-  if (isCloudTrainer()) {
-    $("#migrateDataBtn").hidden = state.players.length > 0;
-    scheduleScoutPublish();
-  }
+  if (isCloudTrainer()) scheduleScoutPublish();
   // SCRUM-35: Beim Start feuern >160 Listener nacheinander. Statt jedes Mal alle Ansichten
   // zu rendern, werden die Snapshots gebuendelt und nur die sichtbare Ansicht gezeichnet.
   requestCloudRender();
@@ -2118,8 +2009,7 @@ function applyRoleRestrictions() {
   document.body.classList.toggle("role-scout", currentRole === "scout");
   document.body.classList.toggle("role-trainer-cloud", isCloudTrainer());
   $("#signOutBtn").hidden = !isCloudActive();
-  $("#migrateDataBtn").hidden = !isCloudTrainer();
-  $("#importBtn").hidden = !canManageRecords() || (isCloudActive() && !legacyBlobMode && !isCloudTrainer());
+  $("#importBtn").hidden = !canManageRecords() || (isCloudActive() && !isCloudTrainer());
   $("#addTrainerBtn").hidden = !isCloudTrainer();
   $("#addScoutBtn").hidden = !isCloudTrainer();
   $("#addPhysioBtn").hidden = !isCloudTrainer();
@@ -2755,49 +2645,6 @@ async function revokeAccess(uid, role) {
   } catch (error) {
     console.error(error);
     alert(`Zugang konnte nicht gesperrt werden.${cloudErrorSuffix(error)}`);
-  }
-}
-
-async function migrateLegacyBlobToCollections() {
-  if (!isCloudTrainer()) return;
-  if (!confirm("Bestehende Cloud-Daten aus dem alten Format in die neue Struktur uebertragen?\n\nAchtung: das ueberschreibt aktuelle Spieler/Events/etc. mit dem Stand des alten Dokuments. Nur einmalig direkt nach der Einrichtung verwenden.")) return;
-  try {
-    const legacySnap = await firestoreModule.getDoc(teamDoc("appState", "current"));
-    if (!legacySnap.exists()) {
-      alert("Keine alten Cloud-Daten gefunden.");
-      return;
-    }
-    const raw = legacySnap.data();
-    // normalizeState() faellt auf die eingebauten Beispieldaten zurueck, wenn "players"
-    // fehlt oder kein Array ist (gedacht fuer den allerersten lokalen Start der App ohne
-    // jede Daten) - bei einer Migration waere das falsch: lieber abbrechen, als
-    // versehentlich Demo-Spieler statt des echten (aber leeren/fehlerhaften) alten
-    // Dokuments in die neue Struktur zu schreiben.
-    if (!Array.isArray(raw.players) || raw.players.length === 0) {
-      alert("Im alten Dokument wurden keine Spieler gefunden. Migration abgebrochen, es wurde nichts geschrieben.");
-      return;
-    }
-    const legacy = normalizeState(raw);
-    await Promise.all(legacy.players.map((player) => cloudSavePlayer(player)));
-    await Promise.all(legacy.events.map(async (event) => {
-      await cloudSaveEvent(event);
-      await Promise.all(Object.entries(event.ratings || {}).map(([playerId, rating]) => cloudSaveRating(event.id, playerId, rating)));
-    }));
-    await Promise.all(Object.entries(legacy.developmentPlans || {}).flatMap(([playerId, plans]) =>
-      plans.map((plan) => cloudSaveDevelopmentPlan(playerId, plan))
-    ));
-    await Promise.all(Object.entries(legacy.absences || {}).flatMap(([playerId, absences]) =>
-      absences.map((absence) => cloudSaveAbsence(playerId, absence))
-    ));
-    await Promise.all(Object.entries(legacy.measurements || {}).flatMap(([playerId, measurements]) =>
-      measurements.map((measurement) => cloudSaveMeasurement(playerId, measurement))
-    ));
-    await Promise.all(legacy.opponents.map((opponent) => cloudSaveOpponent(opponent)));
-    if (legacy.lineup && !lineupIsEmpty(legacy.lineup)) await cloudSaveLineup(legacy.lineup);
-    alert("Migration abgeschlossen. Das alte Dokument bleibt vorerst unveraendert erhalten.");
-  } catch (error) {
-    console.error(error);
-    alert("Migration fehlgeschlagen: " + (error.message || error));
   }
 }
 
@@ -3837,16 +3684,6 @@ function birthQuarterCounts() {
     counts[quarter] += 1;
     return counts;
   }, { Q1: 0, Q2: 0, Q3: 0, Q4: 0 });
-}
-
-function ageGroupCounts() {
-  return state.players.reduce((counts, player) => {
-    const age = ageFromBirthdate(player.birthdate);
-    if (age === null) return counts;
-    const key = age <= 20 ? "U21" : age <= 23 ? "21-23" : age <= 27 ? "24-27" : "28+";
-    counts[key] += 1;
-    return counts;
-  }, { U21: 0, "21-23": 0, "24-27": 0, "28+": 0 });
 }
 
 function positionCoverage() {
@@ -6486,7 +6323,7 @@ function backupSummaryText(summary) {
 
 async function importBackupFile(file) {
   if (!file || !canManageRecords()) return;
-  if (isCloudActive() && !legacyBlobMode && !isCloudTrainer()) return;
+  if (isCloudActive() && !isCloudTrainer()) return;
   let raw;
   try {
     raw = JSON.parse(await file.text());
@@ -6504,7 +6341,7 @@ async function importBackupFile(file) {
   const overwrites = summary.players.overwritten + summary.events.overwritten + summary.opponents.overwritten + summary.plans.overwritten + summary.absences.overwritten + summary.measurements.overwritten;
   const warning = overwrites ? "\nAchtung: Vorhandene Einträge mit gleicher Kennung werden mit dem Stand aus dem Backup überschrieben. Tipp: vorher „Daten exportieren“, um den aktuellen Stand zu sichern." : "";
   if (!confirm(`Backup „${file.name}“ einspielen?\n\n${backupSummaryText(summary)}\nNichts wird gelöscht: Einträge, die nicht im Backup stehen, bleiben erhalten.${warning}`)) return;
-  if (!isCloudActive() || legacyBlobMode) {
+  if (!isCloudActive()) {
     state = normalizeState(mergeBackupState(state, incoming));
     persist();
     renderAll();
@@ -7090,7 +6927,6 @@ on("#stepperJump", "change", (event) => {
 on("#trainerLoginForm", "submit", handleTrainerLogin);
 on("#playerLoginForm", "submit", handlePlayerLogin);
 on("#signOutBtn", "click", handleSignOut);
-on("#migrateDataBtn", "click", migrateLegacyBlobToCollections);
 on("#addTrainerBtn", "click", createTrainerAccount);
 on("#addScoutBtn", "click", createScoutAccount);
 on("#addPhysioBtn", "click", createPhysioAccount);

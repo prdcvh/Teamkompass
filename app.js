@@ -1,5 +1,4 @@
 const storageKey = "teamkompass-data-v2";
-const legacyStorageKey = "teamkompass-data-v1";
 const themeStorageKey = "teamkompass-theme";
 
 const sampleData = {
@@ -151,15 +150,6 @@ function loadState() {
     }
   }
 
-  const legacy = localStorage.getItem(legacyStorageKey);
-  if (legacy) {
-    try {
-      return migrateLegacyState(JSON.parse(legacy));
-    } catch {
-      return normalizeState(sampleData);
-    }
-  }
-
   return normalizeState(sampleData);
 }
 
@@ -263,50 +253,6 @@ function calculatedGrade(rating) {
   const fields = ["effort", "technique", "tactics", "comprehension"];
   if (!fields.every((field) => rating[field])) return "";
   return roundGrade(Number(rating.effort) * 0.3 + Number(rating.technique) * 0.3 + Number(rating.tactics) * 0.25 + Number(rating.comprehension) * 0.15);
-}
-
-function migrateLegacyState(data) {
-  const migrated = {
-    players: Array.isArray(data.players) ? data.players.map(normalizePlayer) : structuredClone(sampleData.players),
-    events: structuredClone(sampleData.events),
-    selectedEventId: sampleData.selectedEventId
-  };
-  if (Array.isArray(data.records) && data.records.length) {
-    const legacyEvent = {
-      id: "e-legacy",
-      type: "Training",
-      title: "Importierte Leistungsdaten",
-      date: data.records.at(-1)?.date || localIsoDate(),
-      intensity: 2,
-      location: "",
-      opponent: "",
-      notes: "Aus der alten Leistungserfassung übernommen.",
-      ratings: {}
-    };
-    data.records.forEach((record) => {
-      legacyEvent.ratings[record.playerId] = {
-        attendance: "present",
-        effort: scoreToGrade({ fitness: record.stamina || record.fitness }),
-        technique: scoreToGrade({ fitness: record.passes || record.fitness }),
-        tactics: scoreToGrade({ fitness: record.passes || record.duels }),
-        comprehension: scoreToGrade(record),
-        note: record.note || ""
-      };
-    });
-    migrated.events.unshift(legacyEvent);
-    migrated.selectedEventId = legacyEvent.id;
-  }
-  return normalizeState(migrated);
-}
-
-function scoreToGrade(record) {
-  const score = record.fitness || 70;
-  if (score >= 90) return 1;
-  if (score >= 78) return 2;
-  if (score >= 64) return 3;
-  if (score >= 50) return 4;
-  if (score >= 35) return 5;
-  return 6;
 }
 
 function persist() {
