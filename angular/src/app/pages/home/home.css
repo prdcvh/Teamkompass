@@ -285,3 +285,9 @@ a:focus-visible {
 [data-variant='mobile'] .later a {
   grid-template-columns: 76px 1fr auto;
 }
+
+.live-start {
+  justify-self: stretch;
+  min-height: 56px;
+  font-size: var(--tk-text-md, 1rem);
+}

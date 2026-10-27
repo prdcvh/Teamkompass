@@ -56,6 +56,17 @@ describe('RankingService (MVP der Woche/des Monats)', () => {
     expect(firebase.calls).not.toContain('readPrivateNotes:s-nein');
   });
 
+  it('Trainer: negative Punkte werden in die Summe eingerechnet (SCRUM-213)', async () => {
+    const service = setup();
+    firebase.ratings.privateNotes.set('t-woche', new Map([['p1', { playerId: 'p1', points: -5 }], ['p2', { playerId: 'p2', points: 4 }]]));
+    startTeam();
+    await service.start();
+    // Woche: Ali -5+2=-3 (kein Platz, nur Punkte über 0 werden gelistet), Ben 4, Cem 1.
+    expect(shape(service.week())).toEqual(['1 Ben 4', '2 Cem 1']);
+    // Monat: Ali 5-5+2=2 (statt 7 mit „negativ = 0“), Ben 12, Cem 9.
+    expect(shape(service.month())).toEqual(['1 Ben 12', '2 Cem 9', '3 Ali 2']);
+  });
+
   it('Trainer: veröffentlicht die Rangliste für Spieler (Platz, Name, Punkte), aber keine Spieler-IDs', async () => {
     const service = setup();
     startTeam();

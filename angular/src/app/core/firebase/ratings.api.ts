@@ -3,6 +3,7 @@ import { CurrentTeam } from '../team/current-team.service';
 import { PlayerStatsMode } from '../team/player-stats-mode';
 import { hasStatsSource, statsUpdate } from '../team/player-stats';
 import { FirebaseConnection } from './firebase-connection';
+import { LIVE_POINTS_FIELD } from '../points/points';
 import type { RawDoc, SnapshotMeta } from './types';
 
 /** Bewertungen je Event und Spieler sowie die internen Trainer-Notizen (getrennt gespeichert, nur Trainer lesen sie). */
@@ -117,12 +118,29 @@ export class RatingsApi {
 
   /**
    * Schreibt die Trainingspunkte (SCRUM-104) ins Trainer-Dokument des Spielers (merge: die Notiz bleibt erhalten).
-   * Wie die interne Notiz bewusst im Pfad, den Spieler und Eltern nie lesen.
+   * Wie die interne Notiz bewusst im Pfad, den Spieler und Eltern nie lesen. `points` ist der Grundwert; Live-Änderungen
+   * (`live`) kommen dazu – wer einen Endwert eintragen will, übergibt deshalb Endwert minus Summe der Live-Änderungen.
    */
   async savePoints(eventId: string, playerId: string, points: number): Promise<void> {
     const { db } = await this.connection.get();
     const { doc, setDoc } = await import('firebase/firestore');
     await setDoc(doc(db, 'teams', this.team.id(), 'events', eventId, 'privateNotes', playerId), { playerId, points }, { merge: true });
+  }
+
+  /**
+   * Live-Modus (SCRUM-213/216): legt eine einzelne Punkte-Änderung unter ihrer Kennung im Trainer-Dokument ab
+   * (`live.<changeId> = delta`, merge). Mehrfaches Senden derselben Änderung (Funkloch, Neustart) schreibt denselben
+   * Eintrag mit demselben Wert und zählt daher genau einmal; Änderungen anderer Trainer haben eigene Kennungen und werden
+   * addiert. Die Punkte ergeben sich aus `points` + Summe aller Einträge (`pointsFromDoc`). Regeln unverändert (Trainer-Pfad).
+   */
+  async addPoints(eventId: string, playerId: string, changeId: string, delta: number): Promise<void> {
+    const { db } = await this.connection.get();
+    const { doc, setDoc } = await import('firebase/firestore');
+    await setDoc(
+      doc(db, 'teams', this.team.id(), 'events', eventId, 'privateNotes', playerId),
+      { playerId, [LIVE_POINTS_FIELD]: { [changeId]: delta } },
+      { merge: true },
+    );
   }
 
   /** Schreibt die interne Notiz. Sie liegt bewusst getrennt von der Bewertung, die Spieler und Eltern lesen dürfen. */

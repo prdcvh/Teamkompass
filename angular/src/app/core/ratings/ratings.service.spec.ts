@@ -4,6 +4,7 @@ import { RatingsService } from './ratings.service';
 import { SessionService } from '../auth/session.service';
 import { SyncService } from '../shell/sync.service';
 import { FakeFirebase, provideFakeFirebase } from '../testing/fake-firebase';
+import { pointsFromDoc } from '../points/points';
 
 describe('RatingsService', () => {
   let firebase: FakeFirebase;
@@ -15,6 +16,7 @@ describe('RatingsService', () => {
     firebase.ratings.privateNotes.set('e1', new Map([['p1', { playerId: 'p1', note: 'Nur für uns' }]]));
     TestBed.configureTestingModule({ providers: [...provideFakeFirebase(firebase)] });
     TestBed.inject(SessionService).role.set(role);
+    if (role) TestBed.inject(SessionService).uid.set('uid-trainer');
     const events = TestBed.inject(EventsService);
     events.start();
     await vi.waitFor(() => expect(events.load()).toBe('ready'));
@@ -159,10 +161,38 @@ describe('RatingsService', () => {
       await vi.waitFor(() => expect(firebase.calls).toContain('savePoints:e1:p1:8'));
       expect(firebase.ratings.privateNotes.get('e1')?.get('p1')).toMatchObject({ note: 'Nur für uns', points: 8 });
       expect(ratings.setPoints('p1', '8')).toBe(false); // unverändert
-      expect(ratings.setPoints('p1', '-2')).toBe(true); // negativ = 0
-      expect(ratings.pointsFor('p1')).toBe(0);
+      expect(ratings.setPoints('p1', '-2')).toBe(true); // negativ ist erlaubt (SCRUM-213)
+      expect(ratings.pointsFor('p1')).toBe(-2);
       ratings.setPrivateNote('p2', 'neu');
       await vi.waitFor(() => expect(firebase.ratings.privateNotes.get('e1')?.get('p2')).toMatchObject({ note: 'neu', points: 4 }));
+    });
+
+    it('addPoints (Live-Modus): addiert die Änderung, auch unter 0, und schreibt die Änderung statt des Endwerts', async () => {
+      const ratings = await setup();
+      firebase.events.events.set('e1', { type: 'Training', title: 'Training', date: '2026-10-10' });
+      firebase.events.emitEvents();
+      firebase.ratings.privateNotes.get('e1')!.set('p2', { playerId: 'p2', note: '', points: 1 });
+      ratings.start('e1');
+      await vi.waitFor(() => expect(ratings.load()).toBe('ready'));
+      await vi.waitFor(() => expect(ratings.pointsActive()).toBe(true));
+      expect(ratings.addPoints('p2', -1)).toBe(true);
+      expect(ratings.addPoints('p2', -2)).toBe(true);
+      expect(ratings.pointsFor('p2')).toBe(-2);
+      expect(ratings.addPoints('p2', 0)).toBe(false);
+      await vi.waitFor(() => expect(firebase.calls).toContain('addPoints:e1:p2:-2'));
+      expect(firebase.calls).toContain('addPoints:e1:p2:-1');
+      await vi.waitFor(() => expect(pointsFromDoc(firebase.ratings.privateNotes.get('e1')?.get('p2'))).toBe(-2));
+      // Ein zweiter Trainer erhöht gleichzeitig: nichts geht verloren.
+      await firebase.ratings.addPoints('e1', 'p2', 'andererTrainer01', 5);
+      await vi.waitFor(() => expect(ratings.pointsFor('p2')).toBe(3));
+    });
+
+    it('addPoints schreibt bei Spiel ohne Punkte und für Nicht-Trainer nichts', async () => {
+      const ratings = await setup();
+      ratings.start('e1');
+      await vi.waitFor(() => expect(ratings.load()).toBe('ready'));
+      expect(ratings.addPoints('p1', 1)).toBe(false);
+      expect(firebase.calls.some((call) => call.startsWith('addPoints'))).toBe(false);
     });
 
     it('Nicht-Trainer: keine Punkte, kein Schreiben', async () => {

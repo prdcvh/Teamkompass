@@ -1,9 +1,10 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, Injector, inject, signal } from '@angular/core';
 import { authErrorMessage, errorCode } from './auth-errors';
 import { AccessApi } from '../firebase/access.api';
 import { AuthApi } from '../firebase/auth.api';
 import type { FirebaseUser, InviteRecord, MemberRecord } from '../firebase/types';
 import { clearLocalTeamData } from '../device/local-data';
+import { LiveOutboxService } from '../live/live-outbox.service';
 import { CurrentTeam, pickTeam, rememberTeam, rememberedTeam } from '../team/current-team.service';
 import type { Role } from './role';
 import { SessionService } from './session.service';
@@ -31,6 +32,7 @@ export class AuthService {
   private readonly session = inject(SessionService);
   private readonly teamAccess = inject(TeamAccess);
   private readonly team = inject(CurrentTeam);
+  private readonly injector = inject(Injector);
 
   readonly status = signal<AuthStatus>('loading');
   readonly error = signal('');
@@ -354,6 +356,8 @@ export class AuthService {
    */
   private purgeLocalCache(): Promise<void> {
     this.purging ??= (async () => {
+      // Wie die Firestore-Warteschlange: ungesendete Live-Punkte (SCRUM-216) bleiben nicht liegen. Erst hier geholt (keine Startabhängigkeit).
+      try { this.injector.get(LiveOutboxService).clear(); } catch (error) { console.error(error); }
       try {
         if (!(await this.authApi.clearLocalCache())) {
           await new Promise((resolve) => setTimeout(resolve, CACHE_CLEAR_RETRY_MS));

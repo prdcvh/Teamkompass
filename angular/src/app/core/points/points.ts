@@ -1,6 +1,6 @@
 /**
  * Trainingspunkte (SCRUM-104): Der Trainer trägt je Spieler und Event eine freie Punktzahl ein (ganze Zahl,
- * 0 oder mehr, keine Obergrenze, leer = 0). Die Punkte liegen bewusst im Trainer-Pfad `privateNotes` des Events
+ * auch negativ (SCRUM-213), keine Obergrenze, leer = 0). Die Punkte liegen bewusst im Trainer-Pfad `privateNotes` des Events
  * (Spieler und Eltern können ihn nicht lesen, die Firestore-Regeln bleiben unverändert).
  *
  * Trainings zählen immer. Bei Spielen entscheidet der Trainer am Event („Punkte vergeben: ja/nein“,
@@ -23,12 +23,35 @@ export interface PointsHistoryRow {
   readonly total: number;
 }
 
-/** Gespeicherter Wert → Punkte: nur ganze Zahlen ab 0; alles andere (leer, Text, negativ, NaN) ist 0. */
+/** Gespeicherter Wert → Punkte: ganze Zahlen, auch negative (SCRUM-213); alles andere (leer, Text, NaN) ist 0. */
 export function normalizePoints(value: unknown): number {
   if (typeof value === 'string' && value.trim() === '') return 0;
   const number = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : Number.NaN;
-  if (!Number.isFinite(number) || number <= 0) return 0;
-  return Math.min(Math.round(number), Number.MAX_SAFE_INTEGER);
+  if (!Number.isFinite(number)) return 0;
+  const rounded = Math.round(number) + 0; // + 0 macht aus -0 eine 0
+  return Math.max(Math.min(rounded, Number.MAX_SAFE_INTEGER), -Number.MAX_SAFE_INTEGER);
+}
+
+/**
+ * Feld im Trainer-Dokument, in dem der Live-Modus jede einzelne Änderung unter einer eigenen Kennung ablegt (SCRUM-216):
+ * `{ [änderungsId]: +2 | −1 | … }`. Ein erneutes Senden derselben Änderung (Funkloch, App neu geöffnet) schreibt denselben
+ * Schlüssel mit demselben Wert und zählt deshalb nie doppelt; Änderungen eines zweiten Trainers haben eigene Schlüssel
+ * und werden addiert. Schlüssel werden nie gelöscht.
+ */
+export const LIVE_POINTS_FIELD = 'live';
+
+/** Summe aller Live-Änderungen eines Trainer-Dokuments (Ungültiges zählt 0). */
+export function livePointsSum(value: unknown): number {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return 0;
+  let sum = 0;
+  for (const delta of Object.values(value as Record<string, unknown>)) sum += typeof delta === 'number' ? normalizePoints(delta) : 0;
+  return normalizePoints(sum);
+}
+
+/** Punkte eines Trainer-Dokuments: eingetragener Grundwert (`points`) plus alle Live-Änderungen. */
+export function pointsFromDoc(data: Readonly<Record<string, unknown>> | null | undefined): number {
+  if (!data) return 0;
+  return normalizePoints(normalizePoints(data['points']) + livePointsSum(data[LIVE_POINTS_FIELD]));
 }
 
 /** Zählen die Punkte dieses Events? Training immer, Spiel nur mit „Punkte vergeben: ja“. */

@@ -352,6 +352,11 @@ tr[data-tone='grey'] td,
   font-size: var(--tk-text-sm);
 }
 
+.live-start {
+  justify-self: start;
+  margin-top: var(--tk-space-3);
+}
+
 /* Zu-/Absagen (SCRUM-205): Zählung über der Matrix und Schild je Spieler. */
 .rsvp-summary {
   display: flex;

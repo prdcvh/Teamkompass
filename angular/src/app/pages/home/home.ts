@@ -76,6 +76,12 @@ export class Home implements OnInit {
     return upcomingEvents(this.team.events(), today, 3).map((event) => ({ event, ...this.dateParts(event), countdown: countdownLabel(event.date, today) }));
   });
 
+  /** Heutiges Training (SCRUM-213): bekommt auf der Startseite den Knopf „Live-Modus“. */
+  protected readonly todayTraining = computed(() => {
+    const today = todayIso();
+    return this.team.events().find((event) => event.type === 'Training' && event.date === today) ?? null;
+  });
+
   /** Spieler als Punkte auf dem Mini-Spielfeld; am Desktop liegt das Feld quer (eigenes Tor links). */
   protected readonly markers = computed(() => {
     const horizontal = !this.mobile();

@@ -1,0 +1,93 @@
+<main class="live">
+  <header class="bar">
+    <h1>{{ event()?.title ?? 'Live-Modus' }}</h1>
+    <a class="end" [routerLink]="eventId() ? ['/events', eventId()] : ['/events']">Beenden</a>
+    @if (ready() && isTraining()) {
+      <p class="save" [class]="saveStatus().kind" role="status" aria-live="polite">{{ saveStatus().text }}</p>
+    }
+  </header>
+
+  <section class="steps" aria-label="Schrittweite">
+    <div class="step-row" role="group" aria-label="Punkte pro Tipp">
+      @for (option of options(); track option) {
+        <button type="button" class="step" [class.active]="option === step()" [attr.aria-pressed]="option === step()" [attr.aria-label]="'Schrittweite ' + option" (click)="chooseStep(option)">{{ option }}</button>
+      }
+      <button type="button" class="step other" [attr.aria-expanded]="customOpen()" (click)="toggleCustom()">Andere…</button>
+    </div>
+    @if (customOpen()) {
+      <form class="custom" (submit)="$event.preventDefault(); applyCustom(num)">
+        <input #num type="text" inputmode="numeric" autocomplete="off" aria-label="Eigene Schrittweite" [placeholder]="minCustom + '–' + maxCustom" (input)="customError.set('')" />
+        <button type="submit" class="action">OK</button>
+      </form>
+    }
+    @if (customError()) {
+      <p class="hint error" role="alert">{{ customError() }}</p>
+    }
+    @if (startHint()) {
+      <p class="hint" role="status">Schrittweite: {{ step() }}</p>
+    }
+  </section>
+
+  @if (failed()) {
+    <div class="notice" role="alert">
+      <p>{{ errorText() }}</p>
+      <button type="button" class="action" (click)="retry()">Erneut versuchen</button>
+    </div>
+  } @else if (!ready()) {
+    <p class="note" role="status">Wird geladen …</p>
+  } @else if (!event()) {
+    <div class="notice" role="alert">
+      <p>Dieses Training gibt es nicht (mehr).</p>
+      <a class="action" routerLink="/events">Zu den Events</a>
+    </div>
+  } @else if (!isTraining()) {
+    <div class="notice" role="alert">
+      <p>Den Live-Modus gibt es nur bei Trainings.</p>
+      <a class="action" [routerLink]="['/events', eventId()]">Zurück zum Event</a>
+    </div>
+  } @else {
+    @if (sync.state() === 'error') {
+      <p class="sync-error" role="alert">Nicht gespeichert: {{ sync.detail() }}</p>
+    }
+    @if (present().length === 0) {
+      <p class="note">Keine Spieler anwesend.</p>
+    }
+    <ul class="players">
+      @for (row of present(); track row.id) {
+        <li class="player" [class.negative]="points(row.id) < 0">
+          <button type="button" class="pad minus" [attr.aria-label]="'Minus ' + step() + ' für ' + row.label" (click)="add(row.id, -1, $event)">
+            <span aria-hidden="true">&minus;{{ step() }}</span>
+          </button>
+          <div class="who">
+            <span class="name">{{ row.label }}</span>
+            <span class="score" [attr.aria-label]="label(points(row.id)) + ' Punkte'">{{ label(points(row.id)) }}</span>
+            @if (waiting(row.id); as count) {
+              <span class="waiting">noch nicht gesendet ({{ count }})</span>
+            }
+          </div>
+          <button type="button" class="pad plus" [attr.aria-label]="'Plus ' + step() + ' für ' + row.label" (click)="add(row.id, 1, $event)">
+            <span aria-hidden="true">+{{ step() }}</span>
+          </button>
+        </li>
+      }
+    </ul>
+
+    @if (away().length > 0) {
+      <details class="away">
+        <summary>Nicht da ({{ away().length }})</summary>
+        <p>
+          @for (row of away(); track row.id; let last = $last) {
+            {{ row.label }}{{ last ? '' : ',' }}
+          }
+        </p>
+      </details>
+    }
+  }
+
+  <div class="dock" [class.shown]="feedback()">
+    <p class="feedback" [class.up]="feedback()?.direction === 1" [class.down]="feedback()?.direction === -1" role="status">{{ feedback()?.text }}</p>
+    @if (undoOffer(); as offer) {
+      <button type="button" class="undo" (click)="undo()">Rückgängig: {{ offer }}</button>
+    }
+  </div>
+</main>

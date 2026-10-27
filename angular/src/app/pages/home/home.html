@@ -71,6 +71,9 @@
                 <a tkButton variant="primary" routerLink="/events">Event anlegen</a>
               </div>
             } @else {
+              @if (todayTraining(); as training) {
+                <a tkButton variant="primary" class="live-start" [routerLink]="['/events', training.id, 'live']">Live-Modus: {{ training.title }}</a>
+              }
               @let first = upcoming()[0];
               <a class="next" [routerLink]="['/events', first.event.id]" [attr.data-type]="first.event.type">
                 <span class="date-tile" aria-hidden="true">
