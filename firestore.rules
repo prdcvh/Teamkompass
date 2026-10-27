@@ -582,8 +582,9 @@ service cloud.firestore {
         allow delete: if isTrainer() && request.auth.uid == uid;
       }
 
-      // Altes Einzeldokument aus dem Single-Blob-Modell - nur fuer die einmalige
-      // Migration in die neue Struktur, danach kann es geloescht werden.
+      // Altes Einzeldokument aus dem frueheren Single-Blob-Modell. Keine App-Kopie (Alt-App, Angular)
+      // liest oder schreibt es mehr, die Migration in die neue Struktur ist aus der App entfernt (SCRUM-36).
+      // Die Regel bleibt nur, damit ein noch vorhandenes Dokument vom Trainer gelesen/geloescht werden kann.
       match /appState/current {
         allow read, write: if isTrainer();
       }
