@@ -55,6 +55,7 @@
     </section>
   } @else {
   <section class="steps" aria-label="Schrittweite">
+    <h2 class="section-title" aria-hidden="true">Punkte pro Tipp</h2>
     <div class="step-row" role="group" aria-label="Punkte pro Tipp">
       @for (option of options(); track option) {
         <button type="button" class="step" [class.active]="option === step()" [attr.aria-pressed]="option === step()" [attr.aria-label]="'Schrittweite ' + option" (click)="chooseStep(option)">{{ option }}</button>
@@ -98,6 +99,9 @@
     }
     @if (present().length === 0) {
       <p class="note">Keine Spieler anwesend.</p>
+    }
+    @if (present().length > 0) {
+      <h2 class="section-title list-title">Spieler ({{ present().length }})</h2>
     }
     <ul class="players">
       @for (row of present(); track row.id) {
