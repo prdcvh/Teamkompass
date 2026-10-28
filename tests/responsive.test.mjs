@@ -144,7 +144,7 @@ test('Keine Seite scrollt seitlich (alle Breiten, alle Seiten)', { skip: playwri
 // CSP aus firebase.json, nur ohne 'unsafe-inline'. Gestaltung per CSSOM ([style.x]-Bindungen, konstruierte Stylesheets)
 // ist erlaubt. Einzige verbleibende Ausnahme: Angular legt die Komponenten-Styles als <style>-Elemente in <head> an –
 // solange das so ist, bleibt 'unsafe-inline' in firebase.json (Entscheidung des PO offen, siehe SCRUM-119).
-const ANGULAR_COMPONENT_STYLE_ELEMENTS_ALLOWED = true;
+const ANGULAR_COMPONENT_STYLE_ELEMENTS_ALLOWED = false;
 
 function strictStyleCsp() {
   const config = JSON.parse(readFileSync(join(root, 'firebase.json'), 'utf8'));

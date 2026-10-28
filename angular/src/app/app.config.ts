@@ -5,10 +5,12 @@ import { provideServiceWorker } from '@angular/service-worker';
 import { AuthService } from './core/auth/auth.service';
 import { OpenMeteoProvider, WeatherProvider } from './core/weather/weather-provider';
 import { routes } from './app.routes';
+import { provideAdoptedStyles } from './core/csp/adopted-styles-host';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
+    ...provideAdoptedStyles(),
     provideRouter(routes),
     // Wetteranbieter austauschbar (SCRUM-96); Open-Meteo braucht die CSP-Freigabe im Hosting-Target u14.
     { provide: WeatherProvider, useClass: OpenMeteoProvider },
