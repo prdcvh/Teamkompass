@@ -1,6 +1,6 @@
 /**
  * Spielerprofil als druckbarer Bericht (PDF über „Drucken → Als PDF speichern“). Entspricht dem Bericht der bisherigen
- * App (outputs/team-manager/app.js: downloadProfilePdf), zeigt aber nur das Wesentliche: Kennzahlen, Kompetenzprofil,
+ * App (Alt-App app.js: downloadProfilePdf), zeigt aber nur das Wesentliche: Kennzahlen, Kompetenzprofil,
  * Verfügbarkeit und die drei besten Events. Jede Eingabe aus der Datenbank wird maskiert (SCRUM-13): kein Name,
  * Titel oder Typ gelangt als HTML in den Bericht.
  */

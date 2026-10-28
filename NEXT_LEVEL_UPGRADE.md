@@ -1,5 +1,9 @@
 # TeamKompass Next-Level Upgrade
 
+> Historische Release-Notiz der Alt-App (seit SCRUM-211 archiviert, siehe `FIREBASE_SETUP.md` §11). Die
+> Rollen und das Sicherheitsmodell unten gelten in der Angular-App unverändert weiter; verbindlich sind
+> `firestore.rules` und `docs/architektur-verein-teams.md`.
+
 ## Sicherer Rollout
 
 Firestore-Regeln und Hosting müssen im selben Release ausgerollt werden. Alte

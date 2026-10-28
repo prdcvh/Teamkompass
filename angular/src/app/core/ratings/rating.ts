@@ -1,7 +1,7 @@
 /**
  * Spielerbewertung je Event: Modell, Gesamtnote und die reine Logik für Änderungen und Fortschritt.
  * Das Dokument `teams/{teamId}/events/{eventId}/ratings/{playerId}` ist mit der bisherigen App
- * identisch (siehe outputs/team-manager/app.js: normalizeRating, calculatedGrade, updateRating).
+ * identisch (siehe Alt-App app.js: normalizeRating, calculatedGrade, updateRating).
  * Noten sind Schulnoten: 1 = sehr gut … 6 = ungenügend; kleiner ist besser.
  */
 

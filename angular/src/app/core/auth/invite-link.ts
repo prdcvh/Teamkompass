@@ -1,5 +1,5 @@
 /**
- * Einladungslinks der bisherigen App (`outputs/*`, `inviteLinkFor`): `https://<site>/?invite=<code>`. Beim Umstieg eines
+ * Einladungslinks der bisherigen App (archivierte Alt-App, `inviteLinkFor`): `https://<site>/?invite=<code>`. Beim Umstieg eines
  * Live-Teams auf Angular (SCRUM-169) sind solche Links schon verschickt; sie sollen weiter funktionieren: der Code wird
  * auf der Anmeldeseite vorausgefüllt, angemeldet wird erst per Knopfdruck (wie bisher).
  */

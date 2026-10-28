@@ -6,7 +6,7 @@
 #   geschlossen sind. Vorschauen offener PRs und der Live-Kanal bleiben unangetastet.
 #
 # Neue Vorschauen gibt es seit SCRUM-210 nur noch auf der Site teamkompass-u14 (Angular-Standard-Build, Testteam U14,
-# SCRUM-206). teamkompass-b8aac (Ziel main), teamkompass-u15 (bis SCRUM-210 Alt-App-Kopie mit Testteam, SCRUM-218) und
+# SCRUM-206). teamkompass-b8aac (Ziel main), teamkompass-u15 (bis SCRUM-210 Alt-App-Kopie mit Testteam, SCRUM-218; Alt-App seit SCRUM-211 archiviert) und
 # teamkompass-u17 bleiben in der Liste, damit aeltere Vorschauen beim Schliessen der PRs ebenfalls verschwinden. Alle
 # werden gleich behandelt.
 #

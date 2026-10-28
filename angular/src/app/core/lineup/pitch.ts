@@ -1,6 +1,6 @@
 /**
  * Spielfeld des Taktikboards: 14 feste Positionszonen, Bänder von hinten nach vorn und die Formations-Vorlagen
- * (wie outputs/team-manager/app.js: PITCH_ZONES, PITCH_BANDS, FORMATION_PRESETS).
+ * (wie Alt-App app.js: PITCH_ZONES, PITCH_BANDS, FORMATION_PRESETS).
  */
 import { type Player, parsePositions } from '../player/player';
 

@@ -10,12 +10,10 @@
 # auf der Test-Site teamkompass-u14. tests/preview-guard.test.mjs prueft jeden Deploy-Schritt hier (Ziel, Build,
 # Team-ID, Projekt-ID), ohne Ausnahme.
 #
-# SCRUM-218/SCRUM-208/SCRUM-210: Seit der Umstellung des Haupt-Teams (Ziel main) und der U15 (Ziel u15) auf Angular
-# wird keine Alt-App mehr ausgeliefert. main, u15 und u17 sind Live-Sites mit echten Daten und bekommen deshalb keine
-# Vorschau; die einzige Vorschau ist der Angular-Standard-Build (Testteam U14) auf u14. Die fruehere Alt-App-Vorschau
-# (Kopie von outputs/u15 mit dem Testteam, scripts/legacy-preview.mjs) ist entfallen: outputs/* ist nur noch die
-# Rueckweg-Kopie (FIREBASE_SETUP.md §11). Faellt ein Team auf die Alt-App zurueck, kann sie wieder eingebaut werden
-# (Pruefung kennt sie weiter).
+# SCRUM-208/SCRUM-210/SCRUM-211: Alle Ziele liefern Angular-Builds aus, die Alt-App ist archiviert
+# (FIREBASE_SETUP.md §11). main, u15 und u17 sind Live-Sites mit echten Daten und bekommen deshalb keine Vorschau;
+# die einzige Vorschau ist der Angular-Standard-Build (Testteam U14) auf u14. Die Pruefung lehnt jedes Vorschau-Ziel
+# ab, das keinen Angular-Build ausliefert.
 
 name: Deploy to Firebase Hosting on PR
 on: pull_request

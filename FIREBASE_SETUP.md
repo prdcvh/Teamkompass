@@ -1,6 +1,11 @@
 # Firebase-Setup fuer TeamKompass
 
-Die App funktioniert ohne Firebase weiterhin lokal im Browser. Fuer mehrere Geraete stellst du `firebase-config.js` auf Firebase um.
+TeamKompass ist die Angular-App in `angular/`. Alle Teams nutzen dasselbe Firebase-Projekt
+`teamkompass-b8aac`; getrennt wird ueber die `teamId` (Pfad `teams/<teamId>/...`). Jedes Team hat eine eigene
+Build-Konfiguration und ein eigenes Hosting-Ziel (`angular/README.md`, Abschnitt "Builds je Team").
+
+Die fruehere Alt-App (`outputs/*` und die Root-Kopie `index.html`/`app.js`/`styles.css`) ist seit SCRUM-211
+archiviert: Sie liegt nur noch in der Git-Historie, Rueckweg siehe Abschnitt 11.
 
 ## 1. Firebase-Projekt anlegen
 
@@ -12,109 +17,57 @@ Die App funktioniert ohne Firebase weiterhin lokal im Browser. Fuer mehrere Gera
 
 ## 2. App konfigurieren
 
-In `firebase-config.js`:
-
-```js
-window.TEAMKOMPASS_CONFIG = {
-  storage: "firebase",
-  teamId: "u17-saison-2026-27",
-  firebase: {
-    apiKey: "...",
-    authDomain: "...",
-    projectId: "...",
-    storageBucket: "...",
-    messagingSenderId: "...",
-    appId: "..."
-  }
-};
-```
+- `angular/src/environments/firebase.ts`: die Firebase-Web-Konfiguration (oeffentlich, kein Geheimnis; der
+  Zugriffsschutz liegt in `firestore.rules`) und der optionale App-Check-Schluessel (Abschnitt 10).
+- `angular/src/environments/environment.ts`: Standard-Build = Testteam `U14` (Hosting-Ziel `u14`).
+- `angular/src/environments/environment.<team>.ts`: je Live-Team `teamId`, `clubName`, `teamLabel`, `teamName`;
+  eingebunden ueber die gleichnamige Build-Konfiguration in `angular/angular.json`.
 
 `teamId` ist der gemeinsame Datenraum. Alle Geraete mit derselben `teamId` sehen dieselben Daten.
 
-## 3. Firestore-Pfad (Standard, ohne Rollen)
+## 3. Firestore-Pfad ohne Rollen (nur Alt-App, archiviert)
 
-Solange `enableRoles` in `firebase-config.js` auf `false` steht (Standard), speichert die
-App den gesamten Team-State weiterhin in einem Dokument, ohne Login:
+Den Modus ohne Anmeldung (ganzer Team-Stand in einem Dokument `teams/{teamId}/appState/current`) gab es nur in
+der Alt-App. Die Angular-App arbeitet immer mit Anmeldung und Rollen (Abschnitt 5).
 
-```txt
-teams/{teamId}/appState/current
-```
+## 4. Einfache Test-Regeln (entfallen)
 
-## 4. Einfache Test-Regeln (nur fuer den Standardmodus ohne Rollen)
+Gehoerten zum Modus aus Abschnitt 3 und sind mit der Alt-App entfallen. Es gelten immer die Regeln aus
+`firestore.rules`.
 
-Nur fuer Entwicklung, solange `enableRoles: false` ist:
+## 5. Rollen und Anmeldung (Trainer sieht alles, Spieler nur das eigene Profil)
 
-```txt
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /teams/{teamId}/appState/current {
-      allow read, write: if true;
-    }
-  }
-}
-```
+Datenmodell und Zugriffsregeln liegen in `firestore.rules` im Repo-Root. Bei jedem Push nach `main`, der die
+Datei aendert, deployt `.github/workflows/firestore-rules-deploy.yml` sie automatisch.
 
-Diese Regeln sind offen und nicht fuer produktive Nutzung geeignet.
+Trainer-Konten entstehen **nie ohne Erlaubnis**: entweder als allererstes Konto manuell in der Firebase-Konsole
+(Bootstrap, unten), durch einen angemeldeten Trainer in der App oder ueber einen Einladungscode bei der
+Registrierung (Abschnitt 10).
 
-## 5. Rollen-Modus aktivieren (Trainer sieht alles, Spieler nur das eigene Profil)
-
-Die App unterstuetzt einen optionalen Rollen-Modus mit echtem Login. Datenmodell und
-Zugriffsregeln liegen in `firestore.rules` im Repo-Root. Solange `enableRoles: false`
-bleibt, aendert sich am heutigen Verhalten nichts.
-
-Trainer-Konten entstehen **absichtlich nicht** ueber die App selbst (keine
-Selbstregistrierung), sondern ausschliesslich manuell in der Firebase-Konsole - so kann
-sich niemand, der die App-URL kennt, selbst zum Trainer machen.
-
-**Einmalige Einrichtung:**
+**Einmalige Einrichtung eines Teams ohne Registrierung (Bootstrap):**
 
 1. Firebase Console -> Authentication -> Sign-in-Methode: **E-Mail/Passwort** UND
    **Anonym** aktivieren.
-2. `firestore.rules` deployen:
-   - per Firebase-CLI: `firebase deploy --only firestore:rules`, oder
-   - manuell: Inhalt von `firestore.rules` in Firebase Console -> Firestore Database
-     -> Regeln einfuegen und veroeffentlichen.
-3. Erstes Trainer-Konto manuell anlegen (einmaliger Bootstrap-Schritt - danach nicht
-   mehr noetig, siehe Schritt 7):
+2. `firestore.rules` deployen (passiert beim Merge nach `main` automatisch; manuell:
+   `firebase deploy --only firestore:rules`).
+3. Erstes Trainer-Konto manuell anlegen:
    - Firebase Console -> Authentication -> Tab "Users" -> "Nutzer hinzufuegen" ->
      E-Mail + Passwort eingeben. Firebase zeigt danach die generierte **Nutzer-ID (UID)**
      an - die brauchst du im naechsten Schritt.
    - Firebase Console -> Firestore Database -> Daten -> zur Collection
      `teams/{teamId}/members` navigieren (bzw. neu anlegen) -> Dokument mit der
      **Dokument-ID = die eben kopierte UID** anlegen, darin ein Feld `role` (Typ String,
-     Wert `trainer`) anlegen. Mehr Felder braucht ein Trainer-Dokument nicht.
-4. In `firebase-config.js` `enableRoles: true` setzen und deployen.
-5. Die App oeffnen - es erscheint ein Login-Bildschirm mit dem Trainer-Login. Dort die
-   in Schritt 3 vergebene E-Mail/Passwort-Kombination eingeben.
-6. Falls schon Daten im alten Format existieren (`teams/{teamId}/appState/current`):
-   im Menue "Aktionen" auf "Alte Daten migrieren" klicken. Das ueberfuehrt Kader,
-   Events, Bewertungen, Foerderplaene und Gegneranalysen einmalig in die neue Struktur.
-   Das alte Dokument bleibt danach unveraendert liegen (kann spaeter manuell geloescht
-   werden).
-7. Fuer jeden Spieler in der Kader-Ansicht auf "Einladen" klicken - das erzeugt einen
-   6-stelligen Einladungscode. Den Code vertraulich an den jeweiligen Spieler weitergeben
-   (wie ein Passwort - nicht wie ein Einmal-Link). Der Spieler gibt ihn auf dem
-   Login-Bildschirm ein und ist danach auf diesem Geraet dauerhaft angemeldet -
-   beschraenkt auf sein eigenes Spielerprofil. Derselbe Code funktioniert auf beliebig
-   vielen Geraeten (z.B. Handy und Tablet) - jedes Geraet, auf dem der Code eingegeben
-   wird, erscheint als eigener Eintrag in "Spieler-Zugaenge verwalten" und kann dort
-   einzeln gesperrt werden. Beim Erzeugen des Codes laesst sich der Zugang optional
-   befristen (z.B. 30 Tage ab dem Erzeugen); das Ablaufdatum gilt fuer den Code selbst
-   und alle damit angemeldeten Geraete gemeinsam - nach Ablauf funktioniert weder eine
-   neue Anmeldung mit dem Code, noch bleibt ein bereits angemeldetes Geraet zugriffsberechtigt.
-8. Weitere Trainer-Konten (z.B. Co-Trainer) legst du ab jetzt direkt in der App an:
-   im Menue "Aktionen" auf "Trainer-Konto anlegen" klicken und E-Mail + Passwort fuer
-   das neue Konto eingeben. Die App legt Auth-Konto und passendes members-Dokument in
-   einem Schritt an - kein manuelles UID-Kopieren mehr noetig. Der Bootstrap-Schritt aus
-   3. bleibt nur fuer das allererste Trainer-Konto erforderlich, da es dafuer naturgemaess
-   noch keinen angemeldeten Trainer gibt, der den Button klicken koennte.
+     Wert `trainer`) anlegen.
+4. Die App oeffnen und mit dieser E-Mail/Passwort-Kombination anmelden.
+5. Alles Weitere legt der Trainer in der App an: Spieler- und Eltern-Einladungen (Einmal-Codes, optional
+   befristet) unter "Spieler-Zugaenge", weitere Trainer, Scout- und Medizin-Zugaenge unter "Trainer-Konto
+   anlegen", "Scout-Zugang anlegen" und "Medizin-Zugang anlegen".
 
-**Datenmodell im Rollen-Modus:**
+**Datenmodell (Auszug):**
 
 ```txt
 teams/{teamId}/members/{uid}                         # Rolle + ggf. playerId je Nutzer
-teams/{teamId}/invites/{code}                        # Einladungscodes fuer Spieler
+teams/{teamId}/invites/{code}                        # Einmal-Einladungscodes fuer Spieler/Eltern
 teams/{teamId}/players/{playerId}
 teams/{teamId}/players/{playerId}/developmentPlans/{planId}
 teams/{teamId}/events/{eventId}                      # Titel/Datum/Ergebnis, keine Noten
@@ -122,58 +75,37 @@ teams/{teamId}/events/{eventId}/ratings/{playerId}   # individuelle Bewertung
 teams/{teamId}/opponents/{opponentId}
 ```
 
-**Grenzen dieser Version:** Nur das allererste Trainer-Konto muss manuell in der
-Firebase-Konsole angelegt werden (Bootstrap-Problem: es gibt anfangs noch keinen
-angemeldeten Trainer, der weitere Konten anlegen koennte); alle weiteren Trainer-Konten
-laufen ueber "Trainer-Konto anlegen" in der App. Spieler-Zugaenge sind an das jeweilige
-Geraet gebunden (anonyme Anmeldung, kein Passwort-Reset - bei Geraetewechsel muss neu
-eingeladen werden).
+Vollstaendig und verbindlich: `firestore.rules` und `docs/architektur-verein-teams.md`.
 
-## 6. Weitere Mannschaft einrichten (z.B. ein anderer Trainer mit eigenem Team)
+## 6. Weitere Mannschaft einrichten
 
-Das Datenmodell trennt Teams bereits vollstaendig ueber die `teamId`
-(`teams/{teamId}/...`, siehe `firestore.rules`) - Teams mit unterschiedlicher
-`teamId` im selben Firebase-Projekt sehen sich gegenseitig nie, weder Kader noch
-Trainer-/Spieler-Zugaenge. Fuer weitere Mannschaften (bisher: U17 `teamId: "U17"`,
-U15 `teamId: "U15"`) sind jeweils bereits vorbereitet:
+Das Datenmodell trennt Teams bereits vollstaendig ueber die `teamId` - Teams mit unterschiedlicher `teamId` im
+selben Firebase-Projekt sehen sich gegenseitig nie. Die Firestore-Regeln sind generisch, sie brauchen fuer ein
+neues Team keine Aenderung.
 
-- `outputs/<team>/` (z.B. `outputs/u17/`, `outputs/u15/`) - eigene Kopie der App mit
-  eigenem Branding und eigener `firebase-config.js` (`teamId`, `enableRoles: true`,
-  gleiches Firebase-Projekt).
-- `firebase.json` / `.firebaserc` - je ein Hosting-Target pro Mannschaft
-  (`main`, `u17`, `u15`, ...), alle im selben Firebase-Projekt `teamkompass-b8aac`.
-- `.github/workflows/firebase-hosting-merge.yml` - deployt bei jedem Merge nach `main`
-  alle Hosting-Targets.
+Neue Trainer mit eigenem Team kommen heute in der Regel ueber die Registrierung mit Einladungscode
+(Abschnitt 10) in die App, ohne neuen Build. Ein **eigenes Hosting-Ziel mit fest eingebautem Team** (wie
+`main`, `u15`, `u17`) braucht dagegen:
 
-**Noch noetig pro neuer Mannschaft - einmalig, nur in der Firebase-Konsole (nicht per
-Code moeglich). Am Beispiel U15, `teamkompass-u15`:**
+1. Angular-Build-Konfiguration (`angular/README.md`, "Builds je Team"): eine Konfiguration in
+   `angular/angular.json`, `angular/src/environments/environment.<team>.ts`,
+   `angular/teams/<team>/manifest.webmanifest` und einen Eintrag in `build:teams` (`angular/package.json`).
+2. Hosting-Ziel: Eintrag in `.firebaserc` (`targets.teamkompass-b8aac.hosting.<ziel>`) und in `firebase.json`
+   (`"public": "angular/dist/team-<team>/browser"`, Header und Rewrite wie bei `u14`).
+3. Merge-Workflow `.github/workflows/firebase-hosting-merge.yml`: im Verify-Job den Build als Artefakt hochladen,
+   im Deploy-Job an genau den `public`-Pfad herunterladen und einen Deploy-Schritt `target: <ziel>` anlegen.
+4. **Keine** PR-Vorschau fuer ein Team mit echten Daten (`tests/preview-guard.test.mjs`, SCRUM-206).
+5. Optional das Team in `scripts/assign-clubs-lib.mjs` (`TEAMS`) eintragen (Abschnitt 9).
 
-1. Firebase Console -> Hosting -> "Website hinzufuegen" -> Site-ID `teamkompass-u15` vergeben
-   (oder per Firebase-CLI, sofern lokal installiert und eingeloggt:
-   `firebase hosting:sites:create teamkompass-u15 --project teamkompass-b8aac`).
-   Ist die gewuenschte Site-ID bereits vergeben, eine andere waehlen und in `.firebaserc`
-   (Eintrag `targets.teamkompass-b8aac.hosting.u15`) sowie ggf. in dieser Anleitung anpassen.
-2. Passt die verwendete Site-ID nicht zu der in `.firebaserc` bereits eingetragenen
-   (`teamkompass-u15`), das Target lokal neu setzen: `firebase target:apply hosting u15 <site-id> --project teamkompass-b8aac`
-   (schreibt `.firebaserc`) und den geaenderten Stand committen.
-3. Firestore-Regeln sind bereits generisch fuer beliebige `teamId` gueltig - hier ist nichts
-   weiter zu tun.
-4. Erstes Trainer-Konto fuer `U15` anlegen (gleicher Bootstrap-Schritt wie in Abschnitt 5,
-   Schritt 3, nur mit `teamId: "U15"` statt der bisherigen `teamId`):
-   Firebase Console -> Authentication -> Nutzer hinzufuegen -> die generierte UID kopieren ->
-   Firestore -> Dokument `teams/U15/members/{UID}` mit Feld `role: "trainer"` anlegen.
-5. Erst NACHDEM Schritt 1 erledigt ist diesen Branch nach `main` mergen - der
-   Deploy-Workflow veroeffentlicht danach automatisch alle Sites. Vorher mergen laesst
-   den neuen Deploy-Schritt fuer `u15` bei jedem Merge nach `main` fehlschlagen, weil die
-   Site noch nicht existiert. Die neue Mannschaft ist nach dem Merge unter
-   `https://teamkompass-u15.web.app` erreichbar (URL haengt von der tatsaechlich
-   vergebenen Site-ID ab).
-6. Der U15-Trainer meldet sich mit dem in Schritt 4 angelegten Konto an und legt seine Spieler,
-   Einladungscodes und bei Bedarf weitere Trainer-Konten direkt in der App an - unabhaengig
-   von den bestehenden Teams.
+**Einmalig, nur in der Firebase-Konsole (nicht per Code moeglich). Am Beispiel `teamkompass-u16`:**
 
-Fuer eine weitere Mannschaft dieselben Schritte mit einer weiteren `teamId`, einem weiteren
-Hosting-Target und einem weiteren `outputs/<team>`-Ordner wiederholen.
+1. Firebase Console -> Hosting -> "Website hinzufuegen" -> Site-ID `teamkompass-u16` vergeben
+   (oder per Firebase-CLI: `firebase hosting:sites:create teamkompass-u16 --project teamkompass-b8aac`).
+   Ist die gewuenschte Site-ID bereits vergeben, eine andere waehlen und in `.firebaserc` eintragen.
+2. Erstes Trainer-Konto fuer das Team anlegen (Abschnitt 5, Schritt 3, mit der neuen `teamId`).
+3. Erst NACHDEM Schritt 1 erledigt ist den PR nach `main` mergen - vorher schlaegt der neue Deploy-Schritt bei
+   jedem Merge nach `main` fehl, weil die Site noch nicht existiert. Danach ist das Team unter
+   `https://teamkompass-u16.web.app` erreichbar (URL haengt von der vergebenen Site-ID ab).
 
 
 ## 7. Daten in ein neues Team kopieren (`scripts/copy-team.mjs`)
@@ -182,8 +114,8 @@ Kopiert rekursiv alles unter `teams/<quelle>` nach `teams/<ziel>`: Spieler samt
 Entwicklungsplaenen/Abwesenheiten/Messwerten, Events samt Bewertungen, Gegner, `meta/*`,
 `members` (gleiche Auth-UIDs, bestehende Trainer-Logins funktionieren also auch im Ziel) und
 `invites`. Typen (Timestamps usw.) bleiben erhalten, Dokument-Referenzen werden auf das Zielteam
-umgebogen. Die **Quelle wird nie veraendert**. Gedacht fuer die Angular-Instanz
-(`mein-team` -> `U14`); die Live-App bleibt auf `mein-team`.
+umgebogen. Die **Quelle wird nie veraendert**. Gedacht fuer die Test-Instanz
+(`mein-team` -> `U14`); das Live-Team bleibt auf `mein-team`.
 
 Ausfuehrung nur durch den Product Owner (braucht Admin-Zugang):
 
@@ -202,7 +134,7 @@ Ausfuehrung nur durch den Product Owner (braucht Admin-Zugang):
 ## 8. Angular-Instanz U14 (`angular/`, Hosting-Target `u14`)
 
 Die Angular-Neuentwicklung (Jira-Epic SCRUM-40) wird als eigene Hosting-Site
-`teamkompass-u14` veroeffentlicht, getrennt von der Live-App. Sie nutzt `teamId: "U14"`
+`teamkompass-u14` veroeffentlicht, getrennt von den Live-Teams. Sie nutzt `teamId: "U14"`
 (`angular/src/environments/environment.ts`), nie `mein-team`.
 
 - `.firebaserc` / `firebase.json`: Target `u14` -> Site `teamkompass-u14`, Public =
@@ -219,14 +151,11 @@ Die Angular-Neuentwicklung (Jira-Epic SCRUM-40) wird als eigene Hosting-Site
   (Testteam `U14`) auf `teamkompass-u14--pr<Nr>-<branch>.web.app`. Eine Vorschau darf nie den Build eines
   Live-Teams (`U17`, `mein-team`, `U15`) ausliefern; `tests/preview-guard.test.mjs` prueft dafuer jeden
   Deploy-Schritt in `firebase-hosting-pull-request.yml` (Ziel, Build, Team-ID, Projekt-ID), ohne Ausnahme.
-- Alt-App-Vorschau: gibt es seit SCRUM-210 **nicht mehr**. Bis dahin lief die Vorschau der Alt-App auf dem Ziel
-  `u15` als Kopie von `outputs/u15` mit dem Testteam `U14` (SCRUM-218, `scripts/legacy-preview.mjs`). Seit die U15 auf
-  Angular läuft, liefert kein Ziel mehr die Alt-App aus; `main`, `u15` und `u17` sind Live-Sites mit echten Daten und
-  bekommen keine Vorschau. Das Skript und die Prüfung in `scripts/preview-guard-lib.mjs` bleiben für den Rückweg
-  erhalten (Abschnitt 11): Fällt ein Team auf die Alt-App zurück und soll es wieder eine Alt-App-Vorschau geben, dann
-  nur auf diese Art (Kopie mit Testteam), nie `outputs/<team>` direkt. Anmeldung in der U14-Vorschau mit einem
-  Trainer-Konto, das unter `teams/U14/members` eingetragen ist (beim Kopieren aus mein-team mitkopiert).
-  Achtung: U14 liegt im selben Firebase-Projekt und enthaelt von `mein-team` kopierte Daten (Abschnitt 8).
+- Alt-App-Vorschau: gibt es seit SCRUM-210 nicht mehr, seit SCRUM-211 ist die Alt-App archiviert (Abschnitt 11).
+  `main`, `u15` und `u17` sind Live-Sites mit echten Daten und bekommen keine Vorschau. Anmeldung in der
+  U14-Vorschau mit einem Trainer-Konto, das unter `teams/U14/members` eingetragen ist (beim Kopieren aus
+  mein-team mitkopiert). Achtung: U14 liegt im selben Firebase-Projekt und enthaelt von `mein-team` kopierte
+  Daten (Abschnitt 7).
 - PWA (SCRUM-76): Manifest `angular/public/manifest.webmanifest`, Service Worker von Angular
   (`angular/ngsw-config.json`, nur im Produktions-Build). `ngsw.json`/`ngsw-worker.js` fallen unter
   die `no-cache`-Regel `**`, Updates kommen also sofort an (Hinweis "Neue Version verfuegbar").
@@ -248,8 +177,7 @@ Team-Dokumenten `clubId`, `name`, `label`, `hasTrainer: true` und schreibt in je
 Feld `uid` (= Dokument-ID). Es zieht **nichts um**, loescht nichts, ueberschreibt keine vorhandenen Felder
 und aendert keine Rolle. Es kann gefahrlos mehrfach laufen.
 
-Reihenfolge: erst die neuen Regeln deployen (Merge des PR), dann das Skript. Die bestehenden Apps merken
-von beidem nichts.
+Reihenfolge: erst die neuen Regeln deployen (Merge des PR), dann das Skript.
 
 Ausfuehrung nur durch den Product Owner (braucht Admin-Zugang):
 
@@ -263,8 +191,8 @@ Ausfuehrung nur durch den Product Owner (braucht Admin-Zugang):
 
 Gehoert ein Team schon zu einem anderen Verein, bricht das Skript ab und schreibt nichts. Spaeter
 hinzugefuegte Teams (Abschnitt 6) bitte in `scripts/assign-clubs-lib.mjs` (`TEAMS`) eintragen und das
-Skript erneut laufen lassen. Mitglieder, die die Alt-Apps nach dem Lauf anlegen, haben kein `uid`-Feld –
-ein erneuter Lauf ergaenzt es.
+Skript erneut laufen lassen. Mitglieder ohne `uid`-Feld (z. B. frueher von der Alt-App angelegt) ergaenzt
+ein erneuter Lauf.
 
 
 ## 10. Registrierung nur mit Einladung (`scripts/create-club-invite.mjs`, SCRUM-181)
@@ -313,52 +241,69 @@ steht (heute leer = aus). Zum Einschalten:
 3. Schluessel in `appCheckSiteKey` eintragen und in `firebase.json` (Ziel `u14`) die Content-Security-Policy
    erweitern: `script-src` um `https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/`,
    `frame-src https://www.google.com/recaptcha/`, `connect-src` um `https://content-firebaseappcheck.googleapis.com`.
-4. Einige Tage unter App Check → **Messwerte** beobachten. **Nicht „Erzwingen“ einschalten, solange eine Alt-App
-   (`outputs/*`) läuft** – die senden kein App-Check-Token und waeren sonst ausgesperrt. Seit SCRUM-210 läuft keine
-   Alt-App mehr live; nach einem Rückweg (Abschnitt 11) wäre das aber wieder so.
+4. Einige Tage unter App Check → **Messwerte** beobachten. Seit SCRUM-210 läuft keine Alt-App mehr live (seit
+   SCRUM-211 archiviert). Nach einem Rückweg auf die Alt-App (Abschnitt 11) **nicht „Erzwingen“ einschalten** – sie
+   sendet kein App-Check-Token und wäre sonst ausgesperrt.
 
 Bis dahin begrenzt die Einladungspflicht neue Konten: ohne Code entsteht kein Verein und kein Team; ein Konto ohne
 Code sieht nichts.
 
-## 11. Live-Team auf Angular umstellen und Rückweg (Rollback)
+## 11. Live-Teams auf Angular und Rückweg (Rollback)
 
-Seit SCRUM-169 liefert das Hosting-Ziel `u17` (Site `teamkompass-u17`) den **Angular-Build der U17**
-aus (`ng build -c production,u17`, Team-ID `U17`, Ausgabe `angular/dist/team-u17/browser`). Die U17
-liest und schreibt dieselben Daten wie vorher (`teams/U17/...`), Firestore-Regeln unverändert. Die alte
-App `outputs/u17/` bleibt im Repo, nur für den Rückweg.
+Alle Hosting-Ziele liefern einen Angular-Build aus; jeder Merge nach `main` deployt alle vier
+(`.github/workflows/firebase-hosting-merge.yml`):
 
-- `firebase.json`, Eintrag `"target": "u17"`: `"public": "angular/dist/team-u17/browser"`, Header und
-  SPA-Rewrite wie beim Ziel `u14`.
-- `.github/workflows/firebase-hosting-merge.yml`: der Verify-Job lädt `angular/dist/team-u17/browser`
-  als Artefakt `angular-dist-u17` hoch, der Deploy-Job legt es dorthin zurück und deployt `target: u17`.
-- PR-Vorschau: **keine** U17-Vorschau mehr (SCRUM-206) – unfreigegebener Code soll nicht gegen echte
-  U17-Daten laufen. Die Angular-Vorschau je PR ist der Testteam-Build auf `teamkompass-u14` (Abschnitt 8).
-  Den Angular-Stand der U17 sieht man erst nach dem Merge live.
-- Alte U17-Vorschaukanäle (von vor SCRUM-206) räumt `firebase-preview-cleanup.yml` weiter mit auf.
+| Ziel | Site | Build | Team-ID | seit |
+|---|---|---|---|---|
+| `main` | `teamkompass-b8aac` (https://teamkompass-b8aac.web.app) | `ng build -c production,mein-team` → `angular/dist/team-mein-team/browser` | `mein-team` (echte Daten) | SCRUM-208 |
+| `u17` | `teamkompass-u17` (https://teamkompass-u17.web.app) | `ng build -c production,u17` → `angular/dist/team-u17/browser` | `U17` (echte Daten) | SCRUM-169 |
+| `u15` | `teamkompass-u15` (https://teamkompass-u15.web.app) | `ng build -c production,u15` → `angular/dist/team-u15/browser` | `U15` (echte Daten) | SCRUM-210 |
+| `u14` | `teamkompass-u14` (https://teamkompass-u14.web.app) | Standard-Build → `angular/dist/teamkompass-angular/browser` | `U14` (Testteam) | SCRUM-40 |
 
-### Rückweg auf die alte App
+- Daten (`teams/<teamId>/...`), Anmeldungen und Firestore-Regeln sind dieselben wie zu Zeiten der Alt-App.
+- Merge-Workflow: der Verify-Job baut alle Builds (`npm run verify`) und lädt sie als Artefakte hoch
+  (`angular-dist`, `angular-dist-mein-team`, `angular-dist-u17`, `angular-dist-u15`); der Deploy-Job legt sie an
+  genau den `public`-Pfad zurück und deployt `target: main`, `u17`, `u15`, `u14`.
+- PR-Vorschau: nur der Testteam-Build auf `teamkompass-u14` (Abschnitt 8). `main`, `u15` und `u17` haben echte
+  Daten und bekommen keine Vorschau (SCRUM-206); man sieht ihren Stand erst nach dem Merge live. Alte
+  Vorschaukanäle aller vier Sites räumt `firebase-preview-cleanup.yml` auf.
 
-**Sofort (Notfall, ohne Code):** Firebase Console → Hosting → Site `teamkompass-u17` →
-Versionsverlauf → bei der letzten Version vor der Umstellung „Zurücksetzen“ (rollback). Wirkt sofort, wird
-aber beim **nächsten Merge nach `main`** wieder überschrieben – deshalb immer auch den dauerhaften Weg
-gehen.
+### Rückweg auf einen früheren Angular-Stand
 
-**Dauerhaft (per PR):**
+**Sofort (Notfall, ohne Code):** Firebase Console → Hosting → betroffene Site (z. B. `teamkompass-u17`) →
+Versionsverlauf → bei der letzten funktionierenden Version „Zurücksetzen“ (rollback). Wirkt sofort, wird aber
+beim **nächsten Merge nach `main`** wieder überschrieben – deshalb immer auch den dauerhaften Weg gehen.
 
-1. In `firebase.json` den Eintrag `"target": "u17"` durch den Hosting-Eintrag der alten App ersetzen (siehe
-   unten „Hosting-Eintrag der alten App“) und darin `target` und `public` setzen:
+**Dauerhaft (per PR):** Den fehlerhaften Commit auf `main` per PR zurücknehmen (`git revert <commit>`),
+`npm run verify`, Merge nach `main` → der Merge-Workflow baut und deployt den früheren Angular-Stand auf alle
+Ziele.
 
-   ```json
-   "target": "u17",
-   "public": "outputs/u17",
+### Rückweg auf die archivierte Alt-App (SCRUM-211)
+
+Die Alt-App (`outputs/team-manager` = Haupt-Team, `outputs/u15`, `outputs/u17`, dazu die Root-Kopie) ist seit
+SCRUM-211 aus `main` gelöscht. **Archiv-Stand** ist der Commit
+`f35a02e147b485d7eb09832e17f122483b8cd13c` (letzter Stand von `main` vor dem Löschen, „SCRUM-210: U15 auf
+Angular umstellen“). Dort liegen auch die Tests der Alt-App (`tests/*.test.mjs`) und das frühere
+Vorschau-Skript `scripts/legacy-preview.mjs`. Ein Rückweg ist nur noch per PR möglich und braucht die
+ausdrückliche Freigabe des PO:
+
+1. Den Ordner des Teams aus dem Archiv zurückholen, z. B. für die U17:
+
+   ```sh
+   git checkout f35a02e147b485d7eb09832e17f122483b8cd13c -- outputs/u17
    ```
 
-   (also wieder die Header der alten App mit dem gstatic-Firebase-SDK in der CSP, ohne `rewrites`).
-2. Den Test „Live-Team U17 läuft auf dem Angular-Build …“ (SCRUM-169) in `tests/project.test.mjs`
-   entfernen bzw. umdrehen. Die Artefakt-Schritte `angular-dist-u17` in den Workflows dürfen bleiben.
-3. `npm run verify`, PR, Merge nach `main` → der Merge-Workflow deployt `outputs/u17` live.
-4. Prüfen: `https://teamkompass-u17.web.app` neu laden – die alte Oberfläche erscheint, Trainer und
-   Spieler sind weiter angemeldet.
+   (Haupt-Team: `outputs/team-manager`, U15: `outputs/u15`.) Bei Bedarf die zugehörigen Tests ebenso, z. B.
+   `git checkout f35a02e147b485d7eb09832e17f122483b8cd13c -- tests/rsvp.test.mjs`.
+2. In `firebase.json` den Eintrag des Ziels durch den Hosting-Eintrag der alten App ersetzen (unten) und darin
+   `target` und `public` setzen, z. B. `"target": "u17"`, `"public": "outputs/u17"`.
+3. Die Tests anpassen, die das Gegenteil erwarten: „Alt-App ist archiviert …“ (SCRUM-211) und den
+   Angular-Test des Teams („Live-Team U17 läuft auf dem Angular-Build …“ usw.) in `tests/project.test.mjs`,
+   in `tests/preview-guard.test.mjs` die Erwartung „kein Ziel liefert die Alt-App aus“. Eine PR-Vorschau für
+   dieses Ziel gibt es nicht; die Vorschau-Prüfung (`scripts/preview-guard-lib.mjs`) lehnt jedes Ziel ohne
+   Angular-Build ab.
+4. `npm run verify`, PR, Merge nach `main` → der Merge-Workflow deployt den Alt-App-Ordner live.
+5. Prüfen: Seite neu laden – die alte Oberfläche erscheint, Trainer und Spieler sind weiter angemeldet.
 
 **Was auf den Geräten passiert:** Der Angular-Service-Worker fragt bei jedem Öffnen `ngsw.json` ab. Die
 alte App hat diese Datei nicht (Antwort 404), daraufhin meldet er sich selbst ab und löscht seinen Cache;
@@ -367,93 +312,17 @@ dauerhaft einen Sync-Fehler (älteres Firebase-SDK mit dem Offline-Speicher der 
 einmal „Website-Daten löschen“ im Browser; Daten gehen dabei nicht verloren, sie liegen in Firestore.
 
 **Vor einem erneuten Umstieg auf Angular:** Die alte App aktualisiert die Angular-Zusammenfassungen je
-Spieler (`teams/U17/playerStats`, SCRUM-201) nicht. Wurden sie in Angular eingerichtet („Einstellungen →
-Zusammenfassungen → Neu berechnen“), nach dem erneuten Umstieg sofort dort **„Neu berechnen“** drücken
-(oder vorher das Dokument `teams/U17/meta/playerStats` löschen – dann rechnet Angular wieder aus allen
-Bewertungen).
+Spieler (`teams/<teamId>/playerStats`, SCRUM-201) nicht. Nach dem erneuten Umstieg in Angular sofort
+„Einstellungen → Zusammenfassungen → **Neu berechnen**“ drücken (oder vorher das Dokument
+`teams/<teamId>/meta/playerStats` löschen – dann rechnet Angular wieder aus allen Bewertungen).
 
-### Haupt-Team (`mein-team`, Ziel `main`) – seit SCRUM-208
+**App Check:** Solange eine Alt-App live läuft, App Check nicht „erzwingen“ (Abschnitt 10) – die Alt-App sendet
+kein App-Check-Token.
 
-Seit SCRUM-208 liefert auch das Hosting-Ziel `main` (Site `teamkompass-b8aac`, https://teamkompass-b8aac.web.app)
-den **Angular-Build des Haupt-Teams** aus (`ng build -c production,mein-team`, Team-ID `mein-team`, Ausgabe
-`angular/dist/team-mein-team/browser`). Daten (`teams/mein-team/...`), Anmeldungen und Firestore-Regeln bleiben
-unverändert. Die alte App `outputs/team-manager/` bleibt im Repo, nur für den Rückweg.
+### Hosting-Eintrag der alten App (für den Rückweg)
 
-- `firebase.json`, Eintrag `"target": "main"`: `"public": "angular/dist/team-mein-team/browser"`, Header und
-  SPA-Rewrite wie bei `u14`/`u17`.
-- Merge-Workflow: Artefakt `angular-dist-mein-team` (Verify-Job) → Deploy-Job → `target: main`.
-- PR-Vorschau: Fuer das Ziel `main` gibt es **keine** Vorschau mehr (Vorschauen laufen nie mit echten Daten,
-  SCRUM-206/218). PRs sehen die Angular-Vorschau mit dem Testteam auf `teamkompass-u14` (Abschnitt 8). Das Haupt-Team
-  mit echten Daten sieht man erst nach dem Merge auf https://teamkompass-b8aac.web.app. Die Sites
-  `teamkompass-b8aac`, `-u14`, `-u15`, `-u17` räumt `firebase-preview-cleanup.yml` auf. Seit SCRUM-210 (U15 auf
-  Angular) gibt es auch die Alt-App-Vorschau nicht mehr.
-
-**Rückweg sofort (Notfall):** Firebase Console → Hosting → Site `teamkompass-b8aac` → Versionsverlauf → letzte
-Version vor der Umstellung → „Zurücksetzen“. Wird beim nächsten Merge nach `main` wieder überschrieben.
-
-**Rückweg dauerhaft (per PR):**
-
-1. In `firebase.json` den Eintrag `"target": "main"` durch den Hosting-Eintrag der alten App ersetzen (siehe unten
-   „Hosting-Eintrag der alten App“) und darin `target` und `public` setzen:
-
-   ```json
-   "target": "main",
-   "public": "outputs/team-manager",
-   ```
-
-2. Den Test „Haupt-Team läuft auf dem Angular-Build …“ (SCRUM-208) in `tests/project.test.mjs` entfernen bzw.
-   umdrehen. Die Artefakt-Schritte `angular-dist-mein-team` in den Workflows dürfen bleiben (eine PR-Vorschau auf
-   `teamkompass-b8aac` gibt es trotzdem nicht, siehe oben).
-3. `npm run verify`, PR, Merge nach `main` → der Merge-Workflow deployt `outputs/team-manager` live.
-4. Prüfen: `https://teamkompass-b8aac.web.app` neu laden – die alte Oberfläche erscheint.
-
-Service Worker auf den Geräten, Sync-Fehler nach dem Rückweg und die Zusammenfassungen (`teams/mein-team/playerStats`,
-„Neu berechnen“) verhalten sich genau wie oben für die U17 beschrieben.
-
-### U15 (Ziel `u15`) – seit SCRUM-210
-
-Seit SCRUM-210 liefert auch das Hosting-Ziel `u15` (Site `teamkompass-u15`, https://teamkompass-u15.web.app) den
-**Angular-Build der U15** aus (`ng build -c production,u15`, Team-ID `U15`, Ausgabe `angular/dist/team-u15/browser`).
-Daten (`teams/U15/...`), Anmeldungen und Firestore-Regeln bleiben unverändert. Die alte App `outputs/u15/` bleibt im
-Repo, nur für den Rückweg. Damit läuft **keine Alt-App (`outputs/*`) mehr live**.
-
-- `firebase.json`, Eintrag `"target": "u15"`: `"public": "angular/dist/team-u15/browser"`, Header und SPA-Rewrite
-  wie bei `u14`/`u17`/`main`.
-- Merge-Workflow: Artefakt `angular-dist-u15` (Verify-Job) → Deploy-Job → `target: u15`.
-- PR-Vorschau: Für das Ziel `u15` gibt es **keine** Vorschau mehr – weder den U15-Build (echte Daten) noch die
-  frühere Alt-App-Kopie mit Testteam (SCRUM-218). Einzige Vorschau ist der Testteam-Build auf `teamkompass-u14`
-  (Abschnitt 8). Änderungen an `outputs/*` haben damit keine Vorschau mehr; sie betreffen nur noch die Rückweg-Kopien.
-  Alte U15-Vorschaukanäle räumt `firebase-preview-cleanup.yml` weiter auf.
-
-**Rückweg sofort (Notfall):** Firebase Console → Hosting → Site `teamkompass-u15` → Versionsverlauf → letzte Version
-vor der Umstellung → „Zurücksetzen“. Wird beim nächsten Merge nach `main` wieder überschrieben.
-
-**Rückweg dauerhaft (per PR):**
-
-1. In `firebase.json` den Eintrag `"target": "u15"` durch den Hosting-Eintrag der alten App ersetzen (siehe unten)
-   und darin `target` und `public` setzen:
-
-   ```json
-   "target": "u15",
-   "public": "outputs/u15",
-   ```
-
-2. Den Test „Live-Team U15 läuft auf dem Angular-Build …“ (SCRUM-210) in `tests/project.test.mjs` entfernen bzw.
-   umdrehen, ebenso in `tests/preview-guard.test.mjs` die Erwartung „kein Ziel liefert die Alt-App aus“. Die
-   Artefakt-Schritte `angular-dist-u15` im Merge-Workflow dürfen bleiben.
-3. Optional wieder eine Alt-App-Vorschau mit dem Testteam: die Schritte aus `LEGACY_UPLOAD`/`LEGACY_STEPS` in
-   `tests/preview-guard.test.mjs` in den PR-Workflow übernehmen (nie `outputs/u15` direkt, das wären echte Daten).
-4. `npm run verify`, PR, Merge nach `main` → der Merge-Workflow deployt `outputs/u15` live.
-5. Prüfen: `https://teamkompass-u15.web.app` neu laden – die alte Oberfläche erscheint.
-
-Service Worker auf den Geräten, Sync-Fehler nach dem Rückweg und die Zusammenfassungen (`teams/U15/playerStats`,
-„Neu berechnen“) verhalten sich genau wie oben für die U17 beschrieben.
-
-### Hosting-Eintrag der alten App (für alle Rückwege)
-
-Seit SCRUM-210 steht in `firebase.json` kein Eintrag der alten App mehr. Für einen Rückweg diesen Eintrag einsetzen
-und nur `target` (`main`, `u15` oder `u17`) und `public` (`outputs/team-manager`, `outputs/u15` bzw. `outputs/u17`)
-anpassen:
+Diesen Eintrag einsetzen und nur `target` (`main`, `u15` oder `u17`) und `public` (`outputs/team-manager`,
+`outputs/u15` bzw. `outputs/u17`) anpassen:
 
 ```json
 {

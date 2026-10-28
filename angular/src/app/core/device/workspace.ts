@@ -1,7 +1,7 @@
 /**
  * Geräte-Einstellungen („Datenschutz & Nachvollziehbarkeit“): lokale Aufbewahrungsdauer und ein
  * Aktivitätsverlauf, der nur auf diesem Gerät liegt. Gleicher Speicherschlüssel und gleiche Form wie die
- * bisherige App (outputs/team-manager/next-level.js), damit beide Versionen auf demselben Gerät dieselben
+ * bisherige App (Alt-App next-level.js), damit beide Versionen auf demselben Gerät dieselben
  * Werte sehen.
  */
 export const WORKSPACE_KEY = 'teamkompass-workspace-v1';

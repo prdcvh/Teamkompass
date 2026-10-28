@@ -49,7 +49,7 @@ describe('Scout-Sicht (SCRUM-170)', () => {
     expect([...profiles.keys()]).toEqual(['p1', 'p3']);
     const p1 = profiles.get('p1')!;
     expect({ ...p1, entries: undefined }).toEqual({ playerId: 'p1', name: 'Mika', number: 7, positions: ['ZM', 'OM'], birthdate: '2012-03-14', version: 1, entries: undefined });
-    // Gleiche Werte wie tests/scout-profile.test.mjs für outputs/*/app.js erwartet.
+    // Gleiche Werte, wie sie der frühere Test der Alt-App (tests/scout-profile.test.mjs, SCRUM-211 archiviert) erwartete.
     expect(p1.entries).toEqual([
       { eventId: 'e1', date: '2026-10-01', type: 'Training', title: 'Training', attendance: 'present', effort: 1, technique: 2, tactics: 2, comprehension: 2, minutes: null, goals: null, assists: null },
       { eventId: 'e2', date: '2026-10-12', type: 'Spiel', title: 'Liga', attendance: 'present', opponent: 'FC Test', goalsFor: 2, goalsAgainst: 1, matchDuration: 70, effort: 2, technique: 3, tactics: 2, comprehension: 1, minutes: 35, goals: 1, assists: null },

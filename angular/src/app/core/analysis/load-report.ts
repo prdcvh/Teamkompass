@@ -1,6 +1,6 @@
 /**
  * Belastungsprotokoll eines Spielers als druckbarer Bericht (SCRUM-139; PDF über „Drucken → Als PDF speichern“),
- * typischerweise für den Physio. Rechnet wie die Live-Apps (outputs/team-manager/app.js: `buildLoadReport`,
+ * typischerweise für den Physio. Rechnet wie die Live-Apps (Alt-App app.js: `buildLoadReport`,
  * `loadReportHtml`) und baut auf der Belastungsrechnung aus SCRUM-137 ({@link injuryRisk}) auf.
  *
  * - Ohne „Verletzungs- und Befindensdaten einschließen“ enthält der Bericht keine Verletzungen, keine

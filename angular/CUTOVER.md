@@ -1,6 +1,7 @@
 # Angular-Cutover (SCRUM-76)
 
-Stand: 26.10.2026 (zuerst 14.10.2026). Vergleich der Live-App (`outputs/team-manager`, gleich für `u15`/`u17`)
+Stand: 26.10.2026 (zuerst 14.10.2026), Abschluss siehe „Stand SCRUM-211“ unten. Vergleich der damaligen Live-App
+(`outputs/team-manager`, gleich für `u15`/`u17`; seit SCRUM-211 archiviert)
 mit der Angular-Version (`angular/`, Site `teamkompass-u14`). **Kein Umstieg ohne ausdrückliche
 Freigabe des Product Owners.**
 
@@ -108,6 +109,12 @@ keine Alt-App (`outputs/*`) mehr live; die Ordner bleiben nur als Rückweg (`FIR
 (U15-Kopie mit Testteam) entfällt; einzige PR-Vorschau ist der Testteam-Build auf `teamkompass-u14`. Offen:
 - Rückweg einmal üben: SCRUM-209.
 - Alt-App abschalten und aufräumen (Schritt 6): SCRUM-211.
+
+**Stand SCRUM-211 (27.10.2026, gilt ab dem Merge von SCRUM-211):** Schritt 6 ist erledigt (vorgezogen, PO-Freigabe
+vom 27.10.2026, ohne die geplanten vier Wochen und ohne den Rückweg-Test SCRUM-209). Die Alt-App (`outputs/*`) und die
+Root-Referenzkopie sind aus `main` gelöscht und nur noch im Archiv-Commit in der Git-Historie; `CLAUDE.md` beschreibt
+nur noch Angular. Rückweg (früherer Angular-Stand oder Alt-App aus dem Archiv): `FIREBASE_SETUP.md` §11. Verweise auf
+`outputs/…` weiter oben in diesem Dokument beschreiben den damaligen Stand.
 
 **Entscheidungen des PO (15.10.2026):**
 - Angular nutzt direkt die bisherigen Daten, keine Kopie. ✅

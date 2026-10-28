@@ -1,6 +1,6 @@
 /**
  * Automatische Aufstellung: verfügbare Spieler den Zonen einer Formation zuordnen, Vorschau und Vorschlag
- * (wie outputs/team-manager/app.js: assignFormationSlots, formationPreview, renderFormationPicker).
+ * (wie Alt-App app.js: assignFormationSlots, formationPreview, renderFormationPicker).
  * Noten sind Schulnoten: kleiner ist besser.
  */
 import { type Player, parsePositions } from '../player/player';

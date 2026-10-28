@@ -9,7 +9,7 @@ import { docFromPlayer, playerFromDoc } from './player/player';
 import { docFromRating, ratingFromDoc } from './ratings/rating';
 
 /**
- * Datenformat alt ↔ neu (SCRUM-125): Dokumente genau so, wie die bisherige App (outputs/team-manager/app.js, cloudSave*)
+ * Datenformat alt ↔ neu (SCRUM-125): Dokumente genau so, wie die bisherige App (Alt-App app.js, cloudSave*)
  * sie schreibt, gehen durch die Lese- und Schreiblogik der Angular-App. Es dürfen weder Felder verloren gehen noch
  * umbenannt oder in der Bedeutung verändert werden – sonst zeigt die alte App nach einem Rollback falsche Daten.
  * Reine Tests ohne Datenbank; es werden keine echten Daten gelesen oder geschrieben.

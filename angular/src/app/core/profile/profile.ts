@@ -1,6 +1,6 @@
 /**
  * Auswertungen im Spielerprofil: Notenschnitt, Kompetenzprofil, Verfügbarkeit, Spielstatistik und Verlauf.
- * Alle Werte rechnen wie die bisherige App (outputs/team-manager/app.js: playerRatings, playerAverageGrade,
+ * Alle Werte rechnen wie die bisherige App (Alt-App app.js: playerRatings, playerAverageGrade,
  * profileSkillAverages, profileAvailability, playerGameStats, renderAnalyticsCards). Noten sind Schulnoten:
  * kleiner ist besser. Wichtig für die Kernzahlen (siehe CLAUDE.md „wrong core numbers“): Anwesenheits- und
  * Einsatzquote zählen nur Events, die nicht in der Zukunft liegen und deren Anwesenheit schon gesetzt ist (SCRUM-20).

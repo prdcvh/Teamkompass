@@ -1,6 +1,6 @@
 /**
  * Auswertungen über das ganze Team (Start-Dashboard): Bilanz, Teamnote, Bestenliste, nächstes Event, Verfügbarkeit
- * und Belastung. Rechnet wie die bisherige App (outputs/team-manager/app.js: gameResult, teamStats, renderMetrics,
+ * und Belastung. Rechnet wie die bisherige App (Alt-App app.js: gameResult, teamStats, renderMetrics,
  * renderLeaders, nextUpcomingEvent). Noten sind Schulnoten: kleiner ist besser.
  */
 import { type TeamEvent } from '../events/event';
