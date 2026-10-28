@@ -96,31 +96,28 @@
         </div>
       </tk-card>
     } @else if (cards()) {
-      @for (group of groups(); track group.title) {
-        <h2 class="group">{{ group.title }} · {{ group.players.length }}</h2>
-        <tk-card>
-          <ul class="cards">
-            @for (player of group.players; track player.id) {
-              <li>
-                <button
-                  type="button"
-                  class="player-card"
-                  [disabled]="!squad.canWrite()"
-                  [attr.aria-label]="squad.canWrite() ? 'Spieler bearbeiten: ' + player.name : null"
-                  (click)="openEdit(player)"
-                >
-                  <span class="number">{{ player.number }}</span>
-                  <span class="who">
-                    <strong>{{ player.name }}</strong>
-                    <small>{{ positionText(player) }} · {{ age(player) }} J.@if (injuryNote(player); as note) { · {{ note }}}</small>
-                  </span>
-                  <tk-status [label]="statusOf(player)" />
-                </button>
-              </li>
-            }
-          </ul>
-        </tk-card>
-      }
+      <tk-card>
+        <ul class="cards">
+          @for (player of visible(); track player.id) {
+            <li>
+              <button
+                type="button"
+                class="player-card"
+                [disabled]="!squad.canWrite()"
+                [attr.aria-label]="squad.canWrite() ? 'Spieler bearbeiten: ' + player.name : null"
+                (click)="openEdit(player)"
+              >
+                <span class="number">{{ player.number }}</span>
+                <span class="who">
+                  <strong>{{ player.name }}</strong>
+                  <small>{{ positionText(player) }} · {{ age(player) }} J.@if (injuryNote(player); as note) { · {{ note }}}</small>
+                </span>
+                <tk-status [label]="statusOf(player)" />
+              </button>
+            </li>
+          }
+        </ul>
+      </tk-card>
     } @else {
       <tk-card>
         <div class="table-wrap">
