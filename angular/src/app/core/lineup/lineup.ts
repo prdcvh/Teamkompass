@@ -125,8 +125,8 @@ export function normalizeEventLineups(raw: unknown, playerIds?: ReadonlySet<stri
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return result;
   for (const [eventId, entry] of Object.entries(raw)) {
     const assignments = normalizeLineup(entry, playerIds);
-    const raw = (entry as { savedAt?: unknown } | null)?.savedAt;
-    const savedAt = typeof raw === 'string' ? raw : '';
+    const rawSavedAt = (entry as { savedAt?: unknown } | null)?.savedAt;
+    const savedAt = typeof rawSavedAt === 'string' ? rawSavedAt : '';
     if (lineupIsEmpty(assignments) && !savedAt) continue;
     result[eventId] = { assignments, savedAt };
   }
