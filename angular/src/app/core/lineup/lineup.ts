@@ -115,17 +115,20 @@ export interface EventLineup {
 export type EventLineups = Readonly<Record<string, EventLineup>>;
 
 /**
- * `byEvent` des Dokuments → Aufstellungen je Spiel (wie normalizeEventLineups der Live-App): Einträge ohne Spieler
- * entfallen, unbekannte Zonen/Spieler (bei bekanntem Kader) fallen weg.
+ * `byEvent` des Dokuments → Aufstellungen je Spiel (wie normalizeEventLineups der Live-App): unbekannte Zonen/Spieler
+ * (bei bekanntem Kader) fallen weg. Ein Eintrag ohne Spieler bleibt erhalten, wenn er ein `savedAt` hat: Der Trainer hat
+ * das Feld bewusst geleert (SCRUM-219) – das Spiel zeigt dann ein leeres Feld statt der allgemeinen Startelf. Ohne Spieler
+ * UND ohne `savedAt` (Altbestand) entfällt der Eintrag.
  */
 export function normalizeEventLineups(raw: unknown, playerIds?: ReadonlySet<string>): EventLineups {
   const result: Record<string, EventLineup> = {};
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return result;
   for (const [eventId, entry] of Object.entries(raw)) {
     const assignments = normalizeLineup(entry, playerIds);
-    if (lineupIsEmpty(assignments)) continue;
-    const savedAt = (entry as { savedAt?: unknown } | null)?.savedAt;
-    result[eventId] = { assignments, savedAt: typeof savedAt === 'string' ? savedAt : '' };
+    const raw = (entry as { savedAt?: unknown } | null)?.savedAt;
+    const savedAt = typeof raw === 'string' ? raw : '';
+    if (lineupIsEmpty(assignments) && !savedAt) continue;
+    result[eventId] = { assignments, savedAt };
   }
   return result;
 }
@@ -140,12 +143,15 @@ export function nextGame(events: readonly TeamEvent[], today: string): TeamEvent
   return [...events].filter((event) => event.type === 'Spiel' && event.date >= today).sort((a, b) => a.date.localeCompare(b.date))[0] ?? null;
 }
 
-/** Letztes Spiel vor dem Ziel-Spiel (ohne Ziel: vor heute), für das eine Aufstellung gespeichert ist. */
+/**
+ * Letztes Spiel vor dem Ziel-Spiel (ohne Ziel: vor heute), für das eine Aufstellung gespeichert ist. Bewusst geleerte
+ * Aufstellungen (SCRUM-219) werden übersprungen – es gibt nichts zu übernehmen.
+ */
 export function previousGameWithLineup(events: readonly TeamEvent[], lineups: EventLineups, target: TeamEvent | null, today: string): TeamEvent | null {
   const before = target?.date ?? today;
   return (
     [...events]
-      .filter((event) => event.type === 'Spiel' && event.id !== target?.id && event.date < before && lineups[event.id])
+      .filter((event) => event.type === 'Spiel' && event.id !== target?.id && event.date < before && lineups[event.id] && !lineupIsEmpty(lineups[event.id].assignments))
       .sort((a, b) => b.date.localeCompare(a.date))[0] ?? null
   );
 }
