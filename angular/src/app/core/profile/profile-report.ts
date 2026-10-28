@@ -28,7 +28,11 @@ export interface ProfileReportInput {
   readonly today: string;
 }
 
-const STYLE = `
+/**
+ * Gestaltung des Berichts. Steht nicht als Style-Element im HTML, sondern wird beim Drucken per CSSOM gesetzt
+ * (`FileOutput.print`), damit die CSP ohne `style-src 'unsafe-inline'` auskommt (SCRUM-119/121).
+ */
+export const PROFILE_REPORT_CSS = `
   body { margin: 32px; color: #241d1f; font-family: Arial, Helvetica, sans-serif; }
   header { border-bottom: 4px solid #d8072e; padding-bottom: 18px; }
   h1 { margin: 0 0 6px; font-size: 30px; }
@@ -73,7 +77,6 @@ export function profileReportHtml(input: ProfileReportInput): string {
 <head>
 <meta charset="utf-8" />
 <title>Spielerprofil ${escapeHtml(player.name)}</title>
-<style>${STYLE}</style>
 </head>
 <body>
 <header>

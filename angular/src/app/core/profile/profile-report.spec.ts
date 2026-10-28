@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { type TeamEvent } from '../events/event';
 import type { Player } from '../player/player';
-import { escapeHtml, profileReportHtml } from './profile-report';
+import { PROFILE_REPORT_CSS, escapeHtml, profileReportHtml } from './profile-report';
 import { BLANK_RATING } from '../ratings/rating';
 
 const player: Player = {
@@ -42,6 +42,11 @@ describe('profileReportHtml', () => {
     expect(html).toContain('<span>Tore + Vorlagen</span><strong>1 + 0</strong>');
     expect(html).toContain('Einsatz');
     expect(html).toContain('01.10.2026');
+  });
+
+  it('enthält keine Inline-Styles; die Gestaltung kommt getrennt per CSSOM (SCRUM-119/121)', () => {
+    expect(html).not.toMatch(/<style|style=/i);
+    expect(PROFILE_REPORT_CSS).toContain('body {');
   });
 
   it('meldet fehlende Bewertungen', () => {

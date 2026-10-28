@@ -7,7 +7,7 @@ import type { Absence } from '../records/absence';
 import type { Measurement } from '../records/measurement';
 import { addDays } from '../shared/dates';
 import { type LoadReportInput, buildLoadReport, canCreateLoadReport, loadReportRange } from './load-report';
-import { loadReportHtml } from './load-report-html';
+import { LOAD_REPORT_CSS, loadReportHtml } from './load-report-html';
 
 const TODAY = '2026-10-20';
 const ago = (days: number) => addDays(TODAY, -days);
@@ -90,6 +90,12 @@ describe('buildLoadReport', () => {
     expect(html).toContain('Keine Termine im Zeitraum.');
     expect(html).toContain('Keine Belastung im Zeitraum eingetragen.');
     expect(html).not.toMatch(/undefined|NaN/);
+  });
+
+  it('enthält keine Inline-Styles; die Gestaltung kommt getrennt per CSSOM (SCRUM-119/121)', () => {
+    const html = loadReportHtml(build({ items: [item('e1', 3)] }));
+    expect(html).not.toMatch(/<style|style=/i);
+    expect(LOAD_REPORT_CSS).toContain('body {');
   });
 
   it('lässt ohne Häkchen Verletzungen, Abwesenheitsgründe und Verfügbarkeit weg', () => {
