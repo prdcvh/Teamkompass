@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'firestore.rules'
+      - 'firestore.indexes.json'
       - 'firebase.json'
   workflow_dispatch: {}
 
@@ -20,7 +21,8 @@ jobs:
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TEAMKOMPASS_B8AAC }}
         run: printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-sa.json"
-      - name: Deploy Firestore rules
-        run: npx firebase-tools deploy --only firestore:rules --project teamkompass-b8aac
+      # Bewusst ohne Force-Schalter: Indizes, die nur in der Konsole existieren, werden nicht gelöscht (nur ein Hinweis im Log).
+      - name: Deploy Firestore rules and indexes
+        run: npx firebase-tools deploy --only firestore:rules,firestore:indexes --project teamkompass-b8aac
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-sa.json
