@@ -492,13 +492,19 @@ test("Angular 22: alle Angular-Pakete auf derselben Hauptversion, passendes Type
   assert.match(deps.typescript, /^~6\.0\./);
   assert.equal(pkg.engines?.node, "^22.22.3 || ^24.15.0 || >=26.0.0");
 
-  // Jeder setup-node-Schritt holt das neueste Node 22.x statt einer älteren Version aus dem Runner-Cache.
+  // Jeder Workflow, der die Angular-App installiert, holt das neueste Node 22.x statt einer älteren Version aus dem Runner-Cache.
+  const angularWorkflows = [];
   for (const file of await readdir(new URL("../.github/workflows/", import.meta.url))) {
     const workflow = await read(`.github/workflows/${file}`);
-    for (const step of workflow.split(/- uses: actions\/setup-node@/).slice(1)) {
+    if (!/--prefix angular\b/.test(workflow)) continue;
+    angularWorkflows.push(file);
+    const steps = workflow.split(/- uses: actions\/setup-node@/).slice(1);
+    assert.ok(steps.length > 0, `${file}: kein setup-node-Schritt`);
+    for (const step of steps) {
       const block = step.split(/\n\s*- /)[0];
       assert.match(block, /node-version: 22\b/, `${file}: Node-Version`);
       assert.match(block, /check-latest: true/, `${file}: check-latest fehlt`);
     }
   }
+  assert.deepEqual(angularWorkflows.sort(), ["firebase-hosting-merge.yml", "firebase-hosting-pull-request.yml", "quality.yml"]);
 });
