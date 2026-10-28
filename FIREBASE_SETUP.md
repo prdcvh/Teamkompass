@@ -278,6 +278,27 @@ beim **nächsten Merge nach `main`** wieder überschrieben – deshalb immer auc
 `npm run verify`, Merge nach `main` → der Merge-Workflow baut und deployt den früheren Angular-Stand auf alle
 Ziele.
 
+#### Geübt am 27.10.2026 (SCRUM-209)
+
+Der „Sofort“-Rückweg wurde einmal beim **Haupt-Team** (Site `teamkompass-b8aac`, echte Daten) ausprobiert:
+In der Firebase Console im Release-Verlauf auf die **direkt vorherige** Version zurückgesetzt, danach wieder
+auf die **neueste**. Ergebnis laut PO: alles hat funktioniert. Auf dem Handy blieb die Anmeldung nach beiden
+Schritten erhalten, alle Daten waren vorhanden, keine Auffälligkeiten.
+
+Praktische Hinweise:
+
+- Einen ruhigen Zeitpunkt wählen (kein Training, kein Spiel): Für ein paar Minuten sehen alle Nutzer des Teams
+  die vorige App-Version.
+- Nur auf Releases **nach der Angular-Umstellung** des jeweiligen Ziels zurücksetzen, sonst kommt eine
+  Alt-App-Version zurück. Haupt-Team (`teamkompass-b8aac`): nichts vor dem 27.10.2026, 01:08 Uhr (SCRUM-208).
+  U17 (`teamkompass-u17`): Angular seit dem Merge vom 24.10.2026 (SCRUM-169, #241). U15 (`teamkompass-u15`):
+  Angular seit dem Merge vom 27.10.2026, 13:24 Uhr (SCRUM-210, #260). Im Zweifel die Release-Zeitpunkte in
+  der Konsole mit diesen Merge-Zeiten vergleichen.
+- „Zurücksetzen“ tauscht nur die ausgelieferte App aus. Die Daten in der Datenbank, die Anmeldungen und die
+  Firestore-Regeln bleiben unberührt.
+- Danach wieder auf die neueste Version setzen, sonst bleibt der alte Stand bis zum nächsten Merge nach `main`
+  stehen.
+
 ### Rückweg auf die archivierte Alt-App (SCRUM-211)
 
 Die Alt-App (`outputs/team-manager` = Haupt-Team, `outputs/u15`, `outputs/u17`, dazu die Root-Kopie) ist seit
