@@ -29,6 +29,19 @@ export function isSeriesEvent(eventId: string): boolean {
   return parseSeriesEventId(eventId) !== null;
 }
 
+/**
+ * Rückfrage beim Löschen eines Termins (SCRUM-222): `plain` = normaler Termin, nur die übliche Bestätigung;
+ * `series` = Termin einer Trainingsserie, der Trainer wählt „nur diesen“ oder „alle Termine der Serie“.
+ * „Alle“ gibt es nur, wenn die Serie in der Planung noch existiert (sonst gibt es nichts, was sich löschen ließe).
+ */
+export type DeleteChoice = { readonly kind: 'plain' } | { readonly kind: 'series'; readonly seriesId: string; readonly allAvailable: boolean };
+
+export function deleteChoice(eventId: string, existingSeriesIds: readonly string[], planningReady: boolean): DeleteChoice {
+  const parsed = parseSeriesEventId(eventId);
+  if (!parsed) return { kind: 'plain' };
+  return { kind: 'series', seriesId: parsed.seriesId, allAvailable: planningReady && existingSeriesIds.includes(parsed.seriesId) };
+}
+
 /** Gelöschte Serien-Termine je Serie, aus dem Planungsdokument (`skipped`); Unbrauchbares wird ignoriert. */
 export type SkippedDates = ReadonlyMap<string, ReadonlySet<string>>;
 
