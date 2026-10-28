@@ -16,6 +16,8 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
+          # SCRUM-165: Angular CLI 22 braucht Node >= 22.22.3 – immer das neueste 22.x holen, nicht ein älteres aus dem Runner-Cache.
+          check-latest: true
       - run: npm ci --prefix angular
       # Browser für den Test „kein seitliches Scrollen“ (tests/responsive.test.mjs, SCRUM-134); ohne ihn würde der Test übersprungen.
       - run: npm install --no-save --no-package-lock --prefix angular playwright@1.56.1

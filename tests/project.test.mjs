@@ -481,3 +481,24 @@ test("Alt-App ist archiviert: kein Code, kein Build und kein Hosting-Ziel mehr, 
   assert.match(setup, new RegExp(`git checkout ${archive[1]} -- outputs/`), "Befehl zum Zurückholen fehlt");
   assert.match(setup, /https:\/\/www\.gstatic\.com\/firebasejs\/10\.12\.5\//, "Hosting-Eintrag der Alt-App fehlt");
 });
+
+test("Angular 22: alle Angular-Pakete auf derselben Hauptversion, passendes TypeScript, CI mit Node >= 22.22.3 (SCRUM-165)", async () => {
+  const pkg = JSON.parse(await read("angular/package.json"));
+  const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+  const angular = Object.entries(deps).filter(([name]) => name.startsWith("@angular/") || name === "angular-eslint");
+  assert.ok(angular.length > 0);
+  for (const [name, range] of angular) assert.match(range, /^\^?22\./, `${name} ist nicht auf Angular 22`);
+  // Angular 22 unterstützt nur TypeScript >= 6.0 < 6.1 (kein TypeScript 7).
+  assert.match(deps.typescript, /^~6\.0\./);
+  assert.equal(pkg.engines?.node, "^22.22.3 || ^24.15.0 || >=26.0.0");
+
+  // Jeder setup-node-Schritt holt das neueste Node 22.x statt einer älteren Version aus dem Runner-Cache.
+  for (const file of await readdir(new URL("../.github/workflows/", import.meta.url))) {
+    const workflow = await read(`.github/workflows/${file}`);
+    for (const step of workflow.split(/- uses: actions\/setup-node@/).slice(1)) {
+      const block = step.split(/\n\s*- /)[0];
+      assert.match(block, /node-version: 22\b/, `${file}: Node-Version`);
+      assert.match(block, /check-latest: true/, `${file}: check-latest fehlt`);
+    }
+  }
+});
