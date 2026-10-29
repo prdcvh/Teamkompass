@@ -84,7 +84,52 @@ describe('Teamanalyse', () => {
     expect(stats.record).toEqual({ wins: 1, draws: 0, losses: 0, goalsFor: 3, goalsAgainst: 1 });
     expect(stats.avgGrade).toBe(2.5); // e1: 3, e3: 2 → Mittel 2,5
     expect(stats.attendanceRate).toBe(75); // present, limited, absent, present = 3 von 4; excluded zählt nicht
-    expect(stats.avgIntensity).toBe(5);
+    expect(stats.avgIntensity).toBe(6); // e1: 7, e3: 5; das kommende e2 zählt nicht
+  });
+
+  it('Kennzahlen: kommende Events (vorbelegtes „Fehlt“, Intensität, Noten) ändern nichts', () => {
+    const past = [
+      event('p1', { date: '2026-10-01', exertion: 4 }),
+      event('p2', { type: 'Spiel', date: '2026-10-03', exertion: 6, goalsFor: 2, goalsAgainst: 2 }),
+    ];
+    const pastRatings = {
+      p1: { a: rating(2), b: rating(3, { attendance: 'absent' }) },
+      p2: { a: rating(3, { attendance: 'limited' }), b: rating(2) },
+    };
+    const before = teamStats(past, ratings(pastRatings), '2026-10-05');
+    expect(before).toMatchObject({ avgIntensity: 5, attendanceRate: 75, avgGrade: 2.3 }); // Noten: p1 2, p2 2,5
+
+    const future = [
+      event('f1', { date: '2026-10-06', exertion: 10 }),
+      event('f2', { type: 'Spiel', date: '2026-12-24', exertion: 1 }),
+    ];
+    const withFuture = ratings({
+      ...pastRatings,
+      // Verletzter Spieler: „Fehlt“ automatisch für kommende Termine vorbelegt; dazu eine (versehentliche) Note.
+      f1: { a: rating(6, { attendance: 'absent' }), b: rating(6, { attendance: 'absent' }) },
+      f2: { a: rating(1, { attendance: 'absent' }), b: rating(5) },
+    });
+    const after = teamStats([...past, ...future], withFuture, '2026-10-05');
+    expect(after.avgIntensity).toBe(before.avgIntensity);
+    expect(after.attendanceRate).toBe(before.attendanceRate);
+    expect(after.avgGrade).toBe(before.avgGrade);
+    expect(after.record).toEqual(before.record);
+  });
+
+  it('Kennzahlen: ein Event von heute zählt mit, eines von morgen nicht', () => {
+    const events = [event('heute', { date: '2026-10-05', exertion: 8 }), event('morgen', { date: '2026-10-06', exertion: 2 })];
+    const byEvent = ratings({ heute: { a: rating(2) }, morgen: { a: rating(2, { attendance: 'absent' }) } });
+    const stats = teamStats(events, byEvent, '2026-10-05');
+    expect(stats.avgIntensity).toBe(8);
+    expect(stats.attendanceRate).toBe(100);
+    // Am nächsten Tag zählt das Event von gestern („morgen“) mit.
+    expect(teamStats(events, byEvent, '2026-10-06')).toMatchObject({ avgIntensity: 5, attendanceRate: 50 });
+  });
+
+  it('Teilnahmequote: „Offen“ (noch nicht gesetzt) verwässert die Quote nicht', () => {
+    const events = [event('e1', { date: '2026-10-01' })];
+    const byEvent = ratings({ e1: { a: rating(2), b: { ...BLANK_RATING, attendance: 'open' } } });
+    expect(teamStats(events, byEvent, '2026-10-05').attendanceRate).toBe(100);
   });
 
   it('Kennzahlen ohne Daten', () => {
