@@ -3,7 +3,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { LayoutService, injectNarrowViewport } from '../../core/shell/layout.service';
 import { ageFromBirthdate, formatDate } from '../../core/shared/dates';
 import { CONSENT_LABELS, type Player, STANDARD_POSITIONS, positionText } from '../../core/player/player';
-import { SORT_OPTIONS, SQUAD_STATUSES, type SortKey, type StatusOf, filterPlayers, groupByLine, sortPlayers, statusCounts } from '../../core/player/squad-list';
+import { SORT_OPTIONS, SQUAD_STATUSES, type SortKey, type StatusOf, filterPlayers, sortPlayers, statusCounts } from '../../core/player/squad-list';
 import { SquadService } from '../../core/player/squad.service';
 import { activeAbsenceOn } from '../../core/records/absence';
 import { type EffectiveStatus, effectiveStatus } from '../../core/records/availability';
@@ -69,7 +69,6 @@ export class Squad implements OnInit {
   protected readonly visible = computed(() =>
     sortPlayers(filterPlayers(this.squad.players(), { query: this.query(), position: this.position(), status: this.status() }, this.statusOf), this.sort(), this.statusOf),
   );
-  protected readonly groups = computed(() => groupByLine(this.visible()));
   protected readonly counts = computed(() => statusCounts(this.squad.players(), this.statusOf));
   /** Zähler: die vier festen immer, „Abwesend“ und „Gesperrt“ nur, wenn es solche Spieler gibt. */
   protected readonly metrics = computed(() => {

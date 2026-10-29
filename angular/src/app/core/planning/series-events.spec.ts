@@ -7,6 +7,7 @@ import { FakeFirebase, provideFakeFirebase } from '../testing/fake-firebase';
 import { type SeriesDraft, type TrainingSeries, emptySeriesDraft, seriesFromDraft } from './planning';
 import { PlanningService } from './planning.service';
 import {
+  deleteChoice,
   eventFromSeries,
   isSeriesEvent,
   parseSeriesEventId,
@@ -289,5 +290,16 @@ describe('PlanningService: Serien-Trainings anlegen', () => {
     await vi.waitFor(() => expect(planning.run().state).toBe('error'));
     expect(planning.run().text).toContain('konnten nicht geladen werden');
     expect(batches()).toEqual([]);
+  });
+});
+
+describe('deleteChoice (SCRUM-222)', () => {
+  it('Termin ohne Serie: normale Bestätigung', () => {
+    expect(deleteChoice('e123', ['s1'], true)).toEqual({ kind: 'plain' });
+  });
+  it('Serien-Termin: Auswahl; „Alle“ nur bei geladener Planung und bestehender Serie', () => {
+    expect(deleteChoice('serie-s1-2026-11-03', ['s1'], true)).toEqual({ kind: 'series', seriesId: 's1', allAvailable: true });
+    expect(deleteChoice('serie-s1-2026-11-03', ['s1'], false)).toMatchObject({ kind: 'series', allAvailable: false });
+    expect(deleteChoice('serie-s1-2026-11-03', ['s2'], true)).toMatchObject({ kind: 'series', allAvailable: false });
   });
 });

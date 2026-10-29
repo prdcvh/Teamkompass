@@ -92,6 +92,21 @@ in `core/` abzulegen.
 `animation`, die eine Keyframe-Animation aus einer anderen Datei nutzt, läuft dann ins Leere. Name und
 Zuweisung gehören in dieselbe Datei (siehe `pages/login/login-motion.css`).
 
+## Firebase-SDK: gebündelt, kein CDN (SCRUM-118, SCRUM-120)
+
+Das Firebase-SDK kommt ausschließlich über npm (`firebase` in `package.json`) und wird vom Build in die
+eigenen JS-Dateien gebündelt. Die App lädt **kein** Skript von `gstatic.com` oder einem anderen fremden Host;
+die Content-Security-Policy in `firebase.json` hat deshalb für alle Hosting-Ziele `script-src 'self'`
+(`connect-src` für Firestore/Auth bleibt unverändert). Die Anmeldung nutzt nur E-Mail/Passwort und den
+Code-Login (kein Popup/Redirect, kein reCAPTCHA); die entsprechenden Fremd-URLs (`apis.google.com`,
+`www.google.com/recaptcha`) stehen nur als ungenutzter Code im SDK. Einzige geplante Ausnahme ist App Check
+(SCRUM-181, aktuell aus): beim Einschalten muss `script-src` bewusst erweitert werden (`FIREBASE_SETUP.md`).
+
+**Neue SDK-Version einspielen:** in `angular/` `npm install firebase@<version>` (bzw. `npm update firebase`),
+danach im Repo-Root `npm run verify` und PR wie gewohnt; die Dateien liegen nicht im Repo, es gibt nichts
+von Hand zu kopieren und keine Versionsnummer in einer CDN-URL. Ein Test in `tests/project.test.mjs` stellt sicher,
+dass `script-src` überall nur `'self'` ist und kein `gstatic`-Import im Angular-Code steht.
+
 ## Abhängigkeiten und `npm audit` (SCRUM-56)
 
 Stand 2026-10-06: `piscina` (kritisch, Build-Tooling über `@angular/build`) und `http-cache-semantics`

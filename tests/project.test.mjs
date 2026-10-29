@@ -46,6 +46,31 @@ test("CSP erlaubt nur eigene Skripte und die benoetigten Google- und Wetter-Dien
   }
 });
 
+test("Kein Skript von fremden Hosts: kein CDN-Import im Angular-Code, SDK nur ueber npm (SCRUM-118, SCRUM-120)", async () => {
+  const { readdir: ls, readFile: rf } = await import("node:fs/promises");
+  const walk = async (dir) => {
+    const out = [];
+    for (const entry of await ls(new URL(`../${dir}/`, import.meta.url), { withFileTypes: true })) {
+      const path = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) out.push(...(await walk(path)));
+      else if (/\.(ts|html|js|mjs|json)$/.test(entry.name)) out.push(path);
+    }
+    return out;
+  };
+  for (const file of await walk("angular/src")) {
+    const text = await rf(new URL(`../${file}`, import.meta.url), "utf8");
+    assert.doesNotMatch(text, /gstatic\.com\/firebasejs|https?:\/\/[^\s"'`]*\.js["'`)]/, `${file}: laedt Skript/SDK von einem fremden Host`);
+    assert.doesNotMatch(text, /<script[^>]+src=["']https?:/i, `${file}: <script> von fremdem Host`);
+  }
+  const pkg = JSON.parse(await read("angular/package.json"));
+  assert.ok(pkg.dependencies.firebase, "Firebase-SDK muss ueber npm kommen");
+  const config = JSON.parse(await read("firebase.json"));
+  for (const target of config.hosting) {
+    const csp = target.headers.flatMap((entry) => entry.headers).find((entry) => entry.key === "Content-Security-Policy").value;
+    assert.doesNotMatch(csp, /gstatic/, `${target.target}: gstatic in der CSP`);
+  }
+});
+
 test("Angular-Target u14: Output, SPA-Rewrite, Caching, CSP und Deploy-Schritt", async () => {
   const config = JSON.parse(await read("firebase.json"));
   const target = config.hosting.find((entry) => entry.target === "u14");
@@ -488,4 +513,29 @@ test("Alt-App ist archiviert: kein Code, kein Build und kein Hosting-Ziel mehr, 
   assert.ok(archive, "FIREBASE_SETUP.md nennt den Archiv-Commit nicht");
   assert.match(setup, new RegExp(`git checkout ${archive[1]} -- outputs/`), "Befehl zum Zurückholen fehlt");
   assert.match(setup, /https:\/\/www\.gstatic\.com\/firebasejs\/10\.12\.5\//, "Hosting-Eintrag der Alt-App fehlt");
+});
+
+test("Firestore-Index: members.uid als Collection-Group-Override, in firebase.json und im Deploy-Workflow (SCRUM-225)", async () => {
+  const indexes = JSON.parse(await read("firestore.indexes.json"));
+  const override = indexes.fieldOverrides.find((entry) => entry.collectionGroup === "members" && entry.fieldPath === "uid");
+  assert.ok(override, "Override fuer members.uid fehlt");
+  assert.ok(
+    override.indexes.some((index) => index.queryScope === "COLLECTION_GROUP" && index.order === "ASCENDING"),
+    "COLLECTION_GROUP ASC fehlt (Teamsuche per collectionGroup('members') + where('uid'))",
+  );
+  // Standard-Einzelfeldindizes des Feldes muessen bleiben, sonst brechen die Abfragen je Team.
+  for (const expected of [{ order: "ASCENDING" }, { order: "DESCENDING" }, { arrayConfig: "CONTAINS" }]) {
+    assert.ok(
+      override.indexes.some((index) => index.queryScope === "COLLECTION" && Object.entries(expected).every(([key, value]) => index[key] === value)),
+      `Standardindex ${JSON.stringify(expected)} (COLLECTION) fehlt`,
+    );
+  }
+  const config = JSON.parse(await read("firebase.json"));
+  assert.equal(config.firestore.indexes, "firestore.indexes.json");
+  const workflow = await read(".github/workflows/firestore-rules-deploy.yml");
+  assert.match(workflow, /paths:[\s\S]*'firestore\.indexes\.json'/);
+  assert.match(workflow, /deploy --only firestore:rules,firestore:indexes /);
+  assert.doesNotMatch(workflow, /--force/, "--force wuerde Konsolen-Indizes loeschen");
+  const api = await read("angular/src/app/core/firebase/teams.api.ts");
+  assert.match(api, /collectionGroup\(db, 'members'\), where\('uid'/);
 });
