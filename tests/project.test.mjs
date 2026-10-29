@@ -46,6 +46,31 @@ test("CSP erlaubt nur eigene Skripte und die benoetigten Google- und Wetter-Dien
   }
 });
 
+test("Kein Skript von fremden Hosts: kein CDN-Import im Angular-Code, SDK nur ueber npm (SCRUM-118, SCRUM-120)", async () => {
+  const { readdir: ls, readFile: rf } = await import("node:fs/promises");
+  const walk = async (dir) => {
+    const out = [];
+    for (const entry of await ls(new URL(`../${dir}/`, import.meta.url), { withFileTypes: true })) {
+      const path = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) out.push(...(await walk(path)));
+      else if (/\.(ts|html|js|mjs|json)$/.test(entry.name)) out.push(path);
+    }
+    return out;
+  };
+  for (const file of await walk("angular/src")) {
+    const text = await rf(new URL(`../${file}`, import.meta.url), "utf8");
+    assert.doesNotMatch(text, /gstatic\.com\/firebasejs|https?:\/\/[^\s"'`]*\.js["'`)]/, `${file}: laedt Skript/SDK von einem fremden Host`);
+    assert.doesNotMatch(text, /<script[^>]+src=["']https?:/i, `${file}: <script> von fremdem Host`);
+  }
+  const pkg = JSON.parse(await read("angular/package.json"));
+  assert.ok(pkg.dependencies.firebase, "Firebase-SDK muss ueber npm kommen");
+  const config = JSON.parse(await read("firebase.json"));
+  for (const target of config.hosting) {
+    const csp = target.headers.flatMap((entry) => entry.headers).find((entry) => entry.key === "Content-Security-Policy").value;
+    assert.doesNotMatch(csp, /gstatic/, `${target.target}: gstatic in der CSP`);
+  }
+});
+
 test("Angular-Target u14: Output, SPA-Rewrite, Caching, CSP und Deploy-Schritt", async () => {
   const config = JSON.parse(await read("firebase.json"));
   const target = config.hosting.find((entry) => entry.target === "u14");
