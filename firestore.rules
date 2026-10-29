@@ -1,12 +1,26 @@
 rules_version = '2';
 
-// Datenmodell: teams/{teamId}/{meta,members,invites,players,events,opponents}
+// Datenmodell:
+// - teams/{teamId}/{meta,members,invites,players,events,opponents,scoutProfiles,playerStats,notifications}
+// - clubs/{clubId}/admins und clubInvites/{code} fuer Vereine und Registrierung (siehe unten)
 // Siehe README/FIREBASE_SETUP.md fuer den Hintergrund. Kernidee:
-// - "members/{uid}" verknuepft eine angemeldete Firebase-Auth-Identitaet mit einer
-//   Rolle ("trainer" oder "player") und - fuer Spieler - der eigenen playerId.
-// - Ein Trainer darf alles lesen/schreiben. Ein Spieler darf nur sein eigenes
-//   Spielerprofil, seinen eigenen Foerderplan und seine eigenen Bewertungen lesen -
-//   nie die Daten anderer Spieler.
+// - "teams/{teamId}/members/{uid}" verknuepft eine angemeldete Firebase-Auth-Identitaet mit einer
+//   Rolle und - fuer Spieler und Eltern - der eigenen playerId. Es gibt diese Team-Rollen:
+//   - "trainer": darf im Team alles lesen/schreiben (Spieler, Termine, Bewertungen, Gegner, Aufstellung,
+//     Planung, Zugaenge und Einladungen). Mehrere Trainer-Konten (auch Co-Trainer) haben dieselbe Rolle.
+//   - "player" (Spieler) und "parent" (Eltern): sehen nur den eigenen Spieler (Profil, Foerderplan,
+//     Bewertungen, Abwesenheiten, Messwerte, eigene Zu-/Absagen), nie die Daten anderer Spieler. Dazu
+//     lesen sie Termine und die Pausen/die MVP-Rangliste des Teams. Nur der Spieler (nicht die Eltern)
+//     darf seine Selbsteinschaetzung im Foerderplan schreiben.
+//   - "physio" (Medizin-Zugang): liest Spielerliste, Status, Abwesenheiten/Verletzungen, Messwerte und
+//     Termine, keine Noten.
+//   - "scout" (Scout-Zugang): liest nur die bereinigte Scout-Sicht (scoutProfiles), keine
+//     Gesundheitsdaten. "medical" ist die alte Kennung dafuer und gilt weiter als "scout".
+//   Zugaenge koennen ein Ablaufdatum (expiresAt) haben; danach gilt das Mitglied als nicht vorhanden.
+// - Ausserhalb der Teams: Vereinsadmins ("clubs/{clubId}/admins/{uid}") verwalten nur Verein, Teams und
+//   Beitrittscodes und sehen keine Spielerdaten. Wer sich neu registriert, braucht einen Einladungscode
+//   in "clubInvites" (Vereins- oder Beitrittscode); Spieler und Eltern treten mit einem Code aus
+//   "teams/{teamId}/invites" bei. Details in den Abschnitten unten.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -307,7 +321,8 @@ service cloud.firestore {
         // Zwei erlaubte Wege, ein members/{uid}-Dokument anzulegen:
         // 1. Ein bereits bestehender Trainer legt (in der App, ueber eine zweite,
         //    temporaere Firebase-App-Instanz fuer den neuen Auth-User - siehe
-        //    createTrainerAccount() in app.js) ein weiteres Trainer-Konto an. Die neue
+        //    createStaffAccount() in angular/src/app/core/firebase/access.api.ts) ein weiteres Konto
+        //    (Trainer, Scout oder Medizin) an. Die neue
         //    UID gehoert dabei nicht dem aufrufenden Trainer, deshalb kein
         //    "request.auth.uid == uid" in diesem Zweig. Das allererste Trainer-Konto
         //    braucht weiterhin einen manuellen Bootstrap-Schritt in der Firebase-Konsole
@@ -336,7 +351,7 @@ service cloud.firestore {
             && request.resource.data.createdAt == request.time
             // Einmalverbrauch (SCRUM-77): Die Mitgliedschaft darf nur angelegt werden, wenn
             // derselbe Schreibvorgang (Batch) den Einladungscode loescht. Beide Clients
-            // (outputs/*/app.js, angular firebase.service.ts) schreiben so. Ein zweiter
+            // (claimInvite() in angular/src/app/core/firebase/access.api.ts) schreibt so. Ein zweiter
             // Versuch mit demselben Code scheitert, weil der Code dann nicht mehr existiert.
             && !existsAfter(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode))
             && get(/databases/$(database)/documents/teams/$(teamId)/invites/$(request.resource.data.claimedInviteCode)).data.playerId == request.resource.data.playerId
@@ -494,7 +509,7 @@ service cloud.firestore {
       }
 
       // Scout-Sicht (SCRUM-170): je Spieler ein Dokument, das ausschliesslich der Trainer-Client schreibt
-      // (buildScoutProfiles in outputs/*/app.js, scout-profile.ts in angular/). Enthaelt Name, Nummer,
+      // (scout-profile.ts in angular/src/app/core/scout/). Enthaelt Name, Nummer,
       // Positionen, Geburtsdatum und je Termin nur Datum/Art/Titel/Gegner/Ergebnis, Anwesenheit ohne Grund,
       // Teilnoten, Minuten, Tore und Vorlagen - keine Rueckmeldungen, Notizen, Status oder Gesundheitsdaten.
       // hasOnly sichert ab, dass kein weiteres Feld (z.B. "status" oder "injuryUntil") hineinrutscht.
@@ -582,8 +597,8 @@ service cloud.firestore {
         allow delete: if isTrainer() && request.auth.uid == uid;
       }
 
-      // Altes Einzeldokument aus dem frueheren Single-Blob-Modell. Keine App-Kopie (Alt-App, Angular)
-      // liest oder schreibt es mehr, die Migration in die neue Struktur ist aus der App entfernt (SCRUM-36).
+      // Altes Einzeldokument aus dem frueheren Single-Blob-Modell. Die App liest oder schreibt es nicht mehr,
+      // die Migration in die neue Struktur ist aus der App entfernt (SCRUM-36).
       // Die Regel bleibt nur, damit ein noch vorhandenes Dokument vom Trainer gelesen/geloescht werden kann.
       match /appState/current {
         allow read, write: if isTrainer();
