@@ -10,6 +10,12 @@ on:
       - 'firebase.json'
   workflow_dispatch: {}
 
+# SCRUM-90: Die Firebase-CLI kommt aus tests/rules/package.json (exakt gepinnt) + package-lock.json (Integritaets-Hashes)
+# per npm ci, ohne Install-Skripte und vor dem Schreiben des Schluessels. Aufgerufen wird die lokale Binary,
+# kein npx und kein Nachladen einer aktuellen Version aus dem Netz.
+permissions:
+  contents: read
+
 jobs:
   deploy_rules:
     runs-on: ubuntu-latest
@@ -17,12 +23,17 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Install pinned Firebase CLI (ohne Install-Skripte)
+        run: npm ci --ignore-scripts --prefix tests/rules
       - name: Write service account key
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TEAMKOMPASS_B8AAC }}
         run: printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-sa.json"
       # Bewusst ohne Force-Schalter: Indizes, die nur in der Konsole existieren, werden nicht gelöscht (nur ein Hinweis im Log).
       - name: Deploy Firestore rules and indexes
-        run: npx firebase-tools deploy --only firestore:rules,firestore:indexes --project teamkompass-b8aac
+        run: tests/rules/node_modules/.bin/firebase deploy --only firestore:rules,firestore:indexes --project teamkompass-b8aac
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-sa.json
