@@ -474,7 +474,19 @@ service cloud.firestore {
           // bei isExpired(): ein Trainer-Dokument hat kein "playerId"-Feld, direkter
           // Zugriff wuerde die Regelauswertung in diesem (eigentlich schon durch
           // isTrainer() abgedeckten) Fall unnoetig riskant machen.
-          allow read: if isTrainer() || (isTeamMember() && memberDoc().data.role in ["player", "parent"] && resource.data.playerId == memberDoc().data.get('playerId', null));
+          //
+          // SCRUM-234: Einzelabruf (get) und Liste (list) getrennt. "Mein Profil" holt fuer JEDEN Termin gezielt
+          // ratings/{eigene playerId} - auch fuer Termine ohne Bewertung (z. B. zukuenftige). Dann gibt es das
+          // Dokument nicht, "resource" ist null und eine Pruefung auf resource.data schlaegt fehl
+          // (permission-denied, das ganze Profil lud nicht). Beim get entscheidet deshalb das Pfadsegment
+          // (Dokument-ID = playerId, so schreibt der Trainer-Client jede Bewertung): Spieler/Eltern lesen nur
+          // ratings/{eigene playerId}, vorhanden oder nicht. Zusaetzlich muss ein vorhandenes Dokument zur
+          // eigenen playerId passen (bzw. kein playerId-Feld haben), damit ein abweichendes Feld nie etwas
+          // Fremdes freigibt. Listen (where("playerId", "==", ...)) pruefen weiter das Datenfeld, weil Firestore
+          // Listenabfragen nur ueber Datenfelder zulassen kann. Scout, Medizin und abgelaufene Zugaenge sind
+          // ueber isPlayerFor()/isTeamMember() weiter ausgeschlossen.
+          allow get: if isTrainer() || (isPlayerFor(playerId) && (resource == null || resource.data.get('playerId', playerId) == playerId));
+          allow list: if isTrainer() || (isTeamMember() && memberDoc().data.role in ["player", "parent"] && resource.data.playerId == memberDoc().data.get('playerId', null));
           allow write: if isTrainer();
         }
 
