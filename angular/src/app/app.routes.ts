@@ -30,10 +30,13 @@ export const routes: Routes = [
   },
   {
     // Live-Modus (SCRUM-213): Vollbild ohne Shell (kein Menü, keine Kopfzeile), nur für Trainer.
-    path: '',
+    // Bewusst mit eigenem Pfad statt `path: ''`: eine leere Elternroute passt auch auf „/“ (ohne Kind) und hat
+    // dort die Shell-Route verdeckt – nach der Anmeldung blieb die Seite leer (SCRUM-224). Reihenfolge der Guards
+    // wie zuvor: erst Anmeldung (canActivate), dann Trainer-Rolle (canActivateChild).
+    path: 'events/:id/live',
     canActivate: [authGuard],
     canActivateChild: [trainerGuard],
-    children: [{ path: 'events/:id/live', loadComponent: () => import('./pages/live/live').then((m) => m.Live) }],
+    children: [{ path: '', loadComponent: () => import('./pages/live/live').then((m) => m.Live) }],
   },
   {
     path: '',
