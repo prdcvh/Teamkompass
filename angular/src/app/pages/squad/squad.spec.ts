@@ -192,9 +192,10 @@ describe('Squad (Kader-Seite)', () => {
   });
 
   describe('Handy', () => {
-    it('zeigt Karten gruppiert nach Mannschaftsteil mit Zugänge-Karte und Anlegen-Knopf', async () => {
+    it('zeigt Karten in einer durchgehenden Liste ohne Gruppenüberschriften mit Zugänge-Karte und Anlegen-Knopf', async () => {
       const fixture = await render('trainer', true);
-      expect(qa(fixture, 'h2.group').map(text)).toEqual(['Tor · 1', 'Abwehr · 1', 'Angriff · 1']);
+      expect(q(fixture, 'h2.group')).toBeNull();
+      for (const title of ['Tor', 'Abwehr', 'Mittelfeld', 'Angriff', 'Weitere']) expect(qa(fixture, 'h2').map(text).join('|')).not.toMatch(new RegExp(`^${title} ·|\\|${title} ·`));
       expect(qa(fixture, '.player-card')).toHaveLength(3);
       expect(text(qa(fixture, '.player-card')[0])).toContain('Jonas Keller');
       expect(text(qa(fixture, '.player-card')[0])).toContain('TW · 14 J.');

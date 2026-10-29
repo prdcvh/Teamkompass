@@ -1,5 +1,5 @@
 import type { Player } from './player';
-import { type StatusOf, filterPlayers, groupByLine, sortPlayers, statusCounts } from './squad-list';
+import { type StatusOf, filterPlayers, sortPlayers, statusCounts } from './squad-list';
 
 function player(overrides: Partial<Player> & { id: string }): Player {
   return {
@@ -51,15 +51,8 @@ describe('Kaderliste: Filter und Sortierung', () => {
     expect(input.map((p) => p.id)).toEqual(['x', 'y']);
   });
 
-  it('zählt Status und gruppiert nach Mannschaftsteil', () => {
+  it('zählt Status', () => {
     expect(statusCounts(squad)).toEqual({ Fit: 1, Angeschlagen: 1, Verletzt: 1, Abwesend: 0, Gesperrt: 0, Pause: 0 });
-    const custom = player({ id: 'd', positions: ['Libero'] });
-    expect(groupByLine([...squad, custom]).map((g) => [g.title, g.players.map((p) => p.id)])).toEqual([
-      ['Tor', ['a']],
-      ['Mittelfeld', ['c']],
-      ['Angriff', ['b']],
-      ['Weitere', ['d']],
-    ]);
   });
 
   it('nutzt den wirksamen Status (laufende Abwesenheit) für Filter, Suche, Sortierung und Zähler (SCRUM-164)', () => {
