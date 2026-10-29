@@ -40,6 +40,17 @@ Gehoerten zum Modus aus Abschnitt 3 und sind mit der Alt-App entfallen. Es gelte
 Datenmodell und Zugriffsregeln liegen in `firestore.rules` im Repo-Root. Bei jedem Push nach `main`, der die
 Datei aendert, deployt `.github/workflows/firestore-rules-deploy.yml` sie automatisch.
 
+**Firestore-Index fuer die Teamsuche (SCRUM-225):** Die App sucht die Teams eines Kontos per
+`collectionGroup('members')` + `where('uid', '==', uid)`. Das braucht einen Einzelfeld-Index mit Collection-Group-Scope
+(`firestore.indexes.json`, Feld-Override `members.uid`: die Standardindizes des Feldes plus `COLLECTION_GROUP` ASC; im
+Emulator ist kein Index noetig). Er steht in `firebase.json` unter `firestore.indexes` und wird vom selben Workflow wie
+die Regeln deployt (`--only firestore:rules,firestore:indexes`, auch bei Aenderung von `firestore.indexes.json`).
+Nach dem ersten Deploy baut Firebase den Index einige Minuten; bis dahin greift der dokumentierte Rueckfall auf das
+Team des Builds. Pruefen: Firebase Console -> Firestore -> Indizes -> Einzelfeld (`members`, `uid`, Collection group).
+Der Workflow nutzt bewusst **kein** `--force`: Indizes, die nur in der Konsole existieren, werden nicht geloescht; im
+nicht-interaktiven Modus (CI) fragt die CLI nicht nach, sondern laesst sie stehen und weist im Log darauf hin.
+Manuell: `firebase deploy --only firestore:indexes`.
+
 Trainer-Konten entstehen **nie ohne Erlaubnis**: entweder als allererstes Konto manuell in der Firebase-Konsole
 (Bootstrap, unten), durch einen angemeldeten Trainer in der App oder ueber einen Einladungscode bei der
 Registrierung (Abschnitt 10).
