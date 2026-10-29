@@ -18,7 +18,8 @@ import { EventsService } from '../../core/events/events.service';
 import { SquadService } from '../../core/player/squad.service';
 import { isUpcoming, rsvpCounts, rsvpCountsText } from '../../core/rsvp/rsvp';
 import { RsvpService } from '../../core/rsvp/rsvp.service';
-import { isSeriesEvent } from '../../core/planning/series-events';
+import { PlanningService } from '../../core/planning/planning.service';
+import { deleteChoice, isSeriesEvent, parseSeriesEventId } from '../../core/planning/series-events';
 import { SyncService } from '../../core/shell/sync.service';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
@@ -45,6 +46,7 @@ export class Events implements OnInit {
   private readonly weather = inject(WeatherService);
   private readonly rsvp = inject(RsvpService);
   private readonly squad = inject(SquadService);
+  protected readonly planning = inject(PlanningService);
   private readonly narrow = injectNarrowViewport();
   /** Kartenliste statt Tabelle: auf dem Handy und überall, wo die Tabelle nicht neben das Seitenmenü passt (SCRUM-134). */
   protected readonly cards = computed(() => this.mobile() || this.narrow());
@@ -63,6 +65,13 @@ export class Events implements OnInit {
   protected readonly deleting = signal<TeamEvent | null>(null);
   protected readonly deleteFailed = signal(false);
   protected readonly deleteBusy = signal(false);
+  /** Hat der Trainer „Alle Termine der Serie“ gewählt, steht der Fortschritt dieser Aktion auf der Seite. */
+  protected readonly seriesDeleteStarted = signal(false);
+  /** Rückfrage zum gerade gewählten Termin: normal oder Serien-Termin mit Auswahl (SCRUM-222). */
+  protected readonly choice = computed(() => {
+    const event = this.deleting();
+    return event ? deleteChoice(event.id, this.planning.series().map((series) => series.id), this.planning.load() === 'ready') : null;
+  });
 
   protected readonly pastOpen = signal(false);
   protected readonly laterOpen = signal(false);
@@ -144,6 +153,27 @@ export class Events implements OnInit {
     this.dialogOpen.set(false);
     this.deleteFailed.set(false);
     this.deleting.set(event);
+    const parsed = parseSeriesEventId(event.id);
+    if (parsed) {
+      // Serien-Termin: Planung laden und nachsehen, wie viele Termine der Serie bewertet sind (Vorschau im Dialog).
+      this.planning.start();
+      void this.planning.loadProtection(parsed.seriesId);
+    }
+  }
+
+  /** Was „Alle Termine der Serie“ mit den künftigen Terminen macht (inkl. Zahl der bleibenden); null, solange geprüft wird. */
+  protected seriesPreview(): string | null {
+    const choice = this.choice();
+    return choice?.kind === 'series' ? this.planning.deletePreview(choice.seriesId) : null;
+  }
+
+  /** „Alle Termine der Serie“: dieselbe Löschlogik wie in der Serienverwaltung. */
+  protected confirmDeleteSeries(): void {
+    const choice = this.choice();
+    if (choice?.kind !== 'series' || !choice.allAvailable) return;
+    this.seriesDeleteStarted.set(true);
+    this.planning.deleteSeries(choice.seriesId);
+    this.deleting.set(null);
   }
 
   protected cancelDelete(): void {
