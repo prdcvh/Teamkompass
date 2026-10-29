@@ -265,6 +265,18 @@ describe('Lineup (Aufstellung)', () => {
       expect(q(fixture, '.copy')).toBeNull();
     });
 
+    it('zeigt eine geleerte Spiel-Aufstellung nach dem Laden leer statt der allgemeinen Startelf (SCRUM-219)', async () => {
+      const fixture = await render('trainer', false, { assignments: full.assignments, byEvent: { bald: { assignments: {}, savedAt: '2026-10-01T10:00:00.000Z' } } }, [['bald', 3]]);
+      expect(text(q(fixture, '.target .meta'))).not.toContain('noch nicht gespeichert');
+      expect(text(q(fixture, '.pitch'))).not.toContain('<b>Stu</b>');
+      expect(qa(fixture, '.chip')).toHaveLength(0);
+    });
+
+    it('bietet „übernehmen“ nicht an, wenn das letzte Spiel bewusst geleert wurde (SCRUM-219)', async () => {
+      const fixture = await render('trainer', false, { byEvent: { letztes: { assignments: {}, savedAt: '2026-10-01T10:00:00.000Z' } } }, [['letztes', -7], ['bald', 3]]);
+      expect(q(fixture, '.copy')).toBeNull();
+    });
+
     it('ohne anstehendes Spiel bleibt es die allgemeine Startelf', async () => {
       const fixture = await render('trainer', false, full, [['alt', -7]]);
       expect(select(fixture).value).toBe('');

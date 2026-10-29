@@ -109,12 +109,30 @@ describe('Aufstellung je Spiel (SCRUM-122, Format der Live-App SCRUM-29)', () =>
 
   it('liest byEvent wie die Live-App: leere Einträge, unbekannte Spieler und fehlendes savedAt', () => {
     const lineups = normalizeEventLineups({ e1: entry(one), e2: { assignments: { TW: ['a'] } }, e3: entry({}), e4: entry({ TW: ['weg'] }), e5: null }, new Set(['a', 'b']));
-    expect(Object.keys(lineups).sort()).toEqual(['e1', 'e2']);
+    expect(Object.keys(lineups).sort()).toEqual(['e1', 'e2', 'e3', 'e4']); // e3/e4: bewusst geleert (savedAt), SCRUM-219
     expect(lineups['e1'].assignments.ST).toEqual(['b']);
     expect(lineups['e1'].savedAt).toBe('2026-10-01T10:00:00.000Z');
     expect(lineups['e2'].savedAt).toBe('');
+    expect(lineupIsEmpty(lineups['e3'].assignments)).toBe(true);
+    expect(lineups['e3'].savedAt).toBe('2026-10-01T10:00:00.000Z');
     expect(normalizeEventLineups(undefined)).toEqual({});
     expect(normalizeEventLineups([1, 2])).toEqual({});
+  });
+
+  it('behält eine geleerte Aufstellung mit savedAt, verwirft leere Einträge ohne savedAt (SCRUM-219)', () => {
+    const lineups = normalizeEventLineups({ geleert: entry({}), alt: { assignments: {} }, altLeer: {}, leerOhneZeit: { assignments: {}, savedAt: '' } });
+    expect(Object.keys(lineups)).toEqual(['geleert']);
+    expect(lineupIsEmpty(lineups['geleert'].assignments)).toBe(true);
+    // Round-Trip: leer gespeichert (docFromEventLineup) → wieder gelesen bleibt leer, aber vorhanden.
+    const written = docFromEventLineup(emptyAssignments(), '2026-10-02T10:00:00.000Z');
+    expect(normalizeEventLineups({ e1: written })['e1']).toBeDefined();
+  });
+
+  it('übernimmt nicht von einem bewusst geleerten Spiel, sondern vom davor liegenden mit Spielern (SCRUM-219)', () => {
+    const events = [game('a', '2026-09-01'), game('b', '2026-09-15'), game('ziel', '2026-10-20')];
+    const lineups = normalizeEventLineups({ a: entry(one), b: entry({}) });
+    expect(previousGameWithLineup(events, lineups, events[2], '2026-10-15')?.id).toBe('a');
+    expect(previousGameWithLineup(events, normalizeEventLineups({ b: entry({}) }), events[2], '2026-10-15')).toBeNull();
   });
 
   it('schreibt genau { assignments (alle 14 Zonen), savedAt } – Live-Eintrag überlebt Lesen und Schreiben', () => {
