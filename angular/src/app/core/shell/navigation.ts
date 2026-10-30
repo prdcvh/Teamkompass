@@ -13,6 +13,7 @@ export const SIDEBAR_ITEMS: readonly NavItem[] = [
   { path: '/kader', label: 'Kader', icon: 'users' },
   { path: '/events', label: 'Events', icon: 'calendar' },
   { path: '/planung', label: 'Planung', icon: 'calendar' },
+  { path: '/wissen', label: 'Wissen', icon: 'book' },
   { path: '/profile', label: 'Spielerprofile', icon: 'user' },
   { path: '/teamanalyse', label: 'Teamanalyse', icon: 'chart' },
   { path: '/gegneranalyse', label: 'Gegneranalyse', icon: 'target' },
@@ -48,6 +49,7 @@ export const MORE_GROUPS: readonly MoreGroup[] = [
     title: 'Bereiche',
     items: [
       { path: '/planung', label: 'Planung', icon: 'calendar', hint: 'Trainingsserien verwalten' },
+      { path: '/wissen', label: 'Wissen', icon: 'book', hint: 'Videos, Dokumente, Glossar' },
       { path: '/gegneranalyse', label: 'Gegneranalyse', icon: 'target', hint: 'Matchplan & Gegnerprofile' },
       { path: '/teamanalyse', label: 'Teamanalyse', icon: 'chart', hint: 'Form, Kennzahlen, Positionen' },
     ],

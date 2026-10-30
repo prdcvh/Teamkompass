@@ -1,0 +1,114 @@
+<section class="page">
+  <header class="head">
+    <div>
+      <p class="tk-eyebrow">Mannschaft</p>
+      <h1>Wissen</h1>
+      <p class="muted">Videos, Playlists, Dokumente und Glossar-Begriffe für die Mannschaft. Es wird nur verlinkt; nichts wird hochgeladen. Nur Trainer sehen diese Seite.</p>
+    </div>
+    @if (knowledge.load() === 'ready') {
+      <button tkButton variant="primary" type="button" (click)="openNew()">+ Eintrag anlegen</button>
+    }
+  </header>
+
+  <p class="sync" role="status" [attr.data-state]="sync.state()">
+    {{ sync.label() }}
+    @if (sync.detail()) {
+      <span> – {{ sync.detail() }}</span>
+    }
+  </p>
+
+  @if (knowledge.load() === 'error') {
+    <div class="notice" role="alert">
+      <p>Das Wissen konnte nicht geladen werden. Bitte Verbindung prüfen.</p>
+      <button tkButton type="button" (click)="knowledge.retry()">Erneut versuchen</button>
+    </div>
+  } @else if (knowledge.load() !== 'ready') {
+    <p class="muted" role="status">Wissen wird geladen …</p>
+  } @else if (knowledge.entries().length === 0) {
+    <tk-card>
+      <div class="empty">
+        <p>Noch kein Eintrag angelegt.</p>
+        <button tkButton variant="primary" type="button" (click)="openNew()">+ Eintrag anlegen</button>
+      </div>
+    </tk-card>
+  } @else {
+    <div class="filters" role="search" aria-label="Wissen filtern">
+      <label class="tk-label search">
+        Suche
+        <input class="tk-input" type="search" name="query" autocomplete="off" placeholder="Titel, Beschreibung oder Kategorie" [value]="filter().query" (input)="setQuery($event)" />
+      </label>
+      <label class="tk-label">
+        Art
+        <select class="tk-input" name="type" [value]="filter().type" (change)="setType($event)">
+          <option value="all" [selected]="filter().type === 'all'">Alle</option>
+          @for (type of types; track type.value) {
+            <option [value]="type.value" [selected]="filter().type === type.value">{{ typeLabel(type.value) }}</option>
+          }
+        </select>
+      </label>
+      <label class="tk-label">
+        Kategorie
+        <select class="tk-input" name="category" [value]="filter().category" (change)="setCategory($event)">
+          <option value="" [selected]="filter().category === ''">Alle</option>
+          @for (category of knowledge.categories(); track category) {
+            <option [value]="category" [selected]="filter().category === category">{{ category }}</option>
+          }
+        </select>
+      </label>
+      @if (filtered()) {
+        <button tkButton size="sm" type="button" class="reset" (click)="resetFilter()">Filter zurücksetzen</button>
+      }
+    </div>
+
+    <p class="muted count" role="status" data-testid="count">{{ visible().length }} von {{ knowledge.entries().length }} Einträgen</p>
+
+    @if (visible().length === 0) {
+      <tk-card>
+        <div class="empty">
+          <p>Kein Eintrag passt zu diesem Filter.</p>
+          <button tkButton type="button" (click)="resetFilter()">Filter zurücksetzen</button>
+        </div>
+      </tk-card>
+    } @else {
+      <tk-card>
+        <ul class="list" data-testid="entry-list">
+          @for (entry of visible(); track entry.id) {
+            <li class="row">
+              <div class="what">
+                <div class="title-line">
+                  <tk-chip [tone]="entry.type === 'link' ? 'blue' : 'amber'">{{ typeLabel(entry.type) }}</tk-chip>
+                  @if (entry.category) {
+                    <tk-chip>{{ entry.category }}</tk-chip>
+                  }
+                </div>
+                @if (entry.url) {
+                  <a class="link" [href]="entry.url" target="_blank" rel="noopener noreferrer" [attr.aria-label]="entry.title + ' (öffnet in neuem Tab)'">
+                    <strong>{{ entry.title }}</strong>
+                    <tk-icon name="share" />
+                  </a>
+                  <small class="host">{{ host(entry.url) }}</small>
+                } @else {
+                  <strong>{{ entry.title }}</strong>
+                }
+                @if (entry.description) {
+                  <p class="desc">{{ entry.description }}</p>
+                }
+              </div>
+              <button tkButton size="sm" type="button" (click)="openEdit(entry)" [attr.aria-label]="'Eintrag bearbeiten: ' + entry.title">Bearbeiten</button>
+            </li>
+          }
+        </ul>
+      </tk-card>
+    }
+  }
+</section>
+
+<tk-knowledge-dialog [open]="dialogOpen()" [entry]="editing()" (closed)="dialogOpen.set(false)" (deleteRequested)="askDelete($event)" />
+
+<tk-dialog [open]="deleting() !== null" title="Eintrag löschen?" (closed)="deleting.set(null)">
+  <p>Der Eintrag „{{ deleting()?.title }}“ wird gelöscht. Das lässt sich nicht rückgängig machen. Die verlinkte Seite selbst bleibt unverändert.</p>
+  <div class="confirm-actions">
+    <button tkButton type="button" (click)="deleting.set(null)">Abbrechen</button>
+    <button tkButton type="button" variant="primary" (click)="confirmDelete()">Endgültig löschen</button>
+  </div>
+</tk-dialog>
