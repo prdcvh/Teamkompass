@@ -6,6 +6,7 @@ import { LayoutService } from '../../core/shell/layout.service';
 import { formationName, lineupIsEmpty, onPitchCount, pitchMarkers } from '../../core/lineup/lineup';
 import { PITCH_BANDS } from '../../core/lineup/pitch';
 import { LineupService } from '../../core/lineup/lineup.service';
+import { WARMUP_INFO_URL, berlinTodayIso, warmupQuoteText, warmupSummary } from '../../core/events/warmup';
 import { todayIso } from '../../core/shared/dates';
 import { numberLabel } from '../../core/profile/profile';
 import { SessionService } from '../../core/auth/session.service';
@@ -68,6 +69,20 @@ export class Home implements OnInit {
       initials: entry.player.name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase(),
     })),
   );
+  /** Aufwärmprogramm (SCRUM-178): Quote der laufenden Woche; Hinweise für laufende und vorige Woche, nur wenn Training war. */
+  protected readonly warmup = computed(() => {
+    const summary = warmupSummary(this.team.events(), berlinTodayIso());
+    return {
+      quote: warmupQuoteText(summary.current),
+      hasTrainings: summary.current.total > 0,
+      done: summary.current.done,
+      total: summary.current.total,
+      currentHint: summary.current.hint,
+      previousHint: summary.previous.hint,
+      previousQuote: warmupQuoteText(summary.previous),
+      url: WARMUP_INFO_URL,
+    };
+  });
   protected readonly formLength = FORM_LENGTH;
 
   /** Die nächsten drei Events: das erste groß, die anderen als kurze Liste. */

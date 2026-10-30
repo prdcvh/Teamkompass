@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { environment } from '../../../environments/environment';
 import { LayoutService } from '../../core/shell/layout.service';
+import { berlinTodayIso } from '../../core/events/warmup';
 import { todayIso } from '../../core/shared/dates';
 import { SessionService } from '../../core/auth/session.service';
 import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
@@ -110,6 +111,40 @@ describe('Home (Start-Dashboard)', () => {
     expect(root(fixture).querySelector('.stats')).toBeNull();
     expect(firebase.calls).not.toContain('watchPlayers');
     expect(firebase.lineup.lineupWatchers).toBe(0);
+  });
+
+  describe('Aufwärmprogramm (SCRUM-178)', () => {
+    const today = berlinTodayIso();
+    const panel = (fixture: { nativeElement: unknown }) => root(fixture).querySelector('[data-testid=warmup-panel]')!;
+
+    it('zeigt die Wochenquote der laufenden Woche und keinen Hinweis, wenn ein Programm gemacht wurde', async () => {
+      const fixture = await render('trainer', false, null, (fb) => {
+        fb.events.events.set('w1', { type: 'Training', title: 'Training A', date: today, warmup: '11+ Kids' });
+      });
+      await ready(fixture);
+      expect(panel(fixture).querySelector('[data-testid=warmup-quote]')?.textContent).toBe('1 von 1 Training');
+      expect(panel(fixture).querySelector('[data-testid=warmup-hint-current]')).toBeNull();
+      const link = panel(fixture).querySelector<HTMLAnchorElement>('a[href^="https://"]')!;
+      expect(link.getAttribute('target')).toBe('_blank');
+      expect(link.getAttribute('rel')).toBe('noopener noreferrer');
+    });
+
+    it('weist auf ein Training ohne Programm hin', async () => {
+      const fixture = await render('trainer', false, null, (fb) => {
+        fb.events.events.set('w1', { type: 'Training', title: 'Training A', date: today });
+      });
+      await ready(fixture);
+      expect(panel(fixture).querySelector('[data-testid=warmup-quote]')?.textContent).toBe('0 von 1 Training');
+      expect(panel(fixture).querySelector('[data-testid=warmup-hint-current]')).not.toBeNull();
+    });
+
+    it('zeigt in einer Woche ohne Training keinen Hinweis', async () => {
+      const fixture = await render();
+      await ready(fixture);
+      expect(panel(fixture).querySelector('[data-testid=warmup-quote]')).toBeNull();
+      expect(panel(fixture).querySelector('.warmup-hint')).toBeNull();
+      expect(panel(fixture).textContent).toContain('noch kein Training');
+    });
   });
 
   describe('MVP der Woche und des Monats (SCRUM-105)', () => {

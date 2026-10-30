@@ -1,5 +1,6 @@
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { authErrorMessage, errorCode } from '../auth/auth-errors';
+import { type WarmupProgram } from './warmup';
 import { type EventDraft, type EventErrors, type TeamEvent, docFromEvent, eventFromDoc, eventFromDraft, validateDraft } from './event';
 import { AbsenceSyncService } from '../records/absence-sync.service';
 import { EventsApi } from '../firebase/events.api';
@@ -147,8 +148,9 @@ export class EventsService {
     const errors = validateDraft(draft);
     if (Object.keys(errors).length > 0) return errors;
     const id = draft.id ?? `e${crypto.randomUUID()}`;
-    const event = eventFromDraft(draft, id);
     const previous = this.events().find((entry) => entry.id === id);
+    // Das Aufwärmprogramm (SCRUM-178) steckt nicht im Formular und bleibt beim Bearbeiten unverändert.
+    const event = { ...eventFromDraft(draft, id), ...(previous?.warmup ? { warmup: previous.warmup } : {}) };
     // Ein Event vor dem Saisonbeginn würde sonst gleich nach dem Speichern aus der Liste verschwinden.
     if (event.date < this.seasonStart()) this.showAllSeasons();
     if (!this.sync.isFailed()) this.sync.state.set('syncing');
@@ -161,6 +163,21 @@ export class EventsService {
       .then(() => (!previous || previous.date !== event.date ? this.absences.reconcileEvent(event, this.squad.players()) : 0))
       .catch((error) => this.failWrite(error, `„${event.title}“ konnte nicht gespeichert werden.`));
     return {};
+  }
+
+  /**
+   * Hält fest, welches Aufwärmprogramm im Training gemacht wurde (`null` = nicht gemacht), ohne das übrige Event
+   * anzufassen (SCRUM-178). Nur Trainer, nur für Trainings. Rückgabe: wurde der Schreibvorgang gestartet?
+   */
+  setWarmup(id: string, program: WarmupProgram | null): boolean {
+    const event = this.events().find((entry) => entry.id === id);
+    if (!this.canEdit() || !event || event.type !== 'Training') return false;
+    if (!this.sync.isFailed()) this.sync.state.set('syncing');
+    void this.eventsApi
+      .saveEvent(id, { warmup: program })
+      .then(() => this.sync.clearError())
+      .catch((error) => this.failWrite(error, `Das Aufwärmprogramm für „${event.title}“ konnte nicht gespeichert werden.`));
+    return true;
   }
 
   /** Löscht das Event (inkl. Bewertungen, internen Notizen und der gespeicherten Aufstellung). Rückgabe: erfolgreich? */
