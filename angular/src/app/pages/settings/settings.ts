@@ -8,12 +8,14 @@ import { ThemeService } from '../../core/device/theme.service';
 import { WorkspaceService } from '../../core/device/workspace.service';
 import { NotificationsService } from '../../core/notifications/notifications.service';
 import { PlayerStatsService } from '../../core/team/player-stats.service';
+import { FEDERAL_STATES, isFederalState } from '../../core/team-settings/federal-states';
+import { TeamSettingsService } from '../../core/team-settings/team-settings.service';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 import { Dialog } from '../../ui/dialog/dialog';
 import { ClubAdminCard } from './club-admin-card';
 
-/** Einstellungen & Datenschutz: Darstellung, lokale Aufbewahrung, lokale Daten löschen, Aktivitätsverlauf. */
+/** Einstellungen & Datenschutz: Darstellung, lokale Aufbewahrung, lokale Daten löschen, Bundesland des Teams, Aktivitätsverlauf. */
 @Component({
   selector: 'app-settings',
   imports: [Button, Card, ClubAdminCard, Dialog, FormsModule],
@@ -39,6 +41,9 @@ export class Settings {
   protected readonly notifications = inject(NotificationsService);
   /** Zusammenfassungen je Spieler (SCRUM-201): Stand, Neuberechnung und Prüfung, nur für Trainer. */
   protected readonly stats = inject(PlayerStatsService);
+  /** Bundesland des Teams für den Schulferien-Hinweis (SCRUM-186), nur für Trainer. */
+  protected readonly teamSettings = inject(TeamSettingsService);
+  protected readonly federalStates = FEDERAL_STATES;
   protected readonly retentionOptions = RETENTION_OPTIONS;
   protected readonly confirmClear = signal(false);
   protected readonly cleared = signal(false);
@@ -48,6 +53,17 @@ export class Settings {
       // untracked: ein Ladefehler darf den Effekt nicht in eine Wiederhol-Schleife schicken (Neuladen per Knopf).
       if (this.notifications.available()) untracked(() => void this.notifications.start());
     });
+    effect(() => {
+      // Teameinstellungen (Bundesland) lesen und schreiben nur Trainer; untracked wie oben.
+      if (this.teamSettings.canWrite()) untracked(() => this.teamSettings.start());
+    });
+  }
+
+  protected setFederalState(event: Event): void {
+    const select = event.target as HTMLSelectElement;
+    const value = select.value;
+    // Ungültige oder nicht erlaubte Werte: die Auswahl springt auf den gespeicherten Stand zurück.
+    if (!isFederalState(value) || !this.teamSettings.saveFederalState(value)) select.value = this.teamSettings.federalState();
   }
 
   protected toggleReminders(event: Event): void {
