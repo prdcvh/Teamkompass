@@ -91,7 +91,7 @@ export class TeamSettingsService {
       .then(() => this.sync.clearError())
       .catch((error) => {
         console.error(error);
-        const message = `${failText} ${authErrorMessage(errorCode(error))}`;
+        const message = `${failText} ${authErrorMessage(errorCode(error), this.session.role())}`;
         this.error.set(message);
         this.sync.fail(message);
       });

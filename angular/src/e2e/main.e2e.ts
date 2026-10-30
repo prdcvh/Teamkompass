@@ -92,6 +92,16 @@ function seed(): FakeFirebase {
       b2: { name: 'Winterpause mit einem ziemlich langen Namen für die Listenansicht', startDate: '2026-12-21', endDate: '2027-01-09' },
     },
   };
+  // Wissen (SCRUM-106): Links und Glossar im Trainer-Dokument; mit langen Titeln/Adressen für den Breitentest.
+  fake.knowledge.doc = {
+    knowledge: {
+      k1: { type: 'link', title: 'Pressing im Mittelfeld: Auslöser, Staffelung und Absicherung bei Ballverlust', url: 'https://www.youtube.com/watch?v=abcdefghijk&list=PLabcdefghijklmnopqrstuvwxyz0123456789', description: 'Zwölf Minuten, die zeigen, wie wir gemeinsam anlaufen. Bitte bis zum Training am Dienstag ansehen.', category: 'Taktik' },
+      k2: { type: 'link', title: 'Spielsystem 4-2-3-1 (PDF)', url: 'https://drive.google.com/file/d/1AbCdEfGhIjKlMnOpQrStUvWxYz/view?usp=sharing', description: '', category: 'Taktik' },
+      k3: { type: 'glossary', title: 'Abseitsfalle', url: null, description: 'Die Abwehrkette rückt gemeinsam nach vorn, sobald der Gegner den Pass spielt. Der Stürmer steht dadurch im Abseits.', category: 'Regeln' },
+      k4: { type: 'glossary', title: 'Gegenpressing', url: 'https://de.wikipedia.org/wiki/Gegenpressing', description: 'Sofort nach dem Ballverlust den Ball zurückerobern, statt sich zurückfallen zu lassen.', category: 'Taktik' },
+      k5: { type: 'link', title: 'Dehnübungen nach dem Spiel', url: 'https://www.dfb.de/trainer/', description: 'Kurzes Programm für zu Hause.', category: 'Fitness' },
+    },
+  };
   // Scout-Sicht (SCRUM-170) so, wie sie der Trainer-Client aus diesen Daten schreiben würde.
   const players = [...fake.players.players].map(([id, data]) => playerFromDoc(id, data));
   const events = [...fake.events.events].map(([id, data]) => eventFromDoc(id, data));

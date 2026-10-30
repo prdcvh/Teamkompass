@@ -173,8 +173,8 @@ export class ProfileService {
 
   private fail(error: unknown): void {
     console.error(error);
-    this.error.set(`Das Profil konnte nicht geladen werden. ${authErrorMessage(errorCode(error))}`);
-    this.sync.fail('Laden fehlgeschlagen');
+    this.error.set(`Das Profil konnte nicht geladen werden. ${authErrorMessage(errorCode(error), this.session.role())}`);
+    this.sync.fail('Laden fehlgeschlagen', 'load');
   }
 
   /** Erneut versuchen nach einem Fehler. */

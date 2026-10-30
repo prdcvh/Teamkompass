@@ -123,24 +123,118 @@ h2 {
   background: var(--tk-chart-1);
 }
 
+/* Kennzahlen-Blöcke im Stil der Dashboard-Kacheln (.stat), SCRUM-162 */
 .insights {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: var(--tk-space-3);
+}
+
+[data-variant='mobile'] .insights {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.insight {
+  display: grid;
+  align-content: start;
+  gap: var(--tk-space-2);
+  min-width: 0;
+  padding: var(--tk-space-4);
+  background: var(--tk-surface);
+  border: 1px solid var(--tk-line);
+  border-radius: var(--tk-radius-lg);
+}
+
+.insight h3 {
+  margin: 0;
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+  font-weight: 400;
+}
+
+.insight p {
+  margin: 0;
+}
+
+.insight-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--tk-space-2);
+  align-items: baseline;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.insight-row a,
+.insight-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+
+.insight-row a {
+  color: inherit;
+}
+
+.value-badge {
+  font-size: var(--tk-text-lg);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.value-badge small,
+.insight-reason,
+.insight-note span {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+  font-weight: 400;
+}
+
+.level-badge {
+  padding: 2px 8px;
+  color: var(--tk-red);
+  background: var(--tk-soft-red);
+  border-radius: var(--tk-radius-pill);
+  font-size: var(--tk-text-sm);
+  font-weight: 600;
+}
+
+.insight-reason {
+  flex-basis: 100%;
+}
+
+.insight-empty {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+.figures {
   display: grid;
   gap: var(--tk-space-3);
 }
 
-.insights article {
+.figures.small {
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+}
+
+.figure {
   display: grid;
-  gap: 2px;
+  gap: 4px;
+}
+
+.figure strong {
+  font-size: var(--tk-text-lg);
+}
+
+.figure span {
+  color: var(--tk-muted);
   font-size: var(--tk-text-sm);
 }
 
-.insights strong {
-  font-size: var(--tk-text-md);
-}
-
-.insights a {
-  color: inherit;
-  font-weight: 600;
+.insight-note {
+  display: grid;
+  gap: 2px;
+  font-size: var(--tk-text-sm);
 }
 
 .bars {
