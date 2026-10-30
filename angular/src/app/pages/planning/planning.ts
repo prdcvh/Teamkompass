@@ -28,7 +28,8 @@ export class Planning implements OnInit {
   private readonly breaksService = inject(BreaksService);
   protected readonly sync = inject(SyncService);
   private readonly events = inject(EventsService);
-  private readonly settings = inject(TeamSettingsService);
+  /** Standardort für neue Serien und Bundesland für den Schulferien-Hinweis (SCRUM-186). */
+  protected readonly settings = inject(TeamSettingsService);
 
   protected readonly dialogOpen = signal(false);
   protected readonly editing = signal<TrainingSeries | null>(null);

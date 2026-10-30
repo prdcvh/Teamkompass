@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { SessionService } from '../auth/session.service';
 import { FakeFirebase, provideFakeFirebase } from '../testing/fake-firebase';
-import { defaultLocationFromDoc, docFromDefaultLocation } from './team-settings';
+import { defaultLocationFromDoc, docFromDefaultLocation, docFromFederalState, federalStateFromDoc } from './team-settings';
 import { TeamSettingsService } from './team-settings.service';
 
 describe('TeamSettingsService (Standardort)', () => {
@@ -59,6 +59,40 @@ describe('TeamSettingsService (Standardort)', () => {
     service.start();
     await vi.waitFor(() => expect(service.load()).toBe('error'));
     expect(service.defaultLocation()).toBeNull();
+  });
+});
+
+describe('TeamSettingsService (Bundesland, SCRUM-186)', () => {
+  it('gilt ohne gespeichertes Feld als Hessen und speichert die Wahl', async () => {
+    const firebase = new FakeFirebase();
+    firebase.settings.settings = { defaultLocation: { text: 'Heimplatz', coords: null } };
+    TestBed.configureTestingModule({ providers: [...provideFakeFirebase(firebase)] });
+    TestBed.inject(SessionService).role.set('trainer');
+    const service = TestBed.inject(TeamSettingsService);
+    service.start();
+    await vi.waitFor(() => expect(service.load()).toBe('ready'));
+    expect(service.federalState()).toBe('HE');
+    expect(service.saveFederalState('BY')).toBe(true);
+    await vi.waitFor(() => expect(firebase.settings.settings).toEqual({ defaultLocation: { text: 'Heimplatz', coords: null }, federalState: 'BY' }));
+    expect(service.federalState()).toBe('BY');
+    expect(service.saveFederalState('XX' as never)).toBe(false);
+  });
+
+  it('lässt nur Trainer das Bundesland ändern', () => {
+    const firebase = new FakeFirebase();
+    TestBed.configureTestingModule({ providers: [...provideFakeFirebase(firebase)] });
+    TestBed.inject(SessionService).role.set('player');
+    const service = TestBed.inject(TeamSettingsService);
+    expect(service.saveFederalState('BY')).toBe(false);
+    expect(firebase.calls).not.toContain('saveSettings');
+  });
+
+  it('liest unbekannte Werte als Hessen', () => {
+    expect(federalStateFromDoc(null)).toBe('HE');
+    expect(federalStateFromDoc({ federalState: 'XX' })).toBe('HE');
+    expect(federalStateFromDoc({ federalState: 42 })).toBe('HE');
+    expect(federalStateFromDoc({ federalState: 'SN' })).toBe('SN');
+    expect(docFromFederalState('NW')).toEqual({ federalState: 'NW' });
   });
 });
 

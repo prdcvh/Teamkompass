@@ -71,6 +71,31 @@
     </tk-card>
   }
 
+  @if (teamSettings.canWrite()) {
+    <tk-card>
+      <div class="panel" id="bundesland">
+        <h2>Bundesland (Cloud, für das Team)</h2>
+        <label class="field">
+          <span>Bundesland des Teams</span>
+          <select class="tk-input" data-testid="federal-state" [disabled]="teamSettings.load() !== 'ready'" (change)="setFederalState($event)">
+            @for (state of federalStates; track state.code) {
+              <option [value]="state.code" [selected]="teamSettings.federalState() === state.code">{{ state.name }}</option>
+            }
+          </select>
+        </label>
+        <p class="muted">Danach richtet sich der Schulferien-Hinweis in der Planung. Solange nichts gewählt ist, gilt Hessen. Nur Trainer können das Bundesland ändern.</p>
+        @if (teamSettings.load() === 'error') {
+          <div>
+            <button tkButton type="button" (click)="teamSettings.start()">Erneut laden</button>
+          </div>
+        }
+        @if (teamSettings.error()) {
+          <p class="error" role="alert">{{ teamSettings.error() }}</p>
+        }
+      </div>
+    </tk-card>
+  }
+
   @if (canChangePassword()) {
     <tk-card>
       <form class="panel" #passwordForm="ngForm" (ngSubmit)="changePassword(passwordForm)" autocomplete="off">
