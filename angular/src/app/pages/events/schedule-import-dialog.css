@@ -1,0 +1,96 @@
+.muted {
+  margin: 0 0 var(--tk-space-2);
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+.file {
+  display: none;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--tk-space-2);
+  margin-top: var(--tk-space-3);
+}
+
+.actions.start {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+.error {
+  margin: var(--tk-space-2) 0;
+  color: var(--tk-red);
+  font-weight: 600;
+}
+
+.done,
+.summary {
+  margin: var(--tk-space-3) 0 var(--tk-space-2);
+  font-weight: 600;
+}
+
+.rows {
+  display: grid;
+  gap: var(--tk-space-2);
+  max-height: 40vh;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px var(--tk-space-3);
+  padding: var(--tk-space-2) var(--tk-space-3);
+  background: var(--tk-field);
+  border-radius: var(--tk-radius-lg);
+}
+
+.row[data-status='error'] {
+  background: var(--tk-soft-red);
+}
+
+.row[data-status='duplicate-file'],
+.row[data-status='duplicate-existing'] {
+  opacity: 0.75;
+}
+
+.line,
+.status,
+small {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-xs);
+}
+
+.row[data-status='error'] .status,
+.row[data-status='error'] .msg {
+  color: var(--tk-red);
+}
+
+.what {
+  display: grid;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.status {
+  grid-column: 2;
+  font-weight: 600;
+}
+
+@media (min-width: 640px) {
+  .row {
+    grid-template-columns: 5.5rem 1fr auto;
+    align-items: center;
+  }
+
+  .status {
+    grid-column: auto;
+    text-align: right;
+  }
+}

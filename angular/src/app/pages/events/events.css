@@ -401,3 +401,9 @@ p.muted a {
   font-size: var(--tk-text-xs);
   font-weight: 500;
 }
+
+.head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tk-space-2);
+}

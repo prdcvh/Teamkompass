@@ -30,11 +30,12 @@ import { WeatherService } from '../../core/weather/weather.service';
 import { Weather } from '../../ui/weather/weather';
 import { WEATHER_ATTRIBUTION, berlinNow } from '../../core/weather/weather';
 import { EventDialog } from './event-dialog';
+import { ScheduleImportDialog } from './schedule-import-dialog';
 
 /** Events (Training/Spiel): Liste mit Suche und Typfilter, anlegen, nachträglich bearbeiten und löschen. */
 @Component({
   selector: 'app-events',
-  imports: [NgTemplateOutlet, RouterLink, Button, Card, Dialog, Icon, EventDialog, Weather, BreakNotice],
+  imports: [NgTemplateOutlet, RouterLink, Button, Card, Dialog, Icon, EventDialog, ScheduleImportDialog, Weather, BreakNotice],
   templateUrl: './events.html',
   styleUrl: './events.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -62,6 +63,8 @@ export class Events implements OnInit {
   /** Dialog-Zustand: `editing` = null und `dialogOpen` = true bedeutet „neues Event“. */
   protected readonly dialogOpen = signal(false);
   protected readonly editing = signal<TeamEvent | null>(null);
+  /** Spielplan-Import (SCRUM-189), nur für Trainer. */
+  protected readonly importOpen = signal(false);
   protected readonly deleting = signal<TeamEvent | null>(null);
   protected readonly deleteFailed = signal(false);
   protected readonly deleteBusy = signal(false);

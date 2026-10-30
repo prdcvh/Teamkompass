@@ -6,7 +6,10 @@
       <p class="meta">{{ events.events().length }} Events</p>
     </div>
     @if (events.canEdit() && !mobile()) {
-      <button tkButton variant="primary" type="button" (click)="openNew()">+ Event anlegen</button>
+      <div class="head-actions">
+        <button tkButton type="button" (click)="importOpen.set(true)">Spielplan importieren</button>
+        <button tkButton variant="primary" type="button" (click)="openNew()">+ Event anlegen</button>
+      </div>
     }
   </header>
 
@@ -206,6 +209,9 @@
         </ul>
       </tk-card>
     </ng-template>
+    @if (events.canEdit() && mobile()) {
+      <p><button tkButton type="button" (click)="importOpen.set(true)">Spielplan importieren</button></p>
+    }
     <p class="muted"><a [href]="source.url" target="_blank" rel="noopener noreferrer">{{ source.text }}</a></p>
   }
 
@@ -215,6 +221,10 @@
 </section>
 
 <tk-event-dialog [open]="dialogOpen()" [event]="editing()" [canEdit]="events.canWrite()" (closed)="closeDialog()" (deleteRequested)="askDelete($event)" />
+
+@if (events.canWrite()) {
+  <tk-schedule-import-dialog [open]="importOpen()" (closed)="importOpen.set(false)" />
+}
 
 @if (events.canWrite()) {
   <tk-dialog [open]="deleting() !== null" [title]="choice()?.kind === 'series' ? 'Serien-Termin löschen?' : 'Event löschen?'" (closed)="cancelDelete()">
