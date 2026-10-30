@@ -20,7 +20,7 @@ describe('Spielplan-Import: Einlesen (SCRUM-189)', () => {
     });
 
     it('überspringt die BOM am Anfang und kommt mit CRLF und fehlendem Zeilenende zurecht', () => {
-      expect(parseCsv('﻿a;b\r\n1;2')).toEqual([['a', 'b'], ['1', '2']]);
+      expect(parseCsv('\ufeffa;b\r\n1;2')).toEqual([['a', 'b'], ['1', '2']]);
     });
 
     it('lässt leere Zeilen weg', () => {
@@ -61,7 +61,7 @@ describe('Spielplan-Import: Einlesen (SCRUM-189)', () => {
 
   describe('parseSchedule', () => {
     it('liest eine Datei mit Kopfzeile, Semikolon und BOM', () => {
-      const result = parseSchedule(`﻿${header}\r\n03.10.2026;11:00;Heim;SV Nord;Hauptplatz\r\n10.10.2026;14:30;Gast;"FC ""Süd"", II";\r\n`);
+      const result = parseSchedule(`\ufeff${header}\r\n03.10.2026;11:00;Heim;SV Nord;Hauptplatz\r\n10.10.2026;14:30;Gast;"FC ""Süd"", II";\r\n`);
       expect(result.fileError).toBeNull();
       expect(result.rows).toEqual([
         { line: 2, date: '2026-10-03', time: '11:00', homeAway: 'home', opponent: 'SV Nord', location: 'Hauptplatz', errors: [] },

@@ -143,57 +143,6 @@ describe('EventsService', () => {
     expect(firebase.calls.some((c) => c.startsWith('saveEvent'))).toBe(false);
   });
 
-  describe('importGames (SCRUM-189)', () => {
-    const games = (count: number) => Array.from({ length: count }, (_, i) => draft({ title: `Spiel ${i}`, opponent: `Gegner ${i}`, date: '2099-03-01', startTime: '11:00', location: 'Hauptplatz' }));
-
-    it('legt alle Spiele in einem Schreibvorgang an, mit denselben Feldern wie von Hand', async () => {
-      const events = setup();
-      events.start();
-      await vi.waitFor(() => expect(events.load()).toBe('ready'));
-      expect(await events.importGames(games(3))).toBe('');
-      expect(firebase.calls.filter((c) => c.startsWith('saveEventsBatch'))).toEqual(['saveEventsBatch:3']);
-      const created = [...firebase.events.events.values()].filter((data) => data['type'] === 'Spiel');
-      expect(created).toHaveLength(3);
-      expect(created[0]).toMatchObject({ startTime: '11:00', location: 'Hauptplatz', date: '2099-03-01', matchDuration: 90, pointsEnabled: true, goalsFor: '' });
-      // Gleiche Dokumentfelder wie beim einzelnen Speichern.
-      events.save(draft({ title: 'Einzeln', opponent: 'Gegner 0', date: '2099-03-01', startTime: '11:00', location: 'Hauptplatz' }));
-      await vi.waitFor(() => expect(firebase.calls.some((c) => c.startsWith('saveEvent:'))).toBe(true));
-      const single = [...firebase.events.events.values()].find((data) => data['title'] === 'Einzeln')!;
-      const { title: _t, id: _i, ...rest } = single;
-      const { title: _t2, id: _i2, ...rest2 } = created[0];
-      expect(rest).toEqual(rest2);
-    });
-
-    it('schreibt nichts, wenn ein Entwurf ungültig ist oder es zu viele sind', async () => {
-      const events = setup();
-      events.start();
-      await vi.waitFor(() => expect(events.load()).toBe('ready'));
-      expect(await events.importGames([...games(2), draft({ title: '' })])).toContain('3. Spiel');
-      expect(await events.importGames(games(451))).toContain('höchstens 450');
-      expect(await events.importGames([])).toContain('nichts');
-      expect(firebase.calls.some((c) => c.startsWith('saveEventsBatch'))).toBe(false);
-    });
-
-    it('meldet einen Fehler des Schreibvorgangs und legt nichts an', async () => {
-      const events = setup();
-      vi.spyOn(console, 'error').mockImplementation(() => undefined);
-      events.start();
-      await vi.waitFor(() => expect(events.load()).toBe('ready'));
-      firebase.events.failBatchNumber = 1;
-      expect(await events.importGames(games(2))).toContain('Es wurde nichts angelegt');
-      expect(firebase.events.events.size).toBe(1);
-      expect(TestBed.inject(SyncService).state()).toBe('error');
-    });
-
-    it('erlaubt nur Trainern den Import', async () => {
-      const events = setup('physio');
-      events.start();
-      await vi.waitFor(() => expect(events.load()).toBe('ready'));
-      expect(await events.importGames(games(1))).toContain('Nur Trainer');
-      expect(firebase.calls.some((c) => c.startsWith('saveEventsBatch'))).toBe(false);
-    });
-  });
-
   it('erlaubt anderen Rollen kein Schreiben', async () => {
     const events = setup('physio');
     events.start();

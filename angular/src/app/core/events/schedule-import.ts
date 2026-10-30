@@ -163,6 +163,7 @@ export function parseHomeAway(value: string): HomeAway | undefined {
 
 /** Steuerzeichen raus, Leerraum glätten: Gegner und Ort sind reiner Text. */
 function cleanText(value: string): string {
+  // eslint-disable-next-line no-control-regex -- Steuerzeichen sollen gerade entfernt werden
   return value.replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
@@ -174,7 +175,7 @@ export function parseSchedule(text: string): ParsedSchedule {
   }
   const columns = new Map<Field, number>();
   table[0].cells.forEach((name, index) => {
-    const field = headerField(name.replace(/^﻿/, ''));
+    const field = headerField(name.replace(/^\ufeff/, ''));
     if (field && !columns.has(field)) columns.set(field, index);
   });
   if (!columns.has('date') || !columns.has('opponent')) {

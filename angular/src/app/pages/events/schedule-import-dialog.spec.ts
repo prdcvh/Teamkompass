@@ -86,7 +86,7 @@ describe('Spielplan-Import (SCRUM-189)', () => {
 
   it('legt die neuen Spiele in einem Schritt an und überspringt Dubletten', async () => {
     const fixture = await render();
-    await chooseFile(fixture, `﻿${header}\r\n07.03.2099;11:00;Heim;SV Nord;Platz\r\n14.03.2099;11:00;Gast;"FC ""Süd""";Sportplatz\r\n21.03.2099;;;<b>TSV</b>;\r\n`);
+    await chooseFile(fixture, `\ufeff${header}\r\n07.03.2099;11:00;Heim;SV Nord;Platz\r\n14.03.2099;11:00;Gast;"FC ""Süd""";Sportplatz\r\n21.03.2099;;;<b>TSV</b>;\r\n`);
     expect(createButton(fixture).disabled).toBe(false);
     expect(text(createButton(fixture))).toBe('2 Spiele anlegen');
     createButton(fixture).click();

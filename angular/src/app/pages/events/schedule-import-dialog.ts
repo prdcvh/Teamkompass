@@ -85,7 +85,7 @@ export class ScheduleImportDialog {
 
   protected downloadTemplate(): void {
     // BOM, damit Excel die Umlaute richtig öffnet.
-    this.files.saveText(TEMPLATE_FILE_NAME, `﻿${templateCsv()}`, 'text/csv;charset=utf-8');
+    this.files.saveText(TEMPLATE_FILE_NAME, `\ufeff${templateCsv()}`, 'text/csv;charset=utf-8');
   }
 
   protected async choose(event: Event): Promise<void> {
