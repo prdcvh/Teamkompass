@@ -21,6 +21,8 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
+          # SCRUM-165: Angular CLI 22 braucht Node >= 22.22.3 – immer das neueste 22.x holen, nicht ein älteres aus dem Runner-Cache.
+          check-latest: true
       - name: Install Angular dependencies (ohne Install-Skripte)
         run: npm ci --ignore-scripts --prefix angular
       - name: Verify application

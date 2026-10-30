@@ -140,15 +140,6 @@ td {
   color: var(--tk-muted);
 }
 
-.group {
-  margin: var(--tk-space-2) 0 calc(var(--tk-space-2) * -1);
-  color: var(--tk-muted);
-  font-size: var(--tk-text-xs);
-  font-weight: 600;
-  letter-spacing: var(--tk-track-eyebrow);
-  text-transform: uppercase;
-}
-
 .cards {
   display: grid;
   margin: 0;

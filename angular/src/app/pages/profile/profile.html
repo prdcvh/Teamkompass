@@ -7,7 +7,7 @@
     @if (players().length > 0) {
       <label class="picker">
         <span class="tk-sr-only">Spieler wählen</span>
-        <select class="tk-input" [value]="player()?.id" (change)="choose(valueOf($event))">
+        <select class="tk-input" [value]="$safeNavigationMigration(player()?.id)" (change)="choose(valueOf($event))">
           @for (entry of players(); track entry.id) {
             <option [value]="entry.id" [selected]="entry.id === player()?.id">{{ entry.number }} · {{ entry.name }}</option>
           }

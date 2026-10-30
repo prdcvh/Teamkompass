@@ -19,6 +19,10 @@
     }
   </p>
 
+  @if (seriesDeleteStarted() && planning.run().state !== 'idle') {
+    <p class="run" role="status" [attr.data-state]="planning.run().state" data-testid="series-delete-run">{{ planning.run().text }}</p>
+  }
+
   @if (events.load() === 'error') {
     <div class="notice" role="alert">
       <p>{{ events.error() }}</p>
@@ -213,16 +217,36 @@
 <tk-event-dialog [open]="dialogOpen()" [event]="editing()" [canEdit]="events.canWrite()" (closed)="closeDialog()" (deleteRequested)="askDelete($event)" />
 
 @if (events.canWrite()) {
-  <tk-dialog [open]="deleting() !== null" title="Event löschen?" (closed)="cancelDelete()">
-    <p>
-      „{{ deleting()?.title }}“ wird mit allen Bewertungen und internen Notizen gelöscht. Das lässt sich nicht rückgängig machen.
-    </p>
-    @if (deleteFailed()) {
-      <p class="error" role="alert">Löschen fehlgeschlagen. Bitte Verbindung prüfen und erneut versuchen.</p>
+  <tk-dialog [open]="deleting() !== null" [title]="choice()?.kind === 'series' ? 'Serien-Termin löschen?' : 'Event löschen?'" (closed)="cancelDelete()">
+    @if (choice(); as c) {
+      @if (c.kind === 'series') {
+        <p>
+          „{{ deleting()?.title }}“ gehört zu einer Trainingsserie. Soll nur dieser Termin gelöscht werden oder alle Termine der Serie?
+        </p>
+        <p><strong>Nur diesen Termin:</strong> wird mit allen Bewertungen und internen Notizen gelöscht und entsteht nicht neu.</p>
+        @if (c.allAvailable) {
+          <p><strong>Alle Termine der Serie:</strong> die Serie wird gelöscht. Vergangene Termine bleiben immer bestehen.</p>
+          <p class="preview" role="status" data-testid="series-delete-preview">{{ seriesPreview() ?? 'Es wird geprüft, welche Termine schon bewertet sind …' }}</p>
+        } @else {
+          <p class="hint" role="status">Die ganze Serie lässt sich hier gerade nicht löschen: Die Planung ist noch nicht geladen oder die Serie gibt es nicht mehr.</p>
+        }
+      } @else {
+        <p>
+          „{{ deleting()?.title }}“ wird mit allen Bewertungen und internen Notizen gelöscht. Das lässt sich nicht rückgängig machen.
+        </p>
+      }
+      @if (deleteFailed()) {
+        <p class="error" role="alert">Löschen fehlgeschlagen. Bitte Verbindung prüfen und erneut versuchen.</p>
+      }
+      <div class="confirm-actions" [class.stacked]="c.kind === 'series'">
+        <button tkButton type="button" (click)="cancelDelete()">Abbrechen</button>
+        @if (c.kind === 'series') {
+          <button tkButton type="button" variant="primary" class="delete-one" [disabled]="deleteBusy()" (click)="confirmDelete()">{{ deleteBusy() ? 'Löscht …' : 'Nur diesen Termin' }}</button>
+          <button tkButton type="button" variant="primary" class="delete-series" [disabled]="deleteBusy() || !c.allAvailable || seriesPreview() === null" (click)="confirmDeleteSeries()">Alle Termine der Serie</button>
+        } @else {
+          <button tkButton type="button" variant="primary" [disabled]="deleteBusy()" (click)="confirmDelete()">{{ deleteBusy() ? 'Löscht …' : 'Endgültig löschen' }}</button>
+        }
+      </div>
     }
-    <div class="confirm-actions">
-      <button tkButton type="button" (click)="cancelDelete()">Abbrechen</button>
-      <button tkButton type="button" variant="primary" [disabled]="deleteBusy()" (click)="confirmDelete()">{{ deleteBusy() ? 'Löscht …' : 'Endgültig löschen' }}</button>
-    </div>
   </tk-dialog>
 }
