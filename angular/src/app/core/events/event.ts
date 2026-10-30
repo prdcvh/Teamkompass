@@ -5,6 +5,7 @@
  * interne Notizen liegen in Unterkollektionen und gehören nie ins Event-Dokument.
  */
 import { formatDate, isIsoDate } from '../shared/dates';
+import { type WarmupProgram, warmupFromDoc } from './warmup';
 import { DEFAULT_EXERTION, DEFAULT_TRAINING_DURATION, exertionFromLegacyIntensity, legacyIntensityForExertion } from './exertion';
 
 export { formatDate };
@@ -72,6 +73,11 @@ export interface TeamEvent {
    * Spiel zählt nicht fürs Punktesammeln. Trainings brauchen die Angabe nicht (dort sind Punkte immer möglich).
    */
   readonly pointsEnabled?: boolean;
+  /**
+   * Nur bei Trainings (SCRUM-178): Welches Aufwärmprogramm gemacht wurde. Fehlt = nicht gemacht (auch bei alten
+   * Events). Wird im Formular nicht bearbeitet, sondern direkt in der Leseansicht gesetzt.
+   */
+  readonly warmup?: WarmupProgram;
 }
 
 /** Eingaben aus dem Formular; alles als Text, wie es der Nutzer eingibt. */
@@ -268,6 +274,7 @@ export function eventFromDoc(id: string, data: Readonly<Record<string, unknown>>
     notes: text(data['notes']),
     ...(data['seriesEdited'] === true ? { seriesEdited: true as const } : {}),
     ...(type === 'Spiel' ? { pointsEnabled: data['pointsEnabled'] === true } : {}),
+    ...(type === 'Training' && warmupFromDoc(data['warmup']) !== null ? { warmup: warmupFromDoc(data['warmup'])! } : {}),
   };
 }
 
@@ -293,6 +300,8 @@ export function docFromEvent(event: TeamEvent): Record<string, unknown> {
     notes: event.notes,
     // Nur bei Spielen; Trainings bleiben unverändert (dort sind Punkte immer möglich).
     ...(event.type === 'Spiel' ? { pointsEnabled: event.pointsEnabled === true } : {}),
+    // Nur wenn gesetzt (merge: das Formular löscht ein gemachtes Aufwärmprogramm nie; das geht nur über setWarmup).
+    ...(event.type === 'Training' && event.warmup ? { warmup: event.warmup } : {}),
   };
 }
 

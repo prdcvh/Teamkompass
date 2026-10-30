@@ -35,6 +35,31 @@
       <app-home-ranking [mobile]="mobile()" />
 
       <tk-card>
+        <div class="panel" data-testid="warmup-panel">
+          <div class="panel-head">
+            <h2>Aufwärmprogramm</h2>
+            <span class="muted">diese Woche (Mo–So)</span>
+          </div>
+          @let warm = warmup();
+          @if (warm.hasTrainings) {
+            <p class="warmup-quote"><strong data-testid="warmup-quote">{{ warm.quote }}</strong> mit Aufwärmprogramm</p>
+          } @else {
+            <p class="muted">Diese Woche gab es noch kein Training.</p>
+          }
+          @if (warm.currentHint) {
+            <p class="warmup-hint" role="status" data-testid="warmup-hint-current">Diese Woche wurde noch kein Aufwärmprogramm eingetragen. Bitte im Training abhaken.</p>
+          }
+          @if (warm.previousHint) {
+            <p class="warmup-hint" role="status" data-testid="warmup-hint-previous">Letzte Woche wurde kein Aufwärmprogramm gemacht ({{ warm.previousQuote }}).</p>
+          }
+          <p class="muted">
+            Der Haken steht in den Event-Details des Trainings.
+            <a class="more" [href]="warm.url" target="_blank" rel="noopener noreferrer">Mehr zu FIFA 11+ Kids (öffnet in neuem Tab)</a>
+          </p>
+        </div>
+      </tk-card>
+
+      <tk-card>
         <div class="panel">
           <div class="panel-head">
             <h2>Aufstellung</h2>
