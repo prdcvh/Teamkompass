@@ -82,6 +82,6 @@ export class PlayerStatsService {
 
   private fail(error: unknown, text: string): void {
     console.error(error);
-    this.error.set(`${text} ${authErrorMessage(errorCode(error))}`);
+    this.error.set(`${text} ${authErrorMessage(errorCode(error), this.session.role())}`);
   }
 }

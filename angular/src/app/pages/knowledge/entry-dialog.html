@@ -1,0 +1,113 @@
+<tk-dialog [open]="open()" [title]="heading()" (closed)="closed.emit()">
+  <form (submit)="submit($event)" novalidate>
+    <div class="field">
+      <label class="tk-label">
+        Art des Eintrags
+        <select class="tk-input" name="type" [value]="draft().type" (change)="setType($event)">
+          @for (type of types; track type.value) {
+            <option [value]="type.value" [selected]="draft().type === type.value">{{ type.label }}</option>
+          }
+        </select>
+      </label>
+    </div>
+
+    <div class="field">
+      <label class="tk-label">
+        {{ isGlossary() ? 'Begriff' : 'Titel' }}
+        <input
+          class="tk-input"
+          name="title"
+          autocomplete="off"
+          [placeholder]="isGlossary() ? 'z. B. Abseitsfalle' : 'z. B. Pressing im Mittelfeld'"
+          [attr.maxlength]="limits.title"
+          [value]="draft().title"
+          [attr.aria-invalid]="errors().title ? 'true' : null"
+          [attr.aria-describedby]="errors().title ? 'err-title' : null"
+          (input)="patch({ title: value($event) })"
+        />
+      </label>
+      @if (errors().title) {
+        <span class="error" id="err-title" role="alert">{{ errors().title }}</span>
+      }
+    </div>
+
+    <div class="field">
+      <label class="tk-label">
+        {{ isGlossary() ? 'Link (optional)' : 'Link' }}
+        <input
+          class="tk-input"
+          name="url"
+          type="text"
+          inputmode="url"
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+          placeholder="https://…"
+          [attr.maxlength]="limits.url"
+          [value]="draft().url"
+          [attr.aria-invalid]="errors().url ? 'true' : null"
+          [attr.aria-describedby]="errors().url ? 'err-url' : 'hint-url'"
+          (input)="patch({ url: value($event) })"
+        />
+      </label>
+      @if (errors().url) {
+        <span class="error" id="err-url" role="alert">{{ errors().url }}</span>
+      } @else {
+        <span class="hint" id="hint-url">Nur Adressen mit https://. Der Link öffnet in einem neuen Tab.</span>
+      }
+    </div>
+
+    <div class="field">
+      <label class="tk-label">
+        {{ isGlossary() ? 'Erklärung' : 'Kurze Beschreibung (optional)' }}
+        <textarea
+          class="tk-input"
+          name="description"
+          rows="4"
+          [attr.maxlength]="limits.description"
+          [value]="draft().description"
+          [attr.aria-invalid]="errors().description ? 'true' : null"
+          [attr.aria-describedby]="errors().description ? 'err-description' : null"
+          (input)="patch({ description: value($event) })"
+        ></textarea>
+      </label>
+      @if (errors().description) {
+        <span class="error" id="err-description" role="alert">{{ errors().description }}</span>
+      }
+    </div>
+
+    <div class="field">
+      <label class="tk-label">
+        Kategorie / Thema (optional)
+        <input
+          class="tk-input"
+          name="category"
+          autocomplete="off"
+          list="knowledge-categories"
+          placeholder="z. B. Taktik"
+          [attr.maxlength]="limits.category"
+          [value]="draft().category"
+          [attr.aria-invalid]="errors().category ? 'true' : null"
+          [attr.aria-describedby]="errors().category ? 'err-category' : null"
+          (input)="patch({ category: value($event) })"
+        />
+      </label>
+      <datalist id="knowledge-categories">
+        @for (category of categories(); track category) {
+          <option [value]="category"></option>
+        }
+      </datalist>
+      @if (errors().category) {
+        <span class="error" id="err-category" role="alert">{{ errors().category }}</span>
+      }
+    </div>
+
+    <menu>
+      @if (editing()) {
+        <button tkButton type="button" variant="neutral" class="delete" (click)="askDelete()">Eintrag löschen</button>
+      }
+      <button tkButton type="button" variant="neutral" (click)="closed.emit()">Abbrechen</button>
+      <button tkButton type="submit" variant="primary">Speichern</button>
+    </menu>
+  </form>
+</tk-dialog>

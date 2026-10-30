@@ -49,3 +49,7 @@ unbestätigte E-Mail, anonym, abgemeldet, fremde E-Mail bei gebundenem Code, unv
 und Codes, die auf bestehende Vereine/Teams zeigen, werden abgewiesen. Beitrittscodes (nur vom Vereinsadmin für den
 eigenen Verein): neues Team mit erstem Trainer, aber keine Adminrechte und kein Zugriff auf Nachbarteams. Ein mit dem
 Skript `scripts/create-club-invite.mjs` (Logik `scripts/club-invite-lib.mjs`) erzeugter Code lässt sich einlösen.
+
+`knowledge.test.mjs`: Wissen (SCRUM-106) liegt als Map `knowledge.{id}` im Trainer-Dokument `meta/settings` – nur Trainer lesen und
+schreiben, Spieler, Eltern, Medizin, Scout, abgelaufene Trainer und Fremde nicht; und der Befund, dass eine neue Unter-Sammlung
+unter `teams/{teamId}` ohne Regeländerung für alle gesperrt wäre.

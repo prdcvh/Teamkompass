@@ -117,6 +117,15 @@ describe('App-Routen (SCRUM-224)', () => {
     expect(router.url).toBe('/anmelden');
   });
 
+  it('„/wissen“ (SCRUM-106) ist nur für Trainer: Spieler, Eltern, Medizin und Scouts landen in ihrer Ansicht', async () => {
+    expect((await open('/wissen')).router.url).toBe('/wissen');
+    for (const role of ['player', 'parent', 'physio', 'scout'] as const) {
+      TestBed.resetTestingModule();
+      state.role = role;
+      expect((await open('/wissen')).router.url).toBe('/ansicht');
+    }
+  });
+
   it('„/events/:id“ (Bewertung) bleibt in der Shell', async () => {
     const { router, text } = await open('/events/abc');
     expect(router.url).toBe('/events/abc');

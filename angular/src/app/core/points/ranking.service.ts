@@ -151,7 +151,7 @@ export class RankingService {
   private fail(error: unknown, generation: number): void {
     if (generation !== this.generation) return;
     console.error(error);
-    this.error.set(`Die Rangliste konnte nicht geladen werden. ${authErrorMessage(errorCode(error))}`);
+    this.error.set(`Die Rangliste konnte nicht geladen werden. ${authErrorMessage(errorCode(error), this.session.role())}`);
     this.load.set('error');
   }
 

@@ -43,7 +43,7 @@ export class NotificationsService {
       console.error(error);
       if (generation !== this.generation) return;
       this.load.set('error');
-      this.error.set(`Die Einstellung konnte nicht geladen werden. ${authErrorMessage(errorCode(error))}`);
+      this.error.set(`Die Einstellung konnte nicht geladen werden. ${authErrorMessage(errorCode(error), this.session.role())}`);
     }
   }
 
@@ -59,7 +59,7 @@ export class NotificationsService {
       if (generation === this.generation) this.emailReminders.set(enabled);
     } catch (error) {
       console.error(error);
-      if (generation === this.generation) this.error.set(`Die Einstellung konnte nicht gespeichert werden. ${authErrorMessage(errorCode(error))}`);
+      if (generation === this.generation) this.error.set(`Die Einstellung konnte nicht gespeichert werden. ${authErrorMessage(errorCode(error), this.session.role())}`);
     } finally {
       if (generation === this.generation) this.saving.set(false);
     }

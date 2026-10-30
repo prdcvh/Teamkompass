@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { emptyDraft } from './event';
+import { draftFromEvent, emptyDraft } from './event';
 import { EventsService } from './events.service';
 import { SessionService } from '../auth/session.service';
 import { SquadService } from '../player/squad.service';
@@ -30,6 +30,41 @@ describe('EventsService', () => {
     firebase.events.events.set('e2', { type: 'Spiel', title: 'Derby', date: '2026-10-10' });
     firebase.events.emitEvents();
     expect(events.events()).toHaveLength(2);
+  });
+
+  describe('Aufwärmprogramm (SCRUM-178)', () => {
+    it('setWarmup schreibt nur das Feld; Bearbeiten über das Formular lässt es unverändert', async () => {
+      const events = setup();
+      events.start();
+      await vi.waitFor(() => expect(events.load()).toBe('ready'));
+      expect(events.events()[0].warmup).toBeUndefined(); // altes Event ohne Feld = nicht gemacht
+      expect(events.setWarmup('e1', '11+ Kids')).toBe(true);
+      await vi.waitFor(() => expect(firebase.events.events.get('e1')?.['warmup']).toBe('11+ Kids'));
+      expect(events.events()[0].warmup).toBe('11+ Kids');
+      const edit = { ...draftFromEvent(events.events()[0]), title: 'Training umbenannt' };
+      expect(events.save(edit)).toEqual({});
+      await vi.waitFor(() => expect(firebase.events.events.get('e1')?.['title']).toBe('Training umbenannt'));
+      expect(firebase.events.events.get('e1')?.['warmup']).toBe('11+ Kids');
+      events.setWarmup('e1', null);
+      await vi.waitFor(() => expect(events.events()[0].warmup).toBeUndefined());
+    });
+
+    it('nur Trainer, nur bei Trainings', async () => {
+      const events = setup('physio');
+      events.start();
+      await vi.waitFor(() => expect(events.load()).toBe('ready'));
+      expect(events.setWarmup('e1', '11+')).toBe(false);
+      expect(firebase.events.events.get('e1')?.['warmup']).toBeUndefined();
+    });
+
+    it('Spiele nehmen kein Aufwärmprogramm an', async () => {
+      const events = setup();
+      firebase.events.events.set('g1', { type: 'Spiel', title: 'Derby', date: '2026-10-10', warmup: '11+' });
+      events.start();
+      await vi.waitFor(() => expect(events.load()).toBe('ready'));
+      expect(events.events().find((e) => e.id === 'g1')?.warmup).toBeUndefined();
+      expect(events.setWarmup('g1', '11+')).toBe(false);
+    });
   });
 
   describe('nur die laufende Saison (SCRUM-199)', () => {

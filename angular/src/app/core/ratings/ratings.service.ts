@@ -233,12 +233,12 @@ export class RatingsService {
     this.unsubscribers.forEach((unsubscribe) => unsubscribe());
     this.unsubscribers = []; // erlaubt „Erneut versuchen“
     this.load.set('error');
-    this.error.set(`Die Bewertungen konnten nicht geladen werden. ${authErrorMessage(errorCode(error))}`);
-    this.sync.fail('Laden fehlgeschlagen');
+    this.error.set(`Die Bewertungen konnten nicht geladen werden. ${authErrorMessage(errorCode(error), this.session.role())}`);
+    this.sync.fail('Laden fehlgeschlagen', 'load');
   }
 
   private failWrite(error: unknown, text: string): void {
     console.error(error);
-    this.sync.fail(`${text} ${authErrorMessage(errorCode(error))}`);
+    this.sync.fail(`${text} ${authErrorMessage(errorCode(error), this.session.role())}`);
   }
 }

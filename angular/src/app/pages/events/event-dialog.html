@@ -20,6 +20,26 @@
           </div>
         }
       </dl>
+      @if (warmup(); as warmup) {
+        <section class="warmup" aria-label="Aufwärmprogramm">
+          <label class="warmup-check">
+            <input type="checkbox" name="warmup" [checked]="warmup.program !== null" [disabled]="!canEdit()" (change)="toggleWarmup($any($event.target).checked)" />
+            <span>Aufwärmprogramm gemacht</span>
+          </label>
+          <label class="tk-label warmup-program">
+            Programm
+            <select class="tk-input" name="warmupProgram" [disabled]="warmup.program === null" [value]="warmup.program ?? warmupPrograms[0]" (change)="chooseWarmup(value($event))">
+              @for (program of warmupPrograms; track program) {
+                <option [value]="program" [selected]="(warmup.program ?? warmupPrograms[0]) === program">{{ program }}</option>
+              }
+            </select>
+          </label>
+          <p class="hint">
+            Wer FIFA 11+ Kids mindestens einmal pro Woche macht, hat deutlich weniger Verletzungen.
+            <a [href]="warmupUrl" target="_blank" rel="noopener noreferrer">Mehr zum Programm (öffnet in neuem Tab)</a>
+          </p>
+        </section>
+      }
       @if (plan(); as plan) {
         <section class="opponent-plan" aria-label="Gegnerprofil">
           <h3>Gegner: {{ plan.profile.name }}</h3>

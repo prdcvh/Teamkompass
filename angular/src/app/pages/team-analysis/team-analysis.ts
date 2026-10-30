@@ -25,6 +25,16 @@ function bars(rows: readonly { label: string; value: number }[]): BarRow[] {
   return rows.map((row) => ({ ...row, percent: Math.round((row.value / max) * 100) }));
 }
 
+/** Bilanz als „2 S · 1 U · 0 N“. */
+export function formatRecord(record: { wins: number; draws: number; losses: number }): string {
+  return `${record.wins} S · ${record.draws} U · ${record.losses} N`;
+}
+
+/** Torverhältnis als „3:1“. */
+export function formatGoals(record: { goalsFor: number; goalsAgainst: number }): string {
+  return `${record.goalsFor}:${record.goalsAgainst}`;
+}
+
 /** Teamanalyse: Teamform, Kennzahlen, Geburtsquartale, Positionsabdeckung und Trainingsfokus (nur Trainer). */
 @Component({
   selector: 'app-team-analysis',
@@ -54,8 +64,8 @@ export class TeamAnalysis implements OnInit {
     const quarters = this.quarters();
     return [
       { label: 'Spiele', value: String(stats.games) },
-      { label: 'Bilanz', value: `${record.wins} S · ${record.draws} U · ${record.losses} N` },
-      { label: 'Torverhältnis', value: `${record.goalsFor}:${record.goalsAgainst}` },
+      { label: 'Bilanz', value: formatRecord(record) },
+      { label: 'Torverhältnis', value: formatGoals(record) },
       { label: 'Ø Teamnote', value: gradeLabel(stats.avgGrade) },
       { label: 'Teilnahmequote', value: `${stats.attendanceRate}%` },
       { label: 'Ø Anstrengung', value: stats.avgIntensity === null ? '-' : stats.avgIntensity.toFixed(1).replace('.', ',') },
@@ -81,10 +91,8 @@ export class TeamAnalysis implements OnInit {
   protected readonly focusRows = computed(() => bars(Object.entries(this.focus()).map(([label, value]) => ({ label, value }))));
   protected readonly quarterRows = computed(() => bars(Object.entries(this.quarters()).map(([label, value]) => ({ label, value }))));
   protected readonly positionRows = computed(() => bars(this.coverage().slice(0, 10).map(([label, value]) => ({ label, value }))));
-  protected readonly quarterText = computed(() => {
-    const q = this.quarters();
-    return `Q1 ${q.Q1}, Q2 ${q.Q2}, Q3 ${q.Q3}, Q4 ${q.Q4}`;
-  });
+  protected readonly recordText = computed(() => formatRecord(this.stats().record));
+  protected readonly goalsText = computed(() => formatGoals(this.stats().record));
 
   protected numberLabel = numberLabel;
   protected gradeLabel = gradeLabel;
