@@ -1,0 +1,65 @@
+<tk-dialog [open]="open()" title="Spielplan importieren" (closed)="closed.emit()">
+  @if (created() !== null) {
+    <p role="status" class="done" data-testid="import-done">
+      {{ created() === 1 ? '1 Spiel wurde angelegt.' : created() + ' Spiele wurden angelegt.' }}
+    </p>
+    <div class="actions">
+      <button tkButton type="button" variant="primary" (click)="closed.emit()">Fertig</button>
+    </div>
+  } @else {
+    <p class="muted">
+      Lade eine CSV-Datei mit deinem Spielplan. Sie wird nur in deinem Browser gelesen und nicht hochgeladen. Erst nach der Vorschau werden die Spiele angelegt.
+    </p>
+    <p class="muted">
+      Spalten: Datum (TT.MM.JJJJ), Uhrzeit (HH:MM), Heim/Gast, Gegner, Ort. „Datum“ und „Gegner“ sind Pflicht. Höchstens {{ maxRows }} Zeilen.
+    </p>
+    <input #csv class="file" type="file" accept=".csv,text/csv,text/plain" aria-label="CSV-Datei wählen" (change)="choose($event)" />
+    <div class="actions start">
+      <button tkButton type="button" [disabled]="reading() || busy()" (click)="csv.click()">{{ previewing() ? 'Andere Datei wählen …' : 'CSV-Datei wählen …' }}</button>
+      <button tkButton type="button" variant="ghost" (click)="downloadTemplate()">Vorlage herunterladen</button>
+    </div>
+
+    @if (reading()) {
+      <p class="muted" role="status">Datei wird gelesen …</p>
+    }
+    @if (fileError()) {
+      <p class="error" role="alert" data-testid="import-file-error">{{ fileError() }}</p>
+    }
+
+    @if (previewing()) {
+      <p class="summary" role="status" data-testid="import-summary">
+        „{{ fileName() }}“: {{ summary().total }} Zeilen – {{ summary().ok }} neu,
+        {{ summary().duplicates }} Dubletten, {{ summary().errors }} fehlerhaft.
+      </p>
+      @if (summary().errors > 0) {
+        <p class="error" role="alert">Es wird nichts angelegt, solange fehlerhafte Zeilen dabei sind. Bitte die Datei korrigieren und erneut wählen.</p>
+      }
+      <ul class="rows" aria-label="Vorschau">
+        @for (entry of checked(); track entry.row.line) {
+          <li class="row" [attr.data-status]="entry.status">
+            <span class="line">Zeile {{ entry.row.line }}</span>
+            <span class="what">
+              <strong>{{ entry.row.opponent || '–' }}</strong>
+              <small>
+                {{ entry.row.date ? formatDate(entry.row.date) : '–' }}{{ entry.row.time ? ', ' + entry.row.time + ' Uhr' : ', keine Uhrzeit' }}@if (sideLabel(entry)) { · {{ sideLabel(entry) }}}@if (entry.row.location) { · {{ entry.row.location }}}
+              </small>
+              @if (entry.message) {
+                <small class="msg">{{ entry.message }}</small>
+              }
+            </span>
+            <span class="status">{{ statusLabel(entry) }}</span>
+          </li>
+        }
+      </ul>
+      @if (failure()) {
+        <p class="error" role="alert">{{ failure() }}</p>
+      }
+      <div class="actions">
+        <button tkButton type="button" (click)="closed.emit()">Abbrechen</button>
+        <button tkButton type="button" variant="primary" [disabled]="!canCreate()" (click)="create()">
+          {{ busy() ? 'Legt an …' : summary().ok === 1 ? '1 Spiel anlegen' : summary().ok + ' Spiele anlegen' }}
+        </button>
+      </div>
+    }
+  }
+</tk-dialog>

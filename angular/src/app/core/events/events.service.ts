@@ -11,6 +11,7 @@ import { SessionService } from '../auth/session.service';
 import { seasonStartIso } from '../shared/season';
 import { SquadService } from '../player/squad.service';
 import { SyncService } from '../shell/sync.service';
+import { MAX_IMPORT_ROWS } from './schedule-import';
 
 export type EventsLoad = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -163,6 +164,34 @@ export class EventsService {
       .then(() => (!previous || previous.date !== event.date ? this.absences.reconcileEvent(event, this.squad.players()) : 0))
       .catch((error) => this.failWrite(error, `„${event.title}“ konnte nicht gespeichert werden.`));
     return {};
+  }
+
+  /**
+   * Spielplan-Import (SCRUM-189): legt alle Spiele in EINEM Schreibvorgang an (alles oder nichts). Jeder Entwurf läuft
+   * durch dieselbe Prüfung und Umwandlung wie {@link save} (`validateDraft`, `eventFromDraft`, `docFromEvent`), die
+   * angelegten Spiele haben also dieselben Felder wie von Hand angelegte. Rückgabe: Fehlertext oder leer bei Erfolg.
+   */
+  async importGames(drafts: readonly EventDraft[]): Promise<string> {
+    if (!this.canWrite()) return 'Nur Trainer dürfen Events ändern.';
+    if (this.load() !== 'ready') return 'Die Events sind noch nicht geladen. Bitte kurz warten und erneut versuchen.';
+    if (drafts.length === 0) return 'Es gibt nichts anzulegen.';
+    if (drafts.length > MAX_IMPORT_ROWS) return `Pro Import sind höchstens ${MAX_IMPORT_ROWS} Spiele erlaubt.`;
+    const bad = drafts.findIndex((draft) => Object.keys(validateDraft(draft)).length > 0);
+    if (bad >= 0) return `Das ${bad + 1}. Spiel ist ungültig. Es wurde nichts angelegt.`;
+    const created = drafts.map((draft) => eventFromDraft(draft, `e${crypto.randomUUID()}`));
+    // Spiele vor dem Saisonbeginn würden sonst gleich nach dem Anlegen aus der Liste verschwinden.
+    if (created.some((event) => event.date < this.seasonStart())) this.showAllSeasons();
+    if (!this.sync.isFailed()) this.sync.state.set('syncing');
+    try {
+      await this.eventsApi.saveEventsBatch(created.map((event) => ({ id: event.id, data: docFromEvent(event) })));
+    } catch (error) {
+      this.failWrite(error, 'Der Spielplan konnte nicht angelegt werden.');
+      return 'Der Spielplan konnte nicht angelegt werden. Es wurde nichts angelegt. Bitte Verbindung prüfen und erneut versuchen.';
+    }
+    this.sync.clearError();
+    // Spieler mit Abwesenheit im Zeitraum automatisch auf „Fehlt“ setzen (SCRUM-80), wie beim einzelnen Anlegen.
+    void this.absences.reconcileEvents(created, this.squad.players(), { fresh: true }).catch((error) => console.error(error));
+    return '';
   }
 
   /**
