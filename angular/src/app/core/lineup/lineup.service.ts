@@ -121,12 +121,12 @@ export class LineupService {
     this.unsubscribe?.();
     this.unsubscribe = null; // erlaubt „Erneut versuchen“
     this.load.set('error');
-    this.error.set(`Die Aufstellung konnte nicht geladen werden. ${authErrorMessage(errorCode(error))}`);
-    this.sync.fail('Laden fehlgeschlagen');
+    this.error.set(`Die Aufstellung konnte nicht geladen werden. ${authErrorMessage(errorCode(error), this.session.role())}`);
+    this.sync.fail('Laden fehlgeschlagen', 'load');
   }
 
   private failWrite(error: unknown): void {
     console.error(error);
-    this.sync.fail(`Die Aufstellung konnte nicht gespeichert werden. ${authErrorMessage(errorCode(error))}`);
+    this.sync.fail(`Die Aufstellung konnte nicht gespeichert werden. ${authErrorMessage(errorCode(error), this.session.role())}`);
   }
 }

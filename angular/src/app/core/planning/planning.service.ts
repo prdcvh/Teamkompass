@@ -215,7 +215,7 @@ export class PlanningService {
       rated = await this.eventsApi.findEventsWithRecords(changeCandidates(seriesId, todayIso(), events));
     } catch (error) {
       console.error(error);
-      this.run.set({ state: 'error', text: `${prefix}es konnte nicht geprüft werden, welche Termine schon bewertet sind. Deshalb wurde nichts geändert. ${authErrorMessage(errorCode(error))} ${suffix}` });
+      this.run.set({ state: 'error', text: `${prefix}es konnte nicht geprüft werden, welche Termine schon bewertet sind. Deshalb wurde nichts geändert. ${authErrorMessage(errorCode(error), this.session.role())} ${suffix}` });
       return null;
     }
     return planSeriesChange(seriesId, series, todayIso(), events, rated, skippedFromPlanningDoc(this.stored()), this.breaks());
@@ -253,7 +253,7 @@ export class PlanningService {
       }
     } catch (error) {
       console.error(error);
-      const reason = authErrorMessage(errorCode(error));
+      const reason = authErrorMessage(errorCode(error), this.session.role());
       this.sync.fail(`Nicht alle Termine der Serie konnten geändert werden. ${reason}`);
       failure = `Es wurden nur ${done} von ${total} Terminänderungen übernommen. ${retryHint} ${reason}`;
     }
@@ -319,7 +319,7 @@ export class PlanningService {
       })
       .catch((error) => {
         console.error(error);
-        this.sync.fail(`${failure} ${authErrorMessage(errorCode(error))}`);
+        this.sync.fail(`${failure} ${authErrorMessage(errorCode(error), this.session.role())}`);
         return false;
       });
   }

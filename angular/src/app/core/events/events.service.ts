@@ -205,12 +205,12 @@ export class EventsService {
     this.unsubscribe = null; // erlaubt „Erneut versuchen“
     this.load.set('error');
     this.flushWaiters();
-    this.error.set(`Die Events konnten nicht geladen werden. ${authErrorMessage(errorCode(error))}`);
-    this.sync.fail('Laden fehlgeschlagen');
+    this.error.set(`Die Events konnten nicht geladen werden. ${authErrorMessage(errorCode(error), this.session.role())}`);
+    this.sync.fail('Laden fehlgeschlagen', 'load');
   }
 
   private failWrite(error: unknown, text: string): void {
     console.error(error);
-    this.sync.fail(`${text} ${authErrorMessage(errorCode(error))}`);
+    this.sync.fail(`${text} ${authErrorMessage(errorCode(error), this.session.role())}`);
   }
 }

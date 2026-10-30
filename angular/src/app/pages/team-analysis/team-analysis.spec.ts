@@ -4,7 +4,7 @@ import { provideRouter } from '@angular/router';
 import { LayoutService } from '../../core/shell/layout.service';
 import { SessionService } from '../../core/auth/session.service';
 import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
-import { TeamAnalysis } from './team-analysis';
+import { TeamAnalysis, formatGoals, formatRecord } from './team-analysis';
 
 describe('TeamAnalysis (Teamanalyse)', () => {
   let firebase: FakeFirebase;
@@ -60,10 +60,30 @@ describe('TeamAnalysis (Teamanalyse)', () => {
     expect(root(fixture).querySelectorAll('svg.chart .dot')).toHaveLength(2);
     const headings = [...root(fixture).querySelectorAll('h2')].map((h) => h.textContent);
     expect(headings).toEqual(['Teamform', 'Nützliche Kennzahlen', 'Geburtsquartale', 'Positionsabdeckung', 'Trainingsfokus']);
-    expect(text(fixture)).toContain('Umschalten: 1 Einheiten');
-    expect(text(fixture)).toContain('Knapp besetzt: IV, LA, ST');
+    expect(text(fixture)).toContain('Umschalten (Einheiten)');
+    expect(text(fixture)).toContain('Knapp besetztIV, LA, ST');
     expect(root(fixture).querySelector('[aria-label="Q1: 1 Spieler"]')).not.toBeNull();
     expect(root(fixture).querySelector('[aria-label="ST: 1 Spieler"]')).not.toBeNull();
+  });
+
+  it('zeigt die fünf Kennzahlen-Blöcke mit hervorgehobenen Zahlen und Profil-Links', async () => {
+    const fixture = await render();
+    await ready(fixture);
+    const blocks = [...root(fixture).querySelectorAll('.insights .insight')];
+    expect(blocks.map((b) => b.querySelector('h3')?.textContent)).toEqual(['Topform', 'Belastung im Blick', 'Spielauswertung', 'Trainingssteuerung', 'Kaderstruktur']);
+    const figures = [...root(fixture).querySelectorAll('[data-insight="spielauswertung"] .figure strong')].map((el) => el.textContent);
+    expect(figures).toEqual(['1 S · 0 U · 0 N', '3:1']);
+    const quarters = [...root(fixture).querySelectorAll('[data-insight="kaderstruktur"] .figure')].map((el) => el.textContent?.replace(/\s+/g, ' ').trim());
+    expect(quarters).toEqual(['1Q1', '0Q2', '0Q3', '1Q4']);
+    const link = root(fixture).querySelector('[data-insight="topform"] a');
+    expect(link?.getAttribute('href')).toBe('/profile/p1');
+    expect(root(fixture).querySelector('[data-insight="topform"] .value-badge')?.textContent).toContain('Note');
+    expect(root(fixture).querySelector('.insights [style]')).toBeNull();
+  });
+
+  it('formatiert Bilanz und Torverhältnis', () => {
+    expect(formatRecord({ wins: 2, draws: 1, losses: 0 })).toBe('2 S · 1 U · 0 N');
+    expect(formatGoals({ goalsFor: 0, goalsAgainst: 0 })).toBe('0:0');
   });
 
   it('gibt Spielernamen und Eventtitel nie als HTML aus', async () => {
@@ -83,6 +103,8 @@ describe('TeamAnalysis (Teamanalyse)', () => {
     expect(text(fixture)).toContain('Noch keine Bewertungen.');
     expect(text(fixture)).toContain('Noch keine Spieler im Kader.');
     expect(text(fixture)).toContain('keine auffälligen Lücken');
+    expect(text(fixture)).toContain('Keine Auffälligkeiten.');
+    expect(root(fixture).querySelectorAll('.insight-empty')).toHaveLength(2);
   });
 
   it('zeigt am Handy eine Spalte', async () => {

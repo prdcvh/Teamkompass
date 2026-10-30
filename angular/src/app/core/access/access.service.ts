@@ -52,7 +52,7 @@ export class AccessService {
     } catch (error) {
       if (generation !== this.generation) return;
       console.error(error);
-      this.error.set(`Die Zugänge konnten nicht geladen werden. ${authErrorMessage(errorCode(error))}`);
+      this.error.set(`Die Zugänge konnten nicht geladen werden. ${authErrorMessage(errorCode(error), this.session.role())}`);
       this.load.set('error');
     }
   }
@@ -76,7 +76,7 @@ export class AccessService {
       await this.accessApi.createInvite(code, { playerId, role: 'player', expiresAt });
     } catch (error) {
       console.error(error);
-      return { ok: false, message: `Der Einladungscode konnte nicht erstellt werden. ${authErrorMessage(errorCode(error))}` };
+      return { ok: false, message: `Der Einladungscode konnte nicht erstellt werden. ${authErrorMessage(errorCode(error), this.session.role())}` };
     }
     await this.reload();
     return { ok: true, code, expiresAt };
@@ -90,7 +90,7 @@ export class AccessService {
       else await this.accessApi.deleteInvite(entry.id);
     } catch (error) {
       console.error(error);
-      return { ok: false, message: `Der Zugang konnte nicht gesperrt werden. ${authErrorMessage(errorCode(error))}` };
+      return { ok: false, message: `Der Zugang konnte nicht gesperrt werden. ${authErrorMessage(errorCode(error), this.session.role())}` };
     }
     await this.reload();
     // Letzter Scout gesperrt: die Scout-Sicht wird gelöscht (SCRUM-170).
@@ -106,7 +106,7 @@ export class AccessService {
     } catch (error) {
       console.error(error);
       const label = staffLabel(role);
-      return { ok: false, message: `${label} konnte nicht angelegt werden. ${authErrorMessage(errorCode(error))}` };
+      return { ok: false, message: `${label} konnte nicht angelegt werden. ${authErrorMessage(errorCode(error), this.session.role())}` };
     }
     if (this.load() === 'ready') await this.reload();
     // Erster Scout angelegt: die Scout-Sicht wird jetzt aufgebaut (SCRUM-170).

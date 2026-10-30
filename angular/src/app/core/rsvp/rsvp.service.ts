@@ -112,7 +112,7 @@ export class RsvpService {
       return true;
     } catch (error) {
       console.error(error);
-      this.error.set(`Rückmeldung konnte nicht gespeichert werden. ${authErrorMessage(errorCode(error))}`);
+      this.error.set(`Rückmeldung konnte nicht gespeichert werden. ${authErrorMessage(errorCode(error), this.session.role())}`);
       return false;
     } finally {
       this.saving.set(null);
@@ -254,7 +254,7 @@ export class RsvpService {
     } catch (error) {
       // Beim nächsten Abgleich erneut versuchen (der Eintrag in `processed` bleibt alt).
       console.error(error);
-      this.sync.fail(`Rückmeldung konnte nicht in die Bewertung übernommen werden. ${authErrorMessage(errorCode(error))}`);
+      this.sync.fail(`Rückmeldung konnte nicht in die Bewertung übernommen werden. ${authErrorMessage(errorCode(error), this.session.role())}`);
       return 0;
     }
   }

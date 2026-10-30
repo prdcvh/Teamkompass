@@ -213,11 +213,11 @@ export class TeamService {
   private fail(error: unknown): void {
     console.error(error);
     this.ownError.set(this.message(error));
-    this.sync.fail('Laden fehlgeschlagen');
+    this.sync.fail('Laden fehlgeschlagen', 'load');
   }
 
   private message(error: unknown): string {
-    return `Die Teamauswertung konnte nicht geladen werden. ${authErrorMessage(errorCode(error))}`;
+    return `Die Teamauswertung konnte nicht geladen werden. ${authErrorMessage(errorCode(error), this.session.role())}`;
   }
 }
 
