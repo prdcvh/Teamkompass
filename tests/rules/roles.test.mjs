@@ -118,6 +118,40 @@ test("Spieler listen Pläne und Noten nur mit passendem playerId-Filter (so frag
   await assertFails(getDocs(query(ratings, where("playerId", "==", "p2"))));
 });
 
+// SCRUM-234: "Mein Profil" holt fuer jeden Termin gezielt ratings/{eigene playerId} - auch fuer Termine ohne
+// Bewertung (zukuenftige Termine, nicht bewertet). Fehlt das Dokument, muss der Abruf trotzdem erlaubt sein,
+// sonst laedt das ganze Profil nicht (permission-denied). Fremde Bewertungen bleiben gesperrt.
+test("Spieler und Eltern lesen das eigene, noch nicht vorhandene Bewertungsdokument; fremde (auch fehlende) nie", async () => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    // e2: zukuenftiger Termin ohne jede Bewertung. e3: Bewertung unter p1, deren Feld aber auf p2 zeigt.
+    await setDoc(doc(db, t("events/e2")), { title: "Spiel", date: "2099-01-01" });
+    await setDoc(doc(db, t("events/e3/ratings/p1")), { playerId: "p2", effort: 1 });
+    await setDoc(doc(db, t("members/oldparent")), { role: "parent", playerId: "p1", expiresAt: past() });
+  });
+  for (const uid of ["pl1", "parent1", "futurepl"]) {
+    await canRead(uid, "events/e2/ratings/p1");
+    // Auch fuer einen Termin, den es (noch) gar nicht gibt.
+    await canRead(uid, "events/unbekannt/ratings/p1");
+    await canRead(uid, "events/e1/ratings/p1");
+    await cannotRead(uid, "events/e2/ratings/p2");
+    await cannotRead(uid, "events/e1/ratings/p2");
+    await cannotRead(uid, "events/e3/ratings/p1");
+  }
+  await canRead("pl2", "events/e2/ratings/p2");
+  await cannotRead("pl2", "events/e2/ratings/p1");
+  for (const uid of [null, "fremd", "oldpl", "oldparent", "medic", "scout", "legacyScout", "oldScout"]) {
+    await cannotRead(uid, "events/e2/ratings/p1");
+    await cannotRead(uid, "events/e1/ratings/p1");
+  }
+  await canRead("coach", "events/e2/ratings/p1");
+  // Listenabfragen bleiben wie bisher nur mit passendem playerId-Filter erlaubt.
+  const ratings = collection(as("pl1"), t("events/e2/ratings"));
+  await assertSucceeds(getDocs(query(ratings, where("playerId", "==", "p1"))));
+  await assertFails(getDocs(ratings));
+  await assertFails(getDocs(query(ratings, where("playerId", "==", "p2"))));
+});
+
 test("Spieler dürfen nur die Selbstreflexion des eigenen Förderplans ändern (Eltern gar nichts)", async () => {
   const plan = (uid) => doc(as(uid), t("players/p1/developmentPlans/f1"));
   await assertSucceeds(updateDoc(plan("pl1"), { selfReflection: "ok", selfReflectionAt: "2026-10-12" }));

@@ -23,26 +23,41 @@ export function eventTeamGrade(ratings: ReadonlyMap<string, Rating> | undefined)
 export interface TeamStats {
   /** Alle Spiel-Events (auch künftige). */
   readonly games: number;
+  /** Bilanz nur aus Spielen bis heute. */
   readonly record: TeamRecord;
-  /** Mittel der Event-Durchschnitte; null ohne Noten. */
+  /** Mittel der Event-Durchschnitte von Events bis heute; null ohne Noten. */
   readonly avgGrade: number | null;
-  /** Anteil „Anwesend“/„Teilweise“ an allen erfassten Bewertungen ohne „Nicht im Kader“, in Prozent. */
+  /**
+   * Anteil „Anwesend“/„Teilweise“ an allen gesetzten Anwesenheiten (ohne „Offen“ und „Nicht im Kader“)
+   * von Events bis heute, in Prozent. Im Voraus vorbelegtes „Fehlt“ (Verletzung/Abwesenheit) bei kommenden
+   * Events zählt nicht.
+   */
   readonly attendanceRate: number;
+  /** Ø Anstrengung der Events bis heute; null ohne solche Events. */
   readonly avgIntensity: number | null;
 }
 
+/**
+ * Event hat schon stattgefunden (Datum heute oder früher; `today` als JJJJ-MM-TT, lokaler Kalendertag).
+ * Gleiche Grenze wie die Bilanz (`matchResult`): Events ohne Datum zählen mit.
+ */
+export function isPastOrToday(event: TeamEvent, today: string): boolean {
+  return !event.date || event.date <= today;
+}
+
 export function teamStats(events: readonly TeamEvent[], ratings: RatingsByEvent, today: string): TeamStats {
-  const eventGrades = events.map((event) => eventTeamGrade(ratings.get(event.id))).filter((grade): grade is number => grade !== null);
-  const attendances = events
+  const past = events.filter((event) => isPastOrToday(event, today));
+  const eventGrades = past.map((event) => eventTeamGrade(ratings.get(event.id))).filter((grade): grade is number => grade !== null);
+  const attendances = past
     .flatMap((event) => [...(ratings.get(event.id)?.values() ?? [])].map((rating) => rating.attendance))
-    .filter((attendance) => attendance !== 'excluded');
+    .filter((attendance) => attendance !== 'excluded' && attendance !== 'open');
   const attended = attendances.filter((attendance) => attendance === 'present' || attendance === 'limited').length;
   return {
     games: events.filter((event) => event.type === 'Spiel').length,
     record: teamRecord(events, today),
     avgGrade: eventGrades.length ? roundGrade(eventGrades.reduce((sum, grade) => sum + grade, 0) / eventGrades.length) : null,
     attendanceRate: attendances.length ? Math.round((attended / attendances.length) * 100) : 0,
-    avgIntensity: events.length ? roundGrade(events.reduce((sum, event) => sum + event.exertion, 0) / events.length) : null,
+    avgIntensity: past.length ? roundGrade(past.reduce((sum, event) => sum + event.exertion, 0) / past.length) : null,
   };
 }
 

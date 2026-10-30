@@ -5,7 +5,7 @@ import { map } from 'rxjs';
 import { exertionLabel, formatDate, resultText } from '../../core/events/event';
 import { EventsService } from '../../core/events/events.service';
 import { LineupService } from '../../core/lineup/lineup.service';
-import { lineupSummary } from '../../core/lineup/lineup';
+import { lineupIsEmpty, lineupSummary } from '../../core/lineup/lineup';
 import { LayoutService, injectNarrowViewport } from '../../core/shell/layout.service';
 import { type Player, consentRevokedMessage, isConsentRevoked } from '../../core/player/player';
 import {
@@ -95,7 +95,7 @@ export class EventRating implements OnInit {
     const event = this.event();
     if (!event || event.type !== 'Spiel' || !this.lineupService.canWrite() || this.lineupService.load() !== 'ready') return null;
     const entry = this.lineupService.eventLineups()[event.id];
-    return entry ? lineupSummary(entry.assignments, this.allPlayers()) : null;
+    return entry && !lineupIsEmpty(entry.assignments) ? lineupSummary(entry.assignments, this.allPlayers()) : null;
   });
 
   protected readonly allPlayers = computed(() => [...this.squad.players()].sort((a, b) => a.number - b.number));

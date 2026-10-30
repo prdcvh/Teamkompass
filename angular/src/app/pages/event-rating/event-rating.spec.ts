@@ -11,7 +11,7 @@ describe('EventRating (Event bewerten)', () => {
   let firebase: FakeFirebase;
   const isMobile = signal(false);
 
-  async function render(options: { mobile?: boolean; eventId?: string; game?: boolean; consent?: string; lineup?: boolean; role?: 'trainer' | 'physio'; points?: boolean } = {}) {
+  async function render(options: { mobile?: boolean; eventId?: string; game?: boolean; consent?: string; lineup?: boolean | 'leer'; role?: 'trainer' | 'physio'; points?: boolean } = {}) {
     const { mobile = false, eventId = 'e1', game = true, consent, lineup = false, role = 'trainer', points = false } = options;
     isMobile.set(mobile);
     firebase = new FakeFirebase();
@@ -26,7 +26,8 @@ describe('EventRating (Event bewerten)', () => {
       ['p3', { attendance: 'absent', note: 'Verletzt', autoAbsence: true, playerId: 'p3' }],
     ]));
     firebase.ratings.privateNotes.set('e1', new Map([['p1', { playerId: 'p1', note: 'Vertraulich' }]]));
-    if (lineup) {
+    if (lineup === 'leer') firebase.lineup.lineup = { assignments: { TW: ['p2'] }, byEvent: { e1: { assignments: {}, savedAt: '2026-10-09T10:00:00.000Z' } } };
+    else if (lineup) {
       firebase.lineup.lineup = { assignments: { TW: ['p2'] }, byEvent: { e1: { assignments: { TW: ['p1'], RV: ['p2', 'weg'] }, savedAt: '2026-10-09T10:00:00.000Z' } } };
     }
     const params = new BehaviorSubject(convertToParamMap({ id: eventId }));
@@ -113,6 +114,13 @@ describe('EventRating (Event bewerten)', () => {
       expect(qa(fixture, '.lineup button, .lineup input, .lineup select')).toHaveLength(0);
       expect(firebase.calls).not.toContain('saveLineup');
       expect(firebase.calls).not.toContain('saveEventLineup');
+    });
+
+    it('zeigt keinen leeren Aufstellungs-Block, wenn die Aufstellung des Spiels bewusst geleert wurde (SCRUM-219)', async () => {
+      const fixture = await render({ lineup: 'leer' });
+      await vi.waitFor(() => expect(firebase.calls).toContain('watchLineup'));
+      fixture.detectChanges();
+      expect(q(fixture, '.lineup')).toBeNull();
     });
 
     it('zeigt nichts, wenn für das Spiel keine Aufstellung gespeichert ist', async () => {
