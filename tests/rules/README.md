@@ -15,7 +15,8 @@ Aktuell abgedeckt (`roles.test.mjs`): Rollen-Matrix für Trainer, Medizin (`phys
 alte Kennung `medical`, SCRUM-170: nur `scoutProfiles`, keine Gesundheits- oder Rohdaten), Spieler, Eltern,
 abgelaufene Zugänge und Nicht-Mitglieder – wer welche Pfade lesen/schreiben darf (Spielerprofile,
 Bewertungen, interne Notizen, Förderpläne, Abwesenheiten, Messwerte, Gegner, Aufstellung,
-Mitgliedschaften, Einladungen), inklusive der Listenabfragen mit `playerId`-Filter.
+Mitgliedschaften, Einladungen), inklusive der Listenabfragen mit `playerId`-Filter. Seit SCRUM-234 auch der gezielte Abruf eines noch **nicht vorhandenen** Bewertungsdokuments
+(eigenes erlaubt, fremdes nicht; Scout, Medizin, abgelaufene Zugänge weiter gesperrt).
 
 `invite-claim.test.mjs`: Einmalverbrauch von Einladungscodes (SCRUM-77) – gültiger Erst-Claim, zweiter Claim,
 fehlender/abgelaufener Code, falscher Spieler/Rolle, parallele Claims und die unveränderten Trainer-Wege.
