@@ -234,7 +234,7 @@ describe('Schulferien (Hinweis)', () => {
     );
     expect(items).toContain('Himmelfahrt/Pfingsten 07.05.2027 (schulfrei)');
     expect(root.textContent).toContain('Kultusministerkonferenz');
-    expect(root.textContent).toContain('keine regulären Ferien');
+    expect(root.textContent).toContain('als schul- bzw. unterrichtsfreie Tage gekennzeichnet');
   });
 
   it('nennt die Sonderregel für die Inseln in Schleswig-Holstein', () => {
@@ -243,7 +243,7 @@ describe('Schulferien (Hinweis)', () => {
       'Schulferien Schleswig-Holstein 2027',
     );
     expect(root.textContent).toContain('Sylt');
-    expect(root.textContent).not.toContain('keine regulären Ferien');
+    expect(root.textContent).not.toContain('als schul- bzw. unterrichtsfreie Tage gekennzeichnet');
   });
 
   it('nennt ein fehlendes Jahr, statt falsche oder leere Daten zu zeigen', () => {

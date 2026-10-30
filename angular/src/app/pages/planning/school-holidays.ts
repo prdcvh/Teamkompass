@@ -1,5 +1,8 @@
 import { DEFAULT_FEDERAL_STATE, type FederalState } from '../../core/team-settings/federal-states';
-import { KMK_SCHOOL_HOLIDAYS } from './school-holidays-kmk';
+import { KMK_2025_26 } from './school-holidays-kmk-2025-26';
+import { KMK_2026_27 } from './school-holidays-kmk-2026-27';
+import { KMK_2027_28 } from './school-holidays-kmk-2027-28';
+import { KMK_2028_29 } from './school-holidays-kmk-2028-29';
 
 /**
  * Schulferien aller 16 Bundesländer als feste Liste (kein Abruf aus dem Internet). Nur ein Hinweis für die
@@ -12,12 +15,13 @@ import { KMK_SCHOOL_HOLIDAYS } from './school-holidays-kmk';
  *   Kultusministerkonferenz (FER2025_26.pdf). Die KMK-Termine 2025/26 bis 2028/29 für Hessen stimmen mit dieser Liste
  *   überein (Test in school-holidays.spec.ts).
  * - Alle anderen Länder: Ferienkalender der Kultusministerkonferenz, Schuljahre 2025/26 bis 2028/29
- *   (school-holidays-kmk.ts, Quelle je Schuljahr dort). Neuere Schuljahre hatte die KMK am 30.10.2026 noch nicht
+ *   (je Schuljahr eine Datei school-holidays-kmk-JJJJ-JJ.ts, Quelle dort). Neuere Schuljahre hatte die KMK am 30.10.2026 noch nicht
  *   veröffentlicht (FER2029_30.pdf gab es nicht).
  * Nicht enthalten: bewegliche Ferientage (legen Länder bzw. Schulen fest).
  *
  * Jährliche Aktualisierung (früher SCRUM-160, jetzt für alle Länder): neues KMK-PDF (bzw. die Seite des Hessischen
- * Kultusministeriums) lesen, Termine in school-holidays-kmk.ts bzw. hier ergänzen, `covered` und
+ * Kultusministeriums) lesen, neue Datei school-holidays-kmk-JJJJ-JJ.ts anlegen (bzw. Hessen hier ergänzen),
+ * in KMK_YEARS eintragen, `covered` und
  * SCHOOL_HOLIDAYS_CHECKED anpassen, Stichproben-Tests in school-holidays.spec.ts ergänzen.
  */
 export interface SchoolHoliday {
@@ -26,7 +30,7 @@ export interface SchoolHoliday {
   from: string;
   /** Letzter Ferientag (JJJJ-MM-TT). */
   to: string;
-  /** In der KMK-Liste kursiv: schul- bzw. unterrichtsfreie Tage statt regulärer Ferien. */
+  /** In der KMK-Liste kursiv gedruckt: dort als schul- bzw. unterrichtsfreie Tage gekennzeichnet. */
   schoolFreeDays?: boolean;
 }
 
@@ -39,6 +43,12 @@ export interface StateSchoolHolidays {
   /** Zusatzhinweis der Quelle für dieses Land (z. B. Sonderregeln für Inseln). */
   readonly note?: string;
 }
+
+/** Ferien eines KMK-Schuljahres je Land (ohne Hessen). */
+export type KmkSchoolYear = Readonly<Record<Exclude<FederalState, 'HE'>, readonly SchoolHoliday[]>>;
+
+/** Alle übernommenen KMK-Schuljahre. Bei der jährlichen Aktualisierung das neue Schuljahr anhängen. */
+const KMK_YEARS: readonly KmkSchoolYear[] = [KMK_2025_26, KMK_2026_27, KMK_2027_28, KMK_2028_29];
 
 /** Stand der Liste: Tag, an dem die Quellen geprüft wurden. */
 export const SCHOOL_HOLIDAYS_CHECKED = '2026-10-30';
@@ -73,7 +83,12 @@ const HESSEN: readonly SchoolHoliday[] = [
 ];
 
 function kmk(state: Exclude<FederalState, 'HE'>, note?: string): StateSchoolHolidays {
-  return { list: KMK_SCHOOL_HOLIDAYS[state], covered: KMK_COVERED, source: KMK_SOURCE, note };
+  return {
+    list: KMK_YEARS.flatMap((year) => year[state]),
+    covered: KMK_COVERED,
+    source: KMK_SOURCE,
+    note,
+  };
 }
 
 export const SCHOOL_HOLIDAYS_BY_STATE: Readonly<Record<FederalState, StateSchoolHolidays>> = {
