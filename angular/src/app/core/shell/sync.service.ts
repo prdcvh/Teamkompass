@@ -16,6 +16,8 @@ export class SyncService {
   readonly state = signal<SyncState>('idle');
   readonly lastSyncedAt = signal<Date | null>(null);
   readonly detail = signal('');
+  /** Woran der Fehler lag: Laden (z. B. Zugriff verweigert) oder Speichern. */
+  readonly failKind = signal<'load' | 'save'>('save');
   /** Ein Fehler bleibt stehen, bis ein späterer Schreibvorgang gelingt: ein Snapshot nach dem Zurückrollen darf ihn nicht überdecken. */
   private sticky = false;
 
@@ -30,7 +32,7 @@ export class SyncService {
       case 'offline':
         return 'Offline – Änderungen werden gesendet, sobald die Verbindung steht';
       case 'error':
-        return 'Speichern fehlgeschlagen – erneut versuchen';
+        return this.failKind() === 'load' ? 'Laden fehlgeschlagen – erneut versuchen' : 'Speichern fehlgeschlagen – erneut versuchen';
       default:
         return 'Verbinde …';
     }
@@ -55,8 +57,9 @@ export class SyncService {
     return this.sticky;
   }
 
-  fail(detail: string): void {
+  fail(detail: string, kind: 'load' | 'save' = 'save'): void {
     this.sticky = true;
+    this.failKind.set(kind);
     this.state.set('error');
     this.detail.set(detail);
   }
@@ -71,6 +74,7 @@ export class SyncService {
 
   reset(): void {
     this.sticky = false;
+    this.failKind.set('save');
     this.state.set('idle');
     this.lastSyncedAt.set(null);
     this.detail.set('');

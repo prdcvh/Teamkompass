@@ -1,5 +1,7 @@
+import type { Role } from './role';
+
 /** Verständliche Meldungen zu Firebase-Fehlercodes (Texte wie in der bisherigen App). */
-export function authErrorMessage(code: string | undefined): string {
+export function authErrorMessage(code: string | undefined, role?: Role | null): string {
   const value = code ?? '';
   if (value.includes('email-already-in-use') || value.includes('credential-already-in-use')) {
     return 'Diese E-Mail wird bereits verwendet.';
@@ -22,7 +24,10 @@ export function authErrorMessage(code: string | undefined): string {
     return 'Diese Anmeldemethode ist in der Firebase-Konsole noch nicht aktiviert.';
   }
   if (value.includes('permission-denied') || value.includes('insufficient-permissions')) {
-    return 'Zugriff von den Firestore-Regeln verweigert (permission-denied). Prüfe, ob firestore.rules wirklich veröffentlicht wurde.';
+    // Der technische Hinweis ist für den Trainer (Admin); alle anderen bekommen einen Text ohne Technikbegriffe (SCRUM-235).
+    return role === 'trainer'
+      ? 'Zugriff von den Firestore-Regeln verweigert (permission-denied). Prüfe, ob firestore.rules wirklich veröffentlicht wurde.'
+      : 'Du hast gerade keinen Zugriff auf diese Daten. Bitte melde dich bei deinem Trainer.';
   }
   return `Etwas ist schiefgelaufen${value ? ` (Code: ${value})` : ''}. Bitte erneut versuchen.`;
 }

@@ -122,7 +122,7 @@ export class RecordsStateService {
 
   failWrite(error: unknown, text: string): void {
     console.error(error);
-    this.sync.fail(`${text} ${authErrorMessage(errorCode(error))}`);
+    this.sync.fail(`${text} ${authErrorMessage(errorCode(error), this.session.role())}`);
   }
 
   clearSyncError(): void {
@@ -156,7 +156,7 @@ export class RecordsStateService {
 
   private failLoad(error: unknown): void {
     console.error(error);
-    this.error.set(`Die Zusatzdaten konnten nicht geladen werden. ${authErrorMessage(errorCode(error))}`);
-    this.sync.fail('Laden fehlgeschlagen');
+    this.error.set(`Die Zusatzdaten konnten nicht geladen werden. ${authErrorMessage(errorCode(error), this.session.role())}`);
+    this.sync.fail('Laden fehlgeschlagen', 'load');
   }
 }

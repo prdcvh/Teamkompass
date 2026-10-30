@@ -112,7 +112,7 @@ export class AbsenceSyncService {
 
   private fail(error: unknown): void {
     console.error(error);
-    this.sync.fail(`Abwesenheit konnte nicht in die Bewertung übernommen werden. ${authErrorMessage(errorCode(error))}`);
+    this.sync.fail(`Abwesenheit konnte nicht in die Bewertung übernommen werden. ${authErrorMessage(errorCode(error), this.session.role())}`);
   }
 }
 
