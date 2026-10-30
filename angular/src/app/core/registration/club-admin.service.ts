@@ -61,7 +61,7 @@ export class ClubAdminService {
       await this.load();
       return true;
     } catch (error) {
-      this.error.set(`Einladung konnte nicht erstellt werden. ${authErrorMessage(errorCode(error))}`);
+      this.error.set(`Einladung konnte nicht erstellt werden. ${authErrorMessage(errorCode(error), this.session.role())}`);
       return false;
     } finally {
       this.busy.set(false);
@@ -76,7 +76,7 @@ export class ClubAdminService {
       await this.api.deleteJoinInvite(code);
       await this.load();
     } catch (error) {
-      this.error.set(`Einladung konnte nicht zurückgezogen werden. ${authErrorMessage(errorCode(error))}`);
+      this.error.set(`Einladung konnte nicht zurückgezogen werden. ${authErrorMessage(errorCode(error), this.session.role())}`);
     } finally {
       this.busy.set(false);
     }

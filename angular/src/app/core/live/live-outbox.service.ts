@@ -122,11 +122,11 @@ export class LiveOutboxService {
       if (FINAL_ERRORS.some((final) => code.includes(final))) {
         console.error(error);
         this.forget(change.id);
-        this.sync.fail(`Punkte konnten nicht gespeichert werden. ${authErrorMessage(code)}`);
+        this.sync.fail(`Punkte konnten nicht gespeichert werden. ${authErrorMessage(code, this.session.role())}`);
       } else {
         // Vorübergehend (z. B. Netz, Server nicht erreichbar): bleibt im Postausgang und geht beim nächsten Start erneut raus.
         console.warn(error);
-        this.sync.fail(`Punkte noch nicht gespeichert, neuer Versuch beim nächsten Öffnen. ${authErrorMessage(code)}`);
+        this.sync.fail(`Punkte noch nicht gespeichert, neuer Versuch beim nächsten Öffnen. ${authErrorMessage(code, this.session.role())}`);
       }
       return false;
     } finally {
