@@ -66,37 +66,54 @@
           <div class="panel">
             <h2>Nützliche Kennzahlen</h2>
             <div class="insights">
-              <article>
-                <strong>Topform</strong>
+              <article class="insight" data-insight="topform">
+                <h3>Topform</h3>
                 @for (entry of topForm(); track entry.player.id) {
-                  <span><a [routerLink]="['/profile', entry.player.id]">{{ entry.player.name }}</a> · Note {{ gradeLabel(entry.grade) }}</span>
+                  <p class="insight-row">
+                    <a [routerLink]="['/profile', entry.player.id]">{{ entry.player.name }}</a>
+                    <span class="value-badge"><small>Note</small> {{ gradeLabel(entry.grade) }}</span>
+                  </p>
                 } @empty {
-                  <span>Noch keine Bewertungen.</span>
+                  <p class="insight-empty">Noch keine Bewertungen.</p>
                 }
               </article>
-              <article>
-                <strong>Belastung im Blick</strong>
+              <article class="insight" data-insight="belastung">
+                <h3>Belastung im Blick</h3>
                 @for (entry of loadWatch(); track entry.player.id) {
-                  <span>{{ entry.player.name }} · {{ entry.risk.level }}@if (entry.risk.reason) { · {{ entry.risk.reason }}}</span>
+                  <p class="insight-row">
+                    <span class="insight-name">{{ entry.player.name }}</span>
+                    <span class="level-badge">{{ entry.risk.level }}</span>
+                    @if (entry.risk.reason) {
+                      <small class="insight-reason">{{ entry.risk.reason }}</small>
+                    }
+                  </p>
                 } @empty {
-                  <span>Keine Auffälligkeiten.</span>
+                  <p class="insight-empty">Keine Auffälligkeiten.</p>
                 }
               </article>
-              <article>
-                <strong>Spielauswertung</strong>
-                <span>{{ stats().record.wins }} Siege, {{ stats().record.draws }} Unentschieden, {{ stats().record.losses }} Niederlagen</span>
-                <span>{{ stats().record.goalsFor }} Tore erzielt, {{ stats().record.goalsAgainst }} Gegentore</span>
+              <article class="insight" data-insight="spielauswertung">
+                <h3>Spielauswertung</h3>
+                <div class="figures">
+                  <p class="figure"><strong>{{ recordText() }}</strong><span>Siege · Unentschieden · Niederlagen</span></p>
+                  <p class="figure"><strong>{{ goalsText() }}</strong><span>Tore erzielt : Gegentore</span></p>
+                </div>
               </article>
-              <article>
-                <strong>Trainingssteuerung</strong>
-                @for (row of focusRows(); track row.label) {
-                  <span>{{ row.label }}: {{ row.value }} Einheiten</span>
-                }
+              <article class="insight" data-insight="trainingssteuerung">
+                <h3>Trainingssteuerung</h3>
+                <div class="figures small">
+                  @for (row of focusRows(); track row.label) {
+                    <p class="figure"><strong>{{ row.value }}</strong><span>{{ row.label }} (Einheiten)</span></p>
+                  }
+                </div>
               </article>
-              <article>
-                <strong>Kaderstruktur</strong>
-                <span>Geburtsquartale: {{ quarterText() }}</span>
-                <span>Knapp besetzt: {{ thin().length ? thin().join(', ') : 'keine auffälligen Lücken' }}</span>
+              <article class="insight" data-insight="kaderstruktur">
+                <h3>Kaderstruktur</h3>
+                <div class="figures small quarters">
+                  @for (row of quarterRows(); track row.label) {
+                    <p class="figure"><strong>{{ row.value }}</strong><span>{{ row.label }}</span></p>
+                  }
+                </div>
+                <p class="insight-note"><span>Knapp besetzt</span> <strong>{{ thin().length ? thin().join(', ') : 'keine auffälligen Lücken' }}</strong></p>
               </article>
             </div>
           </div>
