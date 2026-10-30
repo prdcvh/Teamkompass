@@ -291,3 +291,18 @@ a:focus-visible {
   min-height: 56px;
   font-size: var(--tk-text-md, 1rem);
 }
+
+/* Aufwärmprogramm (SCRUM-178) */
+.warmup-quote {
+  margin: 0;
+  font-size: var(--tk-text-lg);
+}
+
+.warmup-hint {
+  margin: 0;
+  padding: var(--tk-space-3);
+  border-radius: var(--tk-radius-md);
+  background: var(--tk-soft-amber);
+  color: var(--tk-ink);
+  font-size: var(--tk-text-md);
+}

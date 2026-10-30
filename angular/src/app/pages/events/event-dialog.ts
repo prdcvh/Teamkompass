@@ -18,6 +18,7 @@ import {
   formatDate,
   resultText,
 } from '../../core/events/event';
+import { DEFAULT_WARMUP_PROGRAM, WARMUP_INFO_URL, WARMUP_PROGRAMS, type WarmupProgram } from '../../core/events/warmup';
 import { EventsService } from '../../core/events/events.service';
 import { type Opponent, opponentForEvent, opponentNameKey, opponentRecord, recordText } from '../../core/opponents/opponent';
 import { OpponentsService } from '../../core/opponents/opponents.service';
@@ -55,6 +56,8 @@ export class EventDialog {
   protected readonly types = EVENT_TYPES;
   protected readonly exertions = EXERTIONS;
   protected readonly focuses = TRAINING_FOCUSES;
+  protected readonly warmupPrograms = WARMUP_PROGRAMS;
+  protected readonly warmupUrl = WARMUP_INFO_URL;
   protected readonly limits = { title: MAX_TITLE_LENGTH, text: MAX_TEXT_LENGTH, notes: MAX_NOTES_LENGTH, score: MAX_SCORE, duration: MAX_MATCH_DURATION, trainingDuration: MAX_TRAINING_DURATION };
 
   protected readonly draft = signal<EventDraft>(emptyDraft(todayIso()));
@@ -89,6 +92,12 @@ export class EventDialog {
       { label: 'Trainingsschwerpunkt', value: event.type === 'Training' ? event.trainingFocus : '' },
     ];
     return rows.filter((row) => row.value.trim() !== '');
+  });
+
+  /** Aufwärmprogramm-Haken (SCRUM-178): nur Trainer, nur bei Trainings; zeigt das gespeicherte Programm oder null. */
+  protected readonly warmup = computed(() => {
+    const event = this.shown();
+    return event && event.type === 'Training' && this.canEdit() ? { program: event.warmup ?? null } : null;
   });
 
   /** Gegnerprofile zur Auswahl (nur Trainer bekommen sie geladen, sonst leer). */
@@ -184,6 +193,17 @@ export class EventDialog {
 
   protected value(event: Event): string {
     return (event.target as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value;
+  }
+
+  protected toggleWarmup(checked: boolean): void {
+    const event = this.shown();
+    if (event) this.events.setWarmup(event.id, checked ? DEFAULT_WARMUP_PROGRAM : null);
+  }
+
+  protected chooseWarmup(program: string): void {
+    const event = this.shown();
+    const chosen: WarmupProgram | undefined = WARMUP_PROGRAMS.find((entry) => entry === program);
+    if (event && chosen) this.events.setWarmup(event.id, chosen);
   }
 
   protected startEdit(): void {
