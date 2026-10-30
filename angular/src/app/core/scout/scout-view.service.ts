@@ -78,8 +78,8 @@ export class ScoutViewService {
     this.unsubscribe?.();
     this.unsubscribe = null;
     this.view.set(EMPTY);
-    this.error.set(`Die Scout-Ansicht konnte nicht geladen werden. ${authErrorMessage(errorCode(error))}`);
+    this.error.set(`Die Scout-Ansicht konnte nicht geladen werden. ${authErrorMessage(errorCode(error), this.session.role())}`);
     this.load.set('error');
-    this.sync.fail('Laden fehlgeschlagen');
+    this.sync.fail('Laden fehlgeschlagen', 'load');
   }
 }

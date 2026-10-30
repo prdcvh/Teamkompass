@@ -74,7 +74,7 @@ export class TeamSettingsService {
       .then(() => this.sync.clearError())
       .catch((error) => {
         console.error(error);
-        this.sync.fail(`Der Standardort konnte nicht gespeichert werden. ${authErrorMessage(errorCode(error))}`);
+        this.sync.fail(`Der Standardort konnte nicht gespeichert werden. ${authErrorMessage(errorCode(error), this.session.role())}`);
       });
     return true;
   }
