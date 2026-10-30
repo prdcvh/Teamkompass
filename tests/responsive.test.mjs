@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execSync } from 'node:child_process';
-import { createReadStream, existsSync, statSync, mkdirSync } from 'node:fs';
+import { createReadStream, existsSync, statSync, mkdirSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import { extname, join, resolve } from 'node:path';
@@ -36,12 +36,12 @@ export const ROUTES = [
 
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json' };
 
-function serve() {
+function serve(headers = {}) {
   const server = createServer((req, res) => {
     const path = decodeURIComponent((req.url ?? '/').split('?')[0]);
     let file = join(dist, path);
     if (!file.startsWith(dist) || !existsSync(file) || statSync(file).isDirectory()) file = join(dist, 'index.html');
-    res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream' });
+    res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream', ...headers });
     createReadStream(file).pipe(res);
   });
   return new Promise((done) => server.listen(0, '127.0.0.1', () => done(server)));
@@ -102,8 +102,15 @@ function measure() {
 
 const playwright = loadPlaywright();
 
+// Beide Tests prüfen denselben, einmal frisch gebauten Stand (sonst prüfte ein Test einen alten Stand).
+let built = false;
+function buildOnce() {
+  if (!built) execSync('npm run build:e2e', { cwd: angular, stdio: 'inherit' });
+  built = true;
+}
+
 test('Keine Seite scrollt seitlich (alle Breiten, alle Seiten)', { skip: playwright ? false : 'Playwright nicht installiert', timeout: 600_000 }, async () => {
-  execSync('npm run build:e2e', { cwd: angular, stdio: 'inherit' }); // immer frisch bauen, sonst prüft der Test einen alten Stand
+  buildOnce();
   const server = await serve();
   const base = `http://127.0.0.1:${server.address().port}`;
   const browser = await playwright.chromium.launch();
@@ -131,4 +138,71 @@ test('Keine Seite scrollt seitlich (alle Breiten, alle Seiten)', { skip: playwri
     server.close();
   }
   assert.deepEqual(failures, [], `Seitliches Scrollen bzw. Überstand gefunden:\n${failures.join('\n')}`);
+});
+
+// SCRUM-119/121: Mit `style-src 'self'` (ohne 'unsafe-inline') darf die App keine Inline-Styles brauchen. Gemessen mit der
+// CSP aus firebase.json, nur ohne 'unsafe-inline'. Gestaltung per CSSOM ([style.x]-Bindungen, konstruierte Stylesheets)
+// ist erlaubt. Einzige verbleibende Ausnahme: Angular legt die Komponenten-Styles als <style>-Elemente in <head> an –
+// solange das so ist, bleibt 'unsafe-inline' in firebase.json (Entscheidung des PO offen, siehe SCRUM-119).
+const ANGULAR_COMPONENT_STYLE_ELEMENTS_ALLOWED = true;
+
+function strictStyleCsp() {
+  const config = JSON.parse(readFileSync(join(root, 'firebase.json'), 'utf8'));
+  const u14 = config.hosting.find((target) => target.target === 'u14');
+  const csp = u14.headers.flatMap((entry) => entry.headers).find((entry) => entry.key === 'Content-Security-Policy').value;
+  return csp.replace(/style-src [^;]*/, "style-src 'self'");
+}
+
+test('Strenge CSP für Styles: keine Inline-Style-Attribute, Berichte per CSSOM (SCRUM-119/121)', { skip: playwright ? false : 'Playwright nicht installiert', timeout: 600_000 }, async () => {
+  buildOnce();
+  const index = readFileSync(join(dist, 'index.html'), 'utf8');
+  assert.doesNotMatch(index, /<style|\sstyle\s*=|\son[a-z]+\s*=/i, 'index.html enthält Inline-Styles oder Inline-Handler');
+  const server = await serve({ 'content-security-policy': strictStyleCsp() });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await playwright.chromium.launch();
+  const failures = [];
+  try {
+    const routes = process.env.RESPONSIVE_ONLY ? ROUTES.filter((r) => r.includes(process.env.RESPONSIVE_ONLY)) : ROUTES;
+    for (const viewport of [{ width: 390, height: 844 }, { width: 1365, height: 900 }]) {
+      const mobile = viewport.width < 768;
+      const context = await browser.newContext({ viewport, isMobile: mobile, hasTouch: mobile, serviceWorkers: 'block' });
+      await context.addInitScript(() => {
+        window.__cspViolations = [];
+        document.addEventListener('securitypolicyviolation', (event) => {
+          const target = event.target;
+          const angularStyle = target instanceof HTMLStyleElement && target.parentNode === document.head;
+          window.__cspViolations.push({ directive: event.violatedDirective, angularStyle, sample: event.sample });
+        });
+      });
+      const page = await context.newPage();
+      for (const route of routes) {
+        await page.goto(base + route);
+        await page.waitForSelector('main, form, h1', { timeout: 15_000 });
+        await page.waitForTimeout(300);
+        const violations = await page.evaluate(() => window.__cspViolations);
+        const bad = violations.filter((v) => !(ANGULAR_COMPONENT_STYLE_ELEMENTS_ALLOWED && v.directive === 'style-src-elem' && v.angularStyle));
+        if (bad.length) failures.push(`${viewport.width}px ${route}: ${bad.map((v) => `${v.directive} „${v.sample}“`).join('; ')}`);
+      }
+      await context.close();
+    }
+    // PDF-Bericht: läuft im sandboxed iframe, das die CSP der App erbt; die Gestaltung muss trotzdem greifen.
+    const context = await browser.newContext({ serviceWorkers: 'block' });
+    const page = await context.newPage();
+    await page.addInitScript(() => { window.print = () => {}; });
+    await page.goto(`${base}/export`);
+    await page.getByRole('button', { name: 'Bericht erstellen' }).click();
+    const report = await page.waitForFunction(() => {
+      const doc = document.querySelector('iframe[sandbox]')?.contentDocument;
+      if (!doc?.body?.textContent?.includes('Spielerprofil')) return null;
+      return { margin: getComputedStyle(doc.body).marginTop, inline: doc.querySelectorAll('style, [style]').length };
+    });
+    const { margin, inline } = await report.jsonValue();
+    if (margin !== '32px') failures.push(`PDF-Bericht ungestaltet (Rand ${margin} statt 32px)`);
+    if (inline) failures.push(`PDF-Bericht enthält ${inline} Inline-Styles`);
+    await context.close();
+  } finally {
+    await browser.close();
+    server.close();
+  }
+  assert.deepEqual(failures, [], `CSP-Verstöße bei strengem style-src:\n${failures.join('\n')}`);
 });

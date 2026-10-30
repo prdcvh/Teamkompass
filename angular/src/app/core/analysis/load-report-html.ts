@@ -33,7 +33,11 @@ function chartSvg(weeks: readonly LoadReportWeek[]): string {
   return `<svg viewBox="0 0 ${width} ${height}" width="100%" role="img" aria-label="Belastung pro Woche">${grid}${bars}<text x="${left}" y="${height - 4}" font-size="10" fill="#70686b">Woche ab</text></svg>`;
 }
 
-const STYLE = `
+/**
+ * Gestaltung des Berichts. Steht nicht als Style-Element im HTML, sondern wird beim Drucken per CSSOM gesetzt
+ * (`FileOutput.print`), damit die CSP ohne `style-src 'unsafe-inline'` auskommt (SCRUM-119/121).
+ */
+export const LOAD_REPORT_CSS = `
   body { margin: 28px; color: #241d1f; font-family: Arial, Helvetica, sans-serif; font-size: 13px; }
   header { display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 4px solid #d8072e; padding-bottom: 14px; }
   header img { width: 72px; height: 72px; object-fit: contain; }
@@ -99,7 +103,6 @@ export function loadReportHtml(report: LoadReport, logoUrl = ''): string {
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Belastungsprotokoll ${e(report.playerName)}</title>
-<style>${STYLE}</style>
 </head>
 <body>
 <header>

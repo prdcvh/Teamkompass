@@ -46,6 +46,37 @@ test("CSP erlaubt nur eigene Skripte und die benoetigten Google- und Wetter-Dien
   }
 });
 
+test("Keine Inline-Styles im Angular-Quelltext; style-src ist für alle Targets gleich (SCRUM-119/121)", async () => {
+  // Inline-Styles (style-Attribute, <style>-Elemente) bräuchten `style-src 'unsafe-inline'`. Gestaltung per Klasse
+  // oder CSSOM ([style.x]-Bindung, element.style.x, konstruierte Stylesheets) ist von der CSP nicht betroffen.
+  const forbidden = [
+    [/<[a-zA-Z][^<>]*\sstyle\s*=/, "style-Attribut im Markup"],
+    [/<style[\s>]/i, "<style>-Element"],
+    [/\[attr\.style\]/, "[attr.style]-Bindung"],
+    [/setAttribute\(\s*['"]style['"]/, "setAttribute('style', …)"],
+  ];
+  const files = (await readdir(new URL("../angular/src", import.meta.url), { recursive: true }))
+    .filter((name) => /\.(html|ts)$/.test(name) && !name.endsWith(".spec.ts"));
+  assert.ok(files.length > 50, "Angular-Quelltext nicht gefunden");
+  const found = [];
+  for (const name of files) {
+    const text = await read(`angular/src/${name}`);
+    for (const [pattern, what] of forbidden) if (pattern.test(text)) found.push(`${name}: ${what}`);
+  }
+  assert.deepEqual(found, []);
+
+  const config = JSON.parse(await read("firebase.json"));
+  const styleSrc = config.hosting.map((target) => {
+    const csp = target.headers.flatMap((entry) => entry.headers).find((entry) => entry.key === "Content-Security-Policy").value;
+    return csp.split(";").map((part) => part.trim()).find((part) => part.startsWith("style-src "));
+  });
+  assert.equal(new Set(styleSrc).size, 1, `style-src weicht zwischen den Targets ab: ${styleSrc.join(" | ")}`);
+  // 'unsafe-inline' bleibt nur, solange Angular die Komponenten-Styles als <style>-Elemente einfügt (PO-Entscheidung
+  // offen, SCRUM-119); mehr als eigene Dateien plus diese Ausnahme ist nicht erlaubt.
+  const sources = styleSrc[0].split(/\s+/).slice(1);
+  assert.ok(sources.includes("'self'") && sources.every((source) => ["'self'", "'unsafe-inline'"].includes(source)), `style-src zu breit: ${styleSrc[0]}`);
+});
+
 test("Kein Skript von fremden Hosts: kein CDN-Import im Angular-Code, SDK nur ueber npm (SCRUM-118, SCRUM-120)", async () => {
   const { readdir: ls, readFile: rf } = await import("node:fs/promises");
   const walk = async (dir) => {

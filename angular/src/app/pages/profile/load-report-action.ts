@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { CurrentTeam } from '../../core/team/current-team.service';
 import { type LoadReportPeriod, LOAD_REPORT_PERIODS, buildLoadReport, canCreateLoadReport, loadReportRange } from '../../core/analysis/load-report';
-import { loadReportHtml } from '../../core/analysis/load-report-html';
+import { LOAD_REPORT_CSS, loadReportHtml } from '../../core/analysis/load-report-html';
 import { SessionService } from '../../core/auth/session.service';
 import { FileOutput } from '../../core/export/file-output';
 import { type Player, consentRevokedMessage, isConsentRevoked } from '../../core/player/player';
@@ -121,7 +121,7 @@ export class LoadReportAction {
       today: this.today,
       createdBy: this.author(player),
     });
-    this.files.print(loadReportHtml(report, new URL('club-logo.png', document.baseURI).href));
+    this.files.print(loadReportHtml(report, new URL('club-logo.png', document.baseURI).href), LOAD_REPORT_CSS);
     this.open.set(false);
   }
 

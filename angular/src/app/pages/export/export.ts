@@ -9,7 +9,7 @@ import { PlayerRecordsApi } from '../../core/firebase/player-records.api';
 import { OpponentsService } from '../../core/opponents/opponents.service';
 import { todayIso } from '../../core/shared/dates';
 import { type Player, consentRevokedMessage } from '../../core/player/player';
-import { profileReportHtml } from '../../core/profile/profile-report';
+import { PROFILE_REPORT_CSS, profileReportHtml } from '../../core/profile/profile-report';
 import { type Absence, absenceFromDoc } from '../../core/records/absence';
 import { type Measurement, measurementFromDoc } from '../../core/records/measurement';
 import { type DevelopmentPlan, planFromDoc } from '../../core/records/plan';
@@ -190,6 +190,7 @@ export class Export implements OnInit, OnDestroy {
     const history = (await this.readHistory([player])).get(player.id)!;
     this.files.print(
       profileReportHtml({ teamName: this.current.name(), player, items: entry.items, absences: history.absences, measurements: history.measurements, today: todayIso() }),
+      PROFILE_REPORT_CSS,
     );
     this.workspace.record(`Spielerprofil als PDF vorbereitet (${player.name})`);
     this.done.set('Der Druckdialog wurde geöffnet – dort „Als PDF speichern“ wählen.');
