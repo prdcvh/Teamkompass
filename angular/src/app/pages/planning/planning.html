@@ -82,7 +82,11 @@
     }
   }
 
-  <tk-school-holidays-hint />
+  @if (settings.load() === 'ready') {
+    <tk-school-holidays-hint [state]="settings.federalState()" />
+  } @else if (settings.load() === 'error') {
+    <p class="muted" role="status">Schulferien: Das Bundesland aus den Einstellungen konnte nicht geladen werden.</p>
+  }
 </section>
 
 <tk-series-dialog [open]="dialogOpen()" [series]="editing()" (closed)="closeDialog()" (deleteRequested)="askDelete($event)" />

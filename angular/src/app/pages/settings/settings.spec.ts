@@ -270,4 +270,58 @@ describe('Settings (Einstellungen & Datenschutz)', () => {
       expect(card(fixture)?.querySelector('button')).toBeNull();
     });
   });
+
+  describe('Bundesland des Teams (SCRUM-186)', () => {
+    const select = (fixture: { nativeElement: unknown }) => root(fixture).querySelector<HTMLSelectElement>('[data-testid="federal-state"]');
+
+    async function ready(fixture: Awaited<ReturnType<typeof render>>) {
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(select(fixture)?.disabled).toBe(false);
+      });
+    }
+
+    it('ist nur für Trainer sichtbar', async () => {
+      expect(select(await render('player'))).toBeNull();
+      TestBed.resetTestingModule();
+      expect(select(await render('physio'))).toBeNull();
+      TestBed.resetTestingModule();
+      expect(select(await render())).toBeNull();
+      TestBed.resetTestingModule();
+      expect(select(await render('trainer'))).not.toBeNull();
+    });
+
+    it('zeigt ohne gespeichertes Land Hessen und bietet alle 16 Länder an', async () => {
+      const fixture = await render('trainer');
+      await ready(fixture);
+      expect(select(fixture)!.options).toHaveLength(16);
+      expect(select(fixture)!.value).toBe('HE');
+      expect(root(fixture).textContent).toContain('Solange nichts gewählt ist, gilt Hessen');
+    });
+
+    it('speichert das gewählte Land in den Teameinstellungen', async () => {
+      const fixture = await render('trainer');
+      await ready(fixture);
+      const element = select(fixture)!;
+      element.value = 'BY';
+      element.dispatchEvent(new Event('change'));
+      await vi.waitFor(() => expect(firebase.settings.settings).toEqual({ federalState: 'BY' }));
+      fixture.detectChanges();
+      expect(select(fixture)!.value).toBe('BY');
+    });
+
+    it('zeigt einen Speicherfehler an', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const fixture = await render('trainer');
+      await ready(fixture);
+      firebase.settings.saveError = Object.assign(new Error('x'), { code: 'permission-denied' });
+      const element = select(fixture)!;
+      element.value = 'NW';
+      element.dispatchEvent(new Event('change'));
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(root(fixture).querySelector('#bundesland [role="alert"]')?.textContent).toContain('Das Bundesland konnte nicht gespeichert werden.');
+      });
+    });
+  });
 });

@@ -3,10 +3,12 @@ import { authErrorMessage, errorCode } from '../auth/auth-errors';
 import { TeamSettingsApi } from '../firebase/team-settings.api';
 import { SessionService } from '../auth/session.service';
 import { SyncService } from '../shell/sync.service';
-import { type DefaultLocation, defaultLocationFromDoc, docFromDefaultLocation } from './team-settings';
+import { type FederalState, isFederalState } from './federal-states';
+import { type DefaultLocation, defaultLocationFromDoc, docFromDefaultLocation, docFromFederalState, federalStateFromDoc } from './team-settings';
 
 /**
- * Teameinstellungen (`meta/settings`): derzeit der Standardort (Heimplatz), der neue Events vorbelegt.
+ * Teameinstellungen (`meta/settings`): der Standardort (Heimplatz), der neue Events vorbelegt, und das Bundesland
+ * für den Schulferien-Hinweis der Planung (SCRUM-186).
  * Lesen und Schreiben darf nur der Trainer. Ist das Laden nicht möglich, entsteht kein Standardort –
  * Events lassen sich trotzdem anlegen. Beim Abmelden werden Abo und Daten verworfen.
  */
@@ -20,6 +22,10 @@ export class TeamSettingsService {
   readonly load = signal<'idle' | 'loading' | 'ready' | 'error'>('idle');
   readonly canWrite = computed(() => this.session.role() === 'trainer');
   readonly defaultLocation = computed<DefaultLocation | null>(() => defaultLocationFromDoc(this.stored()));
+  /** Bundesland für den Schulferien-Hinweis; ohne gespeicherten Wert Hessen. */
+  readonly federalState = computed<FederalState>(() => federalStateFromDoc(this.stored()));
+  /** Letzter Speicherfehler (für die Anzeige in den Einstellungen); leer, solange alles gespeichert wurde. */
+  readonly error = signal('');
 
   private unsubscribe: (() => void) | null = null;
   private generation = 0;
@@ -60,21 +66,34 @@ export class TeamSettingsService {
     this.unsubscribe?.();
     this.unsubscribe = null;
     this.stored.set(null);
+    this.error.set('');
     this.load.set('idle');
   }
 
   /** Speichert (oder löscht mit null) den Standardort. Rückgabe: false, wenn nicht erlaubt. */
   saveDefaultLocation(location: DefaultLocation | null): boolean {
+    return this.save(docFromDefaultLocation(location), 'Der Standardort konnte nicht gespeichert werden.');
+  }
+
+  /** Speichert das Bundesland des Teams (nur Trainer, SCRUM-186). Rückgabe: false, wenn nicht erlaubt oder ungültig. */
+  saveFederalState(state: FederalState): boolean {
+    if (!isFederalState(state)) return false;
+    return this.save(docFromFederalState(state), 'Das Bundesland konnte nicht gespeichert werden.');
+  }
+
+  private save(doc: Record<string, unknown>, failText: string): boolean {
     if (!this.canWrite()) return false;
-    const doc = docFromDefaultLocation(location);
     this.stored.set({ ...this.stored(), ...doc });
+    this.error.set('');
     if (!this.sync.isFailed()) this.sync.state.set('syncing');
     void this.api
       .saveSettings(doc)
       .then(() => this.sync.clearError())
       .catch((error) => {
         console.error(error);
-        this.sync.fail(`Der Standardort konnte nicht gespeichert werden. ${authErrorMessage(errorCode(error), this.session.role())}`);
+        const message = `${failText} ${authErrorMessage(errorCode(error), this.session.role())}`;
+        this.error.set(message);
+        this.sync.fail(message);
       });
     return true;
   }

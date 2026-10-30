@@ -26,6 +26,20 @@ describe('Planung (Seite)', () => {
     input.dispatchEvent(new Event('input', { bubbles: true }));
   }
 
+  it('zeigt den Schulferien-Hinweis für das Bundesland aus den Teameinstellungen (SCRUM-186)', async () => {
+    const fixture = await render();
+    const summary = () => root(fixture).querySelector('tk-school-holidays-hint summary')?.textContent ?? '';
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(summary()).toContain('Schulferien Hessen');
+    });
+    firebase.settings.settings = { federalState: 'NW' };
+    firebase.settings.emit();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(summary()).toContain('Schulferien Nordrhein-Westfalen');
+  });
+
   it('zeigt eine leere Planung und legt eine Serie über das Formular an', async () => {
     const fixture = await render();
     expect(root(fixture).textContent).toContain('Noch keine Serie angelegt.');

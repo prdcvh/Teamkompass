@@ -1,4 +1,5 @@
 import { type LocationCoords, MAX_TEXT_LENGTH, isLocationCoords } from '../events/event';
+import { DEFAULT_FEDERAL_STATE, type FederalState, isFederalState } from './federal-states';
 
 /**
  * Standardort des Teams für das Wetter (SCRUM-153): gilt für jedes Event ohne über „Ort suchen“ gewählten Ort,
@@ -31,4 +32,14 @@ export function defaultLocationFromDoc(doc: Readonly<Record<string, unknown>> | 
 
 export function docFromDefaultLocation(location: DefaultLocation | null): Record<string, unknown> {
   return { defaultLocation: location === null ? null : { text: location.text.trim(), coords: location.coords } };
+}
+
+/** Dokument `meta/settings` → Bundesland; fehlt das Feld (bestehende Teams) oder ist es unbekannt, gilt Hessen (SCRUM-186). */
+export function federalStateFromDoc(doc: Readonly<Record<string, unknown>> | null): FederalState {
+  const raw = doc?.['federalState'];
+  return isFederalState(raw) ? raw : DEFAULT_FEDERAL_STATE;
+}
+
+export function docFromFederalState(state: FederalState): Record<string, unknown> {
+  return { federalState: state };
 }
