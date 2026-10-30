@@ -346,6 +346,15 @@ test("SessionStart-Hook installiert nur festgeschriebene, integritätsgeprüfte 
   }
 });
 
+test("SessionStart-Hook stellt ein festes Node mit geprueftem SHA-256 bereit (SCRUM-232)", async () => {
+  const hook = await read(".claude/hooks/session-start.sh");
+  assert.match(hook, /node_version="22\.(2[2-9]|[3-9]\d)\.\d+"/, "Node >= 22.22.3 festgeschrieben");
+  assert.match(hook, /node_sha256="[0-9a-f]{64}"/, "Prüfsumme festgeschrieben");
+  assert.match(hook, /sha256sum -c/, "Download wird gegen die Prüfsumme geprüft");
+  assert.match(hook, /CLAUDE_ENV_FILE/, "PATH wird für die Sitzung gesetzt");
+  assert.match(hook, /install_node \|\| echo "WARNUNG/, "ohne Netz/mit falscher Prüfsumme läuft der Sitzungsstart weiter");
+});
+
 test("Workflows: PR-Code laeuft ohne Service-Account-Secret, Secrets nicht inline interpoliert (SCRUM-57)", async () => {
   for (const file of [".github/workflows/firebase-hosting-pull-request.yml", ".github/workflows/firebase-hosting-merge.yml"]) {
     const workflow = await read(file);
