@@ -4,11 +4,12 @@ import { roleLabel } from '../../core/access/access';
 import { AuthService } from '../../core/auth/auth.service';
 import { homeFor, normalizeRole } from '../../core/auth/role';
 import { SessionService } from '../../core/auth/session.service';
+import { TeamSwitch } from '../../core/auth/team-switch.service';
 import { CurrentTeam, type TeamChoice as Choice } from '../../core/team/current-team.service';
 
 /**
  * Teamauswahl (SCRUM-181): Wer in mehreren Teams ist, wählt hier – nach der Anmeldung oder später über „Team
- * wechseln“ in der Seitenleiste bzw. im Mehr-Menü. Seit SCRUM-182 ohne Neuladen: der {@link AuthService} baut das alte
+ * wechseln“ in der Seitenleiste bzw. im Mehr-Menü. Seit SCRUM-182 ohne Neuladen: {@link TeamSwitch} baut das alte
  * Team vollständig ab (Rolle, Daten, Seiten) und öffnet das neue mit der Rolle, die das Konto dort hat.
  */
 @Component({
@@ -23,6 +24,7 @@ export class TeamChoice {
   protected readonly team = inject(CurrentTeam);
   private readonly session = inject(SessionService);
   private readonly router = inject(Router);
+  private readonly switcher = inject(TeamSwitch);
   /** Team, das gerade geöffnet wird (gegen Doppel-Tippen). */
   protected readonly opening = signal<string | null>(null);
 
@@ -52,7 +54,7 @@ export class TeamChoice {
     this.opening.set(choice.teamId);
     try {
       // Danach zur Startseite der neuen Rolle (eine Seite des alten Teams, z. B. ein Spielerprofil, gibt es dort nicht).
-      if (await this.auth.switchTeam(choice.teamId)) await this.router.navigateByUrl(homeFor(this.session.role()));
+      if (await this.switcher.switchTo(choice.teamId)) await this.router.navigateByUrl(homeFor(this.session.role()));
     } finally {
       this.opening.set(null);
     }

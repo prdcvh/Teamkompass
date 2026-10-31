@@ -6,13 +6,15 @@ import { CurrentTeam, LAST_TEAM_KEY } from '../team/current-team.service';
 import { FakeFirebase, provideFakeFirebase } from '../testing/fake-firebase';
 import { AuthService } from './auth.service';
 import { SessionService } from './session.service';
+import { TeamSwitch } from './team-switch.service';
 
 /** Teamwechsel ohne Neuladen (SCRUM-182): nichts vom alten Team bleibt sichtbar, es gilt die Rolle im neuen Team. */
-describe('AuthService – Teamwechsel ohne Neuladen', () => {
+describe('TeamSwitch – Teamwechsel ohne Neuladen', () => {
   let firebase: FakeFirebase;
   let auth: AuthService;
   let team: CurrentTeam;
   let session: SessionService;
+  let switcher: TeamSwitch;
 
   const trainerA = { teamId: 'A', role: 'trainer', playerId: null, expiresAt: null };
   const parentB = { teamId: 'B', role: 'parent', playerId: 'p7', expiresAt: null };
@@ -28,6 +30,7 @@ describe('AuthService – Teamwechsel ohne Neuladen', () => {
     auth = TestBed.inject(AuthService);
     team = TestBed.inject(CurrentTeam);
     session = TestBed.inject(SessionService);
+    switcher = TestBed.inject(TeamSwitch);
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     auth.start(0);
@@ -44,7 +47,7 @@ describe('AuthService – Teamwechsel ohne Neuladen', () => {
     expect(team.id()).toBe('A');
     expect(session.role()).toBe('trainer');
 
-    expect(await auth.switchTeam('B')).toBe(true);
+    expect(await switcher.switchTo('B')).toBe(true);
 
     expect(auth.status()).toBe('ready');
     expect(team.id()).toBe('B');
@@ -56,7 +59,7 @@ describe('AuthService – Teamwechsel ohne Neuladen', () => {
     await vi.waitFor(() => expect(team.title()).toBe('FC Beispiel · U15'));
     expect(team.logoSrc()).toBe('data:image/png;base64,AAAA');
     // Zurück geht genauso – wieder als Trainer.
-    expect(await auth.switchTeam('A')).toBe(true);
+    expect(await switcher.switchTo('A')).toBe(true);
     expect(session.role()).toBe('trainer');
     expect(session.playerId()).toBeNull();
   });
@@ -79,7 +82,7 @@ describe('AuthService – Teamwechsel ohne Neuladen', () => {
       setStatus(value);
     });
     const stop = vi.spyOn(squad, 'stop');
-    expect(await auth.switchTeam('B')).toBe(true);
+    expect(await switcher.switchTo('B')).toBe(true);
 
     // Erst „switching“ (Oberfläche weg, Rolle leer), dann das neue Team.
     expect(statuses).toEqual(['switching', 'ready']);
@@ -97,7 +100,7 @@ describe('AuthService – Teamwechsel ohne Neuladen', () => {
 
   it('prüft den Zugang frisch: inzwischen gesperrter Zugang öffnet nichts, das alte Team bleibt unverändert', async () => {
     firebase.teams.memberships.set('uid-1', [trainerA]);
-    expect(await auth.switchTeam('B')).toBe(false);
+    expect(await switcher.switchTo('B')).toBe(false);
     expect(auth.status()).toBe('ready');
     expect(team.id()).toBe('A');
     expect(session.role()).toBe('trainer');
@@ -108,7 +111,7 @@ describe('AuthService – Teamwechsel ohne Neuladen', () => {
 
   it('frisch geprüfte Rolle gilt: wurde man im Zielteam inzwischen Trainer, öffnet es als Trainer', async () => {
     firebase.teams.memberships.set('uid-1', [trainerA, { ...parentB, role: 'trainer', playerId: null }]);
-    expect(await auth.switchTeam('B')).toBe(true);
+    expect(await switcher.switchTo('B')).toBe(true);
     expect(session.role()).toBe('trainer');
     expect(session.playerId()).toBeNull();
   });
@@ -116,22 +119,22 @@ describe('AuthService – Teamwechsel ohne Neuladen', () => {
   it('wenn die Teamsuche fehlschlägt, bleibt man im alten Team (mit Hinweis)', async () => {
     firebase.teams.membershipsError = Object.assign(new Error('offline'), { code: 'unavailable' });
     firebase.access.memberErrors.set('uid-1', Object.assign(new Error('offline'), { code: 'unavailable' }));
-    expect(await auth.switchTeam('B')).toBe(false);
+    expect(await switcher.switchTo('B')).toBe(false);
     expect(team.id()).toBe('A');
     expect(session.role()).toBe('trainer');
     expect(auth.status()).toBe('ready');
   });
 
   it('gleiches Team oder nicht angemeldet: kein Wechsel', async () => {
-    expect(await auth.switchTeam('A')).toBe(true);
+    expect(await switcher.switchTo('A')).toBe(true);
     expect(session.role()).toBe('trainer');
     await auth.signOut();
-    expect(await auth.switchTeam('B')).toBe(false);
+    expect(await switcher.switchTo('B')).toBe(false);
     expect(auth.status()).toBe('signedOut');
   });
 
   it('Abmelden während des Wechsels gewinnt: danach ist niemand angemeldet und kein Team offen', async () => {
-    const switched = auth.switchTeam('B');
+    const switched = switcher.switchTo('B');
     await auth.signOut();
     expect(await switched).toBe(false);
     expect(auth.status()).toBe('signedOut');
