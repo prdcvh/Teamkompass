@@ -1,4 +1,4 @@
-import type { RegistrationApi } from '../firebase/registration.api';
+import type { AdminClubInfo, RegistrationApi } from '../firebase/registration.api';
 import type { FirebaseUser } from '../firebase/types';
 import type { ClubInvite, RegistrationWrite } from '../registration/registration';
 import type { FakeAuthApi } from './fake-auth.api';
@@ -8,7 +8,8 @@ export class FakeRegistrationApi implements Pick<RegistrationApi, keyof Registra
   readonly calls: string[] = [];
   invites = new Map<string, ClubInvite>();
   clubNames = new Map<string, string>();
-  adminClubs: { clubId: string; name: string }[] = [];
+  adminClubs: AdminClubInfo[] = [];
+  updateClubError: unknown = null;
   /** Ist die E-Mail bestätigt (Ergebnis von refreshVerified)? */
   verified = false;
   createError: unknown = null;
@@ -52,8 +53,14 @@ export class FakeRegistrationApi implements Pick<RegistrationApi, keyof Registra
     if (deleted) this.invites.delete(deleted.path[1]);
   }
 
-  async readMyAdminClubs(): Promise<{ clubId: string; name: string }[]> {
-    return this.adminClubs;
+  async readMyAdminClubs(): Promise<AdminClubInfo[]> {
+    return this.adminClubs.map((club) => ({ ...club }));
+  }
+
+  async updateClub(clubId: string, data: { readonly name: string; readonly logoUrl: string | null }): Promise<void> {
+    this.calls.push(`updateClub:${clubId}`);
+    if (this.updateClubError) throw this.updateClubError;
+    this.adminClubs = this.adminClubs.map((club) => (club.clubId === clubId ? { ...club, name: data.name, logoUrl: data.logoUrl } : club));
   }
 
   joinInvites: ClubInvite[] = [];

@@ -124,7 +124,11 @@ fake.teams.memberships.set('e2e-multi', [
   { teamId: 'Team0000000000000002', role: 'parent', playerId: 'p1', expiresAt: null },
 ]);
 fake.teams.metas.set('U14', { name: 'Test-Team U14 (Angular)', label: 'U14 Test', clubId: 'test-verein', clubName: 'Test-Verein (Angular-Test)', logoUrl: null });
-fake.teams.metas.set('Team0000000000000002', { name: 'FC Beispiel U15', label: 'U15', clubId: 'c2', clubName: 'FC Beispiel', logoUrl: null });
+// Vereinslogo aus der Datenbank (SCRUM-182): ein kleines Beispiel-PNG als data:-URL.
+const SAMPLE_LOGO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAAwklEQVR42u3a0Q2AIAwEUBZxJednG12AhJb2gF6uid/e06jQ2pqKqJ63f5ajZOjrMNHgxyDZwbdC0OFhiF3BIZBT4VMQKyec1VZEVugoBn710QA3who6C2DFpAFGAaIACyI1PAKQgigN8D6sCEAI4X3ToAAzBCdg5V1/CjBErHyokAD3XRBAAAEEEAAGKPEh01rodkCJ5bR2ZDcAym/qKdoq5RtbFK1FiuZu+fY6xYCDYsREM+SjGLPSDLppfjVQBesHTJGigAIPEM8AAAAASUVORK5CYII=';
+fake.teams.metas.set('Team0000000000000002', { name: 'FC Beispiel U15', label: 'U15', clubId: 'c2', clubName: 'FC Beispiel', logoUrl: SAMPLE_LOGO });
+// Vereinsadmin (SCRUM-181/182): Einstellungen zeigen „Name und Logo“ und die Trainer-Einladung.
+fake.registration.adminClubs = [{ clubId: 'c2', name: 'FC Beispiel', logoUrl: SAMPLE_LOGO }];
 // Spieler-Konto mit Einladungscode + E-Mail (SCRUM-114): ein offener Code für Spieler p1; ?as=player-email ist ein
 // schon mit E-Mail verbundener Spieler-Zugang.
 fake.access.invites.set('e2e-einladung', { role: 'player', playerId: 'p1', expiresAt: null, expiresAtRaw: null });

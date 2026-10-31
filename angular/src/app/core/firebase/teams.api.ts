@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import type { TeamMembership, TeamMeta } from '../team/current-team.service';
+import { logoFromDoc } from '../registration/club-logo';
 import { FirebaseConnection } from './firebase-connection';
 
 function dateOf(value: unknown): Date | null {
@@ -51,7 +52,8 @@ export class TeamsApi {
       const club = await getDoc(doc(db, 'clubs', clubId));
       if (club.exists()) {
         clubName = text(club.data()['name']);
-        logoUrl = typeof club.data()['logoUrl'] === 'string' ? club.data()['logoUrl'] : null;
+        // Nur zulässige Bilder (data:-URL, SCRUM-182) – alles andere würde die CSP ohnehin blockieren.
+        logoUrl = logoFromDoc(club.data()['logoUrl']);
       }
     }
     return { name: text(data['name']), label: text(data['label']), clubId, clubName, logoUrl };

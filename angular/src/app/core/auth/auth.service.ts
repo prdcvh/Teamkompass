@@ -1,4 +1,4 @@
-import { Injectable, Injector, inject, signal } from '@angular/core';
+import { ApplicationRef, Injectable, Injector, afterNextRender, inject, signal } from '@angular/core';
 import { authErrorMessage, errorCode } from './auth-errors';
 import { AccessApi } from '../firebase/access.api';
 import { AuthApi } from '../firebase/auth.api';
@@ -16,8 +16,9 @@ import { TeamAccess } from './team-access';
  * ready: angemeldet, Rolle bekannt
  * unavailable: Firebase nicht erreichbar – die App bleibt gesperrt statt Daten zu zeigen
  * chooseTeam: angemeldet, mehrere Teams und keins auf diesem Gerät gemerkt – erst die Teamauswahl (SCRUM-181)
+ * switching: Teamwechsel läuft (SCRUM-182) – die Oberfläche ist abgebaut, Rolle und Teamdaten sind geleert
  */
-export type AuthStatus = 'loading' | 'signedOut' | 'ready' | 'unavailable' | 'chooseTeam';
+export type AuthStatus = 'loading' | 'signedOut' | 'ready' | 'unavailable' | 'chooseTeam' | 'switching';
 
 /** Wartezeit vor dem zweiten Versuch, ein frisch angemeldetes Konto anzulegen (siehe claim). */
 export const CLAIM_RETRY_DELAY_MS = 1500;
@@ -64,6 +65,10 @@ export class AuthService {
   /** Teamauswahl offen: Konto und seine Teams bis zur Wahl. */
   private pendingUser: FirebaseUser | null = null;
   private pendingTeams = new Map<string, MemberRecord>();
+  /** Konto des geöffneten Teams (für den Teamwechsel ohne neue Anmeldung). */
+  private currentUser: FirebaseUser | null = null;
+  /** Teamwechsel läuft: kein zweiter gleichzeitig (Doppel-Tap). */
+  private switching = false;
 
   /** Startet die Anmeldeprüfung (einmal beim App-Start). */
   start(retryDelayMs = CLAIM_RETRY_DELAY_MS): void {
@@ -263,7 +268,81 @@ export class AuthService {
     return true;
   }
 
+  /**
+   * Teamwechsel ohne Neuladen (SCRUM-182). Ablauf:
+   * 1. Zugang zum Zielteam frisch aus der Datenbank prüfen (nicht der Stand von der Anmeldung: ein inzwischen gesperrter
+   *    oder abgelaufener Zugang öffnet nichts, und es gilt die Rolle, die das Konto JETZT in diesem Team hat).
+   * 2. Altes Team abbauen – genau wie beim Abmelden: Rolle leeren (alle Datendienste beenden daraufhin ihre Abos und
+   *    verwerfen ihre Daten), Browser-Teamdaten löschen, Teamangaben neutral. Der Zustand „switching“ entfernt dabei die
+   *    ganze Oberfläche, Seiten und Dialoge des alten Teams werden also zerstört statt weiterverwendet.
+   * 3. Erst nach diesem Durchlauf das neue Team mit seiner Rolle öffnen; Seiten bauen sich neu auf und laden neu.
+   * Das Konto bleibt angemeldet; der lokale Firestore-Speicher bleibt (gleiches Konto, die Regeln gelten weiter).
+   * Gibt false zurück, wenn nicht gewechselt wurde (Fehlertext dann in `error`).
+   */
+  async switchTeam(teamId: string): Promise<boolean> {
+    const user = this.currentUser;
+    if (this.status() !== 'ready' || !user || this.switching) return false;
+    if (teamId === this.team.id()) return true;
+    this.switching = true;
+    this.error.set('');
+    const before = this.epoch;
+    try {
+      let teams: Map<string, MemberRecord>;
+      try {
+        teams = await this.teamAccess.find(user);
+      } catch (error) {
+        console.error(error);
+        this.error.set(`Team konnte nicht gewechselt werden. ${authErrorMessage(errorCode(error))}`);
+        return false;
+      }
+      if (before !== this.epoch || this.status() !== 'ready') return false; // inzwischen abgemeldet oder anderes Konto
+      const member = teams.get(teamId);
+      if (!member) {
+        this.error.set('Für dieses Team gibt es keinen gültigen Zugang mehr (zum Beispiel gesperrt oder abgelaufen). Bitte wende dich an den Trainer.');
+        this.team.choices.set(this.choicesFor(teams));
+        return false;
+      }
+      // Ab hier gilt das alte Team als verlassen: verspätete Antworten (z. B. Teamangaben) werden verworfen.
+      this.epoch += 1;
+      const epoch = this.epoch;
+      this.status.set('switching');
+      this.session.clear();
+      this.notice.set('');
+      clearLocalTeamData();
+      this.team.choices.set(this.choicesFor(teams));
+      this.team.select(teamId);
+      await this.flushTeardown();
+      if (epoch !== this.epoch) return false;
+      this.applyMember(user, member, epoch);
+      return true;
+    } finally {
+      this.switching = false;
+    }
+  }
+
+  /** Neue Teamliste, bekannte Namen/Logos bleiben erhalten (werden danach frisch nachgeladen). */
+  private choicesFor(teams: ReadonlyMap<string, MemberRecord>) {
+    const known = new Map(this.team.choices().map((choice) => [choice.teamId, choice.meta]));
+    return [...teams].map(([teamId, record]) => ({ teamId, role: record.role, meta: known.get(teamId) ?? null }));
+  }
+
+  /**
+   * Führt sofort einen Durchlauf der Oberfläche aus: Dienste, die auf die geleerte Rolle reagieren, räumen dabei auf
+   * (Abos beenden, Daten verwerfen), und die Seiten des alten Teams werden entfernt. Bewusst ein direkter Durchlauf statt
+   * „irgendwann“: ohne ihn sähen diese Dienste die leere Rolle nie, wenn gleich danach die neue gesetzt wird.
+   */
+  private async flushTeardown(): Promise<void> {
+    try {
+      this.injector.get(ApplicationRef).tick();
+    } catch (error) {
+      // Läuft gerade schon ein Durchlauf (sollte nach einem await nie passieren): auf den nächsten warten.
+      console.warn(error);
+      await new Promise<void>((resolve) => afterNextRender(() => resolve(), { injector: this.injector }));
+    }
+  }
+
   private applyMember(user: FirebaseUser, member: MemberRecord, epoch: number): void {
+    this.currentUser = user;
     this.pendingUser = null;
     this.pendingTeams = new Map();
     this.session.role.set(member.role);
@@ -346,6 +425,7 @@ export class AuthService {
     this.notice.set('');
     this.pendingUser = null;
     this.pendingTeams = new Map();
+    this.currentUser = null;
     this.team.reset();
     clearLocalTeamData();
   }

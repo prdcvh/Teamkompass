@@ -4,7 +4,8 @@ import { AuthService } from '../../core/auth/auth.service';
 import { teamChoiceGuard } from '../../core/auth/auth.guard';
 import { CurrentTeam, LAST_TEAM_KEY } from '../../core/team/current-team.service';
 import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
-import { RELOAD, TeamChoice } from './team-choice';
+import { SessionService } from '../../core/auth/session.service';
+import { TeamChoice } from './team-choice';
 
 describe('TeamChoice (Teamauswahl)', () => {
   let firebase: FakeFirebase;
@@ -49,15 +50,31 @@ describe('TeamChoice (Teamauswahl)', () => {
     expect(TestBed.inject(CurrentTeam).id()).toBe('B');
   });
 
-  it('„Team wechseln“ später: merkt die Wahl und lädt die App neu (keine Daten des alten Teams im Speicher)', async () => {
+  it('„Team wechseln“ später: wechselt ohne Neuladen, merkt die Wahl, öffnet die Startseite der Rolle dort (SCRUM-182)', async () => {
     const fixture = await render('A');
-    expect(TestBed.inject(AuthService).status()).toBe('ready');
-    const reload = vi.spyOn(RELOAD, 'to').mockImplementation(() => undefined);
+    const auth = TestBed.inject(AuthService);
+    expect(auth.status()).toBe('ready');
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    const before = location.href;
     const items = (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('button.item');
     expect(items[0].textContent).toContain('geöffnet');
     items[1].click();
-    await vi.waitFor(() => expect(reload).toHaveBeenCalledWith('/'));
+    await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith('/ansicht'));
+    expect(location.href).toBe(before); // kein Neuladen
     expect(localStorage.getItem(LAST_TEAM_KEY)).toBe('B');
+    expect(TestBed.inject(CurrentTeam).id()).toBe('B');
+    expect(TestBed.inject(SessionService).role()).toBe('parent');
+  });
+
+  it('zeigt einen Fehler, wenn der Zugang zum gewählten Team inzwischen fehlt, und bleibt im Team', async () => {
+    const fixture = await render('A');
+    firebase.teams.memberships.set('uid-1', [{ teamId: 'A', role: 'trainer', playerId: null, expiresAt: null }]);
+    const items = (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('button.item');
+    items[1].click();
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect((fixture.nativeElement as HTMLElement).querySelector('[role="alert"]')?.textContent).toContain('keinen gültigen Zugang');
+    });
     expect(TestBed.inject(CurrentTeam).id()).toBe('A');
   });
 

@@ -121,7 +121,9 @@ export class LoadReportAction {
       today: this.today,
       createdBy: this.author(player),
     });
-    this.files.print(loadReportHtml(report, new URL('club-logo.png', document.baseURI).href), LOAD_REPORT_CSS);
+    // Logo des Vereins aus der Datenbank (data:-URL, SCRUM-182), sonst das mitgelieferte – ein neuer Verein ohne Logo druckt keins.
+    const logo = this.current.logoSrc();
+    this.files.print(loadReportHtml(report, logo ? new URL(logo, document.baseURI).href : ''), LOAD_REPORT_CSS);
     this.open.set(false);
   }
 

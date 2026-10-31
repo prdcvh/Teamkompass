@@ -209,11 +209,18 @@ test("5b. Altteams ohne Team-Dokument kann niemand fuer einen Verein beanspruche
   await assertFails(setDoc(doc(as("adminA"), `teams/${NEW_TEAM}`), team({ clubId: "A" }))); // existiert: kein Ueberschreiben
 });
 
+// SCRUM-182: Logo als data:-URL im Vereinsdokument (kein Firebase Storage), Grenze 100000 Zeichen wie in der App.
+const PNG_LOGO = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+const logoOfLength = (type, length) => {
+  const prefix = `data:image/${type};base64,`;
+  return prefix + "A".repeat(length - prefix.length);
+};
+
 test("6. Vereinsdokument: Name/Logo fuer Angemeldete lesbar, nicht auflistbar, nur eigene Admins aendern nur Name/Logo", async () => {
   for (const uid of ["acoach", "bplayer", "anon", "adminB"]) await assertSucceeds(getDoc(doc(as(uid), "clubs/A")));
   await assertFails(getDoc(doc(as(null), "clubs/A")));
   await assertFails(getDocs(collection(as("adminA"), "clubs")));
-  await assertSucceeds(updateDoc(doc(as("adminA"), "clubs/A"), { name: "Verein A e.V.", logoUrl: "https://example.test/logo.png" }));
+  await assertSucceeds(updateDoc(doc(as("adminA"), "clubs/A"), { name: "Verein A e.V.", logoUrl: PNG_LOGO }));
   await assertFails(updateDoc(doc(as("adminA"), "clubs/A"), { name: "" }));
   await assertFails(updateDoc(doc(as("adminA"), "clubs/A"), { plan: "pro" }));
   await assertFails(updateDoc(doc(as("adminA"), "clubs/A"), { logoUrl: 42 }));
@@ -222,6 +229,56 @@ test("6. Vereinsdokument: Name/Logo fuer Angemeldete lesbar, nicht auflistbar, n
     await assertFails(setDoc(doc(as(uid), "clubs/C"), { name: "Neu" }));
     await assertFails(deleteDoc(doc(as(uid), "clubs/A")));
   }
+});
+
+test("6b. Vereinslogo: nur eigene Admins, nur PNG/JPEG/WebP als data:-URL, hoechstens 100000 Zeichen", async () => {
+  const admin = doc(as("adminA"), "clubs/A");
+  for (const type of ["png", "jpeg", "webp"]) await assertSucceeds(updateDoc(admin, { logoUrl: logoOfLength(type, 2000) }));
+  // Genau an der Grenze ja, ein Zeichen mehr nein.
+  await assertSucceeds(updateDoc(admin, { logoUrl: logoOfLength("webp", 100000) }));
+  await assertFails(updateDoc(admin, { logoUrl: logoOfLength("webp", 100001) }));
+  // Keine fremden Adressen, kein SVG (koennte Skript enthalten), kein anderer Datentyp, kein kaputtes base64.
+  for (const bad of [
+    "https://example.test/logo.png",
+    "data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=",
+    "data:text/html;base64,PGgxPkhhbGxvPC9oMT4=",
+    "data:image/png,<svg>",
+    "data:image/png;base64,abc def",
+    " data:image/png;base64,AAAA"
+  ]) await assertFails(updateDoc(admin, { logoUrl: bad }));
+  // Entfernen geht.
+  await assertSucceeds(updateDoc(admin, { logoUrl: null }));
+  // Weder Trainer noch Spieler des Vereins, noch der Admin eines anderen Vereins, noch Fremde.
+  for (const uid of ["acoach", "aplayer", "aparent", "adminB", "bcoach", "fremd", "anon"]) {
+    await assertFails(updateDoc(doc(as(uid), "clubs/A"), { logoUrl: PNG_LOGO }));
+  }
+  // Beim Anlegen eines Vereins (Registrierung) bleibt das Logo leer - siehe registration.test.mjs.
+});
+
+test("6c. Teamwechsel: ein Konto in zwei Teams hat in jedem Team nur die Rechte seiner Rolle dort", async () => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, "teams/A1/members/multi"), { role: "trainer", uid: "multi", email: "multi@example.test" });
+    await setDoc(doc(db, "teams/B1/members/multi"), { role: "parent", playerId: "p1", uid: "multi", expiresAt: null });
+    await setDoc(doc(db, "teams/B1/players/p2"), { name: "Anderes Kind" });
+  });
+  const db = as("multi");
+  // Beide Teams erscheinen in der Teamsuche.
+  const mine = await assertSucceeds(getDocs(query(collectionGroup(db, "members"), where("uid", "==", "multi"))));
+  assert.deepEqual(mine.docs.map((entry) => entry.ref.parent.parent.id).sort(), ["A1", "B1"]);
+  // Team A1 (Trainer): alles.
+  await assertSucceeds(getDocs(collection(db, "teams/A1/players")));
+  await assertSucceeds(getDoc(doc(db, "teams/A1/events/e1/privateNotes/p1")));
+  await assertSucceeds(setDoc(doc(db, "teams/A1/opponents/o2"), { name: "Neu" }));
+  // Team B1 (Eltern): nur das eigene Kind, keine Spielerliste, keine Notizen, keine Zugaenge, kein Schreiben als Trainer.
+  await assertSucceeds(getDoc(doc(db, "teams/B1/players/p1")));
+  await assertFails(getDoc(doc(db, "teams/B1/players/p2")));
+  await assertFails(getDocs(collection(db, "teams/B1/players")));
+  await assertFails(getDoc(doc(db, "teams/B1/events/e1/privateNotes/p1")));
+  await assertFails(getDocs(collection(db, "teams/B1/members")));
+  await assertFails(setDoc(doc(db, "teams/B1/opponents/o2"), { name: "Neu" }));
+  // Ein drittes Team (Verein B, kein Mitglied): nichts.
+  for (const path of teamPaths("x")) await assertFails(getDoc(doc(db, `teams/${NEW_TEAM_B}/${path}`)));
 });
 
 test("7. Erster Trainer: Vereinsadmin setzt genau einen ein, nur solange das Team keinen hat", async () => {
