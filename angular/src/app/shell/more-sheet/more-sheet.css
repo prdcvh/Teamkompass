@@ -103,3 +103,17 @@ input[role='switch']:checked {
 input[role='switch']:checked::after {
   transform: translateX(20px);
 }
+
+.team {
+  display: flex;
+  gap: var(--tk-space-3);
+  align-items: center;
+  padding: 0 var(--tk-space-1);
+}
+
+.team .logo {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}

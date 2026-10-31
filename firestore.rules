@@ -153,12 +153,18 @@ service cloud.firestore {
           "club", clubId,
           get(clubInvitePath(getAfter(/databases/$(database)/documents/clubs/$(clubId)/admins/$(request.auth.uid)).data.inviteCode)).data.get('teamId', null));
       allow delete: if false;
+      // SCRUM-182: Das Logo laedt der Vereinsadmin in der App hoch. Firebase Storage ist nicht eingerichtet und die CSP
+      // erlaubt Bilder nur als data:-URL - deshalb liegt das (im Browser auf 256 px verkleinerte) Logo direkt hier, nur
+      // als PNG/JPEG/WebP in base64 und hoechstens 100000 Zeichen (~75 KB). Gleiche Grenze in der App
+      // (angular/src/app/core/registration/club-logo.ts). Keine fremden Adressen (http...) mehr.
       allow update: if isClubAdmin(clubId)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'logoUrl'])
         && request.resource.data.name is string
         && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 100
         && (request.resource.data.get('logoUrl', null) == null
-          || (request.resource.data.logoUrl is string && request.resource.data.logoUrl.size() <= 500));
+          || (request.resource.data.logoUrl is string
+            && request.resource.data.logoUrl.size() <= 100000
+            && request.resource.data.logoUrl.matches('^data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$')));
 
       match /admins/{uid} {
         allow get: if isClubAdmin(clubId) || (signedIn() && request.auth.uid == uid);

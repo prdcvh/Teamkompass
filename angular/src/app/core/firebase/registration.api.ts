@@ -1,7 +1,15 @@
 import { Injectable, inject } from '@angular/core';
+import { logoFromDoc } from '../registration/club-logo';
 import { type ClubInvite, type RegistrationWrite, SERVER_TIME } from '../registration/registration';
 import { FirebaseConnection } from './firebase-connection';
 import type { FirebaseUser } from './types';
+
+/** Ein Verein, in dem das Konto Admin ist (Name und Logo aus `clubs/{clubId}`). */
+export interface AdminClubInfo {
+  readonly clubId: string;
+  readonly name: string;
+  readonly logoUrl: string | null;
+}
 
 function errorCodeOf(error: unknown): string {
   return typeof error === 'object' && error !== null && 'code' in error ? String((error as { code: unknown }).code) : '';
@@ -100,12 +108,25 @@ export class RegistrationApi {
   // --- Vereinsadmin: Beitrittscodes für den eigenen Verein ---
 
   /** Vereine, in denen das Konto Admin ist (Teamsuche über `admins` mit eigener uid). */
-  async readMyAdminClubs(uid: string): Promise<{ clubId: string; name: string }[]> {
+  async readMyAdminClubs(uid: string): Promise<AdminClubInfo[]> {
     const { db } = await this.connection.get();
-    const { collectionGroup, getDocs, query, where } = await import('firebase/firestore');
+    const { collectionGroup, doc, getDoc, getDocs, query, where } = await import('firebase/firestore');
     const snapshot = await getDocs(query(collectionGroup(db, 'admins'), where('uid', '==', uid)));
     const clubIds = snapshot.docs.filter((entry) => entry.ref.parent.parent?.parent.id === 'clubs').map((entry) => entry.ref.parent.parent!.id);
-    return Promise.all(clubIds.map(async (clubId) => ({ clubId, name: await this.readClubName(clubId) })));
+    return Promise.all(
+      clubIds.map(async (clubId) => {
+        const club = await getDoc(doc(db, 'clubs', clubId));
+        const data = club.exists() ? club.data() : {};
+        return { clubId, name: typeof data['name'] === 'string' ? data['name'] : '', logoUrl: logoFromDoc(data['logoUrl']) };
+      }),
+    );
+  }
+
+  /** Name und Logo des Vereins ändern (nur Vereinsadmins; Format und Größe des Logos prüfen auch die Regeln, SCRUM-182). */
+  async updateClub(clubId: string, data: { readonly name: string; readonly logoUrl: string | null }): Promise<void> {
+    const { db } = await this.connection.get();
+    const { doc, updateDoc } = await import('firebase/firestore');
+    await updateDoc(doc(db, 'clubs', clubId), { name: data.name, logoUrl: data.logoUrl });
   }
 
   async readJoinInvites(clubId: string): Promise<ClubInvite[]> {

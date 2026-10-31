@@ -4,9 +4,8 @@ import { AccessApi } from '../firebase/access.api';
 import { AuthApi } from '../firebase/auth.api';
 import type { FirebaseUser, InviteRecord, MemberRecord } from '../firebase/types';
 import { clearLocalTeamData } from '../device/local-data';
-import { LiveOutboxService } from '../live/live-outbox.service';
 import { CurrentTeam, pickTeam, rememberTeam, rememberedTeam } from '../team/current-team.service';
-import type { Role } from './role';
+import { displayNameFor, purgeLocalCaches } from './auth-helpers';
 import { SessionService } from './session.service';
 import { TeamAccess } from './team-access';
 
@@ -16,14 +15,14 @@ import { TeamAccess } from './team-access';
  * ready: angemeldet, Rolle bekannt
  * unavailable: Firebase nicht erreichbar – die App bleibt gesperrt statt Daten zu zeigen
  * chooseTeam: angemeldet, mehrere Teams und keins auf diesem Gerät gemerkt – erst die Teamauswahl (SCRUM-181)
+ * switching: Teamwechsel läuft (SCRUM-182) – die Oberfläche ist abgebaut, Rolle und Teamdaten sind geleert
  */
-export type AuthStatus = 'loading' | 'signedOut' | 'ready' | 'unavailable' | 'chooseTeam';
+export type AuthStatus = 'loading' | 'signedOut' | 'ready' | 'unavailable' | 'chooseTeam' | 'switching';
 
 /** Wartezeit vor dem zweiten Versuch, ein frisch angemeldetes Konto anzulegen (siehe claim). */
 export const CLAIM_RETRY_DELAY_MS = 1500;
 
-/** Wartezeit vor dem zweiten Versuch, den lokalen Firestore-Speicher zu leeren (ein anderer Tab hält ihn evtl. noch kurz offen). */
-export const CACHE_CLEAR_RETRY_MS = 1000;
+export { CACHE_CLEAR_RETRY_MS, displayNameFor } from './auth-helpers';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -64,6 +63,7 @@ export class AuthService {
   /** Teamauswahl offen: Konto und seine Teams bis zur Wahl. */
   private pendingUser: FirebaseUser | null = null;
   private pendingTeams = new Map<string, MemberRecord>();
+  private currentUser: FirebaseUser | null = null;
 
   /** Startet die Anmeldeprüfung (einmal beim App-Start). */
   start(retryDelayMs = CLAIM_RETRY_DELAY_MS): void {
@@ -263,7 +263,34 @@ export class AuthService {
     return true;
   }
 
+  /** Konto des geöffneten Teams (nur im Zustand „ready“) – für den Teamwechsel, siehe TeamSwitch. */
+  get user(): FirebaseUser | null {
+    return this.status() === 'ready' ? this.currentUser : null;
+  }
+
+  /**
+   * Teamwechsel, Schritt „altes Team verlassen“ (SCRUM-182): genau wie beim Abmelden Rolle leeren (alle Datendienste
+   * beenden daraufhin ihre Abos und verwerfen ihre Daten) und Browser-Teamdaten löschen; „switching“ entfernt die ganze
+   * Oberfläche. Das Konto bleibt angemeldet. Verspätete Antworten zum alten Team werden ab hier verworfen (neue Epoche).
+   */
+  leaveTeam(): number {
+    this.epoch += 1;
+    this.status.set('switching');
+    this.session.clear();
+    this.notice.set('');
+    clearLocalTeamData();
+    return this.epoch;
+  }
+
+  /** Teamwechsel, Schritt „neues Team öffnen“ mit der Rolle dort – nur, wenn inzwischen nichts anderes passiert ist. */
+  enterTeam(user: FirebaseUser, member: MemberRecord, epoch: number): boolean {
+    if (epoch !== this.epoch || this.status() !== 'switching') return false;
+    this.applyMember(user, member, epoch);
+    return true;
+  }
+
   private applyMember(user: FirebaseUser, member: MemberRecord, epoch: number): void {
+    this.currentUser = user;
     this.pendingUser = null;
     this.pendingTeams = new Map();
     this.session.role.set(member.role);
@@ -346,29 +373,14 @@ export class AuthService {
     this.notice.set('');
     this.pendingUser = null;
     this.pendingTeams = new Map();
+    this.currentUser = null;
     this.team.reset();
     clearLocalTeamData();
   }
 
-  /**
-   * Leert den lokalen Firestore-Speicher (SCRUM-199). Mehrere gleichzeitige Aufrufe teilen sich einen Lauf; ein Fehler
-   * darf das Abmelden nie aufhalten.
-   */
+  /** Leert den lokalen Speicher (SCRUM-199, siehe {@link purgeLocalCaches}); gleichzeitige Aufrufe teilen sich einen Lauf. */
   private purgeLocalCache(): Promise<void> {
-    this.purging ??= (async () => {
-      // Wie die Firestore-Warteschlange: ungesendete Live-Punkte (SCRUM-216) bleiben nicht liegen. Erst hier geholt (keine Startabhängigkeit).
-      try { this.injector.get(LiveOutboxService).clear(); } catch (error) { console.error(error); }
-      try {
-        if (!(await this.authApi.clearLocalCache())) {
-          await new Promise((resolve) => setTimeout(resolve, CACHE_CLEAR_RETRY_MS));
-          await this.authApi.clearLocalCache();
-        }
-      } catch (error) {
-        console.error(error);
-      } finally {
-        this.purging = null;
-      }
-    })();
+    this.purging ??= purgeLocalCaches(this.authApi, this.injector).finally(() => (this.purging = null));
     return this.purging;
   }
 
@@ -376,12 +388,4 @@ export class AuthService {
     this.status.set(status);
     this.resolveFirstState();
   }
-}
-
-export function displayNameFor(role: Role, email: string | null): string {
-  if (role === 'player') return 'Spieler';
-  if (role === 'parent') return 'Eltern';
-  if (email) return email.split('@')[0];
-  if (role === 'scout') return 'Scout';
-  return role === 'physio' ? 'Medizin' : 'Trainer';
 }

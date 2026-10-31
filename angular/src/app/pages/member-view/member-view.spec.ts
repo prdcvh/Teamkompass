@@ -1,3 +1,4 @@
+import { CurrentTeam } from '../../core/team/current-team.service';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
@@ -143,6 +144,17 @@ describe('MemberView (Ansicht für Spieler, Eltern und Medizin)', () => {
       const fixture = await render('player');
       const links = [...root(fixture).querySelectorAll('a')].map((link) => link.getAttribute('href'));
       expect(links).toEqual(['/abmelden']);
+    });
+
+    it('Konto in mehreren Teams: bietet „Team wechseln“ an (SCRUM-182)', async () => {
+      const fixture = await render('player');
+      TestBed.inject(CurrentTeam).choices.set([
+        { teamId: 'A', role: 'trainer', meta: null },
+        { teamId: 'B', role: 'player', meta: null },
+      ]);
+      fixture.detectChanges();
+      const links = [...root(fixture).querySelectorAll('a')].map((link) => link.getAttribute('href'));
+      expect(links).toEqual(['/team-waehlen', '/abmelden']);
     });
 
     it('meldet einen Fehler, wenn das Profil nicht gelesen werden darf', async () => {
