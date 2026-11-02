@@ -137,6 +137,14 @@ fake.access.members.set('e2e-player-email', { role: 'player', playerId: 'p1' });
 // Netz zurück, bis der Browser wieder online ist.
 window.addEventListener('offline', () => fake.ratings.goOffline());
 window.addEventListener('online', () => fake.ratings.goOnline());
+// Bewertungsskala (SCRUM-188): ?skala=stufen stellt das Team auf Kompetenzstufen; p1 hat dann zusätzlich eine mit Stufen
+// vergebene Bewertung (gespeichert als 4,5 / 3 / 1,5 mit scale: 'levels'), die ältere Schulnote bleibt daneben stehen.
+if (new URLSearchParams(location.search).get('skala') === 'stufen') {
+  fake.settings.settings = { ratingScale: 'levels' };
+  fake.ratings.ratings.set('serie-s1-2026-10-20', new Map([
+    ['p1', { attendance: 'present', effort: 3, technique: 1.5, tactics: 3, comprehension: 1.5, grade: 2.4, scale: 'levels', note: 'Super mitgemacht', playerId: 'p1' }],
+  ]));
+}
 if (new URLSearchParams(location.search).get('as') === 'fresh') {
   fake.players.players.clear();
   fake.events.events.clear();

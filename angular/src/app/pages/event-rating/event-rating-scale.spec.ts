@@ -58,7 +58,8 @@ describe('Bewertungsskala (SCRUM-188)', () => {
     setup({ label: 'U9' });
     const fixture = await renderRating();
     const select = root(fixture).querySelector<HTMLSelectElement>('select[aria-label="Einsatz: Jonas Keller"]')!;
-    expect([...select.options].map((option) => option.text)).toEqual(['–', 'lernt es noch', 'kann es', 'kann es sicher']);
+    expect([...select.options].map((option) => option.text)).toEqual(['–', 'lernt', 'kann', 'sicher']);
+    expect(root(fixture).querySelector('.scale-legend')?.textContent).toContain('sicher = kann es sicher');
     select.value = '4.5';
     select.dispatchEvent(new Event('change'));
     await vi.waitFor(() => expect(firebase.calls).toContain('saveRating:e1:p1'));

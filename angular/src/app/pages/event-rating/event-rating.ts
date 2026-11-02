@@ -63,6 +63,8 @@ export class EventRating implements OnInit {
   protected readonly ratings = inject(RatingsService);
   /** Bewertungsskala des Teams (SCRUM-188): Schulnoten oder Kompetenzstufen. */
   protected readonly scale = inject(RatingScaleService).scale;
+  /** Legende der Kurzformen in der Matrix, sobald eine Zeile mit Stufen bewertet wird. */
+  protected readonly showLegend = computed(() => this.scale() === 'levels' || this.allPlayers().some((player) => this.usesLevels(player)));
   protected readonly squad = inject(SquadService);
   protected readonly eventsService = inject(EventsService);
   protected readonly sync = inject(SyncService);

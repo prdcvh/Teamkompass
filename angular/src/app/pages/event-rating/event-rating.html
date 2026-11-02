@@ -179,6 +179,9 @@
       }
     } @else {
       <tk-card class="matrix">
+        @if (showLegend()) {
+          <p class="scale-legend muted">Kompetenzstufen: <b>lernt</b> = lernt es noch · <b>kann</b> = kann es · <b>sicher</b> = kann es sicher</p>
+        }
         <div class="table-wrap">
           <table [class.game]="isGame()">
             <thead>
@@ -228,7 +231,7 @@
                       <select class="tk-input grade-select" [attr.aria-label]="gradeLabels[field] + ': ' + player.name" [value]="ratings.ratingFor(player.id)[field] ?? ''" (change)="set(player, field, valueOf($event))">
                         <option value="" [selected]="ratings.ratingFor(player.id)[field] === null">–</option>
                         @for (option of optionsFor(player); track option.value) {
-                          <option [value]="option.value" [selected]="ratings.ratingFor(player.id)[field] === option.value">{{ option.label }}</option>
+                          <option [value]="option.value" [title]="option.label" [selected]="ratings.ratingFor(player.id)[field] === option.value">{{ option.short }}</option>
                         }
                       </select>
                     </td>

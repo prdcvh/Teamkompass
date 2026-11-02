@@ -129,6 +129,11 @@ table.game .col-attendance { width: 13%; }
 table.game .col-grade { width: 6%; }
 table.game .col-note { width: 10%; }
 
+.scale-legend {
+  margin: 0 0 var(--tk-space-2);
+  font-size: 0.85rem;
+}
+
 .matrix {
   padding: var(--tk-space-2);
 }
