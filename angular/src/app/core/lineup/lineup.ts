@@ -5,6 +5,7 @@
  */
 import { roundGrade } from '../ratings/rating';
 import { MAX_ON_PITCH, PITCH_BANDS, PITCH_ZONES, ZONES, type Zone } from './pitch';
+import { type GameFormat, gameFormatInfo, isGameFormat } from './game-format';
 import type { Candidate } from './formation-assignment';
 import type { Player } from '../player/player';
 import type { TeamEvent } from '../events/event';
@@ -62,9 +63,9 @@ function without(assignments: Assignments, ids: readonly string[]): Record<strin
   return Object.fromEntries(ZONES.map((zone) => [zone, assignments[zone].filter((id) => !ids.includes(id))]));
 }
 
-/** Stellt den Spieler in die Zone (und nimmt ihn aus der bisherigen); „voll“, wenn er neu dazukäme und schon 11 stehen. */
-export function moveToZone(assignments: Assignments, playerId: string, zone: Zone): Assignments | 'voll' {
-  if (zoneOf(assignments, playerId) === null && onPitchCount(assignments) >= MAX_ON_PITCH) return 'voll';
+/** Stellt den Spieler in die Zone (und nimmt ihn aus der bisherigen); „voll“, wenn er neu dazukäme und schon `max` (Standard 11) stehen. */
+export function moveToZone(assignments: Assignments, playerId: string, zone: Zone, max: number = MAX_ON_PITCH): Assignments | 'voll' {
+  if (zoneOf(assignments, playerId) === null && onPitchCount(assignments) >= max) return 'voll';
   const next = without(assignments, [playerId]);
   next[zone].push(playerId);
   return next as unknown as Assignments;
@@ -110,6 +111,8 @@ export interface EventLineup {
   readonly assignments: Assignments;
   /** ISO-Zeitpunkt des Speicherns; leer, wenn das Dokument keinen hat. */
   readonly savedAt: string;
+  /** Spielform nur für dieses Spiel (SCRUM-187); fehlt = die Spielform des Teams. */
+  readonly gameFormat?: GameFormat;
 }
 
 export type EventLineups = Readonly<Record<string, EventLineup>>;
@@ -128,14 +131,43 @@ export function normalizeEventLineups(raw: unknown, playerIds?: ReadonlySet<stri
     const rawSavedAt = (entry as { savedAt?: unknown } | null)?.savedAt;
     const savedAt = typeof rawSavedAt === 'string' ? rawSavedAt : '';
     if (lineupIsEmpty(assignments) && !savedAt) continue;
-    result[eventId] = { assignments, savedAt };
+    const rawFormat = (entry as { gameFormat?: unknown } | null)?.gameFormat;
+    result[eventId] = isGameFormat(rawFormat) ? { assignments, savedAt, gameFormat: rawFormat } : { assignments, savedAt };
   }
   return result;
 }
 
 /** Aufstellung eines Spiels → Eintrag in `byEvent` (genau das Format der Live-App). */
-export function docFromEventLineup(assignments: Assignments, savedAt: string): Record<string, unknown> {
-  return { ...docFromLineup(assignments), savedAt };
+export function docFromEventLineup(assignments: Assignments, savedAt: string, gameFormat?: GameFormat): Record<string, unknown> {
+  return { ...docFromLineup(assignments), savedAt, ...(gameFormat ? { gameFormat } : {}) };
+}
+
+/**
+ * Passt eine Aufstellung an eine Spielform an (SCRUM-187): Ohne Torwart in der Spielform geht der Torwart auf die Bank;
+ * sind es danach noch zu viele Spieler, bleiben die hintersten (Torwart zuerst, dann von hinten nach vorn) und die
+ * übrigen gehen auf die Bank. Passt schon alles, bleibt die Aufstellung unverändert.
+ */
+export function fitToFormat(assignments: Assignments, format: GameFormat): Assignments {
+  const info = gameFormatInfo(format);
+  const order: Zone[] = ['TW', ...PITCH_BANDS.flat()];
+  const keep = new Set<string>();
+  for (const zone of order) {
+    if (zone === 'TW' && !info.goalkeeper) continue;
+    for (const id of assignments[zone]) if (keep.size < info.players) keep.add(id);
+  }
+  const drop = [...onPitchIds(assignments)].filter((id) => !keep.has(id));
+  return drop.length ? removeAll(assignments, drop) : assignments;
+}
+
+function removeAll(assignments: Assignments, ids: readonly string[]): Assignments {
+  return without(assignments, ids) as unknown as Assignments;
+}
+
+/** Zonen, die für eine Spielform auf dem Feld angeboten werden: 11:11 alle, sonst die der Formationen plus besetzte. */
+export function zonesForFormat(format: GameFormat, assignments: Assignments): Zone[] {
+  if (format === '11:11') return ZONES;
+  const used = new Set<Zone>(gameFormatInfo(format).presets.flatMap((preset) => Object.keys(preset) as Zone[]));
+  return ZONES.filter((zone) => used.has(zone) || assignments[zone].length > 0);
 }
 
 /** Das nächste anstehende Spiel (heute oder später); null, wenn keins ansteht. */

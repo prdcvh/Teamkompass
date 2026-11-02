@@ -296,3 +296,8 @@ h2 {
 .copy {
   justify-self: start;
 }
+
+.warn {
+  color: var(--tk-red);
+  font-size: var(--tk-text-sm);
+}
