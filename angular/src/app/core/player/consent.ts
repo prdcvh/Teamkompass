@@ -26,6 +26,14 @@ export function mayGiveReason(player: Pick<Player, 'consentStatus'> | null | und
   return player?.consentStatus !== 'revoked' && mayStoreHealth(player, teamId);
 }
 
+/**
+ * Bleibt der Grund einer Abwesenheit oder Absage aus der Rückmeldung in der Bewertung heraus (SCRUM-248)? Bei
+ * widerrufener Einwilligung: Spieler und Eltern lesen die Bewertung, Regeln können einzelne Felder nicht ausblenden.
+ */
+export function hidesHealthReason(player: Pick<Player, 'consentStatus'> | null | undefined): boolean {
+  return player?.consentStatus === 'revoked';
+}
+
 /** Hinweis, wenn Speichern gesperrt ist. */
 export function healthLockedMessage(name: string): string {
   return `Für ${name} fehlt die dokumentierte Einwilligung. Gesundheitsdaten (Verletzung, Abwesenheit mit Grund, Messwerte) lassen sich erst speichern, wenn die Einwilligung im Profil dokumentiert ist.`;

@@ -6,7 +6,8 @@ import type { RawDoc } from './types';
 /**
  * Zu- und Absagen (SCRUM-205, Datenablage wie SCRUM-175): `teams/{teamId}/events/{eventId}/responses/{playerId}`.
  * Der Trainer liest je Event die ganze Unterkollektion, Spieler und Eltern nur das eigene Dokument (gezielter Get –
- * eine Liste lassen die Regeln für sie nicht zu). Schreiben dürfen nur Spieler/Eltern für den eigenen Spieler.
+ * eine Liste lassen die Regeln für sie nicht zu). Schreiben dürfen nur Spieler/Eltern für den eigenen Spieler; der
+ * Trainer darf nur den Grund leeren (SCRUM-248).
  */
 @Injectable({ providedIn: 'root' })
 export class RsvpApi {
@@ -38,6 +39,24 @@ export class RsvpApi {
       (snapshot) => onData(snapshot.exists() ? snapshot.data() : null),
       onError,
     );
+  }
+
+  /** Einmaliges Lesen der Rückmeldung eines Spielers zu einem Event (nur Trainer, SCRUM-248); null = keine. */
+  async readResponse(eventId: string, playerId: string): Promise<Readonly<Record<string, unknown>> | null> {
+    const { db } = await this.connection.get();
+    const { doc, getDoc } = await import('firebase/firestore');
+    const snapshot = await getDoc(doc(db, 'teams', this.team.id(), 'events', eventId, 'responses', playerId));
+    return snapshot.exists() ? snapshot.data() : null;
+  }
+
+  /**
+   * Entfernt nur den Absagegrund (nur Trainer, nach Rückfrage, SCRUM-248). Die Absage selbst, wer sie gegeben hat und
+   * der Zeitstempel bleiben; die Regeln erlauben dem Trainer genau diese eine Änderung.
+   */
+  async clearReason(eventId: string, playerId: string): Promise<void> {
+    const { db } = await this.connection.get();
+    const { doc, updateDoc } = await import('firebase/firestore');
+    await updateDoc(doc(db, 'teams', this.team.id(), 'events', eventId, 'responses', playerId), { reason: '' });
   }
 
   /** Speichert die eigene Rückmeldung (ganzes Dokument, Zeitstempel vom Server – so verlangen es die Regeln). */

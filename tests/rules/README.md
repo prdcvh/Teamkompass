@@ -60,4 +60,5 @@ und Förderplan bleiben lesbar); Medizin listet nur mit Filter `consentStatus !=
 `playerCards/{playerId}` (nur eigener Spieler/Eltern lesen, nur Trainer schreibt, keine Gesundheitsfelder). Eigene Teams
 (`mein-team`, `U14`, `U15`, `U17`) bei „offen“ unverändert; fremde Vereine speichern Gesundheitsdaten (Status außer „Fit“,
 „verletzt bis/seit“, Abwesenheiten, Messwerte, Absagegrund) nur mit dokumentierter Einwilligung. Wer „dokumentiert“ setzt,
-trägt die eigene UID ein (`consentByUid`). `roles.test.mjs` und `rsvp.test.mjs` laufen dafür im eigenen Team `U14`.
+trägt die eigene UID ein (`consentByUid`). SCRUM-248: Der Trainer darf in einer Rückmeldung nur den Absagegrund leeren
+(kein anderes Feld, keine neue Rückmeldung). `roles.test.mjs` und `rsvp.test.mjs` laufen dafür im eigenen Team `U14`.

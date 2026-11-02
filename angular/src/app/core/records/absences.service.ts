@@ -63,7 +63,10 @@ export class AbsencesService {
     }
     let changed = 0;
     for (const { event, rating } of this.profile.items()) {
-      const next = autoAbsenceRating(rating, unavailabilityReason(player, absences, event.date));
+      // Widerrufene Einwilligung: nur „Fehlt“ ohne Grund (SCRUM-248, siehe AbsenceSyncService.allowedReason).
+      const reason = this.absenceSync.allowedReason(player, unavailabilityReason(player, absences, event.date));
+      if (reason === 'skip') continue;
+      const next = autoAbsenceRating(rating, reason);
       if (!next) continue;
       changed += 1;
       this.state.write('Abwesenheit konnte nicht in die Event-Bewertung übernommen werden.', () =>
