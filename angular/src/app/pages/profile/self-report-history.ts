@@ -27,6 +27,7 @@ const SHOWN = 8;
   imports: [Card],
   templateUrl: './self-report-history.html',
   styleUrl: '../member-view/self-report.css',
+  styles: ':host { display: block; }',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SelfReportHistory implements OnInit {

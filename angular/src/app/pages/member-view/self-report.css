@@ -1,7 +1,4 @@
 /* Angaben der Spieler (SCRUM-138): Abfrage, Wochenbelastung und Verlauf. */
-:host {
-  display: block;
-}
 .sr {
   display: grid;
   gap: var(--tk-space-3);

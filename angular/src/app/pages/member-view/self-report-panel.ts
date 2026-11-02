@@ -33,7 +33,8 @@ import { Card } from '../../ui/card/card';
   templateUrl: './self-report-panel.html',
   styleUrl: './self-report.css',
   // Die Karten sollen wie die übrigen Karten der Seite im Abstand der Seite stehen (sonst kleben sie aneinander).
-  host: { style: 'display: contents' },
+  // Als Stylesheet, nicht als style-Attribut (strenge CSP, SCRUM-119).
+  styles: ':host { display: contents; }',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SelfReportPanel {
