@@ -80,7 +80,8 @@ describe('Teamanalyse', () => {
       e3: { a: rating(2), x: { ...BLANK_RATING, attendance: 'excluded' } },
     });
     const stats = teamStats(events, byEvent, '2026-10-05');
-    expect(stats.games).toBe(2);
+    expect(stats.games).toBe(1);
+    expect(stats.gamesPlanned).toBe(1);
     expect(stats.record).toEqual({ wins: 1, draws: 0, losses: 0, goalsFor: 3, goalsAgainst: 1 });
     expect(stats.avgGrade).toBe(2.5); // e1: 3, e3: 2 → Mittel 2,5
     expect(stats.attendanceRate).toBe(75); // present, limited, absent, present = 3 von 4; excluded zählt nicht
@@ -134,7 +135,7 @@ describe('Teamanalyse', () => {
 
   it('Kennzahlen ohne Daten', () => {
     const stats = teamStats([], new Map(), '2026-10-05');
-    expect(stats).toMatchObject({ games: 0, avgGrade: null, attendanceRate: 0, avgIntensity: null });
+    expect(stats).toMatchObject({ games: 0, gamesPlanned: 0, avgGrade: null, attendanceRate: 0, avgIntensity: null });
   });
 
   it('Geburtsquartale: Q1 = Januar–März, ungültige Daten fehlen', () => {
@@ -179,10 +180,29 @@ describe('Teamanalyse', () => {
 
   it('Teamverlauf: nur Events mit Note, älteste zuerst, Typ bleibt erhalten', () => {
     const events = [event('spät', { date: '2026-10-09', type: 'Spiel' }), event('früh', { date: '2026-10-02' }), event('leer', { date: '2026-10-05' })];
-    const chart = teamTrend(events, ratings({ spät: { a: rating(1) }, früh: { a: rating(3) } }));
+    const chart = teamTrend(events, ratings({ spät: { a: rating(1) }, früh: { a: rating(3) } }), '2026-10-31');
     expect(chart.points.map((point) => point.label)).toEqual(['10-02', '10-09']);
     expect(chart.points.map((point) => point.kind)).toEqual(['Training', 'Spiel']);
     expect(chart.points[0].title).toContain('Ø Note 3');
     expect(chart.path.startsWith('M ')).toBe(true);
+  });
+
+  it('Teamverlauf: kommende Termine und Termine ohne Datum erscheinen nicht, auch mit versehentlicher Note (SCRUM-230)', () => {
+    const events = [event('alt', { date: '2026-10-02' }), event('heute', { date: '2026-10-05' }), event('bald', { date: '2026-10-06' }), event('ohne', { date: '' })];
+    const byEvent = ratings({ alt: { a: rating(3) }, heute: { a: rating(2) }, bald: { a: rating(1) }, ohne: { a: rating(1) } });
+    expect(teamTrend(events, byEvent, '2026-10-05').points.map((point) => point.label)).toEqual(['10-02', '10-05']);
+  });
+
+  it('Kennzahlen: Termine ohne Datum zählen nirgends mit (SCRUM-230)', () => {
+    const events = [
+      event('ok', { type: 'Spiel', date: '2026-10-01', goalsFor: 1, goalsAgainst: 0, exertion: 4 }),
+      event('ohne', { type: 'Spiel', date: '', goalsFor: 2, goalsAgainst: 5, exertion: 10 }),
+      event('train-ohne', { date: '', trainingFocus: 'Umschalten' }),
+    ];
+    const byEvent = ratings({ ok: { a: rating(2) }, ohne: { a: rating(5, { attendance: 'absent' }) } });
+    const stats = teamStats(events, byEvent, '2026-10-05');
+    expect(stats).toMatchObject({ games: 1, gamesPlanned: 0, avgIntensity: 4, attendanceRate: 100, avgGrade: 2 });
+    expect(stats.record).toEqual({ wins: 1, draws: 0, losses: 0, goalsFor: 1, goalsAgainst: 0 });
+    expect(trainingFocusCounts(events, '2026-10-05')['Umschalten']).toBe(0);
   });
 });
