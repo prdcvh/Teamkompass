@@ -65,6 +65,7 @@
               <div><span>Schnitt der 3 Wochen davor</span><strong>{{ numberLabel(r.baseline) }}</strong></div>
             </div>
             <small>Belastung je Termin = Minuten × Anstrengung (0–10). {{ r.action }}</small>
+            <small class="risk-disclaimer">Die Ampel ist keine Verletzungswahrscheinlichkeit. Sie zeigt nur, ob die Belastung gerade deutlich über dem Gewohnten liegt (Müdigkeit im Verhältnis zur Fitness, siehe Belastungskurve).</small>
             <small class="risk-availability" [attr.data-availability]="r.availability.key">Verfügbarkeit: <b>{{ r.availability.label }}</b>@if (r.availability.action) { – {{ r.availability.action }}}</small>
           </div>
         }
@@ -122,6 +123,8 @@
           </ul>
         </tk-card>
       </section>
+
+      <tk-load-curve-card [curve]="loadCurve()" />
 
       <h2 class="section-title">Statistik</h2>
       <section class="cards" aria-label="Statistik">
