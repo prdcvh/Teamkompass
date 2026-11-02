@@ -274,6 +274,50 @@ service cloud.firestore {
         return /databases/$(database)/documents/teams/$(teamId);
       }
 
+      // ---------------------------------------------------------------------------------------------
+      // Einwilligung fuer Gesundheitsdaten (SCRUM-245, PO-Entscheidung zu SCRUM-173 vom 02.11.2026).
+      // Gesundheitsdaten: im Spielerdokument status (alles ausser "Fit"), injuryUntil, injuredSince; die
+      // Unter-Sammlungen absences und measurements; der Absagegrund in events/*/responses (reason).
+      // - Einwilligung "widerrufen" (consentStatus "revoked"): Spieler, Eltern und Medizin lesen diese Daten
+      //   nicht mehr (das Spielerdokument gar nicht - dafuer gibt es playerCards, siehe unten). Der Trainer
+      //   liest weiter alles und loescht von Hand; geloescht wird nie automatisch.
+      // - Einwilligung "offen" in den eigenen Teams: alles wie bisher.
+      // - Fremde Vereine (jedes Team ausser den eigenen Teams unten): Gesundheitsdaten werden nur mit
+      //   dokumentierter Einwilligung (consentStatus "granted") gespeichert - volle Sperre beim Schreiben.
+      // Eigene Teams = die vier Team-IDs des 1. FC Koenigstein (U14-Test, Hauptteam, U15, U17). Bewusst eine
+      // feste Liste in den Regeln: kein Client kann ein Team "zum eigenen" machen, und jedes neue Team (auch im
+      // eigenen Verein) ist ab Werk streng. Gleiche Liste in der App: angular/src/app/core/player/consent.ts
+      // (tests/consent.test.mjs prueft, dass beide gleich sind).
+      // ---------------------------------------------------------------------------------------------
+      function isOwnTeam() {
+        return teamId in ['mein-team', 'U14', 'U15', 'U17'];
+      }
+
+      function playerPath(playerId) {
+        return /databases/$(database)/documents/teams/$(teamId)/players/$(playerId);
+      }
+
+      // Einwilligung des Spielers widerrufen? Fehlt das Spielerdokument oder das Feld, gilt "offen".
+      function consentRevoked(playerId) {
+        return exists(playerPath(playerId))
+          && get(playerPath(playerId)).data.get('consentStatus', 'pending') == 'revoked';
+      }
+
+      // Duerfen (nach diesem Schreibvorgang) Gesundheitsdaten des Spielers gespeichert werden? Eigene Teams immer,
+      // fremde nur mit dokumentierter Einwilligung. getAfter: Einwilligung und Eintrag duerfen im selben Schreibvorgang
+      // kommen; ohne Spielerdokument nach dem Schreiben wird nichts gespeichert.
+      function mayStoreHealth(playerId) {
+        return isOwnTeam()
+          || getAfter(playerPath(playerId)).data.get('consentStatus', 'pending') == 'granted';
+      }
+
+      // Spielerdokument ohne Gesundheitsangaben (Status "Fit", kein "verletzt bis/seit").
+      function withoutHealthFields(data) {
+        return data.get('status', 'Fit') == 'Fit'
+          && data.get('injuryUntil', '') in ['', null]
+          && data.get('injuredSince', '') in ['', null];
+      }
+
       // Das Team-Dokument selbst (SCRUM-180). Lesen: Teammitglieder und die Admins des eigenen Vereins.
       allow get: if isTeamMember() || (resource != null && isClubAdmin(resource.data.get('clubId', null)));
       // Liste nur fuer Vereinsadmins und nur mit Filter where('clubId', '==', eigenerVerein).
@@ -437,8 +481,26 @@ service cloud.firestore {
       // Datenfeld (nicht auf das Pfadsegment) prueft, das exakt zum Abfragefilter passt.
       // Deshalb tragen diese beiden Dokumenttypen zusaetzlich ein eigenes "playerId"-Feld.
       match /players/{playerId} {
-        allow read: if isTrainer() || isPhysio() || isPlayerFor(playerId);
-        allow write: if isTrainer();
+        // SCRUM-245: Bei widerrufener Einwilligung lesen Spieler, Eltern und Medizin das Spielerdokument nicht mehr
+        // (Status und "verletzt bis/seit" stehen darin; Felder einzeln ausblenden koennen Regeln nicht). Spieler und
+        // Eltern lesen dann die bereinigte Karte playerCards/{playerId}. Medizin listet nur mit dem Filter
+        // where('consentStatus', '!=', 'revoked') - eine Listenregel muss am Datenfeld pruefen (ohne get-Standardwert,
+        // den der Emulator bei Listen nicht absichert); Dokumente ohne das Feld fehlen in dieser Liste (die App des
+        // Trainers traegt es nach).
+        allow get: if isTrainer()
+          || ((isPhysio() || isPlayerFor(playerId))
+            && (resource == null || resource.data.get('consentStatus', 'pending') != 'revoked'));
+        allow list: if isTrainer() || (isPhysio() && resource.data.consentStatus != 'revoked');
+        // Fremde Vereine: Gesundheitsangaben (Status ausser "Fit", verletzt bis/seit) nur mit dokumentierter
+        // Einwilligung. Wer die Einwilligung auf "dokumentiert" setzt, traegt sich selbst ein (consentByUid).
+        allow create, update: if isTrainer()
+          && (isOwnTeam()
+            || request.resource.data.get('consentStatus', 'pending') == 'granted'
+            || withoutHealthFields(request.resource.data))
+          && (request.resource.data.get('consentStatus', 'pending') != 'granted'
+            || (resource != null && resource.data.get('consentStatus', 'pending') == 'granted')
+            || request.resource.data.get('consentByUid', null) == request.auth.uid);
+        allow delete: if isTrainer();
 
         match /developmentPlans/{planId} {
           // ".get('playerId', null)" statt direktem Feldzugriff - gleiche Absicherung wie
@@ -458,14 +520,23 @@ service cloud.firestore {
           );
         }
 
+        // Abwesenheiten/Verletzungen und Messwerte sind Gesundheitsdaten (SCRUM-245): bei widerrufener Einwilligung
+        // nur noch fuer den Trainer lesbar; in fremden Vereinen nur mit dokumentierter Einwilligung speicherbar.
+        // Loeschen darf der Trainer immer (Aufgabe "Daten pruefen und loeschen").
         match /absences/{absenceId} {
-          allow read: if isTrainer() || isPhysio() || (isTeamMember() && memberDoc().data.role in ["player", "parent"] && resource.data.playerId == memberDoc().data.get('playerId', null));
-          allow write: if isTrainer();
+          allow read: if isTrainer()
+            || ((isPhysio() || (isTeamMember() && memberDoc().data.role in ["player", "parent"] && resource.data.playerId == memberDoc().data.get('playerId', null)))
+              && !consentRevoked(playerId));
+          allow create, update: if isTrainer() && mayStoreHealth(playerId);
+          allow delete: if isTrainer();
         }
 
         match /measurements/{measurementId} {
-          allow read: if isTrainer() || isPhysio() || (isTeamMember() && memberDoc().data.role in ["player", "parent"] && resource.data.playerId == memberDoc().data.get('playerId', null));
-          allow write: if isTrainer();
+          allow read: if isTrainer()
+            || ((isPhysio() || (isTeamMember() && memberDoc().data.role in ["player", "parent"] && resource.data.playerId == memberDoc().data.get('playerId', null)))
+              && !consentRevoked(playerId));
+          allow create, update: if isTrainer() && mayStoreHealth(playerId);
+          allow delete: if isTrainer();
         }
       }
 
@@ -510,9 +581,17 @@ service cloud.firestore {
         // der eigene Spieler bzw. die eigenen Eltern, nicht Medizin oder Scouts. Spieler lesen per gezieltem Get
         // (nie als Liste), deshalb reicht der Pfadvergleich. Die Anwesenheit ("Fehlt") setzt weiterhin nur der
         // Trainer-Client in der Bewertung; Loeschen nur der Trainer (Spieler/Event loeschen).
+        // SCRUM-245: Der Grund ist ein Gesundheitsdatum. Bei widerrufener Einwilligung lesen Spieler/Eltern nur noch
+        // Rueckmeldungen ohne Grund und speichern keinen Grund mehr; in fremden Vereinen gibt es einen Grund nur mit
+        // dokumentierter Einwilligung. Zu-/Absagen selbst gehen immer.
         match /responses/{playerId} {
-          allow read: if isTrainer() || isPlayerFor(playerId);
+          allow read: if isTrainer()
+            || (isPlayerFor(playerId)
+              && (resource == null || resource.data.get('reason', '') == '' || !consentRevoked(playerId)));
           allow create, update: if isPlayerFor(playerId)
+            && (request.resource.data.get('reason', '') == ''
+              || (!consentRevoked(playerId)
+                && (isOwnTeam() || get(playerPath(playerId)).data.get('consentStatus', 'pending') == 'granted')))
             && exists(/databases/$(database)/documents/teams/$(teamId)/events/$(eventId))
             && request.resource.data.keys().hasOnly(['playerId', 'status', 'reason', 'by', 'updatedAt'])
             && request.resource.data.playerId == playerId
@@ -537,6 +616,20 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly(['playerId', 'name', 'number', 'positions', 'birthdate', 'entries', 'version'])
           && request.resource.data.playerId == playerId
           && request.resource.data.entries is list;
+        allow delete: if isTrainer();
+      }
+
+      // Bereinigte Spielerkarte (SCRUM-245): nur fuer Spieler mit widerrufener Einwilligung, die ihr Spielerdokument
+      // dann nicht mehr lesen. Enthaelt Name, Nummer, Positionen, Geburtsdatum - keine Gesundheitsdaten. Schreibt
+      // nur der Trainer-Client (consent-card.service.ts); hasOnly verhindert, dass Status oder "verletzt bis"
+      // hineinrutschen. Lesen: Trainer und der eigene Spieler bzw. die eigenen Eltern (gezielter Abruf).
+      match /playerCards/{playerId} {
+        allow get: if isTrainer() || isPlayerFor(playerId);
+        allow list: if isTrainer();
+        allow create, update: if isTrainer()
+          && request.resource.data.keys().hasOnly(['playerId', 'name', 'number', 'positions', 'birthdate', 'consentStatus'])
+          && request.resource.data.playerId == playerId
+          && request.resource.data.consentStatus == 'revoked';
         allow delete: if isTrainer();
       }
 
