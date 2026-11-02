@@ -20,6 +20,7 @@ import { ProfileService } from '../../core/profile/profile.service';
 import { effectiveStatus } from '../../core/records/availability';
 import { MeasurementsService } from '../../core/records/measurements.service';
 import { RecordsStateService } from '../../core/records/records-state.service';
+import { SelfReportsService } from '../../core/self-report/self-reports.service';
 import { injuryRisk } from '../../core/analysis/risk';
 import { canCreateLoadReport } from '../../core/analysis/load-report';
 import { SessionService } from '../../core/auth/session.service';
@@ -31,11 +32,12 @@ import { Card } from '../../ui/card/card';
 import { Status } from '../../ui/status/status';
 import { LoadReportAction } from './load-report-action';
 import { ProfileExtras } from './profile-extras';
+import { SelfReportHistory } from './self-report-history';
 
 /** Spielerprofil (Figma: Profil Desktop/Handy): Kopfbereich, Notenverlauf, Kompetenzprofil, Verfügbarkeit, Statistik, Eventhistorie. */
 @Component({
   selector: 'app-profile',
-  imports: [Button, Card, Status, ProfileExtras, LoadReportAction],
+  imports: [Button, Card, Status, ProfileExtras, LoadReportAction, SelfReportHistory],
   templateUrl: './profile.html',
   // Reihenfolge = Kaskade (die Handy-Regeln überschreiben Kopf und Auswertung).
   styleUrls: ['./profile.css', './profile-stats.css', './profile-mobile.css', './profile-risk.css', '../../ui/chart/chart.css'],
@@ -47,6 +49,7 @@ export class Profile implements OnInit {
   protected readonly squad = inject(SquadService);
   protected readonly profile = inject(ProfileService);
   protected readonly records = inject(RecordsStateService);
+  private readonly selfReports = inject(SelfReportsService);
   private readonly measurements = inject(MeasurementsService);
   protected readonly sync = inject(SyncService);
   private readonly session = inject(SessionService);
@@ -125,9 +128,11 @@ export class Profile implements OnInit {
         if (player) {
           this.profile.start(player.id);
           this.records.start(player.id);
+          this.selfReports.start(player.id);
         } else {
           this.profile.stop();
           this.records.stop();
+          this.selfReports.stop();
         }
       });
     });

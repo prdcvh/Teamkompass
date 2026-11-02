@@ -1,0 +1,57 @@
+@if (reports.loaded()) {
+  <tk-card>
+    <section class="sr" aria-labelledby="sr-history">
+      <h2 id="sr-history">{{ heading() }}</h2>
+      @if (reports.failed()) {
+        <p class="sr-hint" role="status">Die Angaben des Spielers können gerade nicht geladen werden. Die Belastung rechnet mit dem Wert des Trainerteams.</p>
+      }
+      @for (hint of hints(); track hint) {
+        <p class="sr-alert" role="status">{{ hint }}</p>
+      }
+      @if (compare() && status().current !== null) {
+        <p class="sr-hint">
+          Befinden zuletzt {{ status().current }} von 28@if (status().baseline !== null) { · eigener Normalwert {{ status().baseline }} (letzte 4 Wochen)} @else { · Normalwert ab 6 Antworten}
+        </p>
+      }
+      @if (trend().length > 1) {
+        <div class="sr-trend" role="img" [attr.aria-label]="trendLabel()">
+          @for (point of trend(); track $index) {
+            <span class="sr-bar" [style.height.%]="point.percent" [attr.title]="formatDate(point.date) + ': ' + point.sum"></span>
+          }
+        </div>
+      }
+      @if (rows().length === 0) {
+        <p class="sr-hint">Noch keine Angaben.</p>
+      } @else {
+        <ul class="sr-list">
+          @for (row of shown(); track row.event.id) {
+            <li>
+              <div class="sr-info">
+                <strong>{{ row.event.title || row.event.type }}</strong>
+                <small>{{ formatDate(row.event.date) }} · {{ row.event.type }}</small>
+                @if (row.wellness && wellnessText(row.wellness)) {
+                  <small class="sr-wellness-text">{{ wellnessText(row.wellness) }}</small>
+                }
+              </div>
+              <dl class="sr-values">
+                @if (compare()) {
+                  <div><dt>Trainer</dt><dd>{{ row.trainer }}</dd></div>
+                }
+                <div [class.sr-diff]="compare() && row.player !== null && (row.player - row.trainer >= 2 || row.trainer - row.player >= 2)">
+                  <dt>{{ compare() ? 'Spieler' : 'Anstrengung' }}</dt>
+                  <dd [attr.title]="row.player === null ? '' : exertionLabel(row.player)">{{ row.player ?? '–' }}</dd>
+                </div>
+                @if (row.sum !== null) {
+                  <div><dt>Befinden</dt><dd>{{ row.sum }}</dd></div>
+                }
+              </dl>
+            </li>
+          }
+        </ul>
+        @if (rows().length > shown().length) {
+          <button type="button" class="sr-more" (click)="all.set(true)">Alle {{ rows().length }} anzeigen</button>
+        }
+      }
+    </section>
+  </tk-card>
+}

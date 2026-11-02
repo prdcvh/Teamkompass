@@ -12,6 +12,7 @@ import { gradeLabel } from '../../core/ratings/rating';
 import { effectiveStatus } from '../../core/records/availability';
 import { RecordsStateService } from '../../core/records/records-state.service';
 import { ScoutViewService } from '../../core/scout/scout-view.service';
+import { SelfReportsService } from '../../core/self-report/self-reports.service';
 import { SessionService } from '../../core/auth/session.service';
 import { SquadService } from '../../core/player/squad.service';
 import { SyncService } from '../../core/shell/sync.service';
@@ -25,6 +26,8 @@ import { LoadReportAction } from '../profile/load-report-action';
 import { ProfileExtras } from '../profile/profile-extras';
 import { ConnectEmail } from './connect-email';
 import { RsvpPanel } from './rsvp-panel';
+import { SelfReportPanel } from './self-report-panel';
+import { SelfReportHistory } from '../profile/self-report-history';
 
 /**
  * Die eine Ansicht für Spieler, Eltern, Medizin und Scouts (Figma 01c/01d). Sie zeigt nur, was die Firestore-Regeln
@@ -43,7 +46,7 @@ import { RsvpPanel } from './rsvp-panel';
  */
 @Component({
   selector: 'app-member-view',
-  imports: [RouterLink, Button, Card, InstallHint, Status, ProfileExtras, BreakNotice, LoadReportAction, HomeRanking, ConnectEmail, RsvpPanel],
+  imports: [RouterLink, Button, Card, InstallHint, Status, ProfileExtras, BreakNotice, LoadReportAction, HomeRanking, ConnectEmail, RsvpPanel, SelfReportPanel, SelfReportHistory],
   templateUrl: './member-view.html',
   styleUrls: ['../profile/profile.css', './member-view.css', '../../ui/chart/chart.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -53,6 +56,7 @@ export class MemberView implements OnInit {
   protected readonly squad = inject(SquadService);
   protected readonly profile = inject(ProfileService);
   protected readonly records = inject(RecordsStateService);
+  private readonly selfReports = inject(SelfReportsService);
   protected readonly scoutView = inject(ScoutViewService);
   protected readonly sync = inject(SyncService);
   protected readonly mobile = inject(LayoutService).isMobile;
@@ -97,6 +101,8 @@ export class MemberView implements OnInit {
     if (role === 'parent') return 'Lesezugang zum Profil, zu den Bewertungen und zum Förderplan.';
     return 'Deine Bewertungen, dein Förderplan und deine Entwicklung.';
   });
+
+  protected readonly historyHeading = computed(() => (this.physio() ? 'Anstrengung und Befinden' : this.role() === 'parent' ? 'Angaben nach den Terminen' : 'Deine Angaben nach den Terminen'));
 
   /** Alle Termine mit Bewertung des gewählten Spielers (Scout: aus der Scout-Sicht). */
   private readonly items = computed<readonly EventRating[]>(() => {
@@ -154,12 +160,15 @@ export class MemberView implements OnInit {
         if (!player || this.scout()) {
           this.profile.stop();
           this.records.stop();
+          this.selfReports.stop();
           return;
         }
         // Medizin darf keine Bewertungen lesen (Regeln: events/*/ratings) – dort wird nichts abonniert.
         if (this.physio()) this.profile.stop();
         else this.profile.start(player.id);
         this.records.start(player.id);
+        // Anstrengung und Befinden (SCRUM-138): Spieler/Eltern die eigenen, Medizin die des gewählten Spielers.
+        this.selfReports.start(player.id);
       });
     });
   }

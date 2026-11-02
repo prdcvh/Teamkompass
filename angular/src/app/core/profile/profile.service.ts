@@ -7,6 +7,8 @@ import { type Rating, isRated, ratingFromDoc } from '../ratings/rating';
 import { type PointsEntry, pointsFromDoc } from '../points/points';
 import { SessionService } from '../auth/session.service';
 import { SyncService } from '../shell/sync.service';
+import { withSelfExertion } from '../self-report/self-report';
+import { SelfReportsService } from '../self-report/self-reports.service';
 
 /**
  * Bewertungen EINES Spielers über alle Events (Grundlage des Profils). Je Event wird nur das Bewertungsdokument
@@ -19,6 +21,7 @@ export class ProfileService {
   private readonly session = inject(SessionService);
   private readonly sync = inject(SyncService);
   private readonly events = inject(EventsService);
+  private readonly selfReports = inject(SelfReportsService);
 
   readonly playerId = signal<string | null>(null);
   /** Rating je Event-ID; `null` = für dieses Event gibt es (noch) keine Bewertung dieses Spielers. */
@@ -30,12 +33,18 @@ export class ProfileService {
   readonly error = signal('');
 
   readonly loading = computed(() => this.playerId() !== null && !this.error() && (this.events.load() !== 'ready' || this.waiting() > 0));
-  /** Alle Events mit der Bewertung des Spielers (oder null), neueste zuerst. */
-  readonly items = computed<EventRating[]>(() =>
-    [...this.events.events()]
+  /**
+   * Alle Events mit der Bewertung des Spielers (oder null), neueste zuerst. Hat der Spieler seine Anstrengung selbst
+   * angegeben (SCRUM-138), steht sie in `event.exertion` statt des Trainerwerts – so rechnen Belastungsampel,
+   * Protokoll und Kennzahlen überall mit dem Spielerwert. Den Trainerwert zeigt die Eventliste ({@link EventsService}).
+   */
+  readonly items = computed<EventRating[]>(() => {
+    const playerId = this.playerId();
+    const items = [...this.events.events()]
       .sort((a, b) => b.date.localeCompare(a.date))
-      .map((event) => ({ event, rating: this.byEvent().get(event.id) ?? null })),
-  );
+      .map((event) => ({ event, rating: this.byEvent().get(event.id) ?? null }));
+    return playerId ? withSelfExertion(items, this.selfReports.reportsFor(playerId)) : items;
+  });
 
   /** Alle Events mit den gespeicherten Punkten des Spielers (ob das Event sie zählt, entscheidet `points.ts`). Nur Trainer. */
   readonly pointItems = computed<PointsEntry[]>(() =>

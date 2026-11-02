@@ -1,0 +1,176 @@
+/* Angaben der Spieler (SCRUM-138): Abfrage, Wochenbelastung und Verlauf. */
+:host {
+  display: block;
+}
+.sr {
+  display: grid;
+  gap: var(--tk-space-3);
+  min-width: 0;
+}
+h2,
+p,
+legend {
+  margin: 0;
+}
+h2 {
+  font-size: var(--tk-text-lg, 18px);
+}
+.sr-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--tk-space-2);
+}
+.sr-head small,
+.sr-hint,
+.sr-label,
+.sr-info small,
+.sr-optional {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+.sr-head > div,
+.sr-info {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.sr-done {
+  flex: none;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--tk-soft-green);
+  color: var(--tk-ink);
+  font-size: var(--tk-text-sm);
+  font-weight: 600;
+}
+.sr-form,
+.sr-wellness {
+  display: grid;
+  gap: var(--tk-space-2);
+}
+.sr-wellness {
+  margin: 0;
+  padding: var(--tk-space-3);
+  border: 1px solid var(--tk-line);
+  border-radius: var(--tk-radius-md);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+}
+.sr-wellness legend {
+  padding: 0 4px;
+  font-weight: 600;
+}
+.sr-form .tk-label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.sr-form select {
+  width: 100%;
+  min-height: 44px;
+}
+.sr-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tk-space-2);
+}
+.sr-actions button {
+  flex: 0 1 180px;
+  min-height: 44px;
+}
+.sr-week {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tk-space-2);
+}
+.stat {
+  display: grid;
+  gap: 4px;
+  padding: var(--tk-space-3);
+  border-radius: var(--tk-radius-md);
+  background: var(--tk-surface-2);
+}
+.stat span {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+.stat strong {
+  font-size: 22px;
+}
+.sr-alert {
+  padding: var(--tk-space-2) var(--tk-space-3);
+  border-radius: var(--tk-radius-md);
+  background: var(--tk-soft-amber);
+  color: var(--tk-ink);
+  font-size: var(--tk-text-sm);
+  font-weight: 600;
+}
+.sr-trend {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 56px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--tk-line);
+}
+.sr-bar {
+  flex: 1 1 0;
+  max-width: 24px;
+  min-height: 4px;
+  border-radius: 4px 4px 0 0;
+  background: var(--tk-green);
+}
+.sr-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sr-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tk-space-3);
+  padding: var(--tk-space-2) 0;
+  border-top: 1px solid var(--tk-line);
+}
+.sr-values {
+  display: flex;
+  flex: none;
+  gap: var(--tk-space-3);
+  margin: 0;
+  text-align: center;
+}
+.sr-values dt {
+  color: var(--tk-muted);
+  font-size: 12px;
+}
+.sr-values dd {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+.sr-diff dd {
+  color: var(--tk-red-dark);
+}
+.sr-more {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--tk-ink);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+@media (max-width: 480px) {
+  .sr-list li {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--tk-space-1, 4px);
+  }
+}
