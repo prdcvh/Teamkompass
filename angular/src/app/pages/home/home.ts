@@ -14,7 +14,7 @@ import { SquadService } from '../../core/player/squad.service';
 import { SyncService } from '../../core/shell/sync.service';
 import { smoothPath } from '../../core/chart-path';
 import { type TeamEvent } from '../../core/events/event';
-import { gradeLabel } from '../../core/ratings/rating';
+import { RatingScaleService } from '../../core/ratings/rating-scale.service';
 import { FORM_LENGTH, type FormTrend, countdownLabel, dashboardFigures, leaders, upcomingEvents } from '../../core/team/team';
 import { TeamService } from '../../core/team/team.service';
 import { Button } from '../../ui/button/button';
@@ -56,6 +56,8 @@ export class Home implements OnInit {
   private readonly session = inject(SessionService);
   protected readonly isTrainer = computed(() => this.session.role() === 'trainer');
   private readonly current = inject(CurrentTeam);
+  /** Bewertungsskala des Teams (SCRUM-188); Werte und Formkurve rechnen unverändert, nur die Anzeige folgt ihr. */
+  private readonly ratingScale = inject(RatingScaleService);
   protected readonly teamName = this.current.name;
   protected readonly teamId = this.current.id;
 
@@ -65,6 +67,7 @@ export class Home implements OnInit {
       ...entry,
       spark: this.spark(entry.recent),
       trendText: entry.trend ? TREND_TEXT[entry.trend] : '',
+      gradeText: this.gradeText(entry.grade),
       tone: entry.grade <= 2 ? 'good' : entry.grade <= 3 ? 'ok' : 'weak',
       initials: entry.player.name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase(),
     })),
@@ -116,7 +119,7 @@ export class Home implements OnInit {
       { label: 'Kader', value: String(figures.squad) },
       { label: 'Fit', value: String(figures.fit) },
       { label: 'Events', value: String(figures.events) },
-      { label: 'Teamnote', value: numberLabel(figures.teamGrade) },
+      { label: 'Teamnote', value: this.gradeText(figures.teamGrade) },
       { label: 'Bilanz (S-U-N)', value: `${record.wins}-${record.draws}-${record.losses}` },
       { label: 'Tore', value: `${record.goalsFor}:${record.goalsAgainst}` },
       { label: 'Belastung hoch', value: String(figures.highLoad) },
@@ -136,6 +139,11 @@ export class Home implements OnInit {
     return { empty: lineupIsEmpty(assignments), formation: formationName(assignments), count: onPitchCount(assignments), rows };
   });
 
+  /** Schnitt wie bisher („2,3“, ganze Werte „2“); bei Kompetenzstufen die Stufe (SCRUM-188). */
+  private gradeText(value: number | null): string {
+    return this.ratingScale.scale() === 'levels' ? this.ratingScale.label(value) : numberLabel(value);
+  }
+
   private spark(grades: readonly number[]) {
     const inner = SPARK_HEIGHT - SPARK_PAD * 2;
     const step = grades.length > 1 ? (SPARK_WIDTH - SPARK_PAD * 2) / (grades.length - 1) : 0;
@@ -143,7 +151,7 @@ export class Home implements OnInit {
       x: grades.length > 1 ? SPARK_PAD + index * step : SPARK_WIDTH / 2,
       y: SPARK_PAD + ((Math.min(Math.max(grade, 1), 6) - 1) / 5) * inner,
     }));
-    return { width: SPARK_WIDTH, height: SPARK_HEIGHT, path: smoothPath(points), last: points[points.length - 1] ?? null, label: grades.map(gradeLabel).join(', ') };
+    return { width: SPARK_WIDTH, height: SPARK_HEIGHT, path: smoothPath(points), last: points[points.length - 1] ?? null, label: grades.map((grade) => this.ratingScale.label(grade)).join(', ') };
   }
 
   private dateParts(event: TeamEvent) {

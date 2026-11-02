@@ -7,9 +7,12 @@ import { LayoutService } from '../../core/shell/layout.service';
 import { ageFromBirthdate, todayIso } from '../../core/shared/dates';
 import { type Player, consentRevokedMessage, isConsentRevoked, positionText } from '../../core/player/player';
 import {
+  type GradedEvent,
   availability,
+  deltaLabel,
   gradeToPercent,
   gradedEvents,
+  noteWord,
   numberLabel,
   profileFigures,
   skillAverages,
@@ -23,7 +26,9 @@ import { RecordsStateService } from '../../core/records/records-state.service';
 import { injuryRisk } from '../../core/analysis/risk';
 import { canCreateLoadReport } from '../../core/analysis/load-report';
 import { SessionService } from '../../core/auth/session.service';
-import { gradeLabel } from '../../core/ratings/rating';
+import { ratingScaleOf } from '../../core/ratings/rating';
+import { scoreLabel } from '../../core/ratings/rating-scale';
+import { RatingScaleService } from '../../core/ratings/rating-scale.service';
 import { SquadService } from '../../core/player/squad.service';
 import { SyncService } from '../../core/shell/sync.service';
 import { Button } from '../../ui/button/button';
@@ -50,6 +55,8 @@ export class Profile implements OnInit {
   private readonly measurements = inject(MeasurementsService);
   protected readonly sync = inject(SyncService);
   private readonly session = inject(SessionService);
+  /** Bewertungsskala des Teams (SCRUM-188): Schnitte und Verlauf in dieser Skala, jede Bewertung in ihrer eigenen. */
+  protected readonly scale = inject(RatingScaleService).scale;
   protected readonly mobile = inject(LayoutService).isMobile;
 
   private readonly routeId = toSignal(this.route.paramMap.pipe(map((params) => params.get('id') ?? '')), { initialValue: '' });
@@ -68,7 +75,7 @@ export class Profile implements OnInit {
   protected readonly figures = computed(() => profileFigures(this.profile.items(), this.today));
   protected readonly skills = computed(() => skillAverages(this.graded()));
   protected readonly attendance = computed(() => availability(this.profile.items(), this.today));
-  protected readonly chart = computed(() => trendChart(this.graded()));
+  protected readonly chart = computed(() => trendChart(this.graded(), this.scale()));
   /** Trainingspunkte (SCRUM-104) sieht nur der Trainer. Verlauf neueste zuerst, wie die Eventhistorie. */
   protected readonly pointsVisible = computed(() => this.session.role() === 'trainer');
   private readonly pointsAll = computed(() => pointsHistory(this.profile.pointItems()));
@@ -100,15 +107,15 @@ export class Profile implements OnInit {
     const f = this.figures();
     const g = f.games;
     return [
-      { label: 'Notenschnitt', value: gradeLabel(f.average) },
-      { label: 'Spiel-Schnitt', value: gradeLabel(f.gameAverage) },
-      { label: 'Training-Schnitt', value: gradeLabel(f.trainingAverage) },
+      { label: this.scale() === 'levels' ? 'Stufe im Schnitt' : 'Notenschnitt', value: this.gradeLabel(f.average) },
+      { label: 'Spiel-Schnitt', value: this.gradeLabel(f.gameAverage) },
+      { label: 'Training-Schnitt', value: this.gradeLabel(f.trainingAverage) },
       { label: 'Bewertete Events', value: String(f.ratedEvents) },
       { label: 'Teilnahmen', value: String(f.attendances) },
-      { label: 'Trend', value: numberLabel(f.trend, { signed: true }) },
+      { label: 'Trend', value: deltaLabel(f.trend, this.scale()) },
       { label: 'Ø Anstrengung zuletzt', value: numberLabel(f.recentIntensity) },
-      { label: 'Entwicklung Saison', value: numberLabel(f.development, { signed: true }) },
-      { label: 'Bestes Event', value: f.best ? `${gradeLabel(f.best.grade)} · ${f.best.event.type}` : '–' },
+      { label: 'Entwicklung Saison', value: deltaLabel(f.development, this.scale()) },
+      { label: 'Bestes Event', value: f.best ? `${this.gradeLabel(f.best.grade)} · ${f.best.event.type}` : '–' },
       { label: 'Einsatzquote', value: `${g.appearanceRate}%` },
       { label: 'Scorer/Spiel', value: numberLabel(g.scorersPerGame) },
       { label: 'Tore + Vorlagen', value: `${g.goals} + ${g.assists}` },
@@ -139,7 +146,18 @@ export class Profile implements OnInit {
 
   protected formatDate = formatDate;
   protected positionText = positionText;
-  protected gradeLabel = gradeLabel;
+  protected readonly noteWord = noteWord;
+  /** Schnitt (Gesamt, Kompetenzprofil) in der Skala des Teams. */
+  protected gradeLabel = (value: number | null): string => scoreLabel(value, this.scale());
+
+  /** Eine einzelne Bewertung in der Skala, mit der sie vergeben wurde (alte Schulnoten bleiben Schulnoten). */
+  protected entryScale(entry: GradedEvent) {
+    return ratingScaleOf(entry.rating, this.scale());
+  }
+
+  protected entryLabel(entry: GradedEvent): string {
+    return scoreLabel(entry.grade, this.entryScale(entry));
+  }
   protected gradeToPercent = gradeToPercent;
   protected numberLabel = numberLabel;
 

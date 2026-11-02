@@ -14,11 +14,12 @@ import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 import { Dialog } from '../../ui/dialog/dialog';
 import { ClubAdminCard } from './club-admin-card';
+import { RatingScaleCard } from './rating-scale-card';
 
 /** Einstellungen & Datenschutz: Darstellung, lokale Aufbewahrung, lokale Daten löschen, Bundesland des Teams, Aktivitätsverlauf. */
 @Component({
   selector: 'app-settings',
-  imports: [Button, Card, ClubAdminCard, Dialog, FormsModule],
+  imports: [Button, Card, ClubAdminCard, Dialog, FormsModule, RatingScaleCard],
   templateUrl: './settings.html',
   styleUrl: './settings.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
