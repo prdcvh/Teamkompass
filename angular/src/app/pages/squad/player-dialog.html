@@ -134,6 +134,17 @@
         }
         </div>
       }
+      @if (errors().status) {
+        <!-- Fremder Verein ohne dokumentierte Einwilligung (SCRUM-245). -->
+        <span class="error" id="err-status" role="alert">
+          {{ errors().status }}
+          @if (player(); as p) {
+            <a [routerLink]="['/profile', p.id]" fragment="einwilligung" (click)="closed.emit()">Zum Profil (Einwilligung)</a>
+          } @else {
+            Bitte unten bei „Datennutzung“ „dokumentiert“ wählen oder den Status auf „Fit“ lassen.
+          }
+        </span>
+      }
     </fieldset>
 
     <div class="grid">

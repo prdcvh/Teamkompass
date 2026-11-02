@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { formatDate } from '../../core/events/event';
+import { HEALTH_HIDDEN_TEXT } from '../../core/player/consent';
 import { todayIso } from '../../core/shared/dates';
 import { type Absence, absencePeriodText, absenceTitle, isInjuryAbsence } from '../../core/records/absence';
 import { type Measurement, measurementText } from '../../core/records/measurement';
@@ -48,12 +49,22 @@ export class ProfileExtras {
   readonly showPlans = input(true);
   /** Warntext bei widerrufener Einwilligung (leer = keine Warnung); blockiert nichts. */
   readonly consentWarning = input('');
+  /**
+   * Fremder Verein ohne dokumentierte Einwilligung (SCRUM-245): Hinweistext; Abwesenheiten und Messwerte lassen sich
+   * dann nicht anlegen oder ändern (die Regeln sperren es), nur löschen. Leer = keine Sperre.
+   */
+  readonly healthLocked = input('');
+  /** Spieler/Eltern bei widerrufener Einwilligung: Abwesenheiten und Messwerte sind ausgeblendet (SCRUM-245). */
+  readonly healthHidden = input(false);
 
   protected readonly plans = computed(() => [...this.records.plans()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
   protected readonly absences = computed(() => [...this.records.absences()].sort((a, b) => b.from.localeCompare(a.from)));
   protected readonly measurementsNewestFirst = computed(() => [...this.measurementsService.measurements()].reverse());
   protected readonly chart = computed(() => measurementChart(this.measurementsService.measurements(), todayIso()));
   protected readonly canEdit = computed(() => this.editable() && this.records.canWrite());
+  /** Abwesenheiten/Messwerte anlegen und ändern: nicht bei gesperrten Gesundheitsdaten (löschen geht immer). */
+  protected readonly canEditHealth = computed(() => this.canEdit() && !this.healthLocked());
+  protected readonly hiddenText = HEALTH_HIDDEN_TEXT;
 
   /** Nur der Spieler selbst schreibt die Selbstreflexion (Eltern lesen nur). */
   protected readonly canReflect = computed(() => this.session.role() === 'player');
@@ -149,6 +160,13 @@ export class ProfileExtras {
     } finally {
       this.deleteBusy.set(false);
     }
+  }
+
+  /** Springt zum Abschnitt „Einwilligung“ im Profil. */
+  protected showConsent(): void {
+    const target = document.getElementById('einwilligung');
+    target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    target?.focus({ preventScroll: true });
   }
 
   protected get syncFailed(): boolean {

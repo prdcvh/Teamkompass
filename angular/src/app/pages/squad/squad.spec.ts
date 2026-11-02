@@ -7,20 +7,22 @@ import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-fireb
 import { SquadService } from '../../core/player/squad.service';
 import { SquadAbsencesService } from '../../core/records/squad-absences.service';
 import { Squad } from './squad';
+import { CurrentTeam } from '../../core/team/current-team.service';
 
 describe('Squad (Kader-Seite)', () => {
   let firebase: FakeFirebase;
   const isMobile = signal(false);
 
-  async function render(role: 'trainer' | 'physio' = 'trainer', mobile = false) {
+  async function render(role: 'trainer' | 'physio' = 'trainer', mobile = false, team = 'U14') {
     isMobile.set(mobile);
     firebase = new FakeFirebase();
-    firebase.players.players.set('p1', { name: 'Jonas Keller', positions: ['TW'], number: 1, birthdate: '2012-05-05', status: 'Fit' });
-    firebase.players.players.set('p2', { name: 'Elias Wagner', positions: ['RV'], number: 2, birthdate: '2012-06-06', status: 'Fit' });
-    firebase.players.players.set('p3', { name: 'Jan Braun', positions: ['RA'], number: 17, birthdate: '2013-01-01', status: 'Verletzt' });
+    firebase.players.players.set('p1', { name: 'Jonas Keller', positions: ['TW'], number: 1, birthdate: '2012-05-05', status: 'Fit', consentStatus: 'pending' });
+    firebase.players.players.set('p2', { name: 'Elias Wagner', positions: ['RV'], number: 2, birthdate: '2012-06-06', status: 'Fit', consentStatus: 'pending' });
+    firebase.players.players.set('p3', { name: 'Jan Braun', positions: ['RA'], number: 17, birthdate: '2013-01-01', status: 'Verletzt', consentStatus: 'pending' });
     TestBed.configureTestingModule({
       providers: [provideRouter([]), ...provideFakeFirebase(firebase), { provide: LayoutService, useValue: { isMobile } }],
     });
+    TestBed.inject(CurrentTeam).id.set(team);
     TestBed.inject(SessionService).role.set(role);
     const fixture = TestBed.createComponent(Squad);
     await fixture.whenStable();
@@ -121,6 +123,20 @@ describe('Squad (Kader-Seite)', () => {
       q<HTMLFormElement>(fixture, 'form')!.dispatchEvent(new Event('submit'));
       fixture.detectChanges();
       expect(text(q(fixture, '#err-number'))).toContain('bereits vergeben');
+      expect(firebase.calls.some((c) => c.startsWith('savePlayer'))).toBe(false);
+    });
+
+    it('fremder Verein ohne dokumentierte Einwilligung: Status „Verletzt“ gesperrt, Hinweis mit Link zum Profil (SCRUM-245)', async () => {
+      const fixture = await render('trainer', false, 'Xy7Fremd0000Verein01');
+      qa<HTMLButtonElement>(fixture, 'tbody tr')[0].querySelector<HTMLButtonElement>('button')!.click();
+      fixture.detectChanges();
+      type(q<HTMLSelectElement>(fixture, 'select[name="status"]')!, 'Verletzt', 'change');
+      fixture.detectChanges();
+      q<HTMLFormElement>(fixture, 'form')!.dispatchEvent(new Event('submit'));
+      fixture.detectChanges();
+      expect(text(q(fixture, '#err-status'))).toContain('fehlt die dokumentierte Einwilligung');
+      const link = q<HTMLAnchorElement>(fixture, '#err-status a')!;
+      expect(link.getAttribute('href')).toBe('/profile/p1#einwilligung');
       expect(firebase.calls.some((c) => c.startsWith('savePlayer'))).toBe(false);
     });
 

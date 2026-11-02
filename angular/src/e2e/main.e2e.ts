@@ -44,7 +44,7 @@ function seed(): FakeFirebase {
   names.forEach((name, i) => {
     fake.players.players.set(`p${i + 1}`, {
       name, positions: [['TW', 'IV', 'ZM', 'ST', 'LA'][i % 5]], number: i + 1, birthdate: '2012-05-05',
-      status: ['Fit', 'Angeschlagen', 'Verletzt', 'Pause'][i % 4], ...(i === 4 ? { consentStatus: 'revoked' } : {}),
+      status: ['Fit', 'Angeschlagen', 'Verletzt', 'Pause'][i % 4], consentStatus: i === 4 ? 'revoked' : 'pending',
     });
   });
   fake.events.events.set('e1', { type: 'Training', title: 'Spiel in die Tiefe', date: '2026-10-13', intensity: 3, location: 'Sportplatz am Hang 1, Königstein im Taunus', startTime: '18:00', durationMinutes: 90 });

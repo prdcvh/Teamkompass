@@ -8,6 +8,9 @@ import { LineupService } from '../../core/lineup/lineup.service';
 import { lineupIsEmpty, lineupSummary } from '../../core/lineup/lineup';
 import { LayoutService, injectNarrowViewport } from '../../core/shell/layout.service';
 import { type Player, consentRevokedMessage, isConsentRevoked } from '../../core/player/player';
+import { CurrentTeam } from '../../core/team/current-team.service';
+import { healthLockedMessage, mayStoreHealth } from '../../core/player/consent';
+import { AbsenceSyncService } from '../../core/records/absence-sync.service';
 import {
   ATTENDANCES,
   ATTENDANCE_LABELS,
@@ -66,6 +69,9 @@ export class EventRating implements OnInit {
   protected readonly sync = inject(SyncService);
   private readonly lineupService = inject(LineupService);
   private readonly rsvp = inject(RsvpService);
+  private readonly team = inject(CurrentTeam);
+  /** Automatisches „Fehlt“, das wegen fehlender Einwilligung übersprungen wurde (SCRUM-245). */
+  protected readonly skippedAbsences = inject(AbsenceSyncService).lockedSkips;
   private readonly layoutMobile = inject(LayoutService).isMobile;
   private readonly narrow = injectNarrowViewport();
   /** Einzelkarten-Ansicht (Handy und alles unter TABLE_MIN_WIDTH); sonst die Matrix mit allen Spalten. */
@@ -139,6 +145,15 @@ export class EventRating implements OnInit {
 
   protected revokedMessage(player: Player): string {
     return consentRevokedMessage(player.name);
+  }
+
+  /** Fremder Verein ohne dokumentierte Einwilligung (SCRUM-245): keine Gesundheitsangaben speicherbar. */
+  protected locked(player: Player): boolean {
+    return !mayStoreHealth(player, this.team.id());
+  }
+
+  protected lockedMessage(player: Player): string {
+    return healthLockedMessage(player.name);
   }
 
   /** Schild „Zugesagt“, „Abgesagt (Eltern): Grund“ oder „Offen“ je Spieler; null, solange keine Rückmeldungen geladen sind. */

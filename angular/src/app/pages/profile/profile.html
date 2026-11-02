@@ -75,6 +75,10 @@
         }
       </tk-card>
 
+      @if (trainer()) {
+        <tk-consent-panel [player]="p" />
+      }
+
       <section class="columns">
         <tk-card>
           <h2>Notenverlauf</h2>
@@ -180,7 +184,7 @@
       </tk-card>
       </details>
 
-      <tk-profile-extras [editable]="true" [consentWarning]="consentWarning()" />
+      <tk-profile-extras [editable]="true" [consentWarning]="consentWarning()" [healthLocked]="healthLocked()" />
     }
   }
 </section>

@@ -57,7 +57,8 @@ export class AbsencesService {
   async reconcileAbsences(playerId: string, absences: readonly Absence[]): Promise<number> {
     const player = (await this.squad.whenLoaded()).find((entry) => entry.id === playerId);
     if (!player) return 0;
-    if (this.profile.playerId() !== playerId || this.profile.loading() || this.profile.error()) {
+    // Fremder Verein ohne Einwilligung (SCRUM-245): wie der allgemeine Abgleich – „Fehlt“ mit Grund überspringen.
+    if (this.profile.playerId() !== playerId || this.profile.loading() || this.profile.error() || !this.absenceSync.mayStore(player)) {
       return this.absenceSync.reconcilePlayer(player, await this.events.whenLoaded(), { absences });
     }
     let changed = 0;

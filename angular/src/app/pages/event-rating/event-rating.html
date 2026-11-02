@@ -24,6 +24,14 @@
     }
   </p>
 
+  @for (skip of skippedAbsences(); track skip.id) {
+    <!-- SCRUM-245: automatisches „Fehlt“ mit Grund ohne dokumentierte Einwilligung übersprungen. -->
+    <p class="consent-chip skipped" role="status">
+      Für {{ skip.name }} fehlt die dokumentierte Einwilligung: „Fehlt“ mit Grund wurde nicht automatisch eingetragen.
+      <a [routerLink]="['/profile', skip.id]" fragment="einwilligung">Zum Profil</a>
+    </p>
+  }
+
   @if (failed()) {
     <div class="notice" role="alert">
       <p>{{ errorText() }}</p>
@@ -117,6 +125,8 @@
                 <strong>{{ player.name }}</strong>
                 @if (revoked(player)) {
                   <span class="consent-chip" role="alert" [title]="revokedMessage(player)">⚠ Einwilligung widerrufen – {{ revokedMessage(player) }}</span>
+                } @else if (locked(player)) {
+                  <a class="consent-chip" [routerLink]="['/profile', player.id]" fragment="einwilligung" [title]="lockedMessage(player)">⚠ Einwilligung fehlt – bitte keine Gesundheitsangaben (zum Profil)</a>
                 }
                 @if (rsvpBadge(player); as badge) {
                   <tk-chip class="rsvp-badge" [tone]="badge.tone">{{ badge.label }}</tk-chip>
@@ -208,6 +218,8 @@
                     <span class="number">{{ player.number }}</span> <strong>{{ player.name }}</strong>
                     @if (revoked(player)) {
                       <span class="consent-chip" [title]="revokedMessage(player)">⚠ Einwilligung widerrufen</span>
+                    } @else if (locked(player)) {
+                      <a class="consent-chip" [routerLink]="['/profile', player.id]" fragment="einwilligung" [title]="lockedMessage(player)">⚠ Einwilligung fehlt</a>
                     }
                     @if (rsvpBadge(player); as badge) {
                       <tk-chip class="rsvp-badge" [tone]="badge.tone">{{ badge.label }}</tk-chip>

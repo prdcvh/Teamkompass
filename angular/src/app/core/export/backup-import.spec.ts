@@ -99,6 +99,13 @@ describe('Sicherung einspielen: Zusammenfassung und Schreibliste', () => {
     expect(ops.find((op) => op.path.join('/') === 'events/e1/privateNotes/p1')!.data).toEqual({ playerId: 'p1', note: 'intern: Gespräch nötig' });
   });
 
+  it('trägt bei dokumentierter Einwilligung das einspielende Konto ein (Regeln, SCRUM-245)', () => {
+    const ops = backupOperations(backup(), 'uid-trainer');
+    expect(ops.find((op) => op.path.join('/') === 'players/p1')!.data['consentByUid']).toBe('uid-trainer');
+    expect(ops.find((op) => op.path.join('/') === 'players/p2')!.data['consentByUid']).toBeUndefined();
+    expect(backupOperations(backup()).find((op) => op.path.join('/') === 'players/p1')!.data['consentByUid']).toBeUndefined();
+  });
+
   it('übernimmt die Startelf nur mit bekannten Spielern, führt sie zusammen und lässt eine leere weg', () => {
     const ops = backupOperations(backup());
     const lineup = ops.find((op) => op.path.join('/') === 'meta/lineup')!;
