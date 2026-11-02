@@ -1,8 +1,8 @@
 import type { Player } from '../player/player';
 import { type Candidate, assignmentsFromPreview, eligibleCandidates, expandPreset, formationOptions, suggestedLineup } from './formation-assignment';
 import { GAME_FORMATS, GAME_FORMAT_INFO, type GameFormat, isGameFormat } from './game-format';
-import { docFromEventLineup, emptyAssignments, fitToFormat, formationName, moveToZone, normalizeEventLineups, onPitchCount, zonesForFormat } from './lineup';
-import { presetName } from './pitch';
+import { activePreset, docFromEventLineup, emptyAssignments, fitToFormat, formationName, moveToZone, normalizeEventLineups, onPitchCount, zonesForFormat } from './lineup';
+import { ZONES, presetName } from './pitch';
 
 const cand = (id: string, number: number, positions: string[], grade: number | null = 3): Candidate => ({
   player: { id, name: `Spieler ${id}`, positions, number, birthdate: '2016-01-01', status: 'Fit', injuryUntil: '', injuredSince: '', consentStatus: 'pending', consentDate: '' } as Player,
@@ -77,16 +77,30 @@ describe('Spielformen (SCRUM-187)', () => {
     expect(options.map((option) => option.name)).toEqual(formationOptions(eligibleCandidates(kids), '11:11').map((option) => option.name));
   });
 
-  it('Aufstellung an die Spielform anpassen: Torwart und Überzählige gehen auf die Bank, 11:11 bleibt unverändert', () => {
-    const assignments = suggestedLineup(eligibleCandidates(kids), '9:9');
-    expect(fitToFormat(assignments, '11:11')).toBe(assignments);
-    expect(fitToFormat(assignments, '9:9')).toBe(assignments);
-    const five = fitToFormat(assignments, '5:5');
-    expect(onPitchCount(five)).toBe(5);
-    expect(five.TW).toEqual(assignments.TW);
-    const three = fitToFormat(assignments, '3:3');
-    expect(onPitchCount(three)).toBe(3);
+  it('Aufstellung an die Spielform anpassen: nur Plätze der passenden Formation, Überzählige und Torwart (3:3) auf die Bank', () => {
+    // Bestehende 11er-Elf (4-3-3) eines Teams, das auf 5:5 wechselt.
+    const eleven = Object.assign(emptyAssignments(), {
+      TW: ['tw'], LV: ['lv'], IV: ['iv1', 'iv2'], RV: ['rv'], ZM: ['z1', 'z2', 'z3'], LA: ['la'], ST: ['st'], RA: ['ra'],
+    }) as never;
+    expect(fitToFormat(eleven, '11:11')).toBe(eleven); // 11:11 bleibt unverändert
+    const five = fitToFormat(eleven, '5:5');
+    expect(onPitchCount(five)).toBeLessThanOrEqual(5);
+    const preset = activePreset(eleven, '5:5')!;
+    for (const zone of ZONES) expect(five[zone].length).toBeLessThanOrEqual(preset[zone] ?? 0);
+    expect(zonesForFormat('5:5', five)).toEqual(ZONES.filter((zone) => (preset[zone] ?? 0) > 0));
+    expect(fitToFormat(five, '5:5')).toBe(five); // passt schon
+    const three = fitToFormat(eleven, '3:3');
+    expect(onPitchCount(three)).toBeLessThanOrEqual(3);
     expect(three.TW).toEqual([]);
+    const nine = fitToFormat(eleven, '9:9');
+    expect(onPitchCount(nine)).toBeLessThanOrEqual(9);
+    expect(formationName(fitToFormat(suggestedLineup(eligibleCandidates(kids), '7:7'), '7:7'))).toBe(formationName(suggestedLineup(eligibleCandidates(kids), '7:7')));
+  });
+
+  it('das Feld zeigt bei kleinen Spielformen nur die Plätze einer Formation (nicht die Vereinigung)', () => {
+    const zones = zonesForFormat('5:5', emptyAssignments());
+    expect(zones).toHaveLength(5); // 1-2-1: TW, IV, LM, RM, ST
+    expect(zonesForFormat('3:3', emptyAssignments())).toHaveLength(3);
   });
 
   it('bietet bei kleinen Spielformen nur die genutzten Zonen an, bei 11:11 alle', () => {

@@ -72,7 +72,8 @@ export class Lineup implements OnInit {
   protected readonly format = computed<GameFormat>(() => this.storedForTarget()?.gameFormat ?? this.settings.gameFormat());
   protected readonly info = computed(() => gameFormatInfo(this.format()));
   protected readonly max = computed(() => this.info().players);
-  protected readonly overfull = computed(() => this.onPitchCount() > this.max());
+  /** Die gespeicherte Aufstellung passt nicht zur Spielform (z. B. 11 Spieler bei 5:5); nie bei 11:11. */
+  protected readonly misfit = computed(() => fitToFormat(this.assignments(), this.format()) !== this.assignments());
   protected readonly hasStoredForTarget = computed(() => this.storedForTarget() !== null);
   /** Letztes Spiel vor dem Ziel mit gespeicherter Aufstellung – Quelle für „Vom letzten Spiel übernehmen“. */
   protected readonly previousGame = computed(() =>
@@ -216,6 +217,10 @@ export class Lineup implements OnInit {
     const target = this.target();
     if (target?.kind !== 'zone' || !target.playerId) return;
     this.apply(removeFromPitch(this.assignments(), target.playerId));
+  }
+
+  protected adaptToFormat(): void {
+    this.apply(fitToFormat(this.assignments(), this.format()));
   }
 
   protected applySuggestion(): void {

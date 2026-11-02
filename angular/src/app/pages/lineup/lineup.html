@@ -4,7 +4,7 @@
     <h1>Aufstellung</h1>
     @if (ready()) {
       <p class="meta">
-        {{ name() }} · {{ onPitchCount() }}/{{ max() }} auf dem Feld@if (format() !== '11:11') { ({{ format() }}) } ·
+        @if (format() === '11:11' || onPitchCount() === max()) { {{ name() }} · }{{ onPitchCount() }}/{{ max() }} auf dem Feld@if (format() !== '11:11') { ({{ format() }}) } ·
         @if (teamGrade() !== null) { Mannschaftsnote Ø {{ gradeLabel(teamGrade()) }} } @else { Mannschaftsnote noch ohne Bewertungen }
       </p>
     }
@@ -88,8 +88,11 @@
           <tk-card>
             <div class="panel">
               <h2>Formation</h2>
-              @if (overfull()) {
-                <p class="warn" role="status">Es stehen mehr Spieler auf dem Feld, als {{ format() }} erlaubt. Nimm Spieler vom Feld oder wähle eine Formation.</p>
+              @if (misfit()) {
+                <div class="warn" role="status" data-testid="misfit">
+                  <p>Die gespeicherte Aufstellung passt nicht zu {{ format() }}.</p>
+                  <button tkButton type="button" (click)="adaptToFormat()" [disabled]="!lineup.canEdit()">An Spielform anpassen</button>
+                </div>
               }
               @if (info().rotationHint) {
                 <p class="muted" data-testid="rotation-hint">{{ rotationHint }}</p>

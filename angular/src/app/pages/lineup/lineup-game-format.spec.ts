@@ -142,4 +142,25 @@ describe('Lineup: Spielformen (SCRUM-187)', () => {
     await flush(fixture);
     expect(formatSelect(fixture).value).toBe('5:5');
   });
+
+  it('Team wechselt auf 5:5, die gespeicherte 11er-Elf passt nicht: Hinweis und „An Spielform anpassen“', async () => {
+    const fixture = await render('5:5', full, []);
+    expect(q(fixture, '[data-testid="misfit"]')).not.toBeNull();
+    expect(qa(fixture, '.pitch .slot, .pitch .chip').length).toBeLessThanOrEqual(11);
+    q<HTMLButtonElement>(fixture, '[data-testid="misfit"] button')!.click();
+    await vi.waitFor(() => expect(firebase.calls).toContain('saveLineup'));
+    await flush(fixture);
+    const placed = Object.values((firebase.lineup.lineup as { assignments: Record<string, string[]> }).assignments).flat();
+    expect(placed.length).toBeLessThanOrEqual(5);
+    expect(qa(fixture, '.pitch .zone')).toHaveLength(5); // nur die Plätze der Formation
+    expect(q(fixture, '[data-testid="misfit"]')).toBeNull();
+    expect(text(q(fixture, '.meta'))).not.toMatch(/\/5 auf dem Feld.*11/);
+  });
+
+  it('bei 11:11 gibt es keinen Hinweis und die gespeicherte Aufstellung bleibt unverändert', async () => {
+    const fixture = await render('11:11', full, []);
+    expect(q(fixture, '[data-testid="misfit"]')).toBeNull();
+    expect(qa(fixture, '.pitch .chip')).toHaveLength(11);
+    expect(firebase.calls).not.toContain('saveLineup');
+  });
 });
