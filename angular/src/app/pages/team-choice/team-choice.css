@@ -101,3 +101,31 @@ h1 {
   padding: var(--tk-space-2);
   color: var(--tk-red-dark);
 }
+
+.item:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+/* Vereinslogo aus der Datenbank (SCRUM-182), sonst der Anfangsbuchstabe. */
+.logo {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--tk-radius-md);
+  object-fit: contain;
+}
+
+.placeholder {
+  display: grid;
+  place-items: center;
+  color: var(--tk-red-dark);
+  background: var(--tk-surface-2);
+  font-weight: 700;
+}
+
+.error {
+  margin: var(--tk-space-4) 0 0;
+  color: var(--tk-red-dark);
+  font-size: var(--tk-text-sm);
+}

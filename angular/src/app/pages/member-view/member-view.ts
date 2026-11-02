@@ -57,7 +57,7 @@ export class MemberView implements OnInit {
   protected readonly sync = inject(SyncService);
   protected readonly mobile = inject(LayoutService).isMobile;
 
-  private readonly team = inject(CurrentTeam);
+  protected readonly team = inject(CurrentTeam);
   protected readonly club = computed(() => [this.team.clubName(), this.team.label()].filter(Boolean).join(' '));
   protected readonly today = todayIso();
 

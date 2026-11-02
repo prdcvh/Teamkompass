@@ -102,6 +102,7 @@ match /clubs/{clubId}
   get:            isSignedIn()          // Name + Logo; Frage 3
   list:           false                 // niemand kann alle Vereine auflisten
   update:         isClubAdmin(clubId) && nur Felder name, logoUrl
+                  // SCRUM-182: logoUrl null oder data:image/(png|jpeg|webp);base64,… mit höchstens 100000 Zeichen
   create, delete: false                 // Anlegen erst mit SCRUM-181
 
   match /admins/{uid}

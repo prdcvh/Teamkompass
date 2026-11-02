@@ -7,13 +7,28 @@
     <ul class="list">
       @for (choice of team.choices(); track choice.teamId) {
         <li>
-          <button type="button" class="item" [class.current]="isCurrent(choice)" [attr.aria-current]="isCurrent(choice) ? 'true' : null" (click)="open(choice)">
+          <button
+            type="button"
+            class="item"
+            [class.current]="isCurrent(choice)"
+            [attr.aria-current]="isCurrent(choice) ? 'true' : null"
+            [attr.aria-busy]="opening() === choice.teamId ? 'true' : null"
+            [disabled]="opening() !== null"
+            (click)="open(choice)"
+          >
+            @if (choice.meta?.logoUrl; as logo) {
+              <img class="logo" [src]="logo" alt="" width="36" height="36" />
+            } @else {
+              <span class="logo placeholder" aria-hidden="true">{{ initial(choice) }}</span>
+            }
             <span class="text">
               <strong>{{ title(choice) }}</strong>
               <small>{{ subtitle(choice) }}</small>
             </span>
             @if (isCurrent(choice)) {
               <span class="badge">geöffnet</span>
+            } @else if (opening() === choice.teamId) {
+              <span class="badge">wird geöffnet …</span>
             }
             <span class="chevron" aria-hidden="true">›</span>
           </button>
@@ -21,6 +36,15 @@
       }
     </ul>
 
-    <p class="foot"><a routerLink="/abmelden">Abmelden</a></p>
+    @if (auth.error()) {
+      <p class="error" role="alert">{{ auth.error() }}</p>
+    }
+
+    <p class="foot">
+      @if (auth.status() === 'ready') {
+        <a routerLink="/">Zurück</a> ·
+      }
+      <a routerLink="/abmelden">Abmelden</a>
+    </p>
   </div>
 </main>

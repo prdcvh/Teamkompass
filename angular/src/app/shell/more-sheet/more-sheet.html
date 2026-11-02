@@ -1,4 +1,11 @@
 <tk-dialog title="Weitere Bereiche" [open]="open()" (closed)="closed.emit()">
+  <!-- Geöffnetes Team mit Vereinslogo aus der Datenbank (SCRUM-182) – auf dem Handy die Stelle, an der das Logo erscheint. -->
+  <div class="team">
+    @if (team.logoSrc(); as logo) {
+      <img class="logo" [src]="logo" alt="" width="40" height="40" />
+    }
+    <span class="text"><strong>{{ team.title() || team.name() }}</strong></span>
+  </div>
   @for (group of groups; track group.title) {
     <section>
       <h3>{{ group.title }}</h3>

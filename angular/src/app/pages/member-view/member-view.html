@@ -1,11 +1,23 @@
 <section class="page" [attr.data-variant]="mobile() ? 'mobile' : 'desktop'">
   <header class="head">
     <div>
-      <p class="tk-eyebrow">{{ club() }}</p>
+      <p class="tk-eyebrow club">
+        <!-- Vereinslogo aus der Datenbank (SCRUM-182). -->
+        @if (team.logoSrc(); as logo) {
+          <img class="club-logo" [src]="logo" alt="" width="24" height="24" />
+        }
+        {{ club() }}
+      </p>
       <h1>{{ title() }}</h1>
       <p class="intro">{{ intro() }}</p>
     </div>
-    <a tkButton size="sm" class="sign-out" routerLink="/abmelden">Abmelden</a>
+    <div class="head-actions">
+      <!-- Konto in mehreren Teams (z. B. Trainer hier, Eltern dort): zurück wechseln ohne Abmelden (SCRUM-182). -->
+      @if (team.choices().length > 1) {
+        <a tkButton size="sm" class="sign-out" routerLink="/team-waehlen">Team wechseln</a>
+      }
+      <a tkButton size="sm" class="sign-out" routerLink="/abmelden">Abmelden</a>
+    </div>
     @if (picks() && players().length > 0) {
       <label class="picker">
         <span class="tk-sr-only">Spieler wählen</span>

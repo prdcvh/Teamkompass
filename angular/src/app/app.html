@@ -3,6 +3,10 @@
   @case ('loading') {
     <p class="boot" role="status">Anmeldung wird geprüft …</p>
   }
+  @case ('switching') {
+    <!-- Teamwechsel (SCRUM-182): die Oberfläche des alten Teams wird dabei ganz abgebaut. -->
+    <p class="boot" role="status">Team wird gewechselt …</p>
+  }
   @case ('unavailable') {
     <p class="boot" role="alert">{{ auth.error() }}</p>
   }

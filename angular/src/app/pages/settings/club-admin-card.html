@@ -2,6 +2,39 @@
   <tk-card>
     <div class="panel">
       <h2>Verein: {{ club.name || club.clubId }}</h2>
+
+      <!-- Name und Logo (SCRUM-182): erscheinen in der App bei allen Teams des Vereins. -->
+      <h3>Name und Logo</h3>
+      <div class="club-logo">
+        @if (logoFor(club); as logo) {
+          <img class="club-logo-preview" [src]="logo" alt="Vereinslogo" width="64" height="64" />
+        } @else {
+          <span class="club-logo-preview empty" aria-hidden="true">kein Logo</span>
+        }
+        <div class="club-logo-actions">
+          <input #file class="file-input" type="file" accept="image/png,image/jpeg,image/webp" tabindex="-1" aria-hidden="true" (change)="pick(club.clubId, $event)" />
+          <button tkButton type="button" [disabled]="admin.busy() || reading()" (click)="file.click()">{{ reading() ? 'Bild wird verkleinert …' : 'Logo auswählen' }}</button>
+          @if (logoFor(club)) {
+            <button tkButton type="button" [disabled]="admin.busy()" (click)="removeLogo(club.clubId)">Logo entfernen</button>
+          }
+        </div>
+      </div>
+      <p class="muted">PNG, JPG oder WebP. Das Bild wird automatisch auf höchstens 256 Pixel verkleinert (höchstens 100 KB).</p>
+      @if (logoError()) {
+        <p class="error" role="alert">{{ logoError() }}</p>
+      }
+      <label class="field">
+        <span>Vereinsname</span>
+        <input class="tk-input" type="text" maxlength="100" autocomplete="organization" [value]="nameFor(club)" (input)="setName(club.clubId, value($event))" />
+      </label>
+      <div>
+        <button tkButton variant="primary" type="button" [disabled]="admin.busy() || reading() || !changed(club)" (click)="save(club)">Name und Logo speichern</button>
+        @if (admin.saved() && !changed(club)) {
+          <span class="muted" role="status"> {{ admin.saved() }}</span>
+        }
+      </div>
+
+      <h3>Trainer einladen</h3>
       <p class="muted">
         Du bist Vereinsadmin. Lade einen Trainer ein: Er registriert sich mit dem Link, legt ein neues Team in diesem Verein
         an und wird dessen Trainer. Du siehst dadurch keine Daten seines Teams. Der Link gilt 14 Tage und nur einmal.

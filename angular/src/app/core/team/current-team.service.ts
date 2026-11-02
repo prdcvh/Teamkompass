@@ -76,6 +76,20 @@ export class CurrentTeam {
     this.logoUrl.set(meta.logoUrl);
   }
 
+  /**
+   * Der Vereinsadmin hat Name/Logo geändert (SCRUM-182): sofort im geöffneten Team und in der Teamauswahl zeigen, wenn
+   * sie zu diesem Verein gehören. Andere Vereine bleiben unberührt.
+   */
+  applyClub(clubId: string, clubName: string, logoUrl: string | null): void {
+    if (this.clubId() === clubId) {
+      this.clubName.set(clubName);
+      this.logoUrl.set(logoUrl);
+    }
+    this.choices.update((choices) =>
+      choices.map((choice) => (choice.meta?.clubId === clubId ? { ...choice, meta: { ...choice.meta, clubName, logoUrl } } : choice)),
+    );
+  }
+
   /** Beim Abmelden: zurück zum Team des Builds, keine Auswahl mehr im Speicher. */
   reset(): void {
     this.choices.set([]);
