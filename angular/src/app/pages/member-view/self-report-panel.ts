@@ -32,6 +32,8 @@ import { Card } from '../../ui/card/card';
   imports: [Button, Card],
   templateUrl: './self-report-panel.html',
   styleUrl: './self-report.css',
+  // Die Karten sollen wie die übrigen Karten der Seite im Abstand der Seite stehen (sonst kleben sie aneinander).
+  host: { style: 'display: contents' },
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SelfReportPanel {
