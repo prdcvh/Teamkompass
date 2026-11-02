@@ -5,9 +5,21 @@
  * - Belastung pro Termin = Minuten × Anstrengung (0–10). Minuten: bei Spielen die gespielten Minuten, sonst die Dauer
  *   des Termins (Training: Standard 90); „eingeschränkt“ ohne eingetragene Minuten zählt 60 % der Dauer.
  * - Nur vergangene Termine zählen (SCRUM-136).
- * - Wochenvergleich: die letzten 7 Tage gegen den Schnitt der 3 Wochen davor (Tage 8–28), ohne Überschneidung.
- *   Die Spitzenwarnung (ab dem 1,5-fachen) gibt es nur, wenn in mindestens 3 der 4 Wochen Belastung vorhanden ist; sonst
- *   erscheint nur der Hinweis „Wiedereinstieg – langsam steigern“. So steht nach einer Pause nicht der ganze Kader auf „Anpassen“.
+ * - Belastungsspitze (SCRUM-176): abklingende Mittel statt fester Wochenfenster (load-curve.ts). Verglichen wird die
+ *   Müdigkeit (Mittel über 7 Tage) mit der Fitness (Mittel über 28 Tage): ab dem 1,5-fachen ein Hinweis, ab dem 2-fachen
+ *   ein starker Hinweis. Schwellen nach Gabbett 2016 (BJSM 50:273–280: Bereich 0,8–1,3 unauffällig, ab 1,5 kritisch) und
+ *   Murray et al. 2017 (BJSM 51:749–754: Verhältnis über 2,0 mit deutlich erhöhtem Risiko, EWMA empfindlicher).
+ *   Zwei Schutzregeln gegen Fehlalarme:
+ *   1. Wiedereinstieg (Regel aus SCRUM-137): die Spitzenwarnung gibt es nur, wenn in mindestens 3 der 4 Wochen Belastung
+ *      vorhanden ist; sonst nur der Hinweis „Wiedereinstieg – langsam steigern“. So steht nach einer Pause nicht der
+ *      ganze Kader auf „Anpassen“.
+ *   2. Die letzten 7 Tage müssen mindestens 15 % über einer üblichen Trainingswoche liegen (Schnitt der Wochen davor,
+ *      Tage 8–28, in denen trainiert wurde); sonst bei Lücken in den 4 Wochen ebenfalls „Wiedereinstieg“. Das abklingende
+ *      Mittel über 7 Tage springt direkt nach jeder Einheit hoch (bei zwei Einheiten an zwei Tagen hintereinander auch im
+ *      ganz normalen Wochenrhythmus auf ≈ 1,5) und braucht nach einer Pause mehr als 4 Wochen, bis die Fitness wieder
+ *      aufgebaut ist; ohne diese Regel gäbe es dort Hinweise ohne echte Steigerung. 15 %: Gabbett 2016 nennt
+ *      Wochensteigerungen ab etwa 15 % als kritisch.
+ *   Die Ampel ist keine Verletzungswahrscheinlichkeit (Impellizzeri et al. 2020, Zouhal et al. 2021).
  * - Erholung: zwei Einheiten mit Anstrengung ≥ 7 innerhalb von 48 Stunden.
  * - Wachstumsschub: ab 0,6 cm pro Monat ein Hinweis, ab 1,2 cm pro Monat ein starker Hinweis (Kemper et al. 2015).
  * - Rückkehr nach Verletzung/Abwesenheit wie bisher.
@@ -20,6 +32,7 @@ import { type EventRating } from '../profile/profile';
 import { type Absence, activeAbsenceOn, isInjuryAbsence } from '../records/absence';
 import { type Measurement, sortedMeasurements } from '../records/measurement';
 import { type Rating, roundGrade } from '../ratings/rating';
+import { type LoadCurvePoint, loadCurve, workloadRatio } from './load-curve';
 
 export type RiskTier = 'unauffaellig' | 'beobachten' | 'anpassen';
 export type AvailabilityKey = 'fit' | 'angeschlagen' | 'verletzt';
@@ -55,6 +68,14 @@ export interface InjuryRisk {
   readonly load: number;
   /** Schnitt der 3 Wochen davor (Tage 8–28). */
   readonly baseline: number;
+  /** Müdigkeit (abklingendes Mittel über 7 Tage), pro Woche (SCRUM-176). */
+  readonly fatigue: number;
+  /** Fitness (abklingendes Mittel über 28 Tage), pro Woche. */
+  readonly fitness: number;
+  /** Form = Fitness − Müdigkeit. */
+  readonly form: number;
+  /** Müdigkeit / Fitness (eine Nachkommastelle); ohne Belastung `null`. */
+  readonly ratio: number | null;
   /** In wie vielen der 4 Wochen Belastung vorhanden war. */
   readonly weeksWithLoad: number;
   /** Einsätze der letzten 4 Wochen. */
@@ -79,6 +100,22 @@ function isoOf(date: Date): string {
 }
 
 const label = (value: number) => roundGrade(value).toFixed(1).replace('.', ',');
+
+/** Ab diesem Verhältnis Müdigkeit / Fitness ein Hinweis bzw. ein starker Hinweis (siehe Kopfkommentar). */
+export const SPIKE_RATIO = 1.5;
+export const STRONG_SPIKE_RATIO = 2;
+/** So viel mehr als eine übliche Trainingswoche (Tage 8–28) müssen die letzten 7 Tage sein, damit eine Spitze zählt. */
+export const SPIKE_MIN_WEEK_INCREASE = 1.15;
+
+const tookPart = (rating: Rating | null | undefined) => rating?.attendance === 'present' || rating?.attendance === 'limited';
+
+/** Müdigkeit, Fitness und Form eines Spielers für jeden Tag bis `today` (nur vergangene Termine mit Teilnahme). */
+export function playerLoadCurve(items: readonly EventRating[], today: string): LoadCurvePoint[] {
+  return loadCurve(
+    items.filter(({ rating }) => tookPart(rating)).map(({ event, rating }) => ({ date: event.date, load: sessionLoad(event, rating!) })),
+    today,
+  );
+}
 
 /** Minuten eines Spielers bei diesem Termin. */
 export function sessionMinutes(event: TeamEvent, rating: Rating): number {
@@ -109,7 +146,7 @@ export function injuryRisk(
 
   // Nur vergangene Termine mit Teilnahme; „ago“ = Tage seit dem Termin (0 = heute).
   const past = items
-    .filter(({ rating }) => rating?.attendance === 'present' || rating?.attendance === 'limited')
+    .filter(({ rating }) => tookPart(rating))
     .map(({ event, rating }) => ({ ago: Math.round(daysBetween(localMidnight(event.date), today)), load: sessionLoad(event, rating!), exertion: event.exertion }))
     .filter((item) => item.ago >= 0)
     .sort((a, b) => a.ago - b.ago);
@@ -119,14 +156,18 @@ export function injuryRisk(
   const acute = weekLoads[0];
   const baseline = (weekLoads[1] + weekLoads[2] + weekLoads[3]) / 3;
   const weeksWithLoad = weekLoads.filter((value) => value > 0).length;
-  const ratio = baseline > 0 ? acute / baseline : null;
+  // Übliche Trainingswoche: Schnitt der Wochen 1–3, in denen trainiert wurde (eine Pausenwoche zieht ihn nicht herunter).
+  const usedWeeks = weekLoads.slice(1).filter((value) => value > 0);
+  const usual = usedWeeks.length ? usedWeeks.reduce((sum, value) => sum + value, 0) / usedWeeks.length : 0;
+  const current = playerLoadCurve(items, todayStr).at(-1);
+  const ratio = acute > 0 ? workloadRatio(current) : null;
   const hints: { label: string; weight: number }[] = [];
   const infos: string[] = [];
 
-  const spike = acute > 0 && (ratio === null || ratio >= 1.5);
-  if (spike && weeksWithLoad >= 3 && ratio !== null) {
-    hints.push({ label: `Belastungsspitze (${label(ratio)}-fach des Schnitts der 3 Wochen davor)`, weight: ratio >= 2 ? 2 : 1 });
-  } else if (spike) {
+  const spike = ratio !== null && ratio >= SPIKE_RATIO;
+  if (spike && weeksWithLoad >= 3 && acute >= usual * SPIKE_MIN_WEEK_INCREASE) {
+    hints.push({ label: `Belastungsspitze (Müdigkeit ${label(ratio)}-fach der Fitness)`, weight: ratio >= STRONG_SPIKE_RATIO ? 2 : 1 });
+  } else if (spike && weeksWithLoad < 4) {
     infos.push('Wiedereinstieg – langsam steigern');
   }
 
@@ -181,6 +222,10 @@ export function injuryRisk(
     reason: reasons.join(' · ') || 'Keine auffälligen Belastungsfaktoren',
     load: roundGrade(acute),
     baseline: roundGrade(baseline),
+    fatigue: Math.round(current?.fatigue ?? 0),
+    fitness: Math.round(current?.fitness ?? 0),
+    form: Math.round(current?.form ?? 0) || 0,
+    ratio: ratio === null ? null : roundGrade(ratio),
     weeksWithLoad,
     recentEvents: past.filter((item) => item.ago <= 27).length,
     availability,
