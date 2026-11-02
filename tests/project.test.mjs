@@ -593,6 +593,7 @@ test("Firestore-Index: members.uid als Collection-Group-Override, in firebase.js
   assert.equal(config.firestore.indexes, "firestore.indexes.json");
   const workflow = await read(".github/workflows/firestore-rules-deploy.yml");
   assert.match(workflow, /paths:[\s\S]*'firestore\.indexes\.json'/);
+  assert.match(workflow, /paths:[\s\S]*'\.github\/workflows\/firestore-rules-deploy\.yml'/, "Auch eine Reparatur des Deploy-Ablaufs muss ihn auslösen");
   const deploySteps = workflow.split(/\n      - name:/).filter((step) => /firebase deploy/.test(step));
   assert.equal(deploySteps.length, 2, "Regeln und Indizes brauchen getrennte Schritte (SCRUM-246)");
   assert.match(deploySteps[0], /deploy --only firestore:rules --project teamkompass-b8aac/);

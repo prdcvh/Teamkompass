@@ -5,6 +5,7 @@ on:
     branches:
       - main
     paths:
+      - '.github/workflows/firestore-rules-deploy.yml'
       - 'firestore.rules'
       - 'firestore.indexes.json'
       - 'firebase.json'
