@@ -32,7 +32,7 @@ describe('Profile (Spielerprofil)', () => {
     expect(qa(fixture, 'svg circle')).toHaveLength(2);
     expect(q(fixture, 'svg')?.getAttribute('aria-label')).toContain('Notenverlauf (1 ist die beste Note): ');
     const labels = (list: Element) => [...list.querySelectorAll('.bar')].map((bar) => bar.getAttribute('aria-label'));
-    expect(labels(qa(fixture, '.bars')[0])).toEqual(['Einsatz 2,0', 'Fehlerquote 2,0', 'Entscheidungsfindung 2,0', 'Lernfähigkeit 2,0']);
+    expect(labels(qa(fixture, '.bars')[0])).toEqual(['Einsatz 2,0', 'Fehlerquote 2,0', 'Spielwirkung 2,0', 'Lernfähigkeit 2,0']);
     // das Zukunftsevent mit „Fehlt“ zählt nicht
     expect(labels(qa(fixture, '.bars')[1])).toEqual(['Anwesend 2/2', 'Teilweise 0/2', 'Fehlt 0/2', 'Nicht im Kader 0/2']);
   });

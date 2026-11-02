@@ -43,7 +43,7 @@ const GRADE_OPTIONS = [1, 2, 3, 4, 5, 6] as const;
 const GRADE_HEADERS: Readonly<Record<GradeField, string>> = {
   ...GRADE_LABELS,
   technique: 'Fehler\u00ADquote',
-  tactics: 'Entschei\u00ADdungs\u00ADfindung',
+  tactics: 'Spiel\u00ADwirkung',
   comprehension: 'Lern\u00ADfähig\u00ADkeit',
 };
 

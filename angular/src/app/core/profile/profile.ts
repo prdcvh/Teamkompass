@@ -41,7 +41,7 @@ export function averageGrade(graded: readonly GradedEvent[]): number | null {
   return average(graded.map((entry) => entry.grade));
 }
 
-/** Schnitt je Teilnote (Einsatz, Fehlerquote, Entscheidungsfindung, Lernfähigkeit). */
+/** Schnitt je Teilnote (Einsatz, Fehlerquote, Spielwirkung, Lernfähigkeit). */
 export function skillAverages(graded: readonly GradedEvent[]): { field: GradeField; label: string; value: number | null }[] {
   return GRADE_FIELDS.map((field) => ({
     field,
