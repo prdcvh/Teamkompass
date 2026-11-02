@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import type { LoadCurvePoint } from '../../core/analysis/load-curve';
-import { loadCurveChart } from '../../core/analysis/load-curve-chart';
+import { CURVE_CHART_DESKTOP, CURVE_CHART_MOBILE, loadCurveChart } from '../../core/analysis/load-curve-chart';
 import { Card } from '../../ui/card/card';
 
 /** Belastungskurve im Spielerprofil (SCRUM-176): Müdigkeit, Fitness und Form der letzten 12 Wochen. Nur Trainer (Profilseite). */
@@ -23,7 +23,7 @@ import { Card } from '../../ui/card/card';
               <text x="46" [attr.y]="line.y + 4" class="axis" text-anchor="end">{{ line.label }}</text>
             }
             @for (tick of chart().ticks; track tick.x) {
-              <text [attr.x]="tick.x" [attr.y]="chart().height - 10" class="axis small" text-anchor="middle">{{ tick.label }}</text>
+              <text [attr.x]="tick.x" [attr.y]="chart().height - 10" class="axis small" [attr.text-anchor]="tick.anchor">{{ tick.label }}</text>
             }
             <path [attr.d]="chart().fitness" class="curve fitness" />
             <path [attr.d]="chart().fatigue" class="curve fatigue" />
@@ -45,7 +45,9 @@ import { Card } from '../../ui/card/card';
 })
 export class LoadCurveCard {
   readonly curve = input.required<readonly LoadCurvePoint[]>();
-  protected readonly chart = computed(() => loadCurveChart(this.curve()));
+  /** Handybreite: schmaleres Diagramm mit größerer Schrift. */
+  readonly compact = input(false);
+  protected readonly chart = computed(() => loadCurveChart(this.curve(), this.compact() ? CURVE_CHART_MOBILE : CURVE_CHART_DESKTOP));
 
   protected signed(value: number): string {
     return value > 0 ? `+${value}` : String(value);

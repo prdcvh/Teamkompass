@@ -1,6 +1,6 @@
 import { addDays } from '../shared/dates';
 import { loadCurve } from './load-curve';
-import { CURVE_CHART_DAYS, loadCurveChart } from './load-curve-chart';
+import { CURVE_CHART_DAYS, CURVE_CHART_MOBILE, loadCurveChart } from './load-curve-chart';
 
 describe('load-curve-chart (Belastungskurve im Profil)', () => {
   const TODAY = '2026-11-02';
@@ -24,7 +24,12 @@ describe('load-curve-chart (Belastungskurve im Profil)', () => {
     expect(Number(chart.grid[0].label)).toBeLessThan(0);
     // Pfad endet am rechten Rand (760 − 24).
     expect(chart.fitness.trim().split(' ').at(-2)).toBe('736');
-    expect(chart.ticks.at(-1)!.label).toBe('02.11.');
+    expect(chart.ticks.at(-1)).toMatchObject({ label: '02.11.', anchor: 'end' });
+    expect(chart.ticks).toHaveLength(6); // alle 14 Tage
+    const mobile = loadCurveChart(curve, CURVE_CHART_MOBILE);
+    expect(mobile.width).toBe(380);
+    expect(mobile.ticks).toHaveLength(3); // alle 28 Tage
+    expect(mobile.fitness.trim().split(' ').at(-2)).toBe('356');
     expect(chart.summary).toContain(`Heute: Müdigkeit ${chart.current!.fatigue}, Fitness ${chart.current!.fitness}`);
   });
 

@@ -7,8 +7,6 @@ import { formatDate } from '../shared/dates';
 import type { LoadCurvePoint } from './load-curve';
 
 export const CURVE_CHART_DAYS = 84;
-const WIDTH = 760;
-const HEIGHT = 260;
 const LEFT = 54;
 const RIGHT = 24;
 const TOP = 20;
@@ -18,7 +16,7 @@ export interface LoadCurveChart {
   readonly width: number;
   readonly height: number;
   readonly grid: readonly { readonly y: number; readonly label: string; readonly zero: boolean }[];
-  readonly ticks: readonly { readonly x: number; readonly label: string }[];
+  readonly ticks: readonly { readonly x: number; readonly label: string; readonly anchor: 'middle' | 'end' }[];
   readonly fatigue: string;
   readonly fitness: string;
   readonly form: string;
@@ -35,7 +33,19 @@ function niceStep(range: number): number {
   return [1, 2, 5, 10].map((factor) => factor * power).find((step) => step >= raw) ?? 10 * power;
 }
 
-export function loadCurveChart(curve: readonly LoadCurvePoint[], days = CURVE_CHART_DAYS): LoadCurveChart {
+export interface LoadCurveChartSize {
+  readonly width: number;
+  readonly height: number;
+  /** Abstand der Datumsbeschriftungen in Tagen. */
+  readonly tickDays: number;
+}
+
+/** Desktop breit und flach; am Handy schmaler, damit die Beschriftung lesbar bleibt. */
+export const CURVE_CHART_DESKTOP: LoadCurveChartSize = { width: 760, height: 260, tickDays: 14 };
+export const CURVE_CHART_MOBILE: LoadCurveChartSize = { width: 380, height: 240, tickDays: 28 };
+
+export function loadCurveChart(curve: readonly LoadCurvePoint[], size: LoadCurveChartSize = CURVE_CHART_DESKTOP, days = CURVE_CHART_DAYS): LoadCurveChart {
+  const { width: WIDTH, height: HEIGHT } = size;
   const points = curve.slice(-days);
   const last = points.at(-1);
   const values = points.flatMap((point) => [point.fatigue, point.fitness, point.form]);
@@ -53,8 +63,8 @@ export function loadCurveChart(curve: readonly LoadCurvePoint[], days = CURVE_CH
   for (let value = min; value <= max + step / 2; value += step) grid.push({ y: y(value), label: String(value), zero: value === 0 });
   const ticks = points
     .map((point, index) => ({ point, index }))
-    .filter(({ index }) => (points.length - 1 - index) % 14 === 0)
-    .map(({ point, index }) => ({ x: x(offset + index), label: formatDate(point.date).slice(0, 6) }));
+    .filter(({ index }) => (points.length - 1 - index) % size.tickDays === 0)
+    .map(({ point, index }) => ({ x: x(offset + index), label: formatDate(point.date).slice(0, 6), anchor: index === points.length - 1 ? ('end' as const) : ('middle' as const) }));
   const current = last ? { fatigue: Math.round(last.fatigue), fitness: Math.round(last.fitness), form: Math.round(last.form) || 0 } : null;
   return {
     width: WIDTH,
