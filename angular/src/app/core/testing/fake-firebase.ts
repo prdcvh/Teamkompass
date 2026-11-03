@@ -7,6 +7,7 @@ import { KnowledgeApi } from '../firebase/knowledge.api';
 import { NotificationsApi } from '../firebase/notifications.api';
 import { OpponentsApi } from '../firebase/opponents.api';
 import { PlayerRecordsApi } from '../firebase/player-records.api';
+import { MaturityApi } from '../firebase/maturity.api';
 import { PlayerStatsApi } from '../firebase/player-stats.api';
 import { PlanningApi } from '../firebase/planning.api';
 import { PlayersApi } from '../firebase/players.api';
@@ -31,6 +32,7 @@ import { FakeNotificationsApi } from './fake-notifications.api';
 import { FakeOpponentsApi } from './fake-opponents.api';
 import { FakePlanningApi } from './fake-planning.api';
 import { FakePlayerRecordsApi } from './fake-player-records.api';
+import { FakeMaturityApi } from './fake-maturity.api';
 import { FakePlayerStatsApi } from './fake-player-stats.api';
 import { FakePlayersApi } from './fake-players.api';
 import { FakeRankingApi } from './fake-ranking.api';
@@ -57,6 +59,8 @@ export class FakeFirebase {
   readonly rsvp = new FakeRsvpApi(this.calls);
   readonly ranking = new FakeRankingApi(this.calls, this.ratings.privateNotes);
   readonly records = new FakePlayerRecordsApi(this.calls);
+  /** Eigene Aufrufliste: der Reife-Kompass (SCRUM-190) soll die Reihenfolge-Prüfungen anderer Tests nicht ändern. */
+  readonly maturity = new FakeMaturityApi();
   readonly settings = new FakeTeamSettingsApi(this.calls);
   readonly notifications = new FakeNotificationsApi(this.calls);
   readonly planning =new FakePlanningApi(this.calls);
@@ -85,6 +89,7 @@ export function provideFakeFirebase(fake: FakeFirebase): Provider[] {
     { provide: RsvpApi, useValue: fake.rsvp },
     { provide: RankingApi, useValue: fake.ranking },
     { provide: PlayerRecordsApi, useValue: fake.records },
+    { provide: MaturityApi, useValue: fake.maturity },
     // Seiten zeigen Wetter; Tests sollen nie ins Netz (SCRUM-98).
     { provide: WeatherProvider, useClass: OfflineWeatherProvider },
     { provide: TeamSettingsApi, useValue: fake.settings },
