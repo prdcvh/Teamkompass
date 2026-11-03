@@ -56,16 +56,52 @@ describe('risk (Belastungsampel)', () => {
     expect(risk([entry(-1, 9), entry(-2, 9)]).reasons).toEqual([]);
   });
 
-  it('echte Spitze nach 4 normalen Wochen ergibt einen Hinweis (ab dem 1,5-fachen)', () => {
-    const calm = risk([...normalWeeks, entry(1), entry(4)]);
+  /**
+   * SCRUM-176: Spitze = Müdigkeit (Mittel über 7 Tage) / Fitness (Mittel über 28 Tage) ab 1,5 (stark ab 2,0), nur bei
+   * Belastung in 3 der 4 Wochen und wenn die letzten 7 Tage mindestens 15 % über dem Schnitt der 3 Wochen davor liegen.
+   */
+  /** `weeks` normale Wochen bis gestern vor 7 Tagen: je Woche Termine an den Wochentagen `days` (0 = 7 Tage vor heute …). */
+  const history = (weeks: number, days: readonly number[] = [0, 2], from = 7) =>
+    Array.from({ length: weeks }, (_, week) => days.map((day) => entry(from + week * 7 + day))).flat();
+
+  it('echte Spitze nach 12 normalen Wochen: 2,4-fache Woche ergibt „Beobachten“, Turnier ergibt „Anpassen“', () => {
+    const calm = risk([...history(12), entry(1), entry(4)]);
     expect(calm.baseline).toBe(900);
+    expect(calm.fitness).toBe(989);
     expect(calm.tier).toBe('unauffaellig');
-    const mild = risk([...normalWeeks, entry(1), entry(3), entry(6)]); // 1350 = 1,5-fach
-    expect(mild.tier).toBe('beobachten');
-    expect(mild.reasons[0]).toBe('Belastungsspitze (1,5-fach des Schnitts der 3 Wochen davor)');
-    const big = risk([...normalWeeks, entry(1, 6), entry(3, 6), entry(5, 6), entry(6, 6)]); // 2160 = 2,4-fach
-    expect(big.tier).toBe('anpassen');
+    // 4 Einheiten à 90 Minuten × 6 = 2160 (2,4-fach der üblichen 900): Müdigkeit 1,6-fach der Fitness.
+    const big = risk([...history(12), entry(5, 6), entry(3, 6), entry(1, 6), entry(0, 6)]);
     expect(big.load).toBe(2160);
+    expect(big.ratio).toBe(1.6);
+    expect(big.tier).toBe('beobachten');
+    expect(big.reasons[0]).toBe('Belastungsspitze (Müdigkeit 1,6-fach der Fitness)');
+    // Turnier am Wochenende: je zwei Spiele à 90 Minuten (Anstrengung 9 und 8) gestern und heute nach den zwei üblichen Trainings.
+    const tournament = risk([...history(12), entry(6), entry(4), entry(1, 9), entry(1, 8), entry(0, 9), entry(0, 8)]);
+    expect(tournament.ratio).toBe(2.2);
+    expect(tournament.reasons[0]).toBe('Belastungsspitze (Müdigkeit 2,2-fach der Fitness)');
+    expect(tournament.tier).toBe('anpassen');
+  });
+
+  it('kein Fehlalarm im normalen Wochenrhythmus, auch nicht bei zwei Einheiten an zwei Tagen hintereinander', () => {
+    // Müdigkeit springt nach jeder Einheit hoch (hier bis 1,5-fach der Fitness), die Woche ist aber nicht höher als sonst.
+    const rhythm = (days: readonly number[]) => [0, 1, 2, 3, 4, 5, 6].map((shift) => risk(history(13, days, shift)));
+    for (const days of [[0, 1], [0, 2], [0, 2, 4], [0]]) {
+      expect(rhythm(days).map((result) => result.tier)).toEqual(Array(7).fill('unauffaellig'));
+    }
+    expect(Math.max(...rhythm([0, 1]).map((result) => result.ratio ?? 0))).toBeGreaterThanOrEqual(1.5);
+  });
+
+  it('kein Fehlalarm nach 6 Wochen Pause: weder in den ersten Wochen noch beim langsamen Aufbau der Fitness danach', () => {
+    // 12 Wochen Training, 6 Wochen Pause, dann wieder 2 Einheiten pro Woche; geprüft wird jeder Tag der 6 Wochen danach.
+    const restart = (weeksBack: number, shift: number) => [...history(12, [0, 2], 7 * (6 + weeksBack) + shift), ...history(weeksBack, [0, 2], shift)];
+    for (let weeksBack = 1; weeksBack <= 6; weeksBack += 1) {
+      for (let shift = 0; shift < 7; shift += 1) {
+        const result = risk(restart(weeksBack, shift));
+        expect(result.reasons.some((reason) => reason.startsWith('Belastungsspitze'))).toBe(false);
+        expect(result.tier).toBe('unauffaellig');
+      }
+    }
+    expect(risk(restart(1, 0)).reasons).toContain('Wiedereinstieg – langsam steigern');
   });
 
   it('Wochengrenzen: letzte 7 Tage und die 3 Wochen davor überschneiden sich nicht', () => {

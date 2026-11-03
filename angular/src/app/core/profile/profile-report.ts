@@ -104,7 +104,7 @@ export function profileReportHtml(input: ProfileReportInput): string {
   <h2>Belastung</h2>
   <p><strong>${escapeHtml(risk.level)}</strong> · ${escapeHtml(risk.reason)}</p>
   <table><thead><tr><th>Belastung letzte 7 Tage</th><th>Schnitt der 3 Wochen davor</th><th>Verfügbarkeit</th></tr></thead><tbody><tr><td>${escapeHtml(numberLabel(risk.load))}</td><td>${escapeHtml(numberLabel(risk.baseline))}</td><td>${escapeHtml(risk.availability.label)}${risk.availability.action ? ` – ${escapeHtml(risk.availability.action)}` : ''}</td></tr></tbody></table>
-  <p class="muted">Belastung je Termin = Minuten × Anstrengung (0–10).</p>
+  <p class="muted">Belastung je Termin = Minuten × Anstrengung (0–10). Müdigkeit ${escapeHtml(numberLabel(risk.fatigue))} · Fitness ${escapeHtml(numberLabel(risk.fitness))} · Form ${escapeHtml(numberLabel(risk.form, { signed: true }))} (abklingende Mittel über 7 bzw. 28 Tage, pro Woche). Die Ampel ist keine Verletzungswahrscheinlichkeit.</p>
 </section>
 <section class="section-grid">
   <div>
