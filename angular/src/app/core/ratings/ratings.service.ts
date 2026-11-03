@@ -6,6 +6,7 @@ import type { RawDoc, SnapshotMeta } from '../firebase/types';
 import { LiveOutboxService } from '../live/live-outbox.service';
 import { LIVE_POINTS_FIELD, countsPoints, livePointsSum, normalizePoints, pointsFromDoc } from '../points/points';
 import { RankingService } from '../points/ranking.service';
+import { RatingScaleService } from './rating-scale.service';
 import { MAX_NOTE_LENGTH, type Rating, type RatingField, BLANK_RATING, applyChange, docFromRating, ratingFromDoc } from './rating';
 import { SessionService } from '../auth/session.service';
 import { SyncService } from '../shell/sync.service';
@@ -26,6 +27,7 @@ export class RatingsService {
   private readonly events = inject(EventsService);
   private readonly ranking = inject(RankingService);
   private readonly outbox = inject(LiveOutboxService);
+  private readonly scale = inject(RatingScaleService);
 
   readonly eventId = signal<string | null>(null);
   readonly ratings = signal<ReadonlyMap<string, Rating>>(new Map());
@@ -130,7 +132,7 @@ export class RatingsService {
     const eventId = this.eventId();
     if (!eventId || !this.canWrite() || this.load() !== 'ready') return false;
     const current = this.ratingFor(playerId);
-    const { rating, clearedAuto } = applyChange(current, field, value, this.matchDuration());
+    const { rating, clearedAuto } = applyChange(current, field, value, this.matchDuration(), this.scale.scale());
     if (rating === current) return false;
     this.ratings.update((map) => new Map(map).set(playerId, rating));
     this.markSyncing();
