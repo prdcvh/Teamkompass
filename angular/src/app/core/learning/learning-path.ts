@@ -91,8 +91,8 @@ export function emptyLevelDraft(id: string = newLevelId()): LevelDraft {
   return { id, title: '', unit: '', minutes: DEFAULT_UNIT_MINUTES, url: '', homeTask: '' };
 }
 
-export function emptyPathDraft(ageGroup: string): PathDraft {
-  return { id: null, title: '', position: ALL_POSITIONS, ageGroup: ageGroup.trim().slice(0, MAX_PATH_LABEL), levels: [emptyLevelDraft()] };
+export function emptyPathDraft(teamLabel: string): PathDraft {
+  return { id: null, title: '', position: ALL_POSITIONS, ageGroup: teamAgeGroup(teamLabel).slice(0, MAX_PATH_LABEL), levels: [emptyLevelDraft()] };
 }
 
 export function draftFromPath(path: LearningPath): PathDraft {
@@ -240,12 +240,21 @@ export function ageGroupLabel(ageGroup: string): string {
 const same = (a: string, b: string) => a.trim().toLocaleLowerCase('de') === b.trim().toLocaleLowerCase('de');
 
 /**
- * Gilt der Pfad für diesen Spieler? Position: leer = alle, sonst eine der Positionen des Spielers. Altersklasse: leer =
- * alle, sonst die Altersklasse des Teams (Teambezeichnung, z. B. „U15“).
+ * Altersklasse aus der Teambezeichnung: „U14“, „U14 Test“, „u 15 (2. Mannschaft)“ → „U14“ bzw. „U15“; ohne U-Angabe die
+ * Bezeichnung selbst (z. B. „Erwachsene“).
  */
-export function pathFitsPlayer(path: LearningPath, player: { readonly positions: readonly string[] }, teamAgeGroup: string): boolean {
+export function teamAgeGroup(label: string): string {
+  const match = /^\s*U\s*(\d{1,2})\b/i.exec(label);
+  return match ? `U${Number(match[1])}` : label.trim();
+}
+
+/**
+ * Gilt der Pfad für diesen Spieler? Position: leer = alle, sonst eine der Positionen des Spielers. Altersklasse: leer =
+ * alle, sonst die Altersklasse des Teams (aus der Teambezeichnung, siehe {@link teamAgeGroup}).
+ */
+export function pathFitsPlayer(path: LearningPath, player: { readonly positions: readonly string[] }, teamLabel: string): boolean {
   const positionOk = path.position === ALL_POSITIONS || player.positions.some((position) => same(position, path.position));
-  const ageOk = path.ageGroup === '' || same(path.ageGroup, teamAgeGroup);
+  const ageOk = path.ageGroup === '' || same(path.ageGroup, teamAgeGroup(teamLabel));
   return positionOk && ageOk && path.levels.length > 0;
 }
 

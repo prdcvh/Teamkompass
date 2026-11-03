@@ -13,6 +13,7 @@ import {
   progressFromDoc,
   progressPercent,
   progressText,
+  teamAgeGroup,
   validatePathDraft,
 } from './learning-path';
 
@@ -87,6 +88,17 @@ describe('Lernpfade (SCRUM-192)', () => {
       expect(pathFitsPlayer(path, { positions: ['TW'] }, 'U15')).toBe(false);
       expect(pathFitsPlayer({ ...path, position: '', ageGroup: '' }, { positions: [] }, 'U17')).toBe(true);
       expect(pathFitsPlayer({ ...path, levels: [] }, { positions: ['TW'] }, 'U14')).toBe(false);
+      // Teambezeichnung mit Zusatz: die Altersklasse zählt.
+      expect(pathFitsPlayer(path, { positions: ['TW'] }, 'U14 Test')).toBe(true);
+      expect(pathFitsPlayer(path, { positions: ['TW'] }, 'u 14 (2. Mannschaft)')).toBe(true);
+      expect(pathFitsPlayer(path, { positions: ['TW'] }, 'U140')).toBe(false);
+    });
+
+    it('Altersklasse aus der Teambezeichnung', () => {
+      expect(teamAgeGroup('U14 Test')).toBe('U14');
+      expect(teamAgeGroup(' u09 ')).toBe('U9');
+      expect(teamAgeGroup('Erwachsene')).toBe('Erwachsene');
+      expect(emptyPathDraft('U15 Mädchen').ageGroup).toBe('U15');
     });
   });
 
