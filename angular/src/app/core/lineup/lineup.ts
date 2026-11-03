@@ -4,7 +4,8 @@
  * (wie Alt-App app.js: movePlayerToZone, swapPlayers). Noten sind Schulnoten: kleiner ist besser.
  */
 import { roundGrade } from '../ratings/rating';
-import { MAX_ON_PITCH, PITCH_BANDS, PITCH_ZONES, ZONES, type Zone } from './pitch';
+import { MAX_ON_PITCH, PITCH_BANDS, PITCH_ZONES, type Preset, ZONES, type Zone } from './pitch';
+import { type GameFormat, gameFormatInfo, isGameFormat } from './game-format';
 import type { Candidate } from './formation-assignment';
 import type { Player } from '../player/player';
 import type { TeamEvent } from '../events/event';
@@ -62,9 +63,9 @@ function without(assignments: Assignments, ids: readonly string[]): Record<strin
   return Object.fromEntries(ZONES.map((zone) => [zone, assignments[zone].filter((id) => !ids.includes(id))]));
 }
 
-/** Stellt den Spieler in die Zone (und nimmt ihn aus der bisherigen); „voll“, wenn er neu dazukäme und schon 11 stehen. */
-export function moveToZone(assignments: Assignments, playerId: string, zone: Zone): Assignments | 'voll' {
-  if (zoneOf(assignments, playerId) === null && onPitchCount(assignments) >= MAX_ON_PITCH) return 'voll';
+/** Stellt den Spieler in die Zone (und nimmt ihn aus der bisherigen); „voll“, wenn er neu dazukäme und schon `max` (Standard 11) stehen. */
+export function moveToZone(assignments: Assignments, playerId: string, zone: Zone, max: number = MAX_ON_PITCH): Assignments | 'voll' {
+  if (zoneOf(assignments, playerId) === null && onPitchCount(assignments) >= max) return 'voll';
   const next = without(assignments, [playerId]);
   next[zone].push(playerId);
   return next as unknown as Assignments;
@@ -110,6 +111,8 @@ export interface EventLineup {
   readonly assignments: Assignments;
   /** ISO-Zeitpunkt des Speicherns; leer, wenn das Dokument keinen hat. */
   readonly savedAt: string;
+  /** Spielform nur für dieses Spiel (SCRUM-187); fehlt = die Spielform des Teams. */
+  readonly gameFormat?: GameFormat;
 }
 
 export type EventLineups = Readonly<Record<string, EventLineup>>;
@@ -128,14 +131,47 @@ export function normalizeEventLineups(raw: unknown, playerIds?: ReadonlySet<stri
     const rawSavedAt = (entry as { savedAt?: unknown } | null)?.savedAt;
     const savedAt = typeof rawSavedAt === 'string' ? rawSavedAt : '';
     if (lineupIsEmpty(assignments) && !savedAt) continue;
-    result[eventId] = { assignments, savedAt };
+    const rawFormat = (entry as { gameFormat?: unknown } | null)?.gameFormat;
+    result[eventId] = isGameFormat(rawFormat) ? { assignments, savedAt, gameFormat: rawFormat } : { assignments, savedAt };
   }
   return result;
 }
 
 /** Aufstellung eines Spiels → Eintrag in `byEvent` (genau das Format der Live-App). */
-export function docFromEventLineup(assignments: Assignments, savedAt: string): Record<string, unknown> {
-  return { ...docFromLineup(assignments), savedAt };
+export function docFromEventLineup(assignments: Assignments, savedAt: string, gameFormat?: GameFormat): Record<string, unknown> {
+  return { ...docFromLineup(assignments), savedAt, ...(gameFormat ? { gameFormat } : {}) };
+}
+
+/**
+ * Die Formation der Spielform, die zur Aufstellung am besten passt (meiste gemeinsame Plätze; bei Gleichstand und leerem
+ * Feld die erste). null bei 11:11: dort gibt es keine Anpassung, gespeicherte Aufstellungen bleiben unverändert.
+ */
+export function activePreset(assignments: Assignments, format: GameFormat): Preset | null {
+  if (format === '11:11') return null;
+  const overlap = (preset: Preset) => ZONES.reduce((sum, zone) => sum + Math.min(assignments[zone].length, preset[zone] ?? 0), 0);
+  return gameFormatInfo(format).presets.reduce((best, preset) => (overlap(preset) > overlap(best) ? preset : best));
+}
+
+/**
+ * Passt eine Aufstellung an eine Spielform an (SCRUM-187): Es bleiben nur Spieler auf Plätzen der passenden Formation
+ * (siehe activePreset); wer keinen passenden Platz hat – zu viele auf einer Position, Torwart bei 3:3 –, geht auf die
+ * Bank. Bei 11:11 und wenn schon alles passt, bleibt die Aufstellung unverändert (dasselbe Objekt).
+ */
+export function fitToFormat(assignments: Assignments, format: GameFormat): Assignments {
+  const preset = activePreset(assignments, format);
+  if (!preset) return assignments;
+  const drop = ZONES.flatMap((zone) => assignments[zone].slice(preset[zone] ?? 0));
+  return drop.length ? (without(assignments, drop) as unknown as Assignments) : assignments;
+}
+
+/**
+ * Zonen, die für eine Spielform auf dem Feld angeboten werden: 11:11 alle, sonst nur die Plätze der passenden Formation
+ * (siehe activePreset) und – damit nichts verschwindet – bereits besetzte Zonen.
+ */
+export function zonesForFormat(format: GameFormat, assignments: Assignments): Zone[] {
+  const preset = activePreset(assignments, format);
+  if (!preset) return ZONES;
+  return ZONES.filter((zone) => (preset[zone] ?? 0) > 0 || assignments[zone].length > 0);
 }
 
 /** Das nächste anstehende Spiel (heute oder später); null, wenn keins ansteht. */

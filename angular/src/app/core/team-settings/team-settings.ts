@@ -1,4 +1,5 @@
 import { type LocationCoords, MAX_TEXT_LENGTH, isLocationCoords } from '../events/event';
+import { DEFAULT_GAME_FORMAT, type GameFormat, isGameFormat } from '../lineup/game-format';
 import { DEFAULT_FEDERAL_STATE, type FederalState, isFederalState } from './federal-states';
 
 /**
@@ -42,4 +43,14 @@ export function federalStateFromDoc(doc: Readonly<Record<string, unknown>> | nul
 
 export function docFromFederalState(state: FederalState): Record<string, unknown> {
   return { federalState: state };
+}
+
+/** Dokument `meta/settings` → Spielform des Teams; fehlt das Feld (bestehende Teams), gilt 11:11 (SCRUM-187). */
+export function gameFormatFromDoc(doc: Readonly<Record<string, unknown>> | null): GameFormat {
+  const raw = doc?.['gameFormat'];
+  return isGameFormat(raw) ? raw : DEFAULT_GAME_FORMAT;
+}
+
+export function docFromGameFormat(format: GameFormat): Record<string, unknown> {
+  return { gameFormat: format };
 }
