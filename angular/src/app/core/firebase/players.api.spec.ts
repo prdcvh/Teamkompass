@@ -21,6 +21,8 @@ vi.mock('firebase/firestore', () => {
     getDocs: async (collection: { path: string }) => ({
       docs: (store.docs.get(collection.path) ?? []).map((id) => ({ id, ref: ref(`${collection.path}/${id}`) })),
     }),
+    // Einzel-Löschen (z. B. Lernpfad-Stand, SCRUM-192) zählt wie ein Löschen im Block.
+    deleteDoc: async (target: { path: string }) => void store.deleted.push(target.path),
     writeBatch: () => {
       const pending: string[] = [];
       return {
