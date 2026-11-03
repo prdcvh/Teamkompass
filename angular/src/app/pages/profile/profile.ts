@@ -20,7 +20,7 @@ import { ProfileService } from '../../core/profile/profile.service';
 import { effectiveStatus } from '../../core/records/availability';
 import { MeasurementsService } from '../../core/records/measurements.service';
 import { RecordsStateService } from '../../core/records/records-state.service';
-import { injuryRisk } from '../../core/analysis/risk';
+import { injuryRisk, playerLoadCurve } from '../../core/analysis/risk';
 import { canCreateLoadReport } from '../../core/analysis/load-report';
 import { SessionService } from '../../core/auth/session.service';
 import { gradeLabel } from '../../core/ratings/rating';
@@ -29,13 +29,14 @@ import { SyncService } from '../../core/shell/sync.service';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 import { Status } from '../../ui/status/status';
+import { LoadCurveCard } from './load-curve-card';
 import { LoadReportAction } from './load-report-action';
 import { ProfileExtras } from './profile-extras';
 
 /** Spielerprofil (Figma: Profil Desktop/Handy): Kopfbereich, Notenverlauf, Kompetenzprofil, Verfügbarkeit, Statistik, Eventhistorie. */
 @Component({
   selector: 'app-profile',
-  imports: [Button, Card, Status, ProfileExtras, LoadReportAction],
+  imports: [Button, Card, Status, ProfileExtras, LoadReportAction, LoadCurveCard],
   templateUrl: './profile.html',
   // Reihenfolge = Kaskade (die Handy-Regeln überschreiben Kopf und Auswertung).
   styleUrls: ['./profile.css', './profile-stats.css', './profile-mobile.css', './profile-risk.css', '../../ui/chart/chart.css'],
@@ -89,6 +90,9 @@ export class Profile implements OnInit {
     if (!player || !this.records.ready() || this.profile.loading()) return null;
     return injuryRisk(player, this.profile.items(), this.records.absences(), this.measurements.measurements());
   });
+
+  /** Belastungskurve (SCRUM-176): Müdigkeit, Fitness und Form bis heute. */
+  protected readonly loadCurve = computed(() => (this.profile.loading() ? [] : playerLoadCurve(this.profile.items(), this.today)));
 
   /** Belastungsprotokoll (SCRUM-139): erst wenn auch Abwesenheiten und Messwerte geladen sind. */
   protected readonly reportAllowed = computed(() => {

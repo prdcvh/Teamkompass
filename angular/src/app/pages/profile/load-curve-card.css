@@ -1,0 +1,83 @@
+/* Belastungskurve (SCRUM-176): Müdigkeit, Fitness, Form. */
+.load-curve {
+  display: grid;
+  gap: var(--tk-space-3);
+}
+
+.load-curve h2 {
+  margin: 0;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tk-space-2) var(--tk-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--tk-text-sm);
+  color: var(--tk-muted);
+}
+
+.legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend strong {
+  color: var(--tk-ink);
+}
+
+.swatch {
+  display: inline-block;
+  width: 18px;
+  height: 3px;
+  border-radius: 2px;
+  background: currentcolor;
+}
+
+.legend .fatigue .swatch {
+  color: var(--tk-chart-4);
+}
+
+.legend .fitness .swatch {
+  color: var(--tk-chart-1);
+}
+
+.legend .form .swatch {
+  color: var(--tk-chart-2);
+  background: repeating-linear-gradient(90deg, currentcolor 0 5px, transparent 5px 8px);
+}
+
+.chart .grid.zero {
+  stroke: var(--tk-muted);
+  stroke-dasharray: none;
+}
+
+.chart .curve {
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.chart .curve.fatigue {
+  stroke: var(--tk-chart-4);
+}
+
+.chart .curve.fitness {
+  stroke: var(--tk-chart-1);
+  stroke-width: 3;
+}
+
+.chart .curve.form {
+  stroke: var(--tk-chart-2);
+  stroke-dasharray: 6 4;
+}
+
+.hint {
+  margin: 0;
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
