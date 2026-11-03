@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, OnInit, computed, inject, input, si
 import { EventsService } from '../../core/events/events.service';
 import { type TeamEvent, exertionLabel, formatDate } from '../../core/events/event';
 import { WELLNESS_FIELDS, WELLNESS_QUESTIONS, type WellnessEntry, wellnessSum, wellnessWord } from '../../core/self-report/self-report';
-import { exertionPairs, wellnessRisk, wellnessStatus } from '../../core/self-report/self-report-hints';
+import { exertionPairs, lighterHint, wellnessRisk, wellnessStatus } from '../../core/self-report/self-report-hints';
 import { SelfReportsService } from '../../core/self-report/self-reports.service';
 import { todayIso } from '../../core/shared/dates';
 import { Card } from '../../ui/card/card';
@@ -58,6 +58,8 @@ export class SelfReportHistory implements OnInit {
   protected readonly risk = computed(() =>
     this.compare() ? wellnessRisk([...this.reports.wellness().values()], exertionPairs(this.events.events(), this.reports.reports()), this.today) : null,
   );
+  /** Info „leichter als geplant“ (kein Risiko, nur Trainer und Medizin). */
+  protected readonly lighter = computed(() => (this.compare() ? lighterHint(exertionPairs(this.events.events(), this.reports.reports())) : null));
   protected readonly riskReasons = computed(() =>
     (this.risk()?.contributions ?? []).map((item) => item.label).join(', '),
   );

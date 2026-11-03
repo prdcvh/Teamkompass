@@ -6,13 +6,18 @@
         <p class="sr-hint" role="status">Die Angaben des Spielers können gerade nicht geladen werden. Die Belastung rechnet mit dem Wert des Trainerteams.</p>
       }
       @if (risk(); as r) {
-        @if (r.tier === 'unauffaellig') {
-          <p class="sr-hint" role="status">Befinden: {{ r.level }}</p>
+        @if (!r.hasData) {
+          <p class="sr-hint" role="status">Befinden: keine aktuellen Angaben</p>
+        } @else if (r.tier === 'unauffaellig') {
+          <p class="sr-hint" role="status">Befinden: {{ r.level }}@if (r.basis === 'exertion') { (nur Anstrengung bewertet)}</p>
         } @else {
           <p class="sr-alert" role="status">
-            Befinden: {{ r.level }}@if (riskReasons()) { – wegen {{ riskReasons() }}}
+            Befinden: {{ r.level }}@if (riskReasons()) { – wegen {{ riskReasons() }}}@if (r.basis === 'exertion') { (nur Anstrengung bewertet)}
           </p>
         }
+      }
+      @if (lighter(); as info) {
+        <p class="sr-hint" role="status">{{ info }}</p>
       }
       @if (compare() && status().current !== null) {
         <p class="sr-hint">

@@ -72,9 +72,29 @@ describe('SelfReportHistory', () => {
     const { root } = await render('physio', true, (firebase) => firebase.selfReports.watchErrors.set('wellness', { code: 'permission-denied' }));
     // Ohne lesbares Befinden zählt nur die Abweichung der Anstrengung (≈ 0,7: unauffällig, kein Alarm).
     expect(root.querySelector('.sr-alert')).toBeNull();
-    expect(text(root)).toContain('Befinden: Unauffällig');
+    expect(text(root)).toContain('Befinden: Unauffällig (nur Anstrengung bewertet)');
     expect(root.querySelector('.sr-trend')).toBeNull();
     expect(text(root)).not.toContain('Befinden zuletzt');
     expect([...root.querySelectorAll('dt')].map(text)).not.toContain('Befinden');
+  });
+
+  it('keine aktuellen Angaben: keine Stufe, sondern „keine aktuellen Angaben“', async () => {
+    const { root } = await render('trainer', true, (firebase) => {
+      // Alles älter als 21 Tage vor dem 30.10.: nur ein alter Termin mit Spielerwert.
+      firebase.events.events.clear();
+      firebase.selfReports.docs.clear();
+      firebase.events.events.set('old', { type: 'Training', title: 'Alt', date: '2026-09-01', exertion: 4, startTime: '18:00', durationMinutes: 90 });
+      firebase.selfReports.set('p1', 'selfReports', 'old', { exertion: 4, date: '2026-09-01', updatedAt: null });
+    });
+    expect(text(root)).toContain('Befinden: keine aktuellen Angaben');
+    expect(text(root)).not.toContain('Unauffällig');
+  });
+
+  it('Trainer: „leichter als geplant“ als graue Info, nicht als Alarm', async () => {
+    const { root } = await render('trainer', true, (firebase) => {
+      dates.forEach((date, i) => firebase.selfReports.set('p1', 'selfReports', `e${i}`, { exertion: 1, date, updatedAt: null }));
+    });
+    expect([...root.querySelectorAll('.sr-hint')].map(text)).toContain('Empfindet das Training deutlich leichter als geplant');
+    expect([...root.querySelectorAll('.sr-alert')].map(text).join()).not.toContain('leichter');
   });
 });

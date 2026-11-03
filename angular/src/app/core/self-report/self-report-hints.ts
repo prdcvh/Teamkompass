@@ -37,7 +37,7 @@
  */
 import type { TeamEvent } from '../events/event';
 import { addDays } from '../shared/dates';
-import { type SelfReport, WELLNESS_FIELDS, type WellnessEntry, type WellnessField, countsReport, wellnessSum } from './self-report';
+import { type SelfReport, WELLNESS_FIELDS, type WellnessEntry, type WellnessField, countsReport, hasWellnessAnswer, wellnessSum } from './self-report';
 
 export const WELLNESS_BASELINE_DAYS = 28;
 export const WELLNESS_MIN_ANSWERS = 6;
@@ -60,6 +60,20 @@ export function exertionPairs(events: readonly TeamEvent[], reports: ReadonlyMap
       return countsReport(event, report) ? [{ event, trainer: event.exertion, player: report.exertion }] : [];
     })
     .sort((a, b) => b.event.date.localeCompare(a.event.date) || (b.event.startTime ?? '').localeCompare(a.event.startTime ?? ''));
+}
+
+export const LIGHTER_WINDOW = 5;
+export const LIGHTER_MIN_COUNT = 3;
+export const LIGHTER_STEPS = 2;
+export const LIGHTER_HINT = 'Empfindet das Training deutlich leichter als geplant';
+
+/**
+ * Info (kein Risiko, darum nicht im Risikowert): in mindestens 3 der letzten 5 Termine mit Spielerangabe liegt der
+ * Spielerwert um ≥ 2 Stufen unter dem Trainerwert. `pairs` neueste zuerst (wie {@link exertionPairs}).
+ */
+export function lighterHint(pairs: readonly ExertionPair[]): string | null {
+  const lighter = pairs.slice(0, LIGHTER_WINDOW).filter((pair) => pair.trainer - pair.player >= LIGHTER_STEPS).length;
+  return lighter >= LIGHTER_MIN_COUNT ? LIGHTER_HINT : null;
 }
 
 /** Gewicht w und Abklingzeit τ (Tage) je Faktor; Begründung im Kopf der Datei. */
@@ -87,7 +101,13 @@ export const WELLNESS_TIERS: Readonly<Record<WellnessTier, string>> = {
   anpassen: 'Anpassen',
 };
 
+/** Worauf der Risikowert beruht: Befindensantworten, vergleichbare Termine (Spieler und Trainer) oder beides; sonst keine Daten. */
+export type RiskBasis = 'none' | 'exertion' | 'wellness' | 'both';
+
 export interface WellnessRisk {
+  /** Gibt es im Auswertungsfenster überhaupt Angaben? Ohne sagt die Stufe nichts (kein „Unauffällig“ als Entwarnung). */
+  readonly hasData: boolean;
+  readonly basis: RiskBasis;
   /** Summe R_t aller Signale (zwei Nachkommastellen gerundet). */
   readonly score: number;
   readonly tier: WellnessTier;
@@ -128,13 +148,20 @@ export function wellnessRisk(entries: readonly WellnessEntry[], pairs: readonly 
     }
   }
   for (const pair of pairs) sums.deviation += decayedContribution('deviation', deviationStrength(pair.player - pair.trainer), pair.event.date, today);
+  const inWindow = (date: string) => {
+    const age = dayNumber(today) - dayNumber(date);
+    return age >= 0 && age <= RISK_MAX_AGE_DAYS;
+  };
+  const hasWellness = entries.some((entry) => hasWellnessAnswer(entry) && inWindow(entry.date));
+  const hasExertion = pairs.some((pair) => inWindow(pair.event.date));
+  const basis: RiskBasis = hasWellness ? (hasExertion ? 'both' : 'wellness') : hasExertion ? 'exertion' : 'none';
   const score = Math.round(Object.values(sums).reduce((sum, value) => sum + value, 0) * 100) / 100;
   const tier = wellnessTier(score);
   const contributions = (Object.keys(sums) as RiskFactor[])
     .map((factor) => ({ factor, label: RISK_FACTORS[factor].label, value: Math.round(sums[factor] * 100) / 100 }))
     .filter((item) => item.value >= 0.05)
     .sort((a, b) => b.value - a.value);
-  return { score, tier, level: WELLNESS_TIERS[tier], contributions };
+  return { hasData: basis !== 'none', basis, score, tier, level: WELLNESS_TIERS[tier], contributions };
 }
 
 export interface WellnessStatus {

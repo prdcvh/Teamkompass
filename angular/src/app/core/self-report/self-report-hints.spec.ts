@@ -1,6 +1,6 @@
 import { type TeamEvent } from '../events/event';
 import type { SelfReport, WellnessEntry } from './self-report';
-import { RISK_FACTORS, decayedContribution, deviationStrength, exertionPairs, wellnessRisk, wellnessStatus, wellnessStrength, wellnessTier } from './self-report-hints';
+import { LIGHTER_HINT, RISK_FACTORS, decayedContribution, deviationStrength, exertionPairs, lighterHint, wellnessRisk, wellnessStatus, wellnessStrength, wellnessTier } from './self-report-hints';
 
 /** Risikowert mit Abklingzeit (SCRUM-177) aus den Spielerangaben (SCRUM-138) und Befindensanzeige gegen den eigenen Normalwert. */
 describe('self-report-hints', () => {
@@ -70,14 +70,43 @@ describe('self-report-hints', () => {
     });
 
     it('Zukunft, sehr alte und fehlende Antworten zählen nicht; ohne Daten Unauffällig', () => {
-      expect(wellnessRisk([], [], day(10))).toEqual({ score: 0, tier: 'unauffaellig', level: 'Unauffällig', contributions: [] });
+      expect(wellnessRisk([], [], day(10))).toEqual({ hasData: false, basis: 'none', score: 0, tier: 'unauffaellig', level: 'Unauffällig', contributions: [] });
       expect(wellnessRisk([entry(day(11), [1, 1, 1, 1])], [], day(10)).score).toBe(0);
       expect(wellnessRisk([entry('2026-09-01', [1, 1, 1, 1])], [], day(10)).score).toBe(0);
       expect(wellnessRisk([{ ...entry(day(10), fine), fatigue: null, soreness: 1 }], [], day(10)).score).toBe(1);
     });
 
+    it('basis: Befinden, nur Anstrengung, beides oder keine Daten im Auswertungsfenster', () => {
+      const pairs = setup([6]); // Termin am 01.10.
+      const wellness = [entry(day(1), fine)];
+      expect(wellnessRisk(wellness, pairs, day(2))).toMatchObject({ hasData: true, basis: 'both' });
+      expect(wellnessRisk(wellness, [], day(2))).toMatchObject({ hasData: true, basis: 'wellness' });
+      expect(wellnessRisk([], pairs, day(2))).toMatchObject({ hasData: true, basis: 'exertion' });
+      // Ein Spielertermin mit gleichem Wert ist ebenfalls vergleichbar (Entwarnung möglich), aber nicht älter als 21 Tage.
+      expect(wellnessRisk(wellness, pairs, day(30))).toMatchObject({ hasData: false, basis: 'none' });
+      expect(wellnessRisk([{ ...entry(day(1), fine), fatigue: null, sleep: null, soreness: null, stress: null }], [], day(2)).hasData).toBe(false);
+    });
+
     it('Stufen an den Schwellen', () => {
       expect([0, 0.99, 1, 1.99, 2, 5].map(wellnessTier)).toEqual(['unauffaellig', 'unauffaellig', 'beobachten', 'beobachten', 'anpassen', 'anpassen']);
+    });
+  });
+
+  describe('Leichter-Info', () => {
+    it('3 von 5 Terminen ≥ 2 Stufen darunter: Info', () => {
+      expect(lighterHint(setup([2, 2, 5, 1, 4]))).toBe(LIGHTER_HINT);
+    });
+
+    it('nur 2 von 5, nur 1 Stufe oder „härter“: keine Info', () => {
+      expect(lighterHint(setup([2, 2, 5, 5, 4]))).toBeNull();
+      expect(lighterHint(setup([3, 3, 3, 3, 3]))).toBeNull();
+      expect(lighterHint(setup([7, 7, 7, 7, 7]))).toBeNull();
+      expect(lighterHint([])).toBeNull();
+    });
+
+    it('zählt nur die letzten 5 Termine mit Spielerangabe', () => {
+      expect(lighterHint(setup([1, 1, 1, 4, 4, 5, 4, 4]))).toBeNull();
+      expect(lighterHint(setup([2, null, 2, null, null, 4, 2, 4]))).toBe(LIGHTER_HINT);
     });
   });
 
