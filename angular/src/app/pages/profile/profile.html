@@ -78,6 +78,8 @@
 
       @if (trainer()) {
         <tk-consent-panel [player]="p" />
+        <!-- Noten für Spieler/Eltern veröffentlichen (SCRUM-115). -->
+        <tk-grade-release-panel [player]="p" />
       }
 
       <section class="columns">

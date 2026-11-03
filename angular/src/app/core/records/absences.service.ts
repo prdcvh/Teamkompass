@@ -70,7 +70,7 @@ export class AbsencesService {
       if (!next) continue;
       changed += 1;
       this.state.write('Abwesenheit konnte nicht in die Event-Bewertung übernommen werden.', () =>
-        this.ratingsApi.saveRating(event.id, playerId, docFromRating(next, { clearAuto: true })),
+        this.ratingsApi.saveRating(event.id, playerId, docFromRating(next, { clearAuto: true }), rating ? docFromRating(rating) : null),
       );
     }
     return changed;

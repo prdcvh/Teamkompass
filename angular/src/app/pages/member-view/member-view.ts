@@ -10,6 +10,7 @@ import {
   type EventRating,
   type GradedEvent,
   availability,
+  countsForStats,
   displayScaleFor,
   gradeToPercent,
   gradedEvents,
@@ -20,7 +21,8 @@ import {
   trendChart,
 } from '../../core/profile/profile';
 import { ProfileService } from '../../core/profile/profile.service';
-import { ratingScaleOf } from '../../core/ratings/rating';
+import { ATTENDANCE_LABELS, type Rating, calculatedGrade, ratingScaleOf } from '../../core/ratings/rating';
+import { releaseText } from '../../core/ratings/grade-release';
 import { type RatingScale, scoreLabel } from '../../core/ratings/rating-scale';
 import { RatingScaleService } from '../../core/ratings/rating-scale.service';
 import { effectiveStatus } from '../../core/records/availability';
@@ -46,8 +48,9 @@ import { SelfReportHistory } from '../profile/self-report-history';
 /**
  * Die eine Ansicht für Spieler, Eltern, Medizin und Scouts (Figma 01c/01d). Sie zeigt nur, was die Firestore-Regeln
  * der Rolle erlauben:
- * - Spieler: das eigene Profil, die eigenen Bewertungen (ohne interne Trainer-Notizen) und den eigenen Förderplan
- *   samt Selbstreflexion.
+ * - Spieler: das eigene Profil, die eigenen Werte (Einsatzzeit, Tore, Vorlagen, Anwesenheit), Noten nur nach
+ *   „Bewertung veröffentlichen“ durch den Trainer (SCRUM-115), nie Kommentare oder interne Notizen, und den eigenen
+ *   Förderplan samt Selbstreflexion.
  * - Eltern: dasselbe, nur lesend.
  * - Medizin (`physio`): Spielerliste, Status sowie Abwesenheiten/Verletzungen und Messwerte – keine Noten, keine
  *   Förderpläne.
@@ -112,8 +115,8 @@ export class MemberView implements OnInit {
     const role = this.role();
     if (role === 'scout') return 'Lesezugang: Kompetenzprofil, Notenverlauf und Statistik.';
     if (role === 'physio') return 'Lesezugang: Status, Abwesenheiten, Verletzungen und Messwerte.';
-    if (role === 'parent') return 'Lesezugang zum Profil, zu den Bewertungen und zum Förderplan.';
-    return 'Deine Bewertungen, dein Förderplan und deine Entwicklung.';
+    if (role === 'parent') return 'Lesezugang zum Profil, zu Einsätzen, veröffentlichten Noten und zum Förderplan.';
+    return 'Deine Einsätze, deine veröffentlichten Noten, dein Förderplan und deine Entwicklung.';
   });
 
   protected readonly historyHeading = computed(() => (this.physio() ? 'Anstrengung und Befinden' : this.role() === 'parent' ? 'Angaben nach den Terminen' : 'Deine Angaben nach den Terminen'));
@@ -131,6 +134,22 @@ export class MemberView implements OnInit {
    */
   protected readonly scale = computed<RatingScale>(() => (this.scout() ? this.teamScale() : displayScaleFor(this.items(), this.teamScale())));
   protected readonly graded = computed(() => gradedEvents(this.items()));
+  /**
+   * Noten anzeigen? Scout: immer (bereinigte Scout-Sicht). Spieler und Eltern nur, solange eine Freigabe gilt
+   * (SCRUM-115) – sonst sehen sie nur ihre Werte.
+   */
+  protected readonly gradesShown = computed(() => this.scout() || this.profile.gradesReleased());
+  protected readonly releaseText = computed(() => releaseText(this.profile.release()));
+  /**
+   * Termine mit Werten für Spieler und Eltern (neueste zuerst): alle vergangenen Termine, bei denen die Anwesenheit
+   * gesetzt ist – mit Minuten, Toren, Vorlagen und, falls veröffentlicht, der Note.
+   */
+  protected readonly valueHistory = computed(() =>
+    this.items()
+      .filter(({ event, rating }) => countsForStats(event, rating, this.today))
+      .map(({ event, rating }) => ({ event, rating: rating!, grade: calculatedGrade(rating!) })),
+  );
+  protected readonly attendanceLabels = ATTENDANCE_LABELS;
   protected readonly history = computed(() => [...this.graded()].reverse());
   protected readonly figures = computed(() => profileFigures(this.items(), this.today));
   protected readonly skills = computed(() => skillAverages(this.graded()));
@@ -144,7 +163,14 @@ export class MemberView implements OnInit {
       { label: 'Teilnahmen', value: String(f.attendances) },
       { label: 'Tore + Vorlagen', value: `${f.games.goals} + ${f.games.assists}` },
     ];
-    if (!this.scout()) return cards;
+    if (!this.scout()) {
+      // Spieler/Eltern (SCRUM-115): Einsatzzeit gehört zu den Werten, die immer sichtbar sind.
+      return [
+        ...(this.gradesShown() ? cards : cards.slice(2)),
+        { label: 'Einsatzminuten', value: String(f.games.minutes) },
+        { label: 'Einsatzquote', value: `${f.games.appearanceRate}%` },
+      ];
+    }
     return [
       ...cards,
       { label: 'Spiel-Schnitt', value: this.gradeLabel(f.gameAverage) },
@@ -213,6 +239,15 @@ export class MemberView implements OnInit {
     return scoreLabel(entry.grade, this.entryScale(entry));
   }
   protected gradeToPercent = gradeToPercent;
+
+  /** Note eines Termins in der Skala, mit der sie vergeben wurde (Spieleransicht). */
+  protected scoreLabelFor(rating: Rating, grade: number): string {
+    return scoreLabel(grade, this.ratingScale(rating));
+  }
+
+  protected ratingScale(rating: Rating): RatingScale {
+    return ratingScaleOf(rating, this.scale());
+  }
 
   protected age(birthdate: string): string {
     const age = ageFromBirthdate(birthdate);

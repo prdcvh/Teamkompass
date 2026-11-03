@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { CurrentTeam } from '../team/current-team.service';
 import { PlayerStatsMode } from '../team/player-stats-mode';
+import { PlayerViewMode } from '../ratings/player-view-mode';
 import { FirebaseConnection } from './firebase-connection';
 import type { RawDoc, SnapshotMeta } from './types';
 
@@ -13,6 +14,7 @@ export class PlayersApi {
   private readonly connection = inject(FirebaseConnection);
   private readonly team = inject(CurrentTeam);
   private readonly statsMode = inject(PlayerStatsMode);
+  private readonly viewMode = inject(PlayerViewMode);
 
   /**
    * Echtzeit-Abo auf alle Spieler des Teams. Die Regeln erlauben Lesen für Trainer und Medizin
@@ -124,6 +126,13 @@ export class PlayersApi {
     const refs = [
       ...children.flatMap((snapshot) => snapshot.docs.map((entry) => entry.ref)),
       ...events.docs.map((event) => doc(db, ...base, 'events', event.id, 'ratings', id)),
+      // Kopien für die Spieleransicht und die Freigabe der Noten (SCRUM-115) – nur, wenn die Regeln sie kennen.
+      ...((await this.viewMode.writesCopies())
+        ? [
+            ...events.docs.flatMap((event) => [doc(db, ...base, 'events', event.id, 'ratingValues', id), doc(db, ...base, 'events', event.id, 'ratingGrades', id)]),
+            doc(db, ...base, 'gradeReleases', id),
+          ]
+        : []),
       // Interne Trainer-Notizen (SCRUM-14) liegen getrennt von der Bewertung.
       ...events.docs.map((event) => doc(db, ...base, 'events', event.id, 'privateNotes', id)),
       // Zu-/Absagen des Spielers (SCRUM-205), wie in der bisherigen App.

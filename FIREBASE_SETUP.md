@@ -82,11 +82,23 @@ teams/{teamId}/invites/{code}                        # Einmal-Einladungscodes fu
 teams/{teamId}/players/{playerId}
 teams/{teamId}/players/{playerId}/developmentPlans/{planId}
 teams/{teamId}/events/{eventId}                      # Titel/Datum/Ergebnis, keine Noten
-teams/{teamId}/events/{eventId}/ratings/{playerId}   # individuelle Bewertung
+teams/{teamId}/events/{eventId}/ratings/{playerId}   # individuelle Bewertung (nur Trainer, mit Kommentar)
+teams/{teamId}/events/{eventId}/ratingValues/{playerId}  # Kopie: Werte fuer Spieler/Eltern (SCRUM-115)
+teams/{teamId}/events/{eventId}/ratingGrades/{playerId}  # Kopie: Noten, nur nach Veroeffentlichung lesbar
+teams/{teamId}/gradeReleases/{playerId}              # "Bewertung veroeffentlichen" (bis wann, wie lange)
 teams/{teamId}/opponents/{opponentId}
 ```
 
 Vollstaendig und verbindlich: `firestore.rules` und `docs/architektur-verein-teams.md`.
+
+**Noten fuer Spieler erst nach Veroeffentlichung (SCRUM-115):** Spieler und Eltern lesen nicht mehr die
+Bewertung selbst, sondern zwei Kopien, die die Trainer-App bei jedem Speichern mitschreibt. Bestehende
+Bewertungen uebernimmt die App **einmal automatisch**, sobald nach dem Live-Gang zum ersten Mal ein Trainer
+das Team oeffnet (je Team; Kennzeichen `teams/{teamId}/meta/playerView`). Die Bewertungen selbst werden dabei
+nicht veraendert. Bis dahin sehen Spieler dieses Teams keine Werte; Noten sehen sie erst, wenn der Trainer im
+Spielerprofil "Bewertung veroeffentlichen" klickt (keine automatische Freigabe). Uebernahme wiederholen (z. B.
+nach einem Rueckweg auf einen alten Stand, der die Kopien nicht mitschreibt): das Dokument `meta/playerView`
+loeschen und die App als Trainer oeffnen - danach muessen die Noten neu veroeffentlicht werden.
 
 ## 6. Weitere Mannschaft einrichten
 

@@ -73,7 +73,7 @@
               <span class="status-line"><tk-status [label]="status()" />{{ injury() }}</span>
             }
           </div>
-          @if (!physio()) {
+          @if (!physio() && gradesShown()) {
             <div class="grade">
               <span>{{ scale() === 'levels' ? 'Ø Stufe' : 'Ø Note' }}</span>
               <strong>{{ gradeLabel(figures().average) }}</strong>
@@ -88,7 +88,18 @@
       </tk-card>
 
       @if (!physio()) {
+        @if (!scout()) {
+          <!-- Noten erst nach Veröffentlichung durch den Trainer (SCRUM-115). -->
+          <p class="release-note" role="status" [attr.data-state]="gradesShown() ? 'on' : 'off'">
+            @if (gradesShown()) {
+              {{ releaseText() }}
+            } @else {
+              Noten erscheinen hier, sobald der Trainer die Bewertung veröffentlicht. Einsätze, Tore, Vorlagen und Anwesenheit sind immer sichtbar.
+            }
+          </p>
+        }
         <section class="columns">
+          @if (gradesShown()) {
           <tk-card>
             <h2>Notenverlauf</h2>
             <svg class="chart" [attr.viewBox]="'0 0 ' + chart().width + ' ' + chart().height" role="img" [attr.aria-label]="graded().length ? (scale() === 'levels' ? 'Verlauf der Kompetenzstufen: ' : 'Notenverlauf (1 ist die beste Note): ') + chart().summary : 'Noch keine benoteten Events vorhanden'">
@@ -114,7 +125,9 @@
             </svg>
           </tk-card>
 
+          }
           <tk-card>
+            @if (gradesShown()) {
             <h2>Kompetenzprofil</h2>
             <ul class="bars">
               @for (skill of skills(); track skill.field) {
@@ -124,6 +137,7 @@
                 </li>
               }
             </ul>
+            }
             @if (!scout()) {
               <h2>Verfügbarkeit</h2>
               <ul class="bars">
@@ -147,7 +161,31 @@
 
         <h2 class="section-title">Events</h2>
         <tk-card>
-          @if (history().length === 0) {
+          @if (!scout()) {
+            <!-- Spieler/Eltern: alle vergangenen Termine mit Werten, Note nur wenn veröffentlicht, nie Kommentare (SCRUM-115). -->
+            @if (valueHistory().length === 0) {
+              <div class="empty"><p>Es gibt noch keine erfassten Termine.</p></div>
+            } @else {
+              <ul class="history">
+                @for (entry of valueHistory(); track entry.event.id) {
+                  <li>
+                    <div>
+                      <strong>{{ entry.event.title }}</strong>
+                      <small>
+                        {{ formatDate(entry.event.date) }} · {{ entry.event.type }}@if (entry.event.goalsFor !== null && entry.event.goalsAgainst !== null) { · {{ entry.event.goalsFor }}:{{ entry.event.goalsAgainst }}} · {{ attendanceLabels[entry.rating.attendance] }}@if (gradesShown() && entry.grade !== null) { · {{ noteWord(ratingScale(entry.rating)) }} {{ scoreLabelFor(entry.rating, entry.grade) }}}
+                      </small>
+                      @if (entry.event.type === 'Spiel' && entry.rating.attendance !== 'absent' && entry.rating.attendance !== 'excluded') {
+                        <p class="muted">{{ entry.rating.minutes ?? 0 }} Min. · {{ entry.rating.goals ?? 0 }} Tore · {{ entry.rating.assists ?? 0 }} Vorlagen</p>
+                      }
+                    </div>
+                    @if (gradesShown() && entry.grade !== null) {
+                      <span class="badge">{{ scoreLabelFor(entry.rating, entry.grade) }}</span>
+                    }
+                  </li>
+                }
+              </ul>
+            }
+          } @else if (history().length === 0) {
             <div class="empty"><p>Es gibt noch keine Bewertungen.</p></div>
           } @else {
             <ul class="history">
@@ -158,9 +196,6 @@
                     <small>
                       {{ formatDate(entry.event.date) }} · {{ entry.event.type }}@if (entry.event.goalsFor !== null && entry.event.goalsAgainst !== null) { · {{ entry.event.goalsFor }}:{{ entry.event.goalsAgainst }}} · {{ noteWord(entryScale(entry)) }} {{ entryLabel(entry) }}
                     </small>
-                    @if (!scout()) {
-                      <p class="muted">{{ entry.rating.note || 'Keine Rückmeldung' }}</p>
-                    }
                   </div>
                   <span class="badge">{{ entryLabel(entry) }}</span>
                 </li>
