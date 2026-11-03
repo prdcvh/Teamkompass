@@ -296,3 +296,11 @@ h2 {
 .copy {
   justify-self: start;
 }
+
+.warn {
+  display: grid;
+  justify-items: start;
+  gap: var(--tk-space-2);
+  color: var(--tk-red);
+  font-size: var(--tk-text-sm);
+}

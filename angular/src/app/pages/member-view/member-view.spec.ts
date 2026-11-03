@@ -21,7 +21,7 @@ describe('MemberView (Ansicht für Spieler, Eltern und Medizin)', () => {
     const playerId = options.playerId === undefined ? 'p1' : options.playerId;
     firebase = new FakeFirebase();
     firebase.players.players.set('p1', { name: 'Jonas Keller', positions: ['TW'], number: 1, birthdate: '2012-05-05', status: 'Fit', consentStatus: 'granted' });
-    firebase.players.players.set('p2', { name: 'Elias Wagner', positions: ['RV'], number: 2, birthdate: '2012-06-06', status: 'Verletzt', injuryUntil: '2026-12-01' });
+    firebase.players.players.set('p2', { name: 'Elias Wagner', positions: ['RV'], number: 2, birthdate: '2012-06-06', status: 'Verletzt', injuryUntil: '2026-12-01', consentStatus: 'pending' });
     firebase.events.events.set('e1', { type: 'Training', title: 'Training Montag', date: '2026-09-01', intensity: 2, notes: 'Interne Planung' });
     firebase.events.events.set('e2', { type: 'Spiel', title: 'Heimspiel', date: '2026-09-08', goalsFor: 3, goalsAgainst: 1 });
     firebase.ratings.ratings.set('e1', new Map([['p1', grades(3, { playerId: 'p1' })], ['p2', grades(5, { playerId: 'p2', note: 'Nur für Elias' })]]));

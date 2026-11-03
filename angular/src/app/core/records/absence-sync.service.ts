@@ -1,12 +1,15 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 import { authErrorMessage, errorCode } from '../auth/auth-errors';
 import { type TeamEvent } from '../events/event';
 import { PlayerRecordsApi } from '../firebase/player-records.api';
 import { RatingsApi } from '../firebase/ratings.api';
 import type { Player } from '../player/player';
+import { hidesHealthReason, mayStoreHealth } from '../player/consent';
+import { CurrentTeam } from '../team/current-team.service';
 import { type Rating, docFromRating, ratingFromDoc } from '../ratings/rating';
 import { type Absence, absenceFromDoc } from './absence';
 import { autoAbsenceRating, keepPastOpenInjury, unavailabilityReason } from './availability';
+import { NEUTRAL_ABSENCE_NOTE } from './health-reasons';
 import { SessionService } from '../auth/session.service';
 import { SyncService } from '../shell/sync.service';
 
@@ -38,6 +41,29 @@ export class AbsenceSyncService {
   private readonly ratingsApi = inject(RatingsApi);
   private readonly session = inject(SessionService);
   private readonly sync = inject(SyncService);
+  private readonly team = inject(CurrentTeam);
+
+  /**
+   * Spieler, bei denen ein automatisches „Fehlt“ mit Grund übersprungen wurde, weil in einem fremden Verein die
+   * dokumentierte Einwilligung fehlt (SCRUM-245). Kein Fehler – der Trainer bekommt nur einen Hinweis.
+   */
+  readonly lockedSkips = signal<readonly { readonly id: string; readonly name: string }[]>([]);
+
+  /** Dürfen für den Spieler Gesundheitsdaten (auch als Grund in der Bewertung) gespeichert werden? */
+  mayStore(player: Player): boolean {
+    return mayStoreHealth(player, this.team.id());
+  }
+
+  /**
+   * Grund für „Fehlt“ in der Rückmeldung: wie berechnet; bei widerrufener Einwilligung nur „Fehlt“ ohne Grund (SCRUM-248);
+   * 'skip', wenn in einem fremden Verein die Einwilligung fehlt (dann Hinweis merken, SCRUM-245).
+   */
+  allowedReason(player: Player, reason: string | null): string | null | 'skip' {
+    if (!reason) return reason;
+    if (mayStoreHealth(player, this.team.id())) return hidesHealthReason(player) ? NEUTRAL_ABSENCE_NOTE : reason;
+    if (!this.lockedSkips().some((entry) => entry.id === player.id)) this.lockedSkips.update((list) => [...list, { id: player.id, name: player.name }]);
+    return 'skip';
+  }
 
   /** Neues oder verschobenes Event: für alle Spieler prüfen. Rückgabe: Anzahl geänderter Bewertungen. */
   reconcileEvent(event: TeamEvent, players: readonly Player[]): Promise<number> {
@@ -58,8 +84,8 @@ export class AbsenceSyncService {
         if (!absences) return 0;
         const changed = await Promise.all(
           dated.map((event) => {
-            const reason = unavailabilityReason(player, absences, event.date);
-            if (!reason && options.fresh) return 0;
+            const reason = this.allowedReason(player, unavailabilityReason(player, absences, event.date));
+            if (reason === 'skip' || (!reason && options.fresh)) return 0;
             return this.apply(event, player, (existing) => autoAbsenceRating(existing, reason));
           }),
         );
@@ -79,8 +105,14 @@ export class AbsenceSyncService {
       events
         .filter((event) => event.date)
         .map((event) => {
-          if (pastBefore && event.date < pastBefore) return options.keepPastOpenInjury ? this.apply(event, player, keepPastOpenInjury) : 0;
-          return this.apply(event, player, (existing) => autoAbsenceRating(existing, unavailabilityReason(player, absences, event.date)));
+          if (pastBefore && event.date < pastBefore) {
+            if (!options.keepPastOpenInjury) return 0;
+            const covered = !!unavailabilityReason(player, absences, event.date);
+            return this.apply(event, player, (existing) => keepPastOpenInjury(existing, covered));
+          }
+          const reason = this.allowedReason(player, unavailabilityReason(player, absences, event.date));
+          if (reason === 'skip') return 0;
+          return this.apply(event, player, (existing) => autoAbsenceRating(existing, reason));
         }),
     );
     return sum(changed);

@@ -6,9 +6,23 @@ import { LayoutService } from '../../core/shell/layout.service';
 import { ageFromBirthdate, todayIso } from '../../core/shared/dates';
 import { type Player, positionText } from '../../core/player/player';
 import { canCreateLoadReport } from '../../core/analysis/load-report';
-import { type EventRating, availability, gradeToPercent, gradedEvents, numberLabel, profileFigures, skillAverages, trendChart } from '../../core/profile/profile';
+import {
+  type EventRating,
+  type GradedEvent,
+  availability,
+  displayScaleFor,
+  gradeToPercent,
+  gradedEvents,
+  noteWord,
+  numberLabel,
+  profileFigures,
+  skillAverages,
+  trendChart,
+} from '../../core/profile/profile';
 import { ProfileService } from '../../core/profile/profile.service';
-import { gradeLabel } from '../../core/ratings/rating';
+import { ratingScaleOf } from '../../core/ratings/rating';
+import { type RatingScale, scoreLabel } from '../../core/ratings/rating-scale';
+import { RatingScaleService } from '../../core/ratings/rating-scale.service';
 import { effectiveStatus } from '../../core/records/availability';
 import { RecordsStateService } from '../../core/records/records-state.service';
 import { ScoutViewService } from '../../core/scout/scout-view.service';
@@ -110,16 +124,22 @@ export class MemberView implements OnInit {
     const player = this.player();
     return player ? (this.scoutView.view().items.get(player.id) ?? []) : [];
   });
+  private readonly teamScale = inject(RatingScaleService).scale;
+  /**
+   * Anzeige-Skala (SCRUM-188). Spieler und Eltern dürfen die Teameinstellungen nicht lesen: Es gilt die Skala ihrer
+   * jüngsten Bewertung. Die Scout-Sicht trägt keine Skala je Bewertung, dort gilt der Standard der Altersklasse.
+   */
+  protected readonly scale = computed<RatingScale>(() => (this.scout() ? this.teamScale() : displayScaleFor(this.items(), this.teamScale())));
   protected readonly graded = computed(() => gradedEvents(this.items()));
   protected readonly history = computed(() => [...this.graded()].reverse());
   protected readonly figures = computed(() => profileFigures(this.items(), this.today));
   protected readonly skills = computed(() => skillAverages(this.graded()));
   protected readonly attendance = computed(() => availability(this.items(), this.today));
-  protected readonly chart = computed(() => trendChart(this.graded()));
+  protected readonly chart = computed(() => trendChart(this.graded(), this.scale()));
   protected readonly cards = computed(() => {
     const f = this.figures();
     const cards = [
-      { label: 'Notenschnitt', value: gradeLabel(f.average) },
+      { label: this.scale() === 'levels' ? 'Stufe im Schnitt' : 'Notenschnitt', value: this.gradeLabel(f.average) },
       { label: 'Bewertete Events', value: String(f.ratedEvents) },
       { label: 'Teilnahmen', value: String(f.attendances) },
       { label: 'Tore + Vorlagen', value: `${f.games.goals} + ${f.games.assists}` },
@@ -127,8 +147,8 @@ export class MemberView implements OnInit {
     if (!this.scout()) return cards;
     return [
       ...cards,
-      { label: 'Spiel-Schnitt', value: gradeLabel(f.gameAverage) },
-      { label: 'Training-Schnitt', value: gradeLabel(f.trainingAverage) },
+      { label: 'Spiel-Schnitt', value: this.gradeLabel(f.gameAverage) },
+      { label: 'Training-Schnitt', value: this.gradeLabel(f.trainingAverage) },
       { label: 'Einsatzquote', value: `${f.games.appearanceRate}%` },
       { label: 'Min./Spiel', value: f.games.minutesPerGame ? String(f.games.minutesPerGame) : '–' },
       { label: 'Scorer/Spiel', value: numberLabel(f.games.scorersPerGame) },
@@ -144,7 +164,7 @@ export class MemberView implements OnInit {
   /** Belastungsprotokoll (SCRUM-139): nur der Spieler selbst, erst wenn Abwesenheiten und Messwerte geladen sind. */
   protected readonly reportAllowed = computed(() => {
     const player = this.player();
-    return !!player && this.records.ready() && canCreateLoadReport(this.role(), this.session.playerId(), player.id);
+    return !!player && !player.healthHidden && this.records.ready() && canCreateLoadReport(this.role(), this.session.playerId(), player.id);
   });
   protected readonly failed = computed(() =>
     this.scout() ? this.scoutView.load() === 'error' : this.squad.load() === 'error' || (!this.physio() && this.profile.error() !== ''),
@@ -166,7 +186,8 @@ export class MemberView implements OnInit {
         // Medizin darf keine Bewertungen lesen (Regeln: events/*/ratings) – dort wird nichts abonniert.
         if (this.physio()) this.profile.stop();
         else this.profile.start(player.id);
-        this.records.start(player.id);
+        // Widerrufene Einwilligung (SCRUM-245): keine Abwesenheiten und Messwerte abonnieren (die Regeln sperren sie).
+        this.records.start(player.id, { healthHidden: !!player.healthHidden });
         // Anstrengung und Befinden (SCRUM-138): Spieler/Eltern die eigenen, Medizin die des gewählten Spielers.
         this.selfReports.start(player.id);
       });
@@ -180,7 +201,17 @@ export class MemberView implements OnInit {
 
   protected formatDate = formatDate;
   protected positionText = positionText;
-  protected gradeLabel = gradeLabel;
+  protected readonly noteWord = noteWord;
+  protected gradeLabel = (value: number | null): string => scoreLabel(value, this.scale());
+
+  /** Eine Bewertung in der Skala, mit der sie vergeben wurde (Scout-Sicht: Skala der Ansicht). */
+  protected entryScale(entry: GradedEvent): RatingScale {
+    return this.scout() ? this.scale() : ratingScaleOf(entry.rating, this.scale());
+  }
+
+  protected entryLabel(entry: GradedEvent): string {
+    return scoreLabel(entry.grade, this.entryScale(entry));
+  }
   protected gradeToPercent = gradeToPercent;
 
   protected age(birthdate: string): string {

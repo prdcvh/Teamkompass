@@ -5,6 +5,7 @@ import { MORE_GROUPS, PRIVACY_ITEM } from '../core/shell/navigation';
 import { showsNavigation } from '../core/auth/role';
 import { SessionService } from '../core/auth/session.service';
 import { RsvpService } from '../core/rsvp/rsvp.service';
+import { ConsentCardService } from '../core/player/consent-card.service';
 import { ScoutPublishService } from '../core/scout/scout-publish.service';
 import { MoreSheet } from './more-sheet/more-sheet';
 import { Sidebar } from './sidebar/sidebar';
@@ -36,6 +37,8 @@ export class Shell {
     // Zu-/Absagen (SCRUM-205): Trainer übernehmen Absagen in die Bewertung, solange die App offen ist; Spieler/Eltern
     // lesen ihre eigenen Rückmeldungen. Für Medizin und Scouts tut der Dienst nichts.
     inject(RsvpService);
+    // Einwilligung (SCRUM-245): Trainer pflegen die bereinigten Spielerkarten für widerrufene Einwilligungen.
+    inject(ConsentCardService);
   }
 
   protected readonly variant = computed<'desktop' | 'mobile' | 'focused'>(() => {

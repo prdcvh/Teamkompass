@@ -33,26 +33,26 @@
         <tk-card>
           <div class="panel">
             <h2>Teamform</h2>
-            <svg class="chart" [attr.viewBox]="'0 0 ' + trend().width + ' ' + trend().height" role="img" [attr.aria-label]="trend().points.length ? 'Teamnoten nach Event (1 ist die beste Note): ' + trend().summary : 'Noch keine Teamnoten vorhanden'">
-              @for (line of trend().grid; track line.grade) {
-                <line x1="54" [attr.y1]="line.y" [attr.x2]="trend().width - 24" [attr.y2]="line.y" class="grid" />
-                <text x="24" [attr.y]="line.y + 4" class="axis">{{ line.grade }}</text>
+            <svg class="chart" [attr.viewBox]="'0 0 ' + teamForm().width + ' ' + teamForm().height" role="img" [attr.aria-label]="teamForm().points.length ? (scale() === 'levels' ? 'Teamstufen nach Event: ' : 'Teamnoten nach Event (1 ist die beste Note): ') + teamForm().summary : 'Noch keine Teamnoten vorhanden'">
+              @for (line of teamForm().grid; track line.grade) {
+                <line x1="54" [attr.y1]="line.y" [attr.x2]="teamForm().width - 24" [attr.y2]="line.y" class="grid" />
+                <text [attr.x]="line.x" [attr.y]="line.y + 4" class="axis">{{ line.label }}</text>
               }
-              @if (trend().points.length > 0) {
-                @if (trend().area) {
-                  <path [attr.d]="trend().area" class="area" />
+              @if (teamForm().points.length > 0) {
+                @if (teamForm().area) {
+                  <path [attr.d]="teamForm().area" class="area" />
                 }
-                <path [attr.d]="trend().path" class="line" />
-                @for (point of trend().points; track $index) {
+                <path [attr.d]="teamForm().path" class="line" />
+                @for (point of teamForm().points; track $index) {
                   @if (point.kind === 'Spiel') {
                     <rect [attr.x]="point.x - 6" [attr.y]="point.y - 6" width="12" height="12" rx="2" [attr.transform]="'rotate(45 ' + point.x + ' ' + point.y + ')'" class="dot game" [class.last]="$last" tabindex="0" [attr.aria-label]="point.title + ' (Spiel)'"><title>{{ point.title }}</title></rect>
                   } @else {
                     <circle [attr.cx]="point.x" [attr.cy]="point.y" r="6" class="dot" [class.last]="$last" tabindex="0" [attr.aria-label]="point.title + ' (Training)'"><title>{{ point.title }}</title></circle>
                   }
-                  @if ($last || $index === trend().best || trend().points.length <= 8) {
+                  @if ($last || $index === teamForm().best || teamForm().points.length <= 8) {
                     <text [attr.x]="point.x" [attr.y]="point.y - 14" class="value" text-anchor="middle">{{ point.valueLabel }}</text>
                   }
-                  <text [attr.x]="point.x - 14" [attr.y]="trend().height - 12" class="axis small">{{ point.label }}</text>
+                  <text [attr.x]="point.x - 14" [attr.y]="teamForm().height - 12" class="axis small">{{ point.label }}</text>
                 }
               } @else {
                 <text x="54" y="138" class="axis">Noch keine Teamnoten vorhanden.</text>
@@ -71,7 +71,7 @@
                 @for (entry of topForm(); track entry.player.id) {
                   <p class="insight-row">
                     <a [routerLink]="['/profile', entry.player.id]">{{ entry.player.name }}</a>
-                    <span class="value-badge"><small>Note</small> {{ gradeLabel(entry.grade) }}</span>
+                    <span class="value-badge"><small>{{ scale() === 'levels' ? 'Stufe' : 'Note' }}</small> {{ gradeLabel(entry.grade) }}</span>
                   </p>
                 } @empty {
                   <p class="insight-empty">Noch keine Bewertungen.</p>

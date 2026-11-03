@@ -37,6 +37,16 @@ describe('Profile (Spielerprofil)', () => {
     expect(labels(qa(fixture, '.bars')[1])).toEqual(['Anwesend 2/2', 'Teilweise 0/2', 'Fehlt 0/2', 'Nicht im Kader 0/2']);
   });
 
+  it('zeigt die Belastungskurve (Müdigkeit, Fitness, Form) und den Hinweis, dass die Ampel keine Verletzungswahrscheinlichkeit ist (SCRUM-176)', async () => {
+    const fixture = await render();
+    const card = q(fixture, 'tk-load-curve-card');
+    expect(text(card)).toContain('Belastungskurve');
+    expect(text(card?.querySelector('.legend') ?? null)).toMatch(/Müdigkeit \(7 Tage\) \d+\s*Fitness \(28 Tage\) \d+\s*Form [+-]?\d+/);
+    expect(card?.querySelectorAll('path.curve')).toHaveLength(3);
+    expect(card?.querySelector('svg')?.getAttribute('aria-label')).toContain('Heute: Müdigkeit');
+    expect(text(q(fixture, '.risk'))).toContain('Die Ampel ist keine Verletzungswahrscheinlichkeit');
+  });
+
   it('zeigt Statistik-Karten mit den berechneten Werten', async () => {
     const fixture = await render();
     const cards = Object.fromEntries(qa(fixture, '.stat').map((card) => [text(card.querySelector('span')), text(card.querySelector('strong'))]));

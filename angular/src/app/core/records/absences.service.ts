@@ -57,12 +57,16 @@ export class AbsencesService {
   async reconcileAbsences(playerId: string, absences: readonly Absence[]): Promise<number> {
     const player = (await this.squad.whenLoaded()).find((entry) => entry.id === playerId);
     if (!player) return 0;
-    if (this.profile.playerId() !== playerId || this.profile.loading() || this.profile.error()) {
+    // Fremder Verein ohne Einwilligung (SCRUM-245): wie der allgemeine Abgleich – „Fehlt“ mit Grund überspringen.
+    if (this.profile.playerId() !== playerId || this.profile.loading() || this.profile.error() || !this.absenceSync.mayStore(player)) {
       return this.absenceSync.reconcilePlayer(player, await this.events.whenLoaded(), { absences });
     }
     let changed = 0;
     for (const { event, rating } of this.profile.items()) {
-      const next = autoAbsenceRating(rating, unavailabilityReason(player, absences, event.date));
+      // Widerrufene Einwilligung: nur „Fehlt“ ohne Grund (SCRUM-248, siehe AbsenceSyncService.allowedReason).
+      const reason = this.absenceSync.allowedReason(player, unavailabilityReason(player, absences, event.date));
+      if (reason === 'skip') continue;
+      const next = autoAbsenceRating(rating, reason);
       if (!next) continue;
       changed += 1;
       this.state.write('Abwesenheit konnte nicht in die Event-Bewertung übernommen werden.', () =>

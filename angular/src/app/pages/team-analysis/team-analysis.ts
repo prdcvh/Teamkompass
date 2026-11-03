@@ -3,8 +3,9 @@ import { RouterLink } from '@angular/router';
 import { birthQuarterCounts, positionCoverage, teamStats, teamTrend, thinPositions, trainingFocusCounts } from '../../core/analysis/analysis';
 import { LayoutService } from '../../core/shell/layout.service';
 import { todayIso } from '../../core/shared/dates';
-import { numberLabel } from '../../core/profile/profile';
-import { gradeLabel } from '../../core/ratings/rating';
+import { numberLabel, plotChart } from '../../core/profile/profile';
+import { scoreLabel } from '../../core/ratings/rating-scale';
+import { RatingScaleService } from '../../core/ratings/rating-scale.service';
 import { RISK_TIER_RANK, injuryRisk } from '../../core/analysis/risk';
 import { SessionService } from '../../core/auth/session.service';
 import { SyncService } from '../../core/shell/sync.service';
@@ -55,7 +56,22 @@ export class TeamAnalysis implements OnInit {
   private readonly quarters = computed(() => birthQuarterCounts(this.team.data().map((entry) => entry.player)));
   private readonly coverage = computed(() => positionCoverage(this.team.data().map((entry) => entry.player)));
   protected readonly thin = computed(() => thinPositions(this.coverage()));
-  protected readonly trend = computed(() => teamTrend(this.team.events(), this.team.ratingsByEvent()));
+  protected readonly trend = computed(() => teamTrend(this.team.events(), this.team.ratingsByEvent(), todayIso()));
+
+  /** Bewertungsskala des Teams (SCRUM-188). */
+  protected readonly scale = inject(RatingScaleService).scale;
+  /** Teamform in der Skala des Teams: bei Kompetenzstufen Raster und Beschriftung mit Stufen, Werte unverändert. */
+  protected readonly teamForm = computed(() => {
+    const chart = this.trend();
+    if (this.scale() !== 'levels') return chart;
+    const points = chart.points.map(({ grade, label, title, kind }) => ({
+      grade,
+      label,
+      title: title.replace(/Ø Note [\d,]+$/, `Ø ${scoreLabel(grade, 'levels')}`),
+      kind,
+    }));
+    return plotChart(points, 'levels');
+  });
 
   protected readonly cards = computed(() => {
     const stats = this.stats();
@@ -63,10 +79,10 @@ export class TeamAnalysis implements OnInit {
     const focus = this.focus();
     const quarters = this.quarters();
     return [
-      { label: 'Spiele', value: String(stats.games) },
+      { label: 'Spiele', value: stats.gamesPlanned ? `${stats.games} gespielt · ${stats.gamesPlanned} geplant` : String(stats.games) },
       { label: 'Bilanz', value: formatRecord(record) },
       { label: 'Torverhältnis', value: formatGoals(record) },
-      { label: 'Ø Teamnote', value: gradeLabel(stats.avgGrade) },
+      { label: 'Ø Teamnote', value: this.gradeLabel(stats.avgGrade) },
       { label: 'Teilnahmequote', value: `${stats.attendanceRate}%` },
       { label: 'Ø Anstrengung', value: stats.avgIntensity === null ? '-' : stats.avgIntensity.toFixed(1).replace('.', ',') },
       { label: 'Training BB/GGB', value: `${focus['Eigener Ballbesitz']}/${focus['Gegnerischer Ballbesitz']}` },
@@ -95,7 +111,7 @@ export class TeamAnalysis implements OnInit {
   protected readonly goalsText = computed(() => formatGoals(this.stats().record));
 
   protected numberLabel = numberLabel;
-  protected gradeLabel = gradeLabel;
+  protected gradeLabel = (value: number | null): string => scoreLabel(value, this.scale());
 
   ngOnInit(): void {
     if (this.isTrainer()) this.team.start();

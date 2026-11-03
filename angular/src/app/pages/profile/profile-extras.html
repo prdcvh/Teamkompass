@@ -61,10 +61,19 @@
   </section>
   }
 
+  @if (healthHidden()) {
+  <p class="muted health-hidden" role="status">{{ hiddenText }}</p>
+  } @else {
+  @if (healthLocked() && canEdit()) {
+    <p class="consent-warning health-lock" role="status">
+      {{ healthLocked() }}
+      <button tkButton size="sm" type="button" (click)="showConsent()">Zur Einwilligung</button>
+    </p>
+  }
   <section class="block" aria-labelledby="absences-title">
     <div class="block-head">
       <h2 id="absences-title">Abwesenheiten und Verletzungen</h2>
-      @if (canEdit()) {
+      @if (canEditHealth()) {
         <button tkButton size="sm" type="button" (click)="openAbsence(null)">+ Eintrag</button>
       }
     </div>
@@ -82,7 +91,9 @@
               </div>
               @if (canEdit()) {
                 <div class="row-actions">
+                  @if (canEditHealth()) {
                   <button tkButton size="sm" type="button" (click)="openAbsence(absence)" [attr.aria-label]="'Eintrag bearbeiten: ' + absenceTitle(absence)">Bearbeiten</button>
+                  }
                   <button tkButton size="sm" type="button" class="danger" (click)="askDelete('absence', absence.id, '„' + absenceTitle(absence) + '“')" [attr.aria-label]="'Eintrag löschen: ' + absenceTitle(absence)">Löschen</button>
                 </div>
               }
@@ -96,7 +107,7 @@
   <section class="block" aria-labelledby="measurements-title">
     <div class="block-head">
       <h2 id="measurements-title">Messwerte</h2>
-      @if (canEdit()) {
+      @if (canEditHealth()) {
         <button tkButton size="sm" type="button" (click)="openMeasurement(null)">+ Messung</button>
       }
     </div>
@@ -143,7 +154,9 @@
               </div>
               @if (canEdit()) {
                 <div class="row-actions">
+                  @if (canEditHealth()) {
                   <button tkButton size="sm" type="button" (click)="openMeasurement(measurement)" [attr.aria-label]="'Messung bearbeiten: ' + formatDate(measurement.date)">Bearbeiten</button>
+                  }
                   <button tkButton size="sm" type="button" class="danger" (click)="askDelete('measurement', measurement.id, 'die Messung vom ' + formatDate(measurement.date))" [attr.aria-label]="'Messung löschen: ' + formatDate(measurement.date)">Löschen</button>
                 </div>
               }
@@ -153,6 +166,7 @@
       }
     </tk-card>
   </section>
+  }
 }
 
 @if (canEdit()) {

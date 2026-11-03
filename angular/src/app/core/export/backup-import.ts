@@ -200,9 +200,14 @@ export interface BackupOperation {
 }
 
 /** Schreibliste: dieselben Dokumente und Felder wie die einzelnen Speichern-Funktionen der App (Pfade unterhalb von `teams/{teamId}`). */
-export function backupOperations(backup: Backup): BackupOperation[] {
+export function backupOperations(backup: Backup, uid: string | null = null): BackupOperation[] {
   const ops: BackupOperation[] = [];
-  for (const player of backup.players) ops.push({ path: ['players', String(player['id'])], data: player, merge: true });
+  for (const player of backup.players) {
+    // Dokumentierte Einwilligung (SCRUM-245): Die Regeln verlangen beim Eintragen die UID des schreibenden Kontos –
+    // beim Einspielen ist das der Trainer, der die Sicherung einspielt („consentBy“ aus der Sicherung bleibt).
+    const data = uid && player['consentStatus'] === 'granted' ? { ...player, consentByUid: uid } : player;
+    ops.push({ path: ['players', String(player['id'])], data, merge: true });
+  }
   for (const event of backup.events) {
     ops.push({ path: ['events', event.id], data: event.meta, merge: true });
     for (const [playerId, rating] of Object.entries(event.ratings)) ops.push({ path: ['events', event.id, 'ratings', playerId], data: { ...rating, playerId }, merge: true });

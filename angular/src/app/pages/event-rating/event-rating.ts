@@ -8,6 +8,9 @@ import { LineupService } from '../../core/lineup/lineup.service';
 import { lineupIsEmpty, lineupSummary } from '../../core/lineup/lineup';
 import { LayoutService, injectNarrowViewport } from '../../core/shell/layout.service';
 import { type Player, consentRevokedMessage, isConsentRevoked } from '../../core/player/player';
+import { CurrentTeam } from '../../core/team/current-team.service';
+import { healthLockedMessage, mayStoreHealth } from '../../core/player/consent';
+import { AbsenceSyncService } from '../../core/records/absence-sync.service';
 import {
   ATTENDANCES,
   ATTENDANCE_LABELS,
@@ -23,10 +26,12 @@ import {
   type RatingView,
   attendanceTone,
   calculatedGrade,
-  gradeLabel,
   matchesView,
   progress,
+  ratingScaleOf,
 } from '../../core/ratings/rating';
+import { type ScaleOption, scaleOptions, scoreLabel } from '../../core/ratings/rating-scale';
+import { RatingScaleService } from '../../core/ratings/rating-scale.service';
 import { RatingsService } from '../../core/ratings/ratings.service';
 import { rsvpCounts, rsvpReason } from '../../core/rsvp/rsvp';
 import { RsvpService } from '../../core/rsvp/rsvp.service';
@@ -36,8 +41,6 @@ import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 import { Chip, type Tone } from '../../ui/chip/chip';
 import { Weather } from '../../ui/weather/weather';
-
-const GRADE_OPTIONS = [1, 2, 3, 4, 5, 6] as const;
 
 /** Spaltenköpfe der Matrix: lange Wörter mit weichen Trennstellen, damit sie in schmalen Spalten umbrechen statt abgeschnitten zu werden. */
 const GRADE_HEADERS: Readonly<Record<GradeField, string>> = {
@@ -61,11 +64,18 @@ const GRADE_HEADERS: Readonly<Record<GradeField, string>> = {
 export class EventRating implements OnInit {
   private readonly route = inject(ActivatedRoute);
   protected readonly ratings = inject(RatingsService);
+  /** Bewertungsskala des Teams (SCRUM-188): Schulnoten oder Kompetenzstufen. */
+  protected readonly scale = inject(RatingScaleService).scale;
+  /** Legende der Kurzformen in der Matrix, sobald eine Zeile mit Stufen bewertet wird. */
+  protected readonly showLegend = computed(() => this.scale() === 'levels' || this.allPlayers().some((player) => this.usesLevels(player)));
   protected readonly squad = inject(SquadService);
   protected readonly eventsService = inject(EventsService);
   protected readonly sync = inject(SyncService);
   private readonly lineupService = inject(LineupService);
   private readonly rsvp = inject(RsvpService);
+  private readonly team = inject(CurrentTeam);
+  /** Automatisches „Fehlt“, das wegen fehlender Einwilligung übersprungen wurde (SCRUM-245). */
+  protected readonly skippedAbsences = inject(AbsenceSyncService).lockedSkips;
   private readonly layoutMobile = inject(LayoutService).isMobile;
   private readonly narrow = injectNarrowViewport();
   /** Einzelkarten-Ansicht (Handy und alles unter TABLE_MIN_WIDTH); sonst die Matrix mit allen Spalten. */
@@ -75,7 +85,6 @@ export class EventRating implements OnInit {
   protected readonly attendanceLabels = ATTENDANCE_LABELS;
   protected readonly gradeFields = GRADE_FIELDS;
   protected readonly gradeLabels = GRADE_LABELS;
-  protected readonly gradeOptions = GRADE_OPTIONS;
   protected readonly views = RATING_VIEWS;
   protected readonly gradeHeaders = GRADE_HEADERS;
   protected readonly limits = { note: MAX_NOTE_LENGTH, goals: MAX_GOALS_OR_ASSISTS };
@@ -131,7 +140,6 @@ export class EventRating implements OnInit {
 
   protected formatDate = formatDate;
   protected resultText = resultText;
-  protected gradeLabel = gradeLabel;
 
   protected revoked(player: Player): boolean {
     return isConsentRevoked(player);
@@ -139,6 +147,15 @@ export class EventRating implements OnInit {
 
   protected revokedMessage(player: Player): string {
     return consentRevokedMessage(player.name);
+  }
+
+  /** Fremder Verein ohne dokumentierte Einwilligung (SCRUM-245): keine Gesundheitsangaben speicherbar. */
+  protected locked(player: Player): boolean {
+    return !mayStoreHealth(player, this.team.id());
+  }
+
+  protected lockedMessage(player: Player): string {
+    return healthLockedMessage(player.name);
   }
 
   /** Schild „Zugesagt“, „Abgesagt (Eltern): Grund“ oder „Offen“ je Spieler; null, solange keine Rückmeldungen geladen sind. */
@@ -154,7 +171,17 @@ export class EventRating implements OnInit {
   }
 
   protected total(player: Player): string {
-    return gradeLabel(calculatedGrade(this.ratings.ratingFor(player.id)));
+    const rating = this.ratings.ratingFor(player.id);
+    return scoreLabel(calculatedGrade(rating), ratingScaleOf(rating, this.scale()));
+  }
+
+  /** Auswahl je Spieler: die Skala seiner Bewertung, ohne Teilnote die des Teams (eine Bewertung mischt nie zwei Skalen). */
+  protected optionsFor(player: Player): readonly ScaleOption[] {
+    return scaleOptions(ratingScaleOf(this.ratings.ratingFor(player.id), this.scale()));
+  }
+
+  protected usesLevels(player: Player): boolean {
+    return ratingScaleOf(this.ratings.ratingFor(player.id), this.scale()) === 'levels';
   }
 
   protected intensity(): string {
