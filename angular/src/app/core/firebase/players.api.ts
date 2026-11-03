@@ -4,8 +4,13 @@ import { PlayerStatsMode } from '../team/player-stats-mode';
 import { FirebaseConnection } from './firebase-connection';
 import type { RawDoc, SnapshotMeta } from './types';
 
-/** Unterkollektionen eines Spielers, die beim Löschen mitgehen (Entwicklungspläne, Abwesenheiten, Messwerte). */
-const PLAYER_SUBCOLLECTIONS = ['developmentPlans', 'absences', 'measurements'] as const;
+/**
+ * Unterkollektionen eines Spielers, die beim Löschen mitgehen: Entwicklungspläne, Abwesenheiten, Messwerte und die
+ * Angaben aus dem Check-in nach dem Termin (SCRUM-138: Anstrengung `selfReports`, Befinden `wellness` – ein
+ * Gesundheitsdatum, SCRUM-278). Muss jede `players/{playerId}/…`-Sammlung aus firestore.rules enthalten
+ * (geprüft in tests/project.test.mjs).
+ */
+const PLAYER_SUBCOLLECTIONS = ['developmentPlans', 'absences', 'measurements', 'selfReports', 'wellness'] as const;
 
 /** Spieler des Teams (players): Echtzeit-Abo, Speichern und Löschen samt aller Unterdaten. */
 @Injectable({ providedIn: 'root' })
