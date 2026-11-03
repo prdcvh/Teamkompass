@@ -7,7 +7,7 @@ import { test, before, after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { initializeTestEnvironment, assertFails, assertSucceeds } from "@firebase/rules-unit-testing";
-import { collection, deleteDoc, doc, getDoc, getDocs, query, serverTimestamp, setDoc, where, writeBatch } from "firebase/firestore";
+import { collection, deleteDoc, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from "firebase/firestore";
 
 const OWN = "U17";
 // Team eines fremden Vereins (Zufalls-ID wie bei der Registrierung, SCRUM-181).
@@ -105,6 +105,24 @@ test("Widerrufen: der Trainer löscht von Hand, nichts passiert automatisch", as
     await assertSucceeds(deleteDoc(doc(db, p(team, "events/e1/responses/p1"))));
     // Status zurücksetzen ist immer erlaubt.
     await assertSucceeds(setDoc(doc(db, p(team, "players/p1")), { status: "Fit", injuryUntil: "", injuredSince: "" }, { merge: true }));
+  }
+});
+
+test("SCRUM-248: der Trainer leert nur den Absagegrund, sonst nichts", async () => {
+  for (const team of [OWN, FOREIGN]) {
+    const ref = (uid) => doc(as(uid), p(team, "events/e1/responses/p1"));
+    // Nur den Grund leeren - kein anderer Grund, keine anderen Felder, nicht Spieler/Eltern/Medizin auf diesem Weg.
+    await assertFails(updateDoc(ref("coach"), { reason: "erkältet" }));
+    await assertFails(updateDoc(ref("coach"), { reason: "", status: "yes" }));
+    await assertFails(updateDoc(ref("medic"), { reason: "" }));
+    await assertFails(updateDoc(ref("pl1"), { reason: "" }));
+    await assertSucceeds(updateDoc(ref("coach"), { reason: "" }));
+    const after = await assertSucceeds(getDoc(ref("coach")));
+    assert.deepEqual(after.data(), { playerId: "p1", status: "no", reason: "", by: "player" });
+    // Danach liest der Spieler die Absage wieder (ohne Grund).
+    await assertSucceeds(getDoc(ref("pl1")));
+    // Neue Rückmeldungen legt der Trainer nicht an.
+    await assertFails(setDoc(doc(as("coach"), p(team, "events/e1/responses/p4")), { playerId: "p4", status: "no", reason: "", by: "player" }));
   }
 });
 

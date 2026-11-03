@@ -22,6 +22,7 @@ import { CurrentTeam } from '../../core/team/current-team.service';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 import { Dialog } from '../../ui/dialog/dialog';
+import { HealthReasonsTask } from './health-reasons-task';
 
 type Pending = 'grant' | 'status' | 'absences' | 'measurements';
 
@@ -32,7 +33,7 @@ type Pending = 'grant' | 'status' | 'absences' | 'measurements';
  */
 @Component({
   selector: 'tk-consent-panel',
-  imports: [Button, Card, Dialog],
+  imports: [Button, Card, Dialog, HealthReasonsTask],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <tk-card>
@@ -74,7 +75,7 @@ type Pending = 'grant' | 'status' | 'absences' | 'measurements';
                 }
               </ul>
             }
-            <p class="muted">Absagegründe in den Terminen und Rückmeldungen in den Bewertungen sind hier nicht aufgeführt; bitte bei Bedarf dort prüfen.</p>
+            <tk-health-reasons-task [player]="player()" />
           </div>
         }
         @if (player().consentStatus !== 'granted') {

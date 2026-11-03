@@ -9,7 +9,7 @@ import { RsvpApi } from '../firebase/rsvp.api';
 import type { RawDoc } from '../firebase/types';
 import type { Player } from '../player/player';
 import { SquadService } from '../player/squad.service';
-import { mayGiveReason } from '../player/consent';
+import { hidesHealthReason, mayGiveReason } from '../player/consent';
 import { CurrentTeam } from '../team/current-team.service';
 import { docFromRating, ratingFromDoc } from '../ratings/rating';
 import { AbsenceSyncService } from '../records/absence-sync.service';
@@ -249,13 +249,15 @@ export class RsvpService {
 
   private async reconcilePlayer(event: TeamEvent, player: Player, response: RsvpResponse | null): Promise<number> {
     const id = `${event.id}/${player.id}`;
-    const key = responseKey(response);
+    // Widerrufene Einwilligung (SCRUM-248): der Absagegrund kommt nicht in die Rückmeldung, die Spieler/Eltern lesen.
+    const hideReason = hidesHealthReason(player);
+    const key = responseKey(hideReason && response ? { ...response, reason: '' } : response);
     const before = this.processed.get(id);
     // Unverändert, oder es gab nie eine Rückmeldung: nichts zu lesen.
     if (before === key || (before === undefined && key === 'open')) return 0;
     try {
       const doc = await this.ratingsApi.readRatingDoc(event.id, player.id);
-      const next = rsvpAbsenceRating(doc ? ratingFromDoc(doc) : null, response);
+      const next = rsvpAbsenceRating(doc ? ratingFromDoc(doc) : null, response, { hideReason });
       if (next) {
         await this.ratingsApi.saveRating(event.id, player.id, docFromRating(next, { clearAuto: true }));
         // Nach einer Zusage greift die normale Abwesenheits-Automatik wieder (z. B. inzwischen verletzt gemeldet).

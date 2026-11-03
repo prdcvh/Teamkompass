@@ -4,11 +4,12 @@ import { type TeamEvent } from '../events/event';
 import { PlayerRecordsApi } from '../firebase/player-records.api';
 import { RatingsApi } from '../firebase/ratings.api';
 import type { Player } from '../player/player';
-import { mayStoreHealth } from '../player/consent';
+import { hidesHealthReason, mayStoreHealth } from '../player/consent';
 import { CurrentTeam } from '../team/current-team.service';
 import { type Rating, docFromRating, ratingFromDoc } from '../ratings/rating';
 import { type Absence, absenceFromDoc } from './absence';
 import { autoAbsenceRating, keepPastOpenInjury, unavailabilityReason } from './availability';
+import { NEUTRAL_ABSENCE_NOTE } from './health-reasons';
 import { SessionService } from '../auth/session.service';
 import { SyncService } from '../shell/sync.service';
 
@@ -53,9 +54,13 @@ export class AbsenceSyncService {
     return mayStoreHealth(player, this.team.id());
   }
 
-  /** Grund für „Fehlt“ – oder null, wenn er ohne Einwilligung nicht gespeichert werden darf (dann Hinweis merken). */
-  private allowedReason(player: Player, reason: string | null): string | null | 'skip' {
-    if (!reason || mayStoreHealth(player, this.team.id())) return reason;
+  /**
+   * Grund für „Fehlt“ in der Rückmeldung: wie berechnet; bei widerrufener Einwilligung nur „Fehlt“ ohne Grund (SCRUM-248);
+   * 'skip', wenn in einem fremden Verein die Einwilligung fehlt (dann Hinweis merken, SCRUM-245).
+   */
+  allowedReason(player: Player, reason: string | null): string | null | 'skip' {
+    if (!reason) return reason;
+    if (mayStoreHealth(player, this.team.id())) return hidesHealthReason(player) ? NEUTRAL_ABSENCE_NOTE : reason;
     if (!this.lockedSkips().some((entry) => entry.id === player.id)) this.lockedSkips.update((list) => [...list, { id: player.id, name: player.name }]);
     return 'skip';
   }
@@ -100,7 +105,11 @@ export class AbsenceSyncService {
       events
         .filter((event) => event.date)
         .map((event) => {
-          if (pastBefore && event.date < pastBefore) return options.keepPastOpenInjury ? this.apply(event, player, keepPastOpenInjury) : 0;
+          if (pastBefore && event.date < pastBefore) {
+            if (!options.keepPastOpenInjury) return 0;
+            const covered = !!unavailabilityReason(player, absences, event.date);
+            return this.apply(event, player, (existing) => keepPastOpenInjury(existing, covered));
+          }
           const reason = this.allowedReason(player, unavailabilityReason(player, absences, event.date));
           if (reason === 'skip') return 0;
           return this.apply(event, player, (existing) => autoAbsenceRating(existing, reason));

@@ -584,6 +584,8 @@ service cloud.firestore {
         // SCRUM-245: Der Grund ist ein Gesundheitsdatum. Bei widerrufener Einwilligung lesen Spieler/Eltern nur noch
         // Rueckmeldungen ohne Grund und speichern keinen Grund mehr; in fremden Vereinen gibt es einen Grund nur mit
         // dokumentierter Einwilligung. Zu-/Absagen selbst gehen immer.
+        // SCRUM-248: Der Trainer darf (nach Rueckfrage in der App) nur den Grund leeren - kein anderes Feld,
+        // keine neue Rueckmeldung. Die Absage selbst, wer sie gegeben hat und der Zeitstempel bleiben.
         match /responses/{playerId} {
           allow read: if isTrainer()
             || (isPlayerFor(playerId)
@@ -601,6 +603,9 @@ service cloud.firestore {
             && (request.resource.data.status == "no" || request.resource.data.reason == "")
             && request.resource.data.by == memberDoc().data.role
             && request.resource.data.updatedAt == request.time;
+          allow update: if isTrainer()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reason'])
+            && request.resource.data.reason == '';
           allow delete: if isTrainer();
         }
       }
