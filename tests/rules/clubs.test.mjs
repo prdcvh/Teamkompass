@@ -27,9 +27,10 @@ after(async () => { await env.cleanup(); });
 // (siehe Test 1). Thema fuer SCRUM-181, Architektur-Notiz Abschnitt 6/8.
 const teamPaths = (prefix) => [
   "players/p1", "players/p1/developmentPlans/f1", "players/p1/absences/a1", "players/p1/measurements/m1",
-  "events/e1", "events/e1/ratings/p1", "events/e1/privateNotes/p1", "events/e1/responses/p1",
+  "events/e1", "events/e1/ratings/p1", "events/e1/ratingValues/p1", "events/e1/ratingGrades/p1", "gradeReleases/p1",
+  "events/e1/privateNotes/p1", "events/e1/responses/p1",
   "scoutProfiles/p1", "playerStats/p1", "opponents/o1",
-  "meta/lineup", "meta/settings", "meta/planning", "meta/breaks", "meta/operations", "meta/playerStats",
+  "meta/lineup", "meta/settings", "meta/planning", "meta/breaks", "meta/operations", "meta/playerStats", "meta/playerView",
   `notifications/${prefix}coach`
 ];
 const withInvite = (prefix) => [...teamPaths(prefix), "invites/c1"];
@@ -339,7 +340,9 @@ test("9. Rueckwaertskompatibel: Altteam ohne Team-Dokument, ohne clubId und ohne
   await assertSucceeds(setDoc(doc(as("lcoach"), t("players/p2")), { name: "neu" }));
   await assertSucceeds(setDoc(doc(as("lcoach"), t("members/neuScout")), { role: "scout", email: "s@example.test", createdAt: serverTimestamp() }));
   await assertSucceeds(getDoc(doc(as("lplayer"), t("players/p1"))));
-  await assertSucceeds(getDocs(query(collection(as("lplayer"), t("events/e1/ratings")), where("playerId", "==", "p1"))));
+  // SCRUM-115: Spieler lesen die Werte-Kopie per gezieltem Abruf, das Bewertungsdokument nicht mehr.
+  await assertSucceeds(getDoc(doc(as("lplayer"), t("events/e1/ratingValues/p1"))));
+  await assertFails(getDocs(query(collection(as("lplayer"), t("events/e1/ratings")), where("playerId", "==", "p1"))));
   await assertFails(getDoc(doc(as("lplayer"), t("events/e1/privateNotes/p1"))));
   await assertSucceeds(getDoc(doc(as("lphysio"), t("players/p1/absences/a1"))));
   await assertFails(getDoc(doc(as("lscout"), t("players/p1/absences/a1"))));

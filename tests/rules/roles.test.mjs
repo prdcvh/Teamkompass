@@ -47,6 +47,8 @@ beforeEach(async () => {
       await setDoc(doc(db, t(`players/${id}/absences/a1`)), { playerId: id, label: "Urlaub" });
       await setDoc(doc(db, t(`players/${id}/measurements/m1`)), { playerId: id, value: 1 });
       await setDoc(doc(db, t(`events/e1/ratings/${id}`)), { playerId: id, effort: 2 });
+      // SCRUM-115: Werte-Kopie, die Spieler/Eltern statt des Bewertungsdokuments lesen.
+      await setDoc(doc(db, t(`events/e1/ratingValues/${id}`)), { playerId: id, attendance: "present", minutes: 60, goals: 1, assists: "" });
       await setDoc(doc(db, t(`events/e1/privateNotes/${id}`)), { note: "intern" });
       await setDoc(doc(db, t(`scoutProfiles/${id}`)), { playerId: id, name: id, number: 1, positions: ["ZM"], birthdate: "2012-01-01", version: 1, entries: [] });
     }
@@ -86,7 +88,7 @@ test("Ohne Anmeldung und als Nicht-Mitglied geht nichts", async () => {
 
 test("Medizin: Spieler, Abwesenheiten und Messwerte lesbar; keine Noten, Notizen, Pläne, Scout-Sicht, Gegner, Aufstellung; nichts schreibbar", async () => {
   for (const path of ["players/p1", "players/p2", "players/p1/absences/a1", "players/p2/measurements/m1", "events/e1"]) await canRead("medic", path);
-  for (const path of ["events/e1/ratings/p1", "events/e1/privateNotes/p1", "players/p1/developmentPlans/f1", "scoutProfiles/p1", "opponents/o1", "meta/lineup", "meta/settings", "meta/planning"]) await cannotRead("medic", path);
+  for (const path of ["events/e1/ratings/p1", "events/e1/ratingValues/p1", "events/e1/ratingGrades/p1", "gradeReleases/p1", "events/e1/privateNotes/p1", "players/p1/developmentPlans/f1", "scoutProfiles/p1", "opponents/o1", "meta/lineup", "meta/settings", "meta/planning"]) await cannotRead("medic", path);
   // So laedt die Medizin-Ansicht: ganze Spielerliste, Abwesenheiten und Messwerte je Spieler.
   // SCRUM-245: Die Liste nur mit Filter auf nicht widerrufene Einwilligung (ohne Filter abgelehnt).
   await assertSucceeds(getDocs(query(collection(as("medic"), t("players")), where("consentStatus", "!=", "revoked"))));
@@ -99,60 +101,61 @@ test("Medizin: Spieler, Abwesenheiten und Messwerte lesbar; keine Noten, Notizen
   await assertFails(setDoc(doc(as("medic"), t("players/p9")), { name: "x" }));
 });
 
-test("Spieler und Eltern: nur das eigene Profil samt Noten, Plänen, Abwesenheiten, Messwerten; nie fremde Daten oder interne Notizen", async () => {
+test("Spieler und Eltern: nur das eigene Profil samt Werten, Plänen, Abwesenheiten, Messwerten; nie fremde Daten, Kommentare oder interne Notizen", async () => {
   for (const uid of ["pl1", "parent1"]) {
-    for (const path of ["players/p1", "events/e1/ratings/p1", "players/p1/developmentPlans/f1", "players/p1/absences/a1", "players/p1/measurements/m1", "events/e1"]) await canRead(uid, path);
-    for (const path of ["players/p2", "events/e1/ratings/p2", "players/p2/developmentPlans/f1", "players/p2/absences/a1", "events/e1/privateNotes/p1", "opponents/o1", "meta/lineup", "meta/settings", "meta/planning"]) await cannotRead(uid, path);
+    for (const path of ["players/p1", "events/e1/ratingValues/p1", "players/p1/developmentPlans/f1", "players/p1/absences/a1", "players/p1/measurements/m1", "events/e1"]) await canRead(uid, path);
+    // SCRUM-115: das vollständige Bewertungsdokument (mit Kommentar) liest nur der Trainer.
+    for (const path of ["events/e1/ratings/p1", "players/p2", "events/e1/ratings/p2", "events/e1/ratingValues/p2", "players/p2/developmentPlans/f1", "players/p2/absences/a1", "events/e1/privateNotes/p1", "opponents/o1", "meta/lineup", "meta/settings", "meta/planning"]) await cannotRead(uid, path);
     await assertFails(getDocs(collection(as(uid), t("members"))));
     await assertFails(getDocs(collection(as(uid), t("invites"))));
     await assertFails(getDocs(collection(as(uid), t("players"))));
   }
 });
 
-test("Spieler listen Pläne und Noten nur mit passendem playerId-Filter (so fragt die App ab)", async () => {
+test("Spieler listen Pläne nur mit passendem playerId-Filter; Bewertungen und ihre Kopien gar nicht", async () => {
   const db = as("pl1");
   const plans = (id) => collection(db, t(`players/${id}/developmentPlans`));
   await assertSucceeds(getDocs(query(plans("p1"), where("playerId", "==", "p1"))));
   await assertFails(getDocs(plans("p1")));
   await assertFails(getDocs(query(plans("p2"), where("playerId", "==", "p2"))));
-  const ratings = collection(db, t("events/e1/ratings"));
-  await assertSucceeds(getDocs(query(ratings, where("playerId", "==", "p1"))));
-  await assertFails(getDocs(ratings));
-  await assertFails(getDocs(query(ratings, where("playerId", "==", "p2"))));
+  for (const name of ["ratings", "ratingValues", "ratingGrades"]) {
+    const list = collection(db, t(`events/e1/${name}`));
+    await assertFails(getDocs(query(list, where("playerId", "==", "p1"))));
+    await assertFails(getDocs(list));
+  }
 });
 
-// SCRUM-234: "Mein Profil" holt fuer jeden Termin gezielt ratings/{eigene playerId} - auch fuer Termine ohne
-// Bewertung (zukuenftige Termine, nicht bewertet). Fehlt das Dokument, muss der Abruf trotzdem erlaubt sein,
-// sonst laedt das ganze Profil nicht (permission-denied). Fremde Bewertungen bleiben gesperrt.
-test("Spieler und Eltern lesen das eigene, noch nicht vorhandene Bewertungsdokument; fremde (auch fehlende) nie", async () => {
+// SCRUM-234: "Mein Profil" holt fuer jeden Termin gezielt die eigenen Werte (seit SCRUM-115 ratingValues/{eigene
+// playerId}) - auch fuer Termine ohne Bewertung (zukuenftige Termine, nicht bewertet). Fehlt das Dokument, muss der
+// Abruf trotzdem erlaubt sein, sonst laedt das ganze Profil nicht (permission-denied). Fremde Werte bleiben gesperrt.
+test("Spieler und Eltern lesen die eigenen, noch nicht vorhandenen Werte; fremde (auch fehlende) nie", async () => {
   await env.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();
-    // e2: zukuenftiger Termin ohne jede Bewertung. e3: Bewertung unter p1, deren Feld aber auf p2 zeigt.
+    // e2: zukuenftiger Termin ohne jede Bewertung. e3: Werte unter p1, deren Feld aber auf p2 zeigt.
     await setDoc(doc(db, t("events/e2")), { title: "Spiel", date: "2099-01-01" });
-    await setDoc(doc(db, t("events/e3/ratings/p1")), { playerId: "p2", effort: 1 });
+    await setDoc(doc(db, t("events/e3/ratingValues/p1")), { playerId: "p2", attendance: "present" });
     await setDoc(doc(db, t("members/oldparent")), { role: "parent", playerId: "p1", expiresAt: past() });
   });
   for (const uid of ["pl1", "parent1", "futurepl"]) {
-    await canRead(uid, "events/e2/ratings/p1");
+    await canRead(uid, "events/e2/ratingValues/p1");
     // Auch fuer einen Termin, den es (noch) gar nicht gibt.
-    await canRead(uid, "events/unbekannt/ratings/p1");
-    await canRead(uid, "events/e1/ratings/p1");
-    await cannotRead(uid, "events/e2/ratings/p2");
-    await cannotRead(uid, "events/e1/ratings/p2");
-    await cannotRead(uid, "events/e3/ratings/p1");
-  }
-  await canRead("pl2", "events/e2/ratings/p2");
-  await cannotRead("pl2", "events/e2/ratings/p1");
-  for (const uid of [null, "fremd", "oldpl", "oldparent", "medic", "scout", "legacyScout", "oldScout"]) {
+    await canRead(uid, "events/unbekannt/ratingValues/p1");
+    await canRead(uid, "events/e1/ratingValues/p1");
+    await cannotRead(uid, "events/e2/ratingValues/p2");
+    await cannotRead(uid, "events/e1/ratingValues/p2");
+    await cannotRead(uid, "events/e3/ratingValues/p1");
+    // Das Bewertungsdokument selbst nie - auch nicht, wenn es fehlt.
     await cannotRead(uid, "events/e2/ratings/p1");
+  }
+  await canRead("pl2", "events/e2/ratingValues/p2");
+  await cannotRead("pl2", "events/e2/ratingValues/p1");
+  for (const uid of [null, "fremd", "oldpl", "oldparent", "medic", "scout", "legacyScout", "oldScout"]) {
+    await cannotRead(uid, "events/e2/ratingValues/p1");
+    await cannotRead(uid, "events/e1/ratingValues/p1");
     await cannotRead(uid, "events/e1/ratings/p1");
   }
   await canRead("coach", "events/e2/ratings/p1");
-  // Listenabfragen bleiben wie bisher nur mit passendem playerId-Filter erlaubt.
-  const ratings = collection(as("pl1"), t("events/e2/ratings"));
-  await assertSucceeds(getDocs(query(ratings, where("playerId", "==", "p1"))));
-  await assertFails(getDocs(ratings));
-  await assertFails(getDocs(query(ratings, where("playerId", "==", "p2"))));
+  await canRead("coach", "events/e1/ratingValues/p1");
 });
 
 test("Spieler dürfen nur die Selbstreflexion des eigenen Förderplans ändern (Eltern gar nichts)", async () => {
@@ -199,7 +202,7 @@ test("Pausen: Spieler sehen weiter nur ihre eigenen Daten, auch wenn sie die Pau
   await canRead("pl1", "meta/breaks");
   for (const path of ["players/p2", "events/e1/ratings/p2", "players/p2/developmentPlans/f1", "players/p2/absences/a1", "events/e1/privateNotes/p1", "opponents/o1", "meta/lineup", "meta/settings", "meta/planning", "meta/operations", "appState/current"]) await cannotRead("pl1", path);
   await canRead("pl1", "players/p1");
-  await canRead("pl1", "events/e1/ratings/p1");
+  await canRead("pl1", "events/e1/ratingValues/p1");
 });
 
 test("Pausen: nur der Trainer schreibt und löscht", async () => {
@@ -255,7 +258,7 @@ test("Jeder liest nur das eigene Mitglieds-Dokument; Einladungen gezielt per Cod
 const SCOUT_FORBIDDEN = [
   "players/p1", "players/p2", "players/p1/absences/a1", "players/p2/absences/a1", "players/p1/measurements/m1",
   "players/p2/measurements/m1", "players/p1/developmentPlans/f1", "events/e1", "events/e1/ratings/p1",
-  "events/e1/privateNotes/p1", "opponents/o1", "meta/lineup", "meta/settings", "meta/planning", "meta/operations",
+  "events/e1/ratingValues/p1", "events/e1/ratingGrades/p1", "gradeReleases/p1", "events/e1/privateNotes/p1", "opponents/o1", "meta/lineup", "meta/settings", "meta/planning", "meta/operations",
   "appState/current", "members/pl1"
 ];
 

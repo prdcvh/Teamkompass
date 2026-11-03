@@ -18,6 +18,12 @@ Bewertungen, interne Notizen, Förderpläne, Abwesenheiten, Messwerte, Gegner, A
 Mitgliedschaften, Einladungen), inklusive der Listenabfragen mit `playerId`-Filter. Seit SCRUM-234 auch der gezielte Abruf eines noch **nicht vorhandenen** Bewertungsdokuments
 (eigenes erlaubt, fremdes nicht; Scout, Medizin, abgelaufene Zugänge weiter gesperrt).
 
+`grade-release.test.mjs`: Noten erst nach „Bewertung veröffentlichen“ (SCRUM-115) – Spieler und Eltern lesen die
+Werte-Kopie `events/{e}/ratingValues/{p}` immer, die Noten-Kopie `events/{e}/ratingGrades/{p}` nur bei gültiger Freigabe
+`gradeReleases/{p}` und nur für Noten, die bis zum Klick vergeben wurden (`ratedAt <= publishedUntil`); abgelaufene
+oder zurückgenommene Freigaben, fremde Spieler, Medizin, Scout und abgelaufene Zugänge sehen nichts; die vollständige
+Bewertung mit Kommentar liest nur der Trainer; Freigaben schreibt nur der Trainer (Server-Zeit, eigenes Konto).
+
 `invite-claim.test.mjs`: Einmalverbrauch von Einladungscodes (SCRUM-77) – gültiger Erst-Claim, zweiter Claim,
 fehlender/abgelaufener Code, falscher Spieler/Rolle, parallele Claims und die unveränderten Trainer-Wege.
 

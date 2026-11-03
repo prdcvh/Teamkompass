@@ -1,7 +1,7 @@
 rules_version = '2';
 
 // Datenmodell:
-// - teams/{teamId}/{meta,members,invites,players,events,opponents,scoutProfiles,playerStats,notifications}
+// - teams/{teamId}/{meta,members,invites,players,events,opponents,scoutProfiles,playerStats,gradeReleases,notifications}
 // - clubs/{clubId}/admins und clubInvites/{code} fuer Vereine und Registrierung (siehe unten)
 // Siehe README/FIREBASE_SETUP.md fuer den Hintergrund. Kernidee:
 // - "teams/{teamId}/members/{uid}" verknuepft eine angemeldete Firebase-Auth-Identitaet mit einer
@@ -9,9 +9,10 @@ rules_version = '2';
 //   - "trainer": darf im Team alles lesen/schreiben (Spieler, Termine, Bewertungen, Gegner, Aufstellung,
 //     Planung, Zugaenge und Einladungen). Mehrere Trainer-Konten (auch Co-Trainer) haben dieselbe Rolle.
 //   - "player" (Spieler) und "parent" (Eltern): sehen nur den eigenen Spieler (Profil, Foerderplan,
-//     Bewertungen, Abwesenheiten, Messwerte, eigene Zu-/Absagen), nie die Daten anderer Spieler. Dazu
-//     lesen sie Termine und die Pausen/die MVP-Rangliste des Teams. Nur der Spieler (nicht die Eltern)
-//     darf seine Selbsteinschaetzung im Foerderplan schreiben.
+//     Werte der Bewertungen, Abwesenheiten, Messwerte, eigene Zu-/Absagen), nie die Daten anderer Spieler. Dazu
+//     lesen sie Termine und die Pausen/die MVP-Rangliste des Teams. Noten nur nach "Bewertung veroeffentlichen",
+//     Kommentare der Bewertung nie (SCRUM-115, siehe events/*/ratingValues und ratingGrades). Nur der Spieler
+//     (nicht die Eltern) darf seine Selbsteinschaetzung im Foerderplan schreiben.
 //   - "physio" (Medizin-Zugang): liest Spielerliste, Status, Abwesenheiten/Verletzungen, Messwerte und
 //     Termine, keine Noten.
 //   - "scout" (Scout-Zugang): liest nur die bereinigte Scout-Sicht (scoutProfiles), keine
@@ -614,30 +615,49 @@ service cloud.firestore {
         allow read: if readsEvents();
         allow write: if isTrainer();
 
+        // Bewertung (SCRUM-115): Das vollstaendige Dokument (Anwesenheit, Teilnoten, Minuten, Tore, Vorlagen und der
+        // Kommentar "note") liest und schreibt nur noch der Trainer. Spieler und Eltern lesen stattdessen zwei Kopien,
+        // die der Trainer-Client im selben Schreibvorgang mitschreibt (Firestore sperrt nur ganze Dokumente):
+        // - ratingValues/{playerId}: nur die Werte (Anwesenheit, Minuten, Tore, Vorlagen) - immer lesbar;
+        // - ratingGrades/{playerId}: nur die Noten (Teilnoten, Gesamtnote, Skala) mit dem Zeitpunkt ratedAt - lesbar nur,
+        //   solange eine Freigabe gradeReleases/{playerId} gilt und die Note vor dem Klick auf "Bewertung
+        //   veroeffentlichen" vergeben wurde (ratedAt <= publishedUntil).
+        // Der Kommentar steht in keiner Kopie: Spieler und Eltern sehen ihn nie. selfReportAllowed() (unten) liest die
+        // Anwesenheit weiter per get() aus ratings/{playerId}; das ist von diesen Leseregeln unabhaengig.
         match /ratings/{playerId} {
-          // ".get('playerId', null)" statt direktem Feldzugriff - gleiche Absicherung wie
-          // bei isExpired(): ein Trainer-Dokument hat kein "playerId"-Feld, direkter
-          // Zugriff wuerde die Regelauswertung in diesem (eigentlich schon durch
-          // isTrainer() abgedeckten) Fall unnoetig riskant machen.
-          //
-          // SCRUM-234: Einzelabruf (get) und Liste (list) getrennt. "Mein Profil" holt fuer JEDEN Termin gezielt
-          // ratings/{eigene playerId} - auch fuer Termine ohne Bewertung (z. B. zukuenftige). Dann gibt es das
-          // Dokument nicht, "resource" ist null und eine Pruefung auf resource.data schlaegt fehl
-          // (permission-denied, das ganze Profil lud nicht). Beim get entscheidet deshalb das Pfadsegment
-          // (Dokument-ID = playerId, so schreibt der Trainer-Client jede Bewertung): Spieler/Eltern lesen nur
-          // ratings/{eigene playerId}, vorhanden oder nicht. Zusaetzlich muss ein vorhandenes Dokument zur
-          // eigenen playerId passen (bzw. kein playerId-Feld haben), damit ein abweichendes Feld nie etwas
-          // Fremdes freigibt. Listen (where("playerId", "==", ...)) pruefen weiter das Datenfeld, weil Firestore
-          // Listenabfragen nur ueber Datenfelder zulassen kann. Scout, Medizin und abgelaufene Zugaenge sind
-          // ueber isPlayerFor()/isTeamMember() weiter ausgeschlossen.
-          allow get: if isTrainer() || (isPlayerFor(playerId) && (resource == null || resource.data.get('playerId', playerId) == playerId));
-          allow list: if isTrainer() || (isTeamMember() && memberDoc().data.role in ["player", "parent"] && resource.data.playerId == memberDoc().data.get('playerId', null));
-          allow write: if isTrainer();
+          allow read, write: if isTrainer();
         }
 
-        // Interne Trainer-Notizen zu einer Bewertung. Bewusst ein eigener Pfad: das
-        // Bewertungsdokument darf der Spieler/das Elternteil komplett lesen, dieser Pfad
-        // nie (kein Eintrag fuer player/parent/physio/scout).
+        // Werte-Kopie. Gezielter Abruf durch Spieler/Eltern wie bisher bei ratings (SCRUM-234): auch fuer Termine ohne
+        // Bewertung (resource == null), ein vorhandenes Dokument muss zur eigenen playerId passen. Keine Listen.
+        match /ratingValues/{playerId} {
+          allow get: if isTrainer() || (isPlayerFor(playerId) && (resource == null || resource.data.get('playerId', null) == playerId));
+          allow list: if isTrainer();
+          allow create, update: if isTrainer()
+            && request.resource.data.keys().hasOnly(['playerId', 'attendance', 'minutes', 'goals', 'assists'])
+            && request.resource.data.playerId == playerId;
+          allow delete: if isTrainer();
+        }
+
+        // Noten-Kopie. ratedAt ist der Server-Zeitpunkt des Schreibens - der Client schreibt die Kopie nur, wenn sich
+        // die Noten aendern, damit eine spaetere Aenderung von Minuten/Toren veroeffentlichte Noten nicht verbirgt.
+        match /ratingGrades/{playerId} {
+          allow get: if isTrainer()
+            || (isPlayerFor(playerId) && gradesReleased(playerId)
+              && (resource == null
+                || (resource.data.get('playerId', null) == playerId
+                  && resource.data.get('ratedAt', null) is timestamp
+                  && resource.data.ratedAt <= get(gradeReleasePath(playerId)).data.publishedUntil)));
+          allow list: if isTrainer();
+          allow create, update: if isTrainer()
+            && request.resource.data.keys().hasOnly(['playerId', 'grade', 'effort', 'technique', 'tactics', 'comprehension', 'scale', 'ratedAt'])
+            && request.resource.data.playerId == playerId
+            && request.resource.data.ratedAt == request.time;
+          allow delete: if isTrainer();
+        }
+
+        // Interne Trainer-Notizen zu einer Bewertung. Bewusst ein eigener Pfad, den Spieler, Eltern, Medizin und
+        // Scouts nie lesen (kein Eintrag fuer player/parent/physio/scout).
         match /privateNotes/{playerId} {
           allow read, write: if isTrainer();
         }
@@ -678,6 +698,43 @@ service cloud.firestore {
         }
       }
 
+      // ---------------------------------------------------------------------------------------------
+      // Freigabe der Noten je Spieler (SCRUM-115): "Bewertung veroeffentlichen" im Spielerprofil. Dokument-ID = playerId.
+      // publishedUntil = Zeitpunkt des Klicks (Server-Zeit): freigegeben sind nur Noten, die bis dahin vergeben wurden.
+      // expiresAt = Ende der Freigabe (null = unbefristet), Dauer waehlt der Trainer wie bei Einladungscodes.
+      // Zuruecknehmen = Dokument loeschen. Spieler und Eltern lesen die eigene Freigabe (gezielter Abruf); Schreiben
+      // nur der Trainer. Ohne Freigabe (auch: nach dem Ablauf) sieht der Spieler keine Noten - es gibt keine
+      // automatische Freigabe (PO, 02.11.2026).
+      // ---------------------------------------------------------------------------------------------
+      function gradeReleasePath(playerId) {
+        return /databases/$(database)/documents/teams/$(teamId)/gradeReleases/$(playerId);
+      }
+
+      function gradesReleased(playerId) {
+        return exists(gradeReleasePath(playerId))
+          && get(gradeReleasePath(playerId)).data.get('publishedUntil', null) is timestamp
+          && (get(gradeReleasePath(playerId)).data.get('expiresAt', null) == null
+            || get(gradeReleasePath(playerId)).data.get('expiresAt', null) > request.time);
+      }
+
+      match /gradeReleases/{playerId} {
+        allow get: if isTrainer() || isPlayerFor(playerId);
+        allow list: if isTrainer();
+        allow create, update: if isTrainer()
+          && request.resource.data.keys().hasOnly(['playerId', 'publishedUntil', 'expiresAt', 'createdBy'])
+          && request.resource.data.playerId == playerId
+          && request.resource.data.publishedUntil == request.time
+          && request.resource.data.createdBy == request.auth.uid
+          && (request.resource.data.expiresAt == null
+            || (request.resource.data.expiresAt is timestamp && request.resource.data.expiresAt > request.time));
+        allow delete: if isTrainer();
+      }
+
+      // Kennzeichen "Kopien fuer die Spieleransicht sind eingerichtet" (SCRUM-115, Version und Zeitpunkt) - nur Trainer.
+      match /meta/playerView {
+        allow read, write: if isTrainer();
+      }
+
       // Scout-Sicht (SCRUM-170): je Spieler ein Dokument, das ausschliesslich der Trainer-Client schreibt
       // (scout-profile.ts in angular/src/app/core/scout/). Enthaelt Name, Nummer,
       // Positionen, Geburtsdatum und je Termin nur Datum/Art/Titel/Gegner/Ergebnis, Anwesenheit ohne Grund,
@@ -709,7 +766,7 @@ service cloud.firestore {
       // Zusammenfassung je Spieler (SCRUM-201, nur Angular): je Event Anwesenheit, Teilnoten, Minuten, Tore und
       // Vorlagen - dieselben Werte wie in den Bewertungen, ohne Rueckmeldung und interne Notizen. Der Trainer-Client
       // schreibt sie im selben Schreibvorgang wie jede Bewertung mit. Nur Trainer lesen und schreiben; Spieler, Eltern,
-      // Medizin und Scouts haben keinen Zugriff (Spieler lesen ihre eigenen Bewertungen weiter direkt).
+      // Medizin und Scouts haben keinen Zugriff (Spieler lesen ratingValues/ratingGrades, SCRUM-115).
       // hasOnly/Typen sichern das Format ab, damit kein weiteres Feld (z.B. Notizen) hineinrutscht.
       match /playerStats/{playerId} {
         allow read: if isTrainer();
