@@ -57,6 +57,7 @@
   } @else {
     @if (player(); as p) {
       <tk-rsvp-panel />
+      <tk-self-report-panel [player]="p" />
       @if (!picks()) {
         <app-home-ranking [mobile]="mobile()" />
       }
@@ -170,6 +171,8 @@
       }
 
       @if (!scout()) {
+        <!-- Anstrengung und Befinden (SCRUM-138): Spieler/Eltern die eigenen Angaben, Medizin mit Trainerwert und Hinweisen. -->
+        <tk-self-report-history [compare]="physio()" [heading]="historyHeading()" />
         <tk-profile-extras [editable]="false" [showPlans]="!physio()" [healthHidden]="!!p.healthHidden" />
       }
     }

@@ -14,6 +14,7 @@ import { RankingApi } from '../firebase/ranking.api';
 import { RatingsApi } from '../firebase/ratings.api';
 import { RsvpApi } from '../firebase/rsvp.api';
 import { ScoutApi } from '../firebase/scout.api';
+import { SelfReportsApi } from '../firebase/self-reports.api';
 import { TeamSettingsApi } from '../firebase/team-settings.api';
 import { TeamsApi } from '../firebase/teams.api';
 import { RegistrationApi } from '../firebase/registration.api';
@@ -36,6 +37,7 @@ import { FakeRankingApi } from './fake-ranking.api';
 import { FakeRatingsApi } from './fake-ratings.api';
 import { FakeRsvpApi } from './fake-rsvp.api';
 import { FakeScoutApi } from './fake-scout.api';
+import { FakeSelfReportsApi } from './fake-self-reports.api';
 import { FakeTeamSettingsApi } from './fake-team-settings.api';
 
 /**
@@ -59,6 +61,7 @@ export class FakeFirebase {
   readonly notifications = new FakeNotificationsApi(this.calls);
   readonly planning =new FakePlanningApi(this.calls);
   readonly scout = new FakeScoutApi(this.calls);
+  readonly selfReports = new FakeSelfReportsApi(this.calls);
   readonly playerStats = new FakePlayerStatsApi(this.calls, this.events, this.ratings);
   readonly teams = new FakeTeamsApi();
   readonly registration = new FakeRegistrationApi(this.auth);
@@ -88,6 +91,7 @@ export function provideFakeFirebase(fake: FakeFirebase): Provider[] {
     { provide: NotificationsApi, useValue: fake.notifications },
     { provide: PlanningApi, useValue: fake.planning },
     { provide: ScoutApi, useValue: fake.scout },
+    { provide: SelfReportsApi, useValue: fake.selfReports },
     { provide: PlayerStatsApi, useValue: fake.playerStats },
     { provide: TeamsApi, useValue: fake.teams },
     { provide: RegistrationApi, useValue: fake.registration },

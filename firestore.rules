@@ -538,6 +538,74 @@ service cloud.firestore {
           allow create, update: if isTrainer() && mayStoreHealth(playerId);
           allow delete: if isTrainer();
         }
+
+        // -----------------------------------------------------------------------------------------
+        // Angaben des Spielers nach einem Termin (SCRUM-138, PO-Entscheidung 02.11.2026). Dokument-ID = Event-ID.
+        // - selfReports: Anstrengung 0-10 (kein Gesundheitsdatum, wird ohne Einwilligung abgefragt).
+        // - wellness: Befinden (Muedigkeit, Schlaf, Muskelkater, Stress, je 1-7 oder leer) - ein Gesundheitsdatum.
+        //   Speichern nur bei dokumentierter Einwilligung (consentStatus "granted", SCRUM-173 (a) Option 2). Bei
+        //   widerrufener Einwilligung lesen es Medizin, Spieler und Eltern nicht mehr; der Trainer sieht es weiter
+        //   und loescht von Hand (geloescht wird nie automatisch).
+        // Lesen: Trainer (alle Trainer-Konten = Trainerteam), Medizin und der eigene Spieler bzw. die eigenen Eltern.
+        // Der Spieler steht im Pfad, deshalb sind auch Listen des eigenen Spielers ohne Filter erlaubt; fremde nie.
+        // Schreiben: nur der eigene Spieler bzw. die eigenen Eltern, nur fuer ein bestehendes Event, bei dem der
+        // Trainer ihn als "anwesend" oder "eingeschraenkt" eingetragen hat, nur bis zum Ende des Folgetags und nur
+        // mit genau diesen Feldern (Datum = Datum des Events, Rolle = eigene Rolle, Zeitpunkt vom Server).
+        // Die Frist prueft der Server grob in UTC (Termintag 00:00 Berliner Zeit bis Ende des Folgetags, bis zu einer
+        // Stunde Spielraum durch die Sommerzeit); genau (ab Ende des Termins) prueft es die App.
+        // Loeschen: nur der Trainer (Spieler loeschen, Daten pruefen und loeschen). Scouts haben keinen Zugriff.
+        // -----------------------------------------------------------------------------------------
+        match /selfReports/{eventId} {
+          allow read: if isTrainer() || isPhysio() || isPlayerFor(playerId);
+          allow create, update: if isPlayerFor(playerId)
+            && selfReportAllowed(playerId, eventId)
+            && request.resource.data.keys().hasOnly(['playerId', 'eventId', 'date', 'exertion', 'by', 'updatedAt'])
+            && request.resource.data.exertion is int
+            && request.resource.data.exertion >= 0
+            && request.resource.data.exertion <= 10;
+          allow delete: if isTrainer();
+        }
+
+        match /wellness/{eventId} {
+          allow read: if isTrainer()
+            || ((isPhysio() || isPlayerFor(playerId))
+              && get(/databases/$(database)/documents/teams/$(teamId)/players/$(playerId)).data.get('consentStatus', 'pending') != 'revoked');
+          allow create, update: if isPlayerFor(playerId)
+            && get(/databases/$(database)/documents/teams/$(teamId)/players/$(playerId)).data.get('consentStatus', 'pending') == 'granted'
+            && selfReportAllowed(playerId, eventId)
+            && request.resource.data.keys().hasOnly(['playerId', 'eventId', 'date', 'fatigue', 'sleep', 'soreness', 'stress', 'by', 'updatedAt'])
+            && wellnessValue(request.resource.data.get('fatigue', null))
+            && wellnessValue(request.resource.data.get('sleep', null))
+            && wellnessValue(request.resource.data.get('soreness', null))
+            && wellnessValue(request.resource.data.get('stress', null));
+          allow delete: if isTrainer();
+        }
+      }
+
+      // Gemeinsame Pruefungen fuer selfReports und wellness (SCRUM-138, siehe oben).
+      function selfReportAllowed(playerId, eventId) {
+        return exists(/databases/$(database)/documents/teams/$(teamId)/events/$(eventId))
+          && exists(/databases/$(database)/documents/teams/$(teamId)/events/$(eventId)/ratings/$(playerId))
+          && get(/databases/$(database)/documents/teams/$(teamId)/events/$(eventId)/ratings/$(playerId)).data.get('attendance', '') in ['present', 'limited']
+          && request.resource.data.playerId == playerId
+          && request.resource.data.eventId == eventId
+          && request.resource.data.by == memberDoc().data.role
+          && request.resource.data.updatedAt == request.time
+          && request.resource.data.date == get(/databases/$(database)/documents/teams/$(teamId)/events/$(eventId)).data.get('date', null)
+          && reportWindowOpen(request.resource.data.date);
+      }
+
+      // Termintag "JJJJ-MM-TT": offen ab 00:00 Berliner Zeit (= Vortag 22:00 UTC im Sommer) bis Ende des Folgetags
+      // (spaetestens 23:00 UTC des Folgetags = 00:00 bzw. 01:00 Berliner Zeit).
+      function reportWindowOpen(date) {
+        return date is string
+          && date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+          && request.time >= timestamp.date(int(date.split('-')[0]), int(date.split('-')[1]), int(date.split('-')[2])) - duration.value(2, 'h')
+          && request.time < timestamp.date(int(date.split('-')[0]), int(date.split('-')[1]), int(date.split('-')[2])) + duration.value(47, 'h');
+      }
+
+      function wellnessValue(value) {
+        return value == null || (value is int && value >= 1 && value <= 7);
       }
 
       match /events/{eventId} {

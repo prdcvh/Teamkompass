@@ -62,6 +62,17 @@ function seed(): FakeFirebase {
   // Zu-/Absagen (SCRUM-205) zum Training morgen: eine Absage der Eltern mit langem Grund, eine Zusage.
   fake.rsvp.set('e4', 'p2', { playerId: 'p2', status: 'no', reason: 'Familienfeier bei den Großeltern in Norddeutschland, wir sind erst Sonntag zurück', by: 'parent' });
   fake.rsvp.set('e4', 'p3', { playerId: 'p3', status: 'yes', reason: '', by: 'player' });
+  // Anstrengung und Befinden (SCRUM-138): Spieler p1 (Einwilligung dokumentiert) war gestern beim Training – die Frage ist
+  // offen; zu drei früheren Terminen gibt es schon Angaben (eine deutlich härter als der Trainerwert).
+  fake.players.players.set('p1', { ...fake.players.players.get('p1'), consentStatus: 'granted' });
+  const yesterday = new Date(Date.now() - 24 * 3600 * 1000);
+  const yesterdayIso = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+  fake.events.events.set('gestern', { type: 'Training', title: 'Training gestern', date: yesterdayIso, exertion: 4, location: 'Kunstrasen - heim', startTime: '17:30', durationMinutes: 90 });
+  fake.ratings.ratings.set('gestern', new Map([['p1', { attendance: 'present', playerId: 'p1' }]]));
+  for (const [eventId, date, exertion, wellness] of [['e1', '2026-10-13', 7, [4, 3, 3, 4]], ['e2', '2026-10-10', 9, [5, 5, 3, 4]], ['serie-s1-2026-10-27', '2026-10-27', 6, [6, 5, 6, 5]]] as const) {
+    fake.selfReports.set('p1', 'selfReports', eventId, { playerId: 'p1', eventId, date, exertion, by: 'player', updatedAt: null });
+    fake.selfReports.set('p1', 'wellness', eventId, { playerId: 'p1', eventId, date, fatigue: wellness[0], sleep: wellness[1], soreness: wellness[2], stress: wellness[3], by: 'player', updatedAt: null });
+  }
   const ratings = new Map<string, Record<string, unknown>>();
   const attendances = ['present', 'absent', 'excused', 'late'];
   names.forEach((_, i) => ratings.set(`p${i + 1}`, { attendance: attendances[i % 4], effort: 2, technique: 3, tactics: 2, comprehension: 4, grade: 2.8, note: 'Gute Einstellung im Training, weiter so', playerId: `p${i + 1}` }));

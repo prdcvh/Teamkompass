@@ -163,6 +163,9 @@
         </details>
       }
 
+      <!-- Anstrengung (Trainer/Spieler je Termin) und Befinden des Spielers (SCRUM-138). -->
+      <tk-self-report-history [compare]="true" heading="Anstrengung und Befinden" />
+
       <details class="fold history-fold">
       <summary><h2 class="section-title">Eventhistorie · {{ history().length }}</h2></summary>
       <tk-card>

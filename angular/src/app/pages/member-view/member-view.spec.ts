@@ -99,7 +99,9 @@ describe('MemberView (Ansicht für Spieler, Eltern und Medizin)', () => {
       expect(text(fixture)).not.toContain('GEHEIME');
       expect(text(fixture)).not.toContain('Interne Planung');
       expect(text(fixture)).not.toContain('Belastungsindikator');
-      expect(text(fixture)).not.toContain('Schnitt der 3 Wochen davor');
+      // SCRUM-138: Der Spieler sieht seine eigene Wochenbelastung, aber nicht die Ampel des Trainers (Stufe, Gründe).
+      expect(text(fixture, '.sr-week')).toContain('Schnitt der 3 Wochen davor');
+      for (const tier of ['Unauffällig', 'Beobachten', 'Anpassen', 'Keine auffälligen Belastungsfaktoren']) expect(text(fixture)).not.toContain(tier);
     });
 
     it('liest nur das eigene Dokument und eigene Daten, nie Kader, Notizen, Gegner oder Aufstellung', async () => {
