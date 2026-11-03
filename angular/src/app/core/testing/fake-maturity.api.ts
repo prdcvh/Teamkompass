@@ -1,7 +1,10 @@
 import type { MaturityApi } from '../firebase/maturity.api';
 import type { SnapshotMeta } from '../firebase/types';
 
-type Listener = { onData: (data: Readonly<Record<string, unknown>> | null, meta: SnapshotMeta) => void; onError: (error: unknown) => void };
+interface Listener {
+  readonly onData: (data: Readonly<Record<string, unknown>> | null, meta: SnapshotMeta) => void;
+  readonly onError: (error: unknown) => void;
+}
 
 /** Ersatz für {@link MaturityApi} in Tests: Dokument `maturity/parents` je Spieler. */
 export class FakeMaturityApi implements Pick<MaturityApi, keyof MaturityApi> {
