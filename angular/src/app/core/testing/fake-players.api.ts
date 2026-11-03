@@ -14,11 +14,16 @@ export class FakePlayersApi implements Pick<PlayersApi, keyof PlayersApi> {
   private playersListener: ((docs: RawDoc[], meta: SnapshotMeta) => void) | null = null;
   private playersErrorListener: ((error: unknown) => void) | null = null;
 
+  /** Optionen des letzten watchPlayers-Aufrufs (Medizin filtert widerrufene Einwilligungen heraus). */
+  lastWatchOptions: { readonly withoutRevokedConsent?: boolean } = {};
+
   async watchPlayers(
     onData: (docs: RawDoc[], meta: SnapshotMeta) => void,
     onError: (error: unknown) => void,
+    options: { readonly withoutRevokedConsent?: boolean } = {},
   ): Promise<() => void> {
     this.calls.push('watchPlayers');
+    this.lastWatchOptions = options;
     if (this.watchPlayersError) throw this.watchPlayersError;
     this.playerWatchers += 1;
     this.playersListener = onData;
@@ -35,7 +40,10 @@ export class FakePlayersApi implements Pick<PlayersApi, keyof PlayersApi> {
   emitPlayers(meta: SnapshotMeta = this.playersMeta): void {
     this.playersMeta = meta;
     this.playersListener?.(
-      [...this.players].map(([id, data]) => ({ id, data })),
+      [...this.players]
+        // Wie die Firestore-Abfrage where('consentStatus', '!=', 'revoked'): ohne Feld oder widerrufen → nicht dabei.
+        .filter(([, data]) => !this.lastWatchOptions.withoutRevokedConsent || (typeof data['consentStatus'] === 'string' && data['consentStatus'] !== 'revoked'))
+        .map(([id, data]) => ({ id, data })),
       meta,
     );
   }
@@ -77,5 +85,52 @@ export class FakePlayersApi implements Pick<PlayersApi, keyof PlayersApi> {
     }
     onData(this.players.get(playerId) ?? null, { fromCache: false, hasPendingWrites: false });
     return () => undefined;
+  }
+
+  // --- Bereinigte Karten (SCRUM-245) ---
+  cards = new Map<string, Record<string, unknown>>();
+  private cardsListener: ((docs: RawDoc[]) => void) | null = null;
+  private cardListeners = new Map<string, (data: Readonly<Record<string, unknown>> | null, meta: SnapshotMeta) => void>();
+
+  async watchPlayerCard(
+    playerId: string,
+    onData: (data: Readonly<Record<string, unknown>> | null, meta: SnapshotMeta) => void,
+    onError: (error: unknown) => void,
+  ): Promise<() => void> {
+    this.calls.push(`watchPlayerCard:${playerId}`);
+    if (this.readablePlayerCards && !this.readablePlayerCards.has(playerId)) {
+      onError({ code: 'permission-denied' });
+      return () => undefined;
+    }
+    this.cardListeners.set(playerId, onData);
+    onData(this.cards.get(playerId) ?? null, { fromCache: false, hasPendingWrites: false });
+    return () => this.cardListeners.delete(playerId);
+  }
+
+  /** Karten, die gelesen werden dürfen; `null` = alle. */
+  readablePlayerCards: Set<string> | null = null;
+
+  async watchPlayerCards(onData: (docs: RawDoc[]) => void, onError: (error: unknown) => void): Promise<() => void> {
+    void onError;
+    this.calls.push('watchPlayerCards');
+    this.cardsListener = onData;
+    this.emitCards();
+    return () => {
+      this.cardsListener = null;
+    };
+  }
+
+  async applyPlayerCards(changes: ReadonlyMap<string, Readonly<Record<string, unknown>> | null>): Promise<void> {
+    this.calls.push(`applyPlayerCards:${[...changes.keys()].join(',')}`);
+    for (const [id, data] of changes) {
+      if (data) this.cards.set(id, { ...data });
+      else this.cards.delete(id);
+      this.cardListeners.get(id)?.(data, { fromCache: false, hasPendingWrites: false });
+    }
+    this.emitCards();
+  }
+
+  private emitCards(): void {
+    this.cardsListener?.([...this.cards].map(([id, data]) => ({ id, data })));
   }
 }

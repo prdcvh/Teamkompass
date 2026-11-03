@@ -4,6 +4,7 @@ import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
 import { LayoutService } from '../../../core/shell/layout.service';
 import { SessionService } from '../../../core/auth/session.service';
+import { CurrentTeam } from '../../../core/team/current-team.service';
 import { FakeFirebase, provideFakeFirebase } from '../../../core/testing/fake-firebase';
 import { Profile } from '../profile';
 
@@ -17,7 +18,9 @@ export const q = <T extends Element>(fixture: { nativeElement: unknown }, select
 export const qa = <T extends Element>(fixture: { nativeElement: unknown }, selector: string) => [...root(fixture).querySelectorAll<T>(selector)];
 export const text = (element: Element | null | undefined) => element?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
 
-export async function renderProfile(options: { mobile?: boolean; id?: string; withData?: boolean; consent?: string } = {}) {
+export async function renderProfile(
+  options: { mobile?: boolean; id?: string; withData?: boolean; consent?: string; team?: string; fragment?: string; setup?: (firebase: FakeFirebase) => void } = {},
+) {
   const { mobile = false, id = '', withData = true, consent } = options;
   isMobile.set(mobile);
   const firebase = new FakeFirebase();
@@ -31,16 +34,20 @@ export async function renderProfile(options: { mobile?: boolean; id?: string; wi
     firebase.ratings.ratings.set('e2', new Map([['p1', grades(1, { note: 'Starkes Spiel', minutes: 80, goals: 2, assists: 1 })]]));
     firebase.ratings.ratings.set('e3', new Map([['p1', { attendance: 'absent' }]]));
   }
+  options.setup?.(firebase);
   const navigate = vi.fn().mockResolvedValue(true);
   TestBed.configureTestingModule({
     providers: [
       ...provideFakeFirebase(firebase),
       { provide: LayoutService, useValue: { isMobile } },
-      { provide: ActivatedRoute, useValue: { paramMap: new BehaviorSubject(convertToParamMap(id ? { id } : {})) } },
+      { provide: ActivatedRoute, useValue: { paramMap: new BehaviorSubject(convertToParamMap(id ? { id } : {})), fragment: new BehaviorSubject(options.fragment ?? null) } },
       { provide: Router, useValue: { navigate } },
     ],
   });
+  if (options.team) TestBed.inject(CurrentTeam).id.set(options.team);
   TestBed.inject(SessionService).role.set('trainer');
+  TestBed.inject(SessionService).uid.set('uid-trainer');
+  TestBed.inject(SessionService).email.set('trainer@example.test');
   const fixture = TestBed.createComponent(Profile);
   await fixture.whenStable();
   await vi.waitFor(() => {

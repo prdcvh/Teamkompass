@@ -9,6 +9,8 @@ import { RsvpApi } from '../firebase/rsvp.api';
 import type { RawDoc } from '../firebase/types';
 import type { Player } from '../player/player';
 import { SquadService } from '../player/squad.service';
+import { mayGiveReason } from '../player/consent';
+import { CurrentTeam } from '../team/current-team.service';
 import { docFromRating, ratingFromDoc } from '../ratings/rating';
 import { AbsenceSyncService } from '../records/absence-sync.service';
 import { todayIso } from '../shared/dates';
@@ -47,6 +49,7 @@ export class RsvpService {
   private readonly squad = inject(SquadService);
   private readonly absences = inject(AbsenceSyncService);
   private readonly sync = inject(SyncService);
+  private readonly team = inject(CurrentTeam);
 
   /** Rückmeldungen je Event-ID (nur Events, deren erste Antwort schon da ist). */
   readonly responses = signal<ReadonlyMap<string, EventResponses>>(new Map());
@@ -58,6 +61,15 @@ export class RsvpService {
   readonly canAnswer = computed(() => {
     const role = this.session.role();
     return (role === 'player' || role === 'parent') && !!this.session.playerId();
+  });
+
+  /**
+   * Darf bei einer Absage ein Grund angegeben werden (SCRUM-245)? Nicht bei widerrufener Einwilligung und in fremden
+   * Vereinen nur mit dokumentierter Einwilligung – der Grund kann ein Gesundheitsdatum sein. Die Regeln prüfen dasselbe.
+   */
+  readonly reasonAllowed = computed(() => {
+    const own = this.squad.players().find((player) => player.id === this.session.playerId());
+    return mayGiveReason(own ?? null, this.team.id());
   });
 
   private readonly today = signal(todayIso());
@@ -102,7 +114,7 @@ export class RsvpService {
    */
   async answer(eventId: string, status: RsvpAnswer, reason: string): Promise<boolean> {
     const playerId = this.session.playerId();
-    const payload = buildRsvpResponse(playerId, status, reason, this.session.role());
+    const payload = buildRsvpResponse(playerId, status, this.reasonAllowed() ? reason : '', this.session.role());
     if (!payload || !playerId || !this.upcoming().some((event) => event.id === eventId) || this.saving()) return false;
     this.saving.set(eventId);
     this.error.set('');

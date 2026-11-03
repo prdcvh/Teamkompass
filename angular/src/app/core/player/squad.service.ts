@@ -3,7 +3,9 @@ import { AbsenceSyncService } from '../records/absence-sync.service';
 import { authErrorMessage, errorCode } from '../auth/auth-errors';
 import { PlayersApi } from '../firebase/players.api';
 import type { SnapshotMeta } from '../firebase/types';
-import { type Player, type PlayerDraft, type PlayerErrors, playerFromDoc, playerFromDraft, docFromPlayer, validateDraft } from './player';
+import { CurrentTeam } from '../team/current-team.service';
+import { hasHealthFields, healthLockedMessage, requiresDocumentedConsent } from './consent';
+import { type Player, type PlayerDraft, type PlayerErrors, playerFromCard, playerFromDoc, playerFromDraft, docFromPlayer, validateDraft } from './player';
 import { EventsService } from '../events/events.service';
 import { isOpenInjury } from '../records/availability';
 import { todayIso } from '../shared/dates';
@@ -23,12 +25,15 @@ export class SquadService {
   private readonly session = inject(SessionService);
   private readonly sync = inject(SyncService);
   private readonly absences = inject(AbsenceSyncService);
+  private readonly team = inject(CurrentTeam);
   // EventsService hängt selbst vom Kader ab: erst beim Gebrauch holen, sonst gäbe es einen Zirkelbezug.
   private readonly injector = inject(Injector);
 
   readonly players = signal<readonly Player[]>([]);
   readonly load = signal<SquadLoad>('idle');
   readonly error = signal('');
+  /** Trainer: Spielerdokumente ohne Feld `consentStatus` (ältere Daten). Ohne das Feld fehlen sie in der Medizin-Liste (SCRUM-245). */
+  readonly missingConsent = signal<readonly string[]>([]);
   readonly canWrite = computed(() => this.session.role() === 'trainer');
   /** Anlegen/Ändern erst, wenn der ganze Kader da ist – sonst ließe sich die Rückennummern-Prüfung umgehen. */
   readonly canEdit = computed(() => this.canWrite() && this.load() === 'ready');
@@ -72,9 +77,19 @@ export class SquadService {
     const subscription =
       role === 'player' || role === 'parent'
         ? ownId
-          ? this.playersApi.watchPlayerDoc(ownId, (data, meta) => onData(data ? [playerFromDoc(ownId, data)] : [], meta), onError)
+          ? this.watchOwn(ownId, onData, onError)
           : Promise.reject(new Error('Kein Spielerprofil verknüpft'))
-        : this.playersApi.watchPlayers((docs, meta) => onData(docs.map((entry) => playerFromDoc(entry.id, entry.data)), meta), onError);
+        : this.playersApi.watchPlayers(
+            (docs, meta) => {
+              if (role === 'trainer' && generation === this.generation) {
+                this.missingConsent.set(docs.filter((entry) => typeof entry.data['consentStatus'] !== 'string').map((entry) => entry.id));
+              }
+              onData(docs.map((entry) => playerFromDoc(entry.id, entry.data)), meta);
+            },
+            onError,
+            // Medizin sieht Spieler mit widerrufener Einwilligung nicht (SCRUM-245, Regeln: players list).
+            { withoutRevokedConsent: role === 'physio' },
+          );
     subscription
       .then((unsubscribe) => {
         // Wurde inzwischen gestoppt oder ist das Abo schon fehlgeschlagen, wird es sofort wieder beendet.
@@ -86,10 +101,68 @@ export class SquadService {
       });
   }
 
+  /**
+   * Spieler/Eltern: das eigene Spielerdokument. Sperren die Regeln es (widerrufene Einwilligung, SCRUM-245), kommt die
+   * bereinigte Karte ohne Gesundheitsangaben. Verschwindet die Karte wieder (Einwilligung nicht mehr widerrufen), wird
+   * einmal erneut das Spielerdokument versucht.
+   */
+  private async watchOwn(
+    ownId: string,
+    onData: (players: readonly Player[], meta: SnapshotMeta) => void,
+    onError: (error: unknown) => void,
+  ): Promise<() => void> {
+    let stopped = false;
+    let stopDoc: (() => void) | null = null;
+    let stopCard: (() => void) | null = null;
+    let sawCard = false;
+    const openDoc = async (): Promise<void> => {
+      const unsubscribe = await this.playersApi.watchPlayerDoc(ownId, (data, meta) => onData(data ? [playerFromDoc(ownId, data)] : [], meta), (error) => {
+        if (stopped) return;
+        if (errorCode(error) === 'permission-denied' && !stopCard) void openCard(error).catch(onError);
+        else onError(error);
+      });
+      if (stopped) unsubscribe();
+      else stopDoc = unsubscribe;
+    };
+    const openCard = async (denied: unknown): Promise<void> => {
+      sawCard = false;
+      const unsubscribe = await this.playersApi.watchPlayerCard(
+        ownId,
+        (data, meta) => {
+          if (stopped) return;
+          if (data) {
+            sawCard = true;
+            onData([playerFromCard(ownId, data)], meta);
+            return;
+          }
+          // Keine Karte: der Grund der Sperre ist nicht die Einwilligung (oder der Trainer hat noch nicht abgeglichen).
+          if (!sawCard) {
+            onError(denied);
+            return;
+          }
+          // Karte gelöscht: Einwilligung wieder offen/dokumentiert – zurück zum Spielerdokument.
+          stopCard?.();
+          stopCard = null;
+          void openDoc().catch(onError);
+        },
+        onError,
+      );
+      if (stopped) unsubscribe();
+      else stopCard = unsubscribe;
+    };
+    await openDoc();
+    return () => {
+      stopped = true;
+      stopDoc?.();
+      stopCard?.();
+    };
+  }
+
   stop(): void {
     this.generation += 1;
     this.unsubscribe?.();
     this.unsubscribe = null;
+    this.missingConsent.set([]);
     this.players.set([]);
     this.load.set('idle');
     this.error.set('');
@@ -118,13 +191,21 @@ export class SquadService {
   save(draft: PlayerDraft): PlayerErrors {
     if (!this.canWrite()) return { name: 'Nur Trainer dürfen Spieler ändern.' };
     if (this.load() !== 'ready') return { name: 'Der Kader ist noch nicht geladen. Bitte kurz warten und erneut versuchen.' };
-    const errors = validateDraft(draft, this.players());
+    const errors: PlayerErrors = validateDraft(draft, this.players());
+    // Fremde Vereine (SCRUM-245): Gesundheitsangaben nur mit dokumentierter Einwilligung (die Regeln sperren es sonst).
+    if (requiresDocumentedConsent(this.team.id()) && draft.consentStatus !== 'granted' && hasHealthFields({ status: draft.status, injuryUntil: draft.injuryUntil, injuredSince: '' })) {
+      errors.status = healthLockedMessage(draft.name.trim() || 'diesen Spieler');
+    }
     if (Object.keys(errors).length > 0) return errors;
     const id = draft.id ?? `p${crypto.randomUUID()}`;
     const previous = this.players().find((entry) => entry.id === id);
     const now = new Date();
     const today = todayIso(now);
-    const player = playerFromDraft(draft, id, previous ?? null, now);
+    let player = playerFromDraft(draft, id, previous ?? null, now);
+    // Neu „dokumentiert“: Datum (falls leer) und wer es eingetragen hat festhalten (die Regeln verlangen die eigene UID).
+    if (player.consentStatus === 'granted' && previous?.consentStatus !== 'granted') {
+      player = { ...player, consentDate: player.consentDate || today, consentBy: this.session.email() ?? '', consentByUid: this.session.uid() ?? '' };
+    }
     if (!this.sync.isFailed()) this.sync.state.set('syncing');
     void this.playersApi
       .savePlayer(id, docFromPlayer(player))

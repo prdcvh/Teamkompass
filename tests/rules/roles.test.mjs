@@ -6,7 +6,8 @@ import { readFileSync } from "node:fs";
 import { initializeTestEnvironment, assertFails, assertSucceeds } from "@firebase/rules-unit-testing";
 import { collection, doc, getDoc, getDocs, query, setDoc, deleteDoc, updateDoc, where, Timestamp } from "firebase/firestore";
 
-const TEAM = "TESTTEAM";
+// Eigenes Team (SCRUM-245): hier gilt die Einwilligungs-Sperre fremder Vereine nicht - die Rollen-Matrix bleibt unveraendert.
+const TEAM = "U14";
 const t = (path) => `teams/${TEAM}/${path}`;
 let env;
 
@@ -41,7 +42,7 @@ beforeEach(async () => {
     };
     for (const [uid, data] of Object.entries(members)) await setDoc(doc(db, t(`members/${uid}`)), data);
     for (const id of ["p1", "p2"]) {
-      await setDoc(doc(db, t(`players/${id}`)), { name: id });
+      await setDoc(doc(db, t(`players/${id}`)), { name: id, consentStatus: "pending" });
       await setDoc(doc(db, t(`players/${id}/developmentPlans/f1`)), { playerId: id, focus: "x", selfReflection: "", selfReflectionAt: "" });
       await setDoc(doc(db, t(`players/${id}/absences/a1`)), { playerId: id, label: "Urlaub" });
       await setDoc(doc(db, t(`players/${id}/measurements/m1`)), { playerId: id, value: 1 });
@@ -87,7 +88,9 @@ test("Medizin: Spieler, Abwesenheiten und Messwerte lesbar; keine Noten, Notizen
   for (const path of ["players/p1", "players/p2", "players/p1/absences/a1", "players/p2/measurements/m1", "events/e1"]) await canRead("medic", path);
   for (const path of ["events/e1/ratings/p1", "events/e1/privateNotes/p1", "players/p1/developmentPlans/f1", "scoutProfiles/p1", "opponents/o1", "meta/lineup", "meta/settings", "meta/planning"]) await cannotRead("medic", path);
   // So laedt die Medizin-Ansicht: ganze Spielerliste, Abwesenheiten und Messwerte je Spieler.
-  await assertSucceeds(getDocs(collection(as("medic"), t("players"))));
+  // SCRUM-245: Die Liste nur mit Filter auf nicht widerrufene Einwilligung (ohne Filter abgelehnt).
+  await assertSucceeds(getDocs(query(collection(as("medic"), t("players")), where("consentStatus", "!=", "revoked"))));
+  await assertFails(getDocs(collection(as("medic"), t("players"))));
   await assertSucceeds(getDocs(collection(as("medic"), t("players/p2/absences"))));
   await assertSucceeds(getDocs(collection(as("medic"), t("players/p2/measurements"))));
   await assertFails(getDocs(collection(as("medic"), t("events/e1/ratings"))));

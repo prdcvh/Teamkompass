@@ -268,7 +268,7 @@ export class Export implements OnInit, OnDestroy {
     this.importError.set('');
     this.importDone.set('');
     try {
-      await this.backupApi.writeAll(backupOperations(pending.backup));
+      await this.backupApi.writeAll(backupOperations(pending.backup, this.session.uid()));
       // Die Sicherung schreibt Bewertungen direkt: eingerichtete Zusammenfassungen danach neu berechnen (SCRUM-201).
       const statsOk = this.stats.state() !== 'on' || (await this.stats.rebuild())?.differences.length === 0;
       this.workspace.record(`Sicherung eingespielt (${pending.fileName})`);

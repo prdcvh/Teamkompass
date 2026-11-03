@@ -53,3 +53,11 @@ Skript `scripts/create-club-invite.mjs` (Logik `scripts/club-invite-lib.mjs`) er
 `knowledge.test.mjs`: Wissen (SCRUM-106) liegt als Map `knowledge.{id}` im Trainer-Dokument `meta/settings` – nur Trainer lesen und
 schreiben, Spieler, Eltern, Medizin, Scout, abgelaufene Trainer und Fremde nicht; und der Befund, dass eine neue Unter-Sammlung
 unter `teams/{teamId}` ohne Regeländerung für alle gesperrt wäre.
+
+`consent.test.mjs`: Einwilligung für Gesundheitsdaten (SCRUM-245) – bei „widerrufen“ lesen Spieler, Eltern und Medizin weder
+Spielerdokument (Status, „verletzt bis/seit“) noch Abwesenheiten, Messwerte oder Absagegründe (der Trainer schon; Noten
+und Förderplan bleiben lesbar); Medizin listet nur mit Filter `consentStatus != revoked`; bereinigte Spielerkarte
+`playerCards/{playerId}` (nur eigener Spieler/Eltern lesen, nur Trainer schreibt, keine Gesundheitsfelder). Eigene Teams
+(`mein-team`, `U14`, `U15`, `U17`) bei „offen“ unverändert; fremde Vereine speichern Gesundheitsdaten (Status außer „Fit“,
+„verletzt bis/seit“, Abwesenheiten, Messwerte, Absagegrund) nur mit dokumentierter Einwilligung. Wer „dokumentiert“ setzt,
+trägt die eigene UID ein (`consentByUid`). `roles.test.mjs` und `rsvp.test.mjs` laufen dafür im eigenen Team `U14`.

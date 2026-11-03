@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
-import { map } from 'rxjs';
+import { map, of } from 'rxjs';
 import { formatDate } from '../../core/events/event';
 import { LayoutService } from '../../core/shell/layout.service';
 import { ageFromBirthdate, todayIso } from '../../core/shared/dates';
@@ -37,11 +37,14 @@ import { Status } from '../../ui/status/status';
 import { LoadCurveCard } from './load-curve-card';
 import { LoadReportAction } from './load-report-action';
 import { ProfileExtras } from './profile-extras';
+import { ConsentPanel } from './consent-panel';
+import { CurrentTeam } from '../../core/team/current-team.service';
+import { healthLockedMessage, mayStoreHealth } from '../../core/player/consent';
 
 /** Spielerprofil (Figma: Profil Desktop/Handy): Kopfbereich, Notenverlauf, Kompetenzprofil, Verfügbarkeit, Statistik, Eventhistorie. */
 @Component({
   selector: 'app-profile',
-  imports: [Button, Card, Status, ProfileExtras, LoadReportAction, LoadCurveCard],
+  imports: [Button, Card, Status, ProfileExtras, LoadReportAction, LoadCurveCard, ConsentPanel],
   templateUrl: './profile.html',
   // Reihenfolge = Kaskade (die Handy-Regeln überschreiben Kopf und Auswertung).
   styleUrls: ['./profile.css', './profile-stats.css', './profile-mobile.css', './profile-risk.css', '../../ui/chart/chart.css'],
@@ -56,9 +59,20 @@ export class Profile implements OnInit {
   private readonly measurements = inject(MeasurementsService);
   protected readonly sync = inject(SyncService);
   private readonly session = inject(SessionService);
+  private readonly team = inject(CurrentTeam);
   /** Bewertungsskala des Teams (SCRUM-188): Schnitte und Verlauf in dieser Skala, jede Bewertung in ihrer eigenen. */
   protected readonly scale = inject(RatingScaleService).scale;
   protected readonly mobile = inject(LayoutService).isMobile;
+
+  /** Einwilligung (SCRUM-245): Abschnitt nur für Trainer; Links mit #einwilligung springen dorthin. */
+  protected readonly trainer = computed(() => this.session.role() === 'trainer');
+  private readonly fragment = toSignal(this.route.fragment ?? of(null), { initialValue: null });
+  private scrolledToConsent = false;
+  /** Fremder Verein ohne dokumentierte Einwilligung: Hinweis statt „+ Eintrag“/„+ Messung“. */
+  protected readonly healthLocked = computed(() => {
+    const player = this.player();
+    return player && !mayStoreHealth(player, this.team.id()) ? healthLockedMessage(player.name) : '';
+  });
 
   private readonly routeId = toSignal(this.route.paramMap.pipe(map((params) => params.get('id') ?? '')), { initialValue: '' });
   /** Gewählter Spieler: aus der Adresse, sonst der erste im Kader (nach Rückennummer). */
@@ -147,6 +161,17 @@ export class Profile implements OnInit {
   ngOnInit(): void {
     this.squad.start();
   }
+
+  /** Einmal zum Abschnitt „Einwilligung“ springen, wenn die Adresse #einwilligung trägt und das Profil steht. */
+  private readonly consentJump = effect(() => {
+    if (this.fragment() !== 'einwilligung' || !this.ready() || !this.trainer() || this.scrolledToConsent) return;
+    this.scrolledToConsent = true;
+    setTimeout(() => {
+      const target = document.getElementById('einwilligung');
+      target?.scrollIntoView?.({ block: 'start' });
+      target?.focus?.({ preventScroll: true });
+    });
+  });
 
   protected formatDate = formatDate;
   protected positionText = positionText;

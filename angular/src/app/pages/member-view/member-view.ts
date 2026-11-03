@@ -158,7 +158,7 @@ export class MemberView implements OnInit {
   /** Belastungsprotokoll (SCRUM-139): nur der Spieler selbst, erst wenn Abwesenheiten und Messwerte geladen sind. */
   protected readonly reportAllowed = computed(() => {
     const player = this.player();
-    return !!player && this.records.ready() && canCreateLoadReport(this.role(), this.session.playerId(), player.id);
+    return !!player && !player.healthHidden && this.records.ready() && canCreateLoadReport(this.role(), this.session.playerId(), player.id);
   });
   protected readonly failed = computed(() =>
     this.scout() ? this.scoutView.load() === 'error' : this.squad.load() === 'error' || (!this.physio() && this.profile.error() !== ''),
@@ -179,7 +179,8 @@ export class MemberView implements OnInit {
         // Medizin darf keine Bewertungen lesen (Regeln: events/*/ratings) – dort wird nichts abonniert.
         if (this.physio()) this.profile.stop();
         else this.profile.start(player.id);
-        this.records.start(player.id);
+        // Widerrufene Einwilligung (SCRUM-245): keine Abwesenheiten und Messwerte abonnieren (die Regeln sperren sie).
+        this.records.start(player.id, { healthHidden: !!player.healthHidden });
       });
     });
   }
