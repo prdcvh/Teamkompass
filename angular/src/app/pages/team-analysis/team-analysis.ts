@@ -56,7 +56,7 @@ export class TeamAnalysis implements OnInit {
   private readonly quarters = computed(() => birthQuarterCounts(this.team.data().map((entry) => entry.player)));
   private readonly coverage = computed(() => positionCoverage(this.team.data().map((entry) => entry.player)));
   protected readonly thin = computed(() => thinPositions(this.coverage()));
-  protected readonly trend = computed(() => teamTrend(this.team.events(), this.team.ratingsByEvent()));
+  protected readonly trend = computed(() => teamTrend(this.team.events(), this.team.ratingsByEvent(), todayIso()));
 
   /** Bewertungsskala des Teams (SCRUM-188). */
   protected readonly scale = inject(RatingScaleService).scale;
@@ -79,7 +79,7 @@ export class TeamAnalysis implements OnInit {
     const focus = this.focus();
     const quarters = this.quarters();
     return [
-      { label: 'Spiele', value: String(stats.games) },
+      { label: 'Spiele', value: stats.gamesPlanned ? `${stats.games} gespielt · ${stats.gamesPlanned} geplant` : String(stats.games) },
       { label: 'Bilanz', value: formatRecord(record) },
       { label: 'Torverhältnis', value: formatGoals(record) },
       { label: 'Ø Teamnote', value: this.gradeLabel(stats.avgGrade) },

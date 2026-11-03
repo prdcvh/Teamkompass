@@ -3,8 +3,9 @@ import { EventsService } from '../../core/events/events.service';
 import { formatDate } from '../../core/events/event';
 import { LayoutService } from '../../core/shell/layout.service';
 import { type Candidate, eligibleCandidates, formationOptions, assignmentsFromPreview, suggestedLineup } from '../../core/lineup/formation-assignment';
-import { type Assignments, benchOf, formationName, lineupGrade, lineupIsEmpty, moveToZone, nextGame, onPitchIds, previousGameWithLineup, removeFromPitch, swapPlayers, zoneOf } from '../../core/lineup/lineup';
-import { PITCH_ZONES, ZONES, type Zone, outOfPosition, MAX_ON_PITCH, FORMATION_PRESETS } from '../../core/lineup/pitch';
+import { type Assignments, benchOf, fitToFormat, formationName, lineupGrade, lineupIsEmpty, moveToZone, nextGame, onPitchIds, previousGameWithLineup, removeFromPitch, swapPlayers, zoneOf, zonesForFormat } from '../../core/lineup/lineup';
+import { PITCH_ZONES, type Zone, outOfPosition } from '../../core/lineup/pitch';
+import { GAME_FORMATS, type GameFormat, ROTATION_HINT, gameFormatInfo, isGameFormat } from '../../core/lineup/game-format';
 import { LineupService } from '../../core/lineup/lineup.service';
 import { todayIso } from '../../core/shared/dates';
 import { positionText } from '../../core/player/player';
@@ -13,6 +14,7 @@ import { RatingScaleService } from '../../core/ratings/rating-scale.service';
 import { effectiveStatus } from '../../core/records/availability';
 import { SessionService } from '../../core/auth/session.service';
 import { SyncService } from '../../core/shell/sync.service';
+import { TeamSettingsService } from '../../core/team-settings/team-settings.service';
 import { TeamService } from '../../core/team/team.service';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
@@ -37,10 +39,13 @@ export class Lineup implements OnInit {
   protected readonly mobile = inject(LayoutService).isMobile;
   private readonly session = inject(SessionService);
   protected readonly isTrainer = computed(() => this.session.role() === 'trainer');
-  protected readonly zones = ZONES;
-  protected readonly max = MAX_ON_PITCH;
+  private readonly settings = inject(TeamSettingsService);
+  protected readonly gameFormats = GAME_FORMATS;
+  protected readonly rotationHint = ROTATION_HINT;
 
-  protected readonly ready = computed(() => this.team.ready() && this.lineup.load() === 'ready' && this.eventsService.load() === 'ready');
+  // Die Teameinstellungen (Spielform) müssen geantwortet haben; scheitert das Laden, gilt 11:11.
+  private readonly settingsSettled = computed(() => this.settings.load() === 'ready' || this.settings.load() === 'error');
+  protected readonly ready = computed(() => this.team.ready() && this.lineup.load() === 'ready' && this.eventsService.load() === 'ready' && this.settingsSettled());
   protected readonly failed = computed(() => this.team.error() || this.lineup.error() || this.eventsService.error());
 
   /** Alle Spiele, neueste zuerst; die Aufstellung lässt sich für jedes davon ablegen. */
@@ -63,6 +68,12 @@ export class Lineup implements OnInit {
     const game = this.targetGame();
     return game ? (this.lineup.eventLineups()[game.id] ?? null) : null;
   });
+  /** Spielform der Aufstellung: die des Spiels, sonst die des Teams (ohne Angabe 11:11). */
+  protected readonly format = computed<GameFormat>(() => this.storedForTarget()?.gameFormat ?? this.settings.gameFormat());
+  protected readonly info = computed(() => gameFormatInfo(this.format()));
+  protected readonly max = computed(() => this.info().players);
+  /** Die gespeicherte Aufstellung passt nicht zur Spielform (z. B. 11 Spieler bei 5:5); nie bei 11:11. */
+  protected readonly misfit = computed(() => fitToFormat(this.assignments(), this.format()) !== this.assignments());
   protected readonly hasStoredForTarget = computed(() => this.storedForTarget() !== null);
   /** Letztes Spiel vor dem Ziel mit gespeicherter Aufstellung – Quelle für „Vom letzten Spiel übernehmen“. */
   protected readonly previousGame = computed(() =>
@@ -90,17 +101,18 @@ export class Lineup implements OnInit {
   /** Empfohlene Elf, nur wenn das Feld leer ist und es einen Vorschlag gibt. */
   protected readonly suggestion = computed<Assignments | null>(() => {
     if (!lineupIsEmpty(this.assignments())) return null;
-    const suggested = suggestedLineup(this.eligible());
+    const suggested = suggestedLineup(this.eligible(), this.format());
     return lineupIsEmpty(suggested) ? null : suggested;
   });
   protected readonly name = computed(() => formationName(this.assignments()));
   protected readonly teamGrade = computed(() => lineupGrade(this.assignments(), this.entries()));
-  protected readonly options = computed(() => formationOptions(this.eligible()));
+  protected readonly options = computed(() => formationOptions(this.eligible(), this.format()));
   protected readonly bench = computed(() => benchOf(this.assignments(), this.entries()));
 
   /** Zonen mit ihren Spielern, bereit zum Anzeigen. */
+  protected readonly visibleZones = computed(() => zonesForFormat(this.format(), this.assignments()));
   protected readonly board = computed(() =>
-    ZONES.map((zone) => ({
+    this.visibleZones().map((zone) => ({
       zone,
       ...PITCH_ZONES[zone],
       chips: this.assignments()[zone].flatMap((id) => {
@@ -152,6 +164,7 @@ export class Lineup implements OnInit {
       this.team.start();
       this.lineup.start();
       this.eventsService.start();
+      this.settings.start();
     }
   }
 
@@ -167,7 +180,7 @@ export class Lineup implements OnInit {
     const source = this.previousGame();
     if (!game || !source || !this.lineup.canEdit()) return;
     const entry = this.lineup.eventLineups()[source.id];
-    if (entry) this.lineup.saveForEvent(game.id, entry.assignments);
+    if (entry) this.lineup.saveForEvent(game.id, entry.assignments, undefined, entry.gameFormat);
   }
 
   protected openZone(zone: Zone, playerId: string | null): void {
@@ -207,6 +220,10 @@ export class Lineup implements OnInit {
     this.apply(removeFromPitch(this.assignments(), target.playerId));
   }
 
+  protected adaptToFormat(): void {
+    this.apply(fitToFormat(this.assignments(), this.format()));
+  }
+
   protected applySuggestion(): void {
     const suggested = this.suggestion();
     if (suggested) this.apply(suggested);
@@ -219,7 +236,17 @@ export class Lineup implements OnInit {
 
   protected onFormationSelect(event: Event): void {
     const index = Number((event.target as HTMLSelectElement).value);
-    if (Number.isInteger(index) && index >= 0 && index < FORMATION_PRESETS.length) this.applyFormation(index);
+    if (Number.isInteger(index) && index >= 0 && index < this.options().length) this.applyFormation(index);
+  }
+
+  /** Spielform für das gewählte Spiel ändern; zu viele Spieler (oder der Torwart bei 3:3) gehen auf die Bank. */
+  protected onFormatSelect(event: Event): void {
+    const select = event.target as HTMLSelectElement;
+    const game = this.targetGame();
+    const value = select.value;
+    if (!game || !isGameFormat(value) || !this.lineup.saveForEvent(game.id, fitToFormat(this.assignments(), value), undefined, value)) {
+      select.value = this.format();
+    }
   }
 
   protected valueOf(event: Event): string {
@@ -241,9 +268,9 @@ export class Lineup implements OnInit {
   }
 
   private place(playerId: string, zone: Zone): void {
-    const next = moveToZone(this.assignments(), playerId, zone);
+    const next = moveToZone(this.assignments(), playerId, zone, this.max());
     if (next === 'voll') {
-      this.message.set('Die Startelf ist bereits voll (11 Spieler). Nimm zuerst jemanden vom Feld, bevor du einen weiteren Spieler aufstellst.');
+      this.message.set(`Die Startelf ist bereits voll (${this.max()} Spieler). Nimm zuerst jemanden vom Feld, bevor du einen weiteren Spieler aufstellst.`);
       return;
     }
     this.apply(next);
@@ -251,7 +278,7 @@ export class Lineup implements OnInit {
 
   private apply(next: Assignments): void {
     const game = this.targetGame();
-    const saved = game ? this.lineup.saveForEvent(game.id, next) : this.lineup.save(next);
+    const saved = game ? this.lineup.saveForEvent(game.id, next, undefined, this.storedForTarget()?.gameFormat) : this.lineup.save(next);
     if (saved) this.target.set(null);
   }
 }

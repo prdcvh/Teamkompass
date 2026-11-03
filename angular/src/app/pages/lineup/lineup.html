@@ -4,7 +4,7 @@
     <h1>Aufstellung</h1>
     @if (ready()) {
       <p class="meta">
-        {{ name() }} · {{ onPitchCount() }}/{{ max }} auf dem Feld ·
+        @if (format() === '11:11' || onPitchCount() === max()) { {{ name() }} · }{{ onPitchCount() }}/{{ max() }} auf dem Feld@if (format() !== '11:11') { ({{ format() }}) } ·
         @if (teamGrade() !== null) { Mannschaftsnote Ø {{ gradeLabel(teamGrade()) }} } @else { Mannschaftsnote noch ohne Bewertungen }
       </p>
     }
@@ -40,6 +40,14 @@
             </select>
           </label>
           @if (targetGame(); as game) {
+            <label class="tk-label">
+              Spielform für dieses Spiel
+              <select class="tk-input" aria-label="Spielform für dieses Spiel" data-testid="game-format" [disabled]="!lineup.canEdit()" (change)="onFormatSelect($event)">
+                @for (option of gameFormats; track option) {
+                  <option [value]="option" [selected]="option === format()">{{ option }}</option>
+                }
+              </select>
+            </label>
             <p class="meta" role="status">
               {{ game.title }} am {{ formatDate(game.date) }}@if (!hasStoredForTarget()) { – noch nicht gespeichert; jede Änderung legt die Aufstellung an diesem Spiel ab }
             </p>
@@ -49,7 +57,7 @@
               </button>
             }
           } @else {
-            <p class="meta">{{ games().length ? 'Kein Spiel gewählt' : 'Kein Spiel angelegt' }} – allgemeine Startelf</p>
+            <p class="meta">{{ games().length ? 'Kein Spiel gewählt' : 'Kein Spiel angelegt' }} – allgemeine Startelf ({{ format() }}, Spielform des Teams)</p>
           }
         </div>
       </tk-card>
@@ -80,6 +88,15 @@
           <tk-card>
             <div class="panel">
               <h2>Formation</h2>
+              @if (misfit()) {
+                <div class="warn" role="status" data-testid="misfit">
+                  <p>Die gespeicherte Aufstellung passt nicht zu {{ format() }}.</p>
+                  <button tkButton type="button" (click)="adaptToFormat()" [disabled]="!lineup.canEdit()">An Spielform anpassen</button>
+                </div>
+              }
+              @if (info().rotationHint) {
+                <p class="muted" data-testid="rotation-hint">{{ rotationHint }}</p>
+              }
               @if (suggestion()) {
                 <button tkButton type="button" class="suggest" (click)="applySuggestion()" [disabled]="!lineup.canEdit()">Empfohlene Elf übernehmen</button>
               }
@@ -148,7 +165,7 @@
     }
     @if (benchTarget()) {
       <div class="zone-grid">
-        @for (zone of zones; track zone) {
+        @for (zone of visibleZones(); track zone) {
           <button tkButton type="button" (click)="placeBench(zone)">{{ zone }}</button>
         }
       </div>

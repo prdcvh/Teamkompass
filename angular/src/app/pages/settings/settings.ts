@@ -8,6 +8,7 @@ import { ThemeService } from '../../core/device/theme.service';
 import { WorkspaceService } from '../../core/device/workspace.service';
 import { NotificationsService } from '../../core/notifications/notifications.service';
 import { PlayerStatsService } from '../../core/team/player-stats.service';
+import { GAME_FORMATS, isGameFormat } from '../../core/lineup/game-format';
 import { FEDERAL_STATES, isFederalState } from '../../core/team-settings/federal-states';
 import { TeamSettingsService } from '../../core/team-settings/team-settings.service';
 import { Button } from '../../ui/button/button';
@@ -45,6 +46,7 @@ export class Settings {
   /** Bundesland des Teams für den Schulferien-Hinweis (SCRUM-186), nur für Trainer. */
   protected readonly teamSettings = inject(TeamSettingsService);
   protected readonly federalStates = FEDERAL_STATES;
+  protected readonly gameFormats = GAME_FORMATS;
   protected readonly retentionOptions = RETENTION_OPTIONS;
   protected readonly confirmClear = signal(false);
   protected readonly cleared = signal(false);
@@ -65,6 +67,11 @@ export class Settings {
     const value = select.value;
     // Ungültige oder nicht erlaubte Werte: die Auswahl springt auf den gespeicherten Stand zurück.
     if (!isFederalState(value) || !this.teamSettings.saveFederalState(value)) select.value = this.teamSettings.federalState();
+  }
+
+  protected setGameFormat(event: Event): void {
+    const select = event.target as HTMLSelectElement;
+    if (!isGameFormat(select.value) || !this.teamSettings.saveGameFormat(select.value)) select.value = this.teamSettings.gameFormat();
   }
 
   protected toggleReminders(event: Event): void {
