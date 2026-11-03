@@ -5,8 +5,14 @@
       @if (reports.failed()) {
         <p class="sr-hint" role="status">Die Angaben des Spielers können gerade nicht geladen werden. Die Belastung rechnet mit dem Wert des Trainerteams.</p>
       }
-      @for (hint of hints(); track hint) {
-        <p class="sr-alert" role="status">{{ hint }}</p>
+      @if (risk(); as r) {
+        @if (r.tier === 'unauffaellig') {
+          <p class="sr-hint" role="status">Befinden: {{ r.level }}</p>
+        } @else {
+          <p class="sr-alert" role="status">
+            Befinden: {{ r.level }}@if (riskReasons()) { – wegen {{ riskReasons() }}}
+          </p>
+        }
       }
       @if (compare() && status().current !== null) {
         <p class="sr-hint">

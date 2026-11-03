@@ -1,8 +1,8 @@
 import { type TeamEvent } from '../events/event';
 import type { SelfReport, WellnessEntry } from './self-report';
-import { HARDER_HINT, LIGHTER_HINT, WELLNESS_HINT, deviationHint, exertionPairs, wellnessStatus } from './self-report-hints';
+import { RISK_FACTORS, decayedContribution, deviationStrength, exertionPairs, wellnessRisk, wellnessStatus, wellnessStrength, wellnessTier } from './self-report-hints';
 
-/** Hinweise aus den Spielerangaben (SCRUM-138): Abweichung 3 von 5 Terminen ≥ 2 Stufen, Befinden gegen den eigenen Normalwert. */
+/** Risikowert mit Abklingzeit (SCRUM-177) aus den Spielerangaben (SCRUM-138) und Befindensanzeige gegen den eigenen Normalwert. */
 describe('self-report-hints', () => {
   const event = (n: number, exertion: number): TeamEvent =>
     ({ id: `e${n}`, type: 'Training', title: 'T', date: `2026-10-${String(n).padStart(2, '0')}`, exertion, intensity: 2, location: '', trainingFocus: '', opponent: '', goalsFor: null, goalsAgainst: null, matchDuration: null, startTime: '18:00', durationMinutes: 90, locationCoords: null, notes: '' }) as TeamEvent;
@@ -16,32 +16,68 @@ describe('self-report-hints', () => {
     return exertionPairs(events, reports);
   };
 
-  describe('Abweichung Spieler ↔ Trainer', () => {
-    it('3 von 5 Terminen ≥ 2 Stufen darüber: härter als geplant', () => {
-      expect(deviationHint(setup([6, 4, 7, 5, 6]))).toBe(HARDER_HINT);
-      expect(deviationHint(setup([10, 6, 6, 6]))).toBe(HARDER_HINT);
+  describe('Risikowert mit Abklingzeit', () => {
+    const entry = (date: string, values: [number, number, number, number]): WellnessEntry => ({ eventId: date, date, fatigue: values[0], sleep: values[1], soreness: values[2], stress: values[3], updatedAt: null });
+    const fine = [4, 4, 4, 4] as [number, number, number, number];
+    const day = (n: number) => `2026-10-${String(n).padStart(2, '0')}`;
+
+    it('Stärke: normal und besser = 0, sehr schlecht = 1', () => {
+      expect([7, 5, 4, 3, 2, 1].map(wellnessStrength)).toEqual([0, 0, 0, 1 / 3, 2 / 3, 1]);
+      expect([0, 1, 2, 3, 4, 7].map(deviationStrength)).toEqual([0, 0, 1 / 3, 2 / 3, 1, 1]);
     });
 
-    it('3 von 5 Terminen ≥ 2 Stufen darunter: leichter als geplant', () => {
-      expect(deviationHint(setup([2, 2, 5, 1, 4]))).toBe(LIGHTER_HINT);
+    it('ein Signal zählt heute voll und klingt mit der Abklingzeit ab (Halbwertszeit 0,69 · τ)', () => {
+      const { weight, tau } = RISK_FACTORS.soreness;
+      expect(decayedContribution('soreness', 1, day(10), day(10))).toBeCloseTo(weight, 10);
+      expect(decayedContribution('soreness', 1, day(10), day(11))).toBeCloseTo(weight * Math.exp(-1 / tau), 10);
+      // nach τ Tagen noch 1/e, nach 0,69 · τ ≈ 2 Tagen etwa die Hälfte
+      expect(decayedContribution('soreness', 1, day(10), day(13))).toBeCloseTo(weight / Math.E, 10);
+      expect(decayedContribution('soreness', 1, day(10), day(12))).toBeCloseTo(0.51, 2);
+      const scores = [10, 11, 12, 13, 14, 17].map((today) => wellnessRisk([entry(day(10), [4, 4, 1, 4])], [], day(today)).score);
+      expect(scores).toEqual([1, 0.72, 0.51, 0.37, 0.26, 0.1]);
+      expect(scores.every((score, i) => i === 0 || score < scores[i - 1])).toBe(true);
     });
 
-    it('nur 2 von 5 oder nur 1 Stufe: kein Hinweis', () => {
-      expect(deviationHint(setup([6, 6, 5, 5, 4]))).toBeNull();
-      expect(deviationHint(setup([5, 5, 5, 5, 5]))).toBeNull();
-      expect(deviationHint(setup([6, 2, 6, 2, 4]))).toBeNull();
-      expect(deviationHint([])).toBeNull();
+    it('Stufe wechselt bei festen Beispielwerten: ein starker Muskelkater erst Beobachten, nach 3 Tagen wieder Unauffällig', () => {
+      const sore = [entry(day(10), [4, 4, 1, 4])];
+      expect(wellnessRisk(sore, [], day(10))).toMatchObject({ score: 1, tier: 'beobachten', level: 'Beobachten' });
+      expect(wellnessRisk(sore, [], day(11)).tier).toBe('unauffaellig');
+      expect(wellnessRisk(sore, [], day(13)).tier).toBe('unauffaellig');
     });
 
-    it('zählt nur die letzten 5 Termine mit Spielerangabe', () => {
-      // Termine 1–3 deutlich härter, die jüngsten 5 Angaben (4–8) nicht mehr.
-      expect(deviationHint(setup([7, 7, 7, 4, 4, 5, 4, 4]))).toBeNull();
-      // Termine ohne Angabe zählen nicht mit: 3 der letzten 5 Angaben deutlich härter.
-      expect(deviationHint(setup([6, null, 6, null, null, 4, 6, 4]))).toBe(HARDER_HINT);
+    it('mehrere Signale addieren sich über Faktoren und über Tage', () => {
+      const single = wellnessRisk([entry(day(10), [4, 4, 2, 4])], [], day(10)).score; // 1,0 · 2/3
+      const two = wellnessRisk([entry(day(10), [3, 4, 2, 4])], [], day(10)).score; // + 1,0 · 1/3
+      expect(single).toBe(0.67);
+      expect(two).toBe(1);
+      // drei Tage hintereinander leicht schlecht (alle Fragen 3) ergeben zusammen mehr als jeder Tag allein
+      const days = [entry(day(8), [3, 3, 3, 3]), entry(day(9), [3, 3, 3, 3]), entry(day(10), [3, 3, 3, 3])];
+      const oneDay = wellnessRisk(days.slice(2), [], day(10));
+      const threeDays = wellnessRisk(days, [], day(10));
+      expect(oneDay).toMatchObject({ score: 1.17, tier: 'beobachten' });
+      expect(threeDays.score).toBeGreaterThan(oneDay.score);
+      expect(threeDays).toMatchObject({ score: 2.65, tier: 'anpassen', level: 'Anpassen' });
+      // Beiträge je Faktor, größter zuerst
+      expect(threeDays.contributions.map((item) => item.factor)).toEqual(['fatigue', 'soreness', 'stress', 'sleep']);
     });
 
-    it('vergleicht mit dem Trainerwert aus der Eventliste', () => {
-      expect(setup([6])[0]).toMatchObject({ trainer: 4, player: 6 });
+    it('Abweichung Spieler ↔ Trainer: nur „härter“ ab 2 Stufen zählt und klingt ab', () => {
+      const harder = setup([7]); // Trainer 4, Spieler 7: Differenz 3
+      expect(wellnessRisk([], harder, '2026-10-01')).toMatchObject({ score: 0.53, tier: 'unauffaellig' }); // 0,8 · 2/3
+      expect(wellnessRisk([], harder, '2026-10-06').score).toBe(0.2); // 0,8 · 2/3 · e^(−1)
+      expect(wellnessRisk([], setup([5, 3, 2]), '2026-10-03').score).toBe(0);
+      expect(wellnessRisk([], setup([6, 6, 6]), '2026-10-03').contributions).toEqual([{ factor: 'deviation', label: RISK_FACTORS.deviation.label, value: 0.66 }]);
+    });
+
+    it('Zukunft, sehr alte und fehlende Antworten zählen nicht; ohne Daten Unauffällig', () => {
+      expect(wellnessRisk([], [], day(10))).toEqual({ score: 0, tier: 'unauffaellig', level: 'Unauffällig', contributions: [] });
+      expect(wellnessRisk([entry(day(11), [1, 1, 1, 1])], [], day(10)).score).toBe(0);
+      expect(wellnessRisk([entry('2026-09-01', [1, 1, 1, 1])], [], day(10)).score).toBe(0);
+      expect(wellnessRisk([{ ...entry(day(10), fine), fatigue: null, soreness: 1 }], [], day(10)).score).toBe(1);
+    });
+
+    it('Stufen an den Schwellen', () => {
+      expect([0, 0.99, 1, 1.99, 2, 5].map(wellnessTier)).toEqual(['unauffaellig', 'unauffaellig', 'beobachten', 'beobachten', 'anpassen', 'anpassen']);
     });
   });
 
@@ -51,25 +87,14 @@ describe('self-report-hints', () => {
     const normal = ['2026-10-05', '2026-10-08', '2026-10-12', '2026-10-15', '2026-10-19', '2026-10-25'].map((date, i) => entry(date, i < 2 ? [5, 5, 5, 5] : i < 4 ? [6, 6, 5, 5] : [6, 5, 5, 5]));
     const TODAY = '2026-10-30';
 
-    it('deutlich darunter (≥ 3 Punkte und ≥ 1 Standardabweichung): Hinweis', () => {
+    it('jüngste Summe und eigener Normalwert (Schnitt der 28 Tage davor)', () => {
       const status = wellnessStatus([...normal, entry('2026-10-29', [4, 4, 5, 5])], TODAY);
-      expect(status).toEqual({ current: 18, baseline: 21, answers: 6, hint: WELLNESS_HINT });
-    });
-
-    it('nur 2 Punkte darunter: kein Hinweis', () => {
-      expect(wellnessStatus([...normal, entry('2026-10-29', [5, 4, 5, 5])], TODAY).hint).toBeNull();
-    });
-
-    it('bei stark schwankenden Antworten braucht es mehr als 3 Punkte (eine Standardabweichung)', () => {
-      const wild = ['2026-10-05', '2026-10-08', '2026-10-12', '2026-10-15', '2026-10-19', '2026-10-25'].map((date, i) => entry(date, i % 2 ? [7, 7, 7, 7] : [4, 4, 4, 4]));
-      // Schnitt 22, Standardabweichung 6: 4 Punkte darunter reichen nicht, 7 schon.
-      expect(wellnessStatus([...wild, entry('2026-10-29', [5, 5, 4, 4])], TODAY).hint).toBeNull();
-      expect(wellnessStatus([...wild, entry('2026-10-29', [4, 4, 4, 3])], TODAY).hint).toBe(WELLNESS_HINT);
+      expect(status).toEqual({ current: 18, baseline: 21, answers: 6 });
     });
 
     it('frühestens ab 6 Antworten in den 4 Wochen davor', () => {
       const status = wellnessStatus([...normal.slice(1), entry('2026-10-29', [1, 1, 1, 1])], TODAY);
-      expect(status).toMatchObject({ current: 4, baseline: null, answers: 5, hint: null });
+      expect(status).toMatchObject({ current: 4, baseline: null, answers: 5 });
       // Ältere Antworten (mehr als 28 Tage vor der jüngsten) zählen nicht mit.
       const old = entry('2026-09-20', [5, 5, 5, 5]);
       expect(wellnessStatus([old, ...normal.slice(1), entry('2026-10-29', [1, 1, 1, 1])], TODAY).baseline).toBeNull();
@@ -77,7 +102,7 @@ describe('self-report-hints', () => {
 
     it('unvollständige Antworten und alte Antworten ergeben keinen aktuellen Wert', () => {
       const partial: WellnessEntry = { ...entry('2026-10-29', [1, 1, 1, 1]), sleep: null };
-      expect(wellnessStatus([...normal, partial], TODAY)).toMatchObject({ current: 21, hint: null });
+      expect(wellnessStatus([...normal, partial], TODAY)).toMatchObject({ current: 21 });
       expect(wellnessStatus([...normal, entry('2026-10-20', [1, 1, 1, 1])], '2026-11-20').current).toBeNull();
     });
   });

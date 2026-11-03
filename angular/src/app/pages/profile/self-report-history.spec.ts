@@ -5,7 +5,7 @@ import { SelfReportsService } from '../../core/self-report/self-reports.service'
 import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
 import { SelfReportHistory } from './self-report-history';
 
-/** Anstrengung (Trainer/Spieler je Termin) und Befindensverlauf mit Hinweisen (SCRUM-138). */
+/** Anstrengung (Trainer/Spieler je Termin) und Befindensverlauf mit Risikohinweis mit Abklingzeit (SCRUM-138, SCRUM-177). */
 describe('SelfReportHistory', () => {
   const text = (element: Element | null | undefined) => element?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
   const dates = ['2026-10-20', '2026-10-22', '2026-10-24', '2026-10-27', '2026-10-29'];
@@ -23,12 +23,12 @@ describe('SelfReportHistory', () => {
       // Spieler empfindet 4 von 5 Terminen um 2–3 Stufen härter.
       firebase.selfReports.set('p1', 'selfReports', `e${i}`, { exertion: i === 0 ? 4 : 6 + (i % 2), date, updatedAt: null });
     });
-    // Befinden: 6 Antworten mit Summe 21 vor dem 29.10., dann 16.
+    // Befinden: 6 Antworten mit Summe 21 vor dem 29.10., dann 12 (alle Fragen „eher schlecht“).
     ['2026-10-05', '2026-10-08', '2026-10-12', '2026-10-15', '2026-10-19', '2026-10-22'].forEach((date, i) => {
       firebase.events.events.set(`w${i}`, { type: 'Training', title: `Alt ${i}`, date, exertion: 5 });
       firebase.selfReports.set('p1', 'wellness', `w${i}`, { date, fatigue: 6, sleep: 5, soreness: 5, stress: 5 });
     });
-    firebase.selfReports.set('p1', 'wellness', 'e4', { date: '2026-10-29', fatigue: 4, sleep: 4, soreness: 4, stress: 4 });
+    firebase.selfReports.set('p1', 'wellness', 'e4', { date: '2026-10-29', fatigue: 3, sleep: 3, soreness: 3, stress: 3 });
     mutate?.(firebase);
     TestBed.configureTestingModule({ providers: [...provideFakeFirebase(firebase)] });
     const session = TestBed.inject(SessionService);
@@ -46,30 +46,33 @@ describe('SelfReportHistory', () => {
     return { fixture, root };
   }
 
-  it('Trainer: beide Werte je Termin, Hinweise zu Abweichung und Befinden, Verlauf', async () => {
+  it('Trainer: beide Werte je Termin, Risikohinweis (Stufe und Gründe), Verlauf', async () => {
     const { root } = await render('trainer', true);
-    expect([...root.querySelectorAll('.sr-alert')].map(text)).toEqual(['Empfindet das Training deutlich härter als geplant', 'Befinden schlechter als üblich']);
+    expect([...root.querySelectorAll('.sr-alert')].map(text)).toEqual(['Befinden: Beobachten – wegen Anstrengung härter als geplant, Müdigkeit, Muskelkater, Stress, Schlaf']);
     const first = root.querySelector('.sr-list li')!;
     expect(text(first)).toContain('Training 4');
-    expect(text(first.querySelector('.sr-values'))).toBe('Trainer4Spieler6Befinden16');
+    expect(text(first.querySelector('.sr-values'))).toBe('Trainer4Spieler6Befinden12');
     expect(first.querySelector('.sr-diff')).not.toBeNull();
-    expect(text(root)).toContain('Befinden zuletzt 16 von 28 · eigener Normalwert 21 (letzte 4 Wochen)');
+    expect(text(root)).toContain('Befinden zuletzt 12 von 28 · eigener Normalwert 21 (letzte 4 Wochen)');
     expect(root.querySelectorAll('.sr-bar')).toHaveLength(7);
     // 11 Termine mit Angaben, 8 sichtbar.
     expect(root.querySelectorAll('.sr-list li')).toHaveLength(8);
     root.querySelector<HTMLButtonElement>('.sr-more')!.click();
   });
 
-  it('Spieler: nur die eigenen Werte, kein Trainerwert und keine Hinweise', async () => {
+  it('Spieler: nur die eigenen Werte, kein Trainerwert und keine Bewertung', async () => {
     const { root } = await render('player', false);
     expect(root.querySelector('.sr-alert')).toBeNull();
-    expect(text(root.querySelector('.sr-list li .sr-values'))).toBe('Anstrengung6Befinden16');
+    expect(text(root)).not.toContain('Befinden:');
+    expect(text(root.querySelector('.sr-list li .sr-values'))).toBe('Anstrengung6Befinden12');
     expect(text(root)).not.toContain('Trainer');
   });
 
   it('Befinden nicht lesbar (Einwilligung widerrufen): nur die Anstrengung', async () => {
     const { root } = await render('physio', true, (firebase) => firebase.selfReports.watchErrors.set('wellness', { code: 'permission-denied' }));
-    expect([...root.querySelectorAll('.sr-alert')].map(text)).toEqual(['Empfindet das Training deutlich härter als geplant']);
+    // Ohne lesbares Befinden zählt nur die Abweichung der Anstrengung (≈ 0,7: unauffällig, kein Alarm).
+    expect(root.querySelector('.sr-alert')).toBeNull();
+    expect(text(root)).toContain('Befinden: Unauffällig');
     expect(root.querySelector('.sr-trend')).toBeNull();
     expect(text(root)).not.toContain('Befinden zuletzt');
     expect([...root.querySelectorAll('dt')].map(text)).not.toContain('Befinden');
