@@ -7,9 +7,12 @@ import { LayoutService } from '../../core/shell/layout.service';
 import { ageFromBirthdate, todayIso } from '../../core/shared/dates';
 import { type Player, consentRevokedMessage, isConsentRevoked, positionText } from '../../core/player/player';
 import {
+  type GradedEvent,
   availability,
+  deltaLabel,
   gradeToPercent,
   gradedEvents,
+  noteWord,
   numberLabel,
   profileFigures,
   skillAverages,
@@ -20,15 +23,18 @@ import { ProfileService } from '../../core/profile/profile.service';
 import { effectiveStatus } from '../../core/records/availability';
 import { MeasurementsService } from '../../core/records/measurements.service';
 import { RecordsStateService } from '../../core/records/records-state.service';
-import { injuryRisk } from '../../core/analysis/risk';
+import { injuryRisk, playerLoadCurve } from '../../core/analysis/risk';
 import { canCreateLoadReport } from '../../core/analysis/load-report';
 import { SessionService } from '../../core/auth/session.service';
-import { gradeLabel } from '../../core/ratings/rating';
+import { ratingScaleOf } from '../../core/ratings/rating';
+import { scoreLabel } from '../../core/ratings/rating-scale';
+import { RatingScaleService } from '../../core/ratings/rating-scale.service';
 import { SquadService } from '../../core/player/squad.service';
 import { SyncService } from '../../core/shell/sync.service';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 import { Status } from '../../ui/status/status';
+import { LoadCurveCard } from './load-curve-card';
 import { LoadReportAction } from './load-report-action';
 import { ProfileExtras } from './profile-extras';
 import { ConsentPanel } from './consent-panel';
@@ -38,7 +44,7 @@ import { healthLockedMessage, mayStoreHealth } from '../../core/player/consent';
 /** Spielerprofil (Figma: Profil Desktop/Handy): Kopfbereich, Notenverlauf, Kompetenzprofil, Verfügbarkeit, Statistik, Eventhistorie. */
 @Component({
   selector: 'app-profile',
-  imports: [Button, Card, Status, ProfileExtras, LoadReportAction, ConsentPanel],
+  imports: [Button, Card, Status, ProfileExtras, LoadReportAction, LoadCurveCard, ConsentPanel],
   templateUrl: './profile.html',
   // Reihenfolge = Kaskade (die Handy-Regeln überschreiben Kopf und Auswertung).
   styleUrls: ['./profile.css', './profile-stats.css', './profile-mobile.css', './profile-risk.css', '../../ui/chart/chart.css'],
@@ -54,6 +60,8 @@ export class Profile implements OnInit {
   protected readonly sync = inject(SyncService);
   private readonly session = inject(SessionService);
   private readonly team = inject(CurrentTeam);
+  /** Bewertungsskala des Teams (SCRUM-188): Schnitte und Verlauf in dieser Skala, jede Bewertung in ihrer eigenen. */
+  protected readonly scale = inject(RatingScaleService).scale;
   protected readonly mobile = inject(LayoutService).isMobile;
 
   /** Einwilligung (SCRUM-245): Abschnitt nur für Trainer; Links mit #einwilligung springen dorthin. */
@@ -82,7 +90,7 @@ export class Profile implements OnInit {
   protected readonly figures = computed(() => profileFigures(this.profile.items(), this.today));
   protected readonly skills = computed(() => skillAverages(this.graded()));
   protected readonly attendance = computed(() => availability(this.profile.items(), this.today));
-  protected readonly chart = computed(() => trendChart(this.graded()));
+  protected readonly chart = computed(() => trendChart(this.graded(), this.scale()));
   /** Trainingspunkte (SCRUM-104) sieht nur der Trainer. Verlauf neueste zuerst, wie die Eventhistorie. */
   protected readonly pointsVisible = computed(() => this.session.role() === 'trainer');
   private readonly pointsAll = computed(() => pointsHistory(this.profile.pointItems()));
@@ -104,6 +112,9 @@ export class Profile implements OnInit {
     return injuryRisk(player, this.profile.items(), this.records.absences(), this.measurements.measurements());
   });
 
+  /** Belastungskurve (SCRUM-176): Müdigkeit, Fitness und Form bis heute. */
+  protected readonly loadCurve = computed(() => (this.profile.loading() ? [] : playerLoadCurve(this.profile.items(), this.today)));
+
   /** Belastungsprotokoll (SCRUM-139): erst wenn auch Abwesenheiten und Messwerte geladen sind. */
   protected readonly reportAllowed = computed(() => {
     const player = this.player();
@@ -114,15 +125,15 @@ export class Profile implements OnInit {
     const f = this.figures();
     const g = f.games;
     return [
-      { label: 'Notenschnitt', value: gradeLabel(f.average) },
-      { label: 'Spiel-Schnitt', value: gradeLabel(f.gameAverage) },
-      { label: 'Training-Schnitt', value: gradeLabel(f.trainingAverage) },
+      { label: this.scale() === 'levels' ? 'Stufe im Schnitt' : 'Notenschnitt', value: this.gradeLabel(f.average) },
+      { label: 'Spiel-Schnitt', value: this.gradeLabel(f.gameAverage) },
+      { label: 'Training-Schnitt', value: this.gradeLabel(f.trainingAverage) },
       { label: 'Bewertete Events', value: String(f.ratedEvents) },
       { label: 'Teilnahmen', value: String(f.attendances) },
-      { label: 'Trend', value: numberLabel(f.trend, { signed: true }) },
+      { label: 'Trend', value: deltaLabel(f.trend, this.scale()) },
       { label: 'Ø Anstrengung zuletzt', value: numberLabel(f.recentIntensity) },
-      { label: 'Entwicklung Saison', value: numberLabel(f.development, { signed: true }) },
-      { label: 'Bestes Event', value: f.best ? `${gradeLabel(f.best.grade)} · ${f.best.event.type}` : '–' },
+      { label: 'Entwicklung Saison', value: deltaLabel(f.development, this.scale()) },
+      { label: 'Bestes Event', value: f.best ? `${this.gradeLabel(f.best.grade)} · ${f.best.event.type}` : '–' },
       { label: 'Einsatzquote', value: `${g.appearanceRate}%` },
       { label: 'Scorer/Spiel', value: numberLabel(g.scorersPerGame) },
       { label: 'Tore + Vorlagen', value: `${g.goals} + ${g.assists}` },
@@ -164,7 +175,18 @@ export class Profile implements OnInit {
 
   protected formatDate = formatDate;
   protected positionText = positionText;
-  protected gradeLabel = gradeLabel;
+  protected readonly noteWord = noteWord;
+  /** Schnitt (Gesamt, Kompetenzprofil) in der Skala des Teams. */
+  protected gradeLabel = (value: number | null): string => scoreLabel(value, this.scale());
+
+  /** Eine einzelne Bewertung in der Skala, mit der sie vergeben wurde (alte Schulnoten bleiben Schulnoten). */
+  protected entryScale(entry: GradedEvent) {
+    return ratingScaleOf(entry.rating, this.scale());
+  }
+
+  protected entryLabel(entry: GradedEvent): string {
+    return scoreLabel(entry.grade, this.entryScale(entry));
+  }
   protected gradeToPercent = gradeToPercent;
   protected numberLabel = numberLabel;
 

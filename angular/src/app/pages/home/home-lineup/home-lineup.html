@@ -34,7 +34,7 @@
   </a>
   <div class="lineup-side">
     <p class="formation">{{ summary().formation }}</p>
-    <p class="muted">{{ summary().count }} von 11 Spielern auf dem Platz</p>
+    <p class="muted">{{ summary().count }} Spieler auf dem Platz</p>
     <ul class="lineup-rows">
       @for (row of summary().rows; track row.label) {
         <li><span class="zone">{{ row.label }}</span><span>{{ row.names.join(' · ') }}</span></li>

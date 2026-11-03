@@ -71,6 +71,8 @@
     </tk-card>
   }
 
+  <tk-rating-scale-card />
+
   @if (teamSettings.canWrite()) {
     <tk-card>
       <div class="panel" id="bundesland">
@@ -92,6 +94,23 @@
         @if (teamSettings.error()) {
           <p class="error" role="alert">{{ teamSettings.error() }}</p>
         }
+      </div>
+    </tk-card>
+  }
+
+  @if (teamSettings.canWrite()) {
+    <tk-card>
+      <div class="panel" id="spielform">
+        <h2>Spielform (Cloud, für das Team)</h2>
+        <label class="field">
+          <span>Spielform des Teams</span>
+          <select class="tk-input" data-testid="game-format" [disabled]="teamSettings.load() !== 'ready'" (change)="setGameFormat($event)">
+            @for (format of gameFormats; track format) {
+              <option [value]="format" [selected]="teamSettings.gameFormat() === format">{{ format }}</option>
+            }
+          </select>
+        </label>
+        <p class="muted">Danach richtet sich die Aufstellung: Formationen, Anzahl der Spieler auf dem Feld und der Vorschlag. 3:3 wird ohne Torwart gespielt. Bei einzelnen Spielen lässt sich die Spielform in der Aufstellung ändern. Solange nichts gewählt ist, gilt 11:11.</p>
       </div>
     </tk-card>
   }

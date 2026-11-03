@@ -99,6 +99,9 @@ export interface LoadReport {
   readonly assessment: Pick<InjuryRisk, 'level' | 'tier' | 'action' | 'reasons'> & {
     readonly load: number;
     readonly baseline: number;
+    readonly fatigue: number;
+    readonly fitness: number;
+    readonly form: number;
     readonly availability: LoadAvailability | null;
   };
   readonly weeks: readonly LoadReportWeek[];
@@ -247,6 +250,9 @@ export function buildLoadReport(input: LoadReportInput): LoadReport {
       reasons: risk.reasons,
       load: Math.round(risk.load),
       baseline: Math.round(risk.baseline),
+      fatigue: risk.fatigue,
+      fitness: risk.fitness,
+      form: risk.form,
       availability: includeHealth ? risk.availability : null,
     },
     weeks,

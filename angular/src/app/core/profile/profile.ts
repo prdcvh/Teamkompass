@@ -7,7 +7,8 @@
  */
 import { areaPath, smoothPath } from '../chart-path';
 import { type TeamEvent } from '../events/event';
-import { GRADE_FIELDS, GRADE_LABELS, type GradeField, type Rating, calculatedGrade, gradeLabel, roundGrade } from '../ratings/rating';
+import { GRADE_FIELDS, GRADE_LABELS, type GradeField, type Rating, calculatedGrade, roundGrade } from '../ratings/rating';
+import { LEVEL_OPTIONS, type RatingScale, scoreLabel, scoreShortLabel } from '../ratings/rating-scale';
 
 /** Ein Event samt der Bewertung eines Spielers (die Bewertung kann fehlen). */
 export interface EventRating {
@@ -31,6 +32,16 @@ export function gradedEvents(items: readonly EventRating[]): GradedEvent[] {
     if (grade !== null) graded.push({ event, rating, grade });
   }
   return graded.sort((a, b) => a.event.date.localeCompare(b.event.date) || a.event.title.localeCompare(b.event.title, 'de'));
+}
+
+/**
+ * Skala für die Anzeige der Werte eines Spielers (SCRUM-188): die Skala seiner jüngsten benoteten Bewertung, ohne
+ * Bewertung `fallback`. Für Spieler und Eltern, die die Teameinstellungen nicht lesen dürfen – so sehen sie Schnitt und
+ * Verlauf in der Skala, mit der der Trainer zuletzt bewertet hat.
+ */
+export function displayScaleFor(items: readonly EventRating[], fallback: RatingScale): RatingScale {
+  const last = gradedEvents(items).at(-1);
+  return last ? (last.rating.scale ?? 'grades') : fallback;
 }
 
 function average(values: readonly number[]): number | null {
@@ -166,6 +177,12 @@ export function numberLabel(value: number | null, options: { signed?: boolean } 
   return options.signed && value > 0 ? `+${text}` : text;
 }
 
+/** Trend und Entwicklung: Schulnoten „+0,5“; bei Kompetenzstufen „besser“, „schlechter“ oder „gleich“ (SCRUM-188). */
+export function deltaLabel(value: number | null, scale: RatingScale): string {
+  if (scale !== 'levels' || value === null) return numberLabel(value, { signed: true });
+  return value > 0 ? 'besser' : value < 0 ? 'schlechter' : 'gleich';
+}
+
 export const CHART_WIDTH = 760;
 export const CHART_HEIGHT = 260;
 const CHART_LEFT = 54;
@@ -186,7 +203,7 @@ export interface ChartPoint {
 export interface TrendChart {
   readonly width: number;
   readonly height: number;
-  readonly grid: readonly { y: number; grade: number }[];
+  readonly grid: readonly GridLine[];
   readonly points: readonly ChartPoint[];
   readonly path: string;
   /** Fläche unter der Kurve (leer bei weniger als zwei Punkten). */
@@ -195,6 +212,15 @@ export interface TrendChart {
   readonly summary: string;
   /** Index des besten Wertes (kleinste Note), -1 ohne Punkte. */
   readonly best: number;
+}
+
+/** Rasterlinie mit Achsenbeschriftung (Schulnote „1“ … „6“ oder Stufe „lernt“/„kann“/„sicher“, SCRUM-188). */
+export interface GridLine {
+  readonly y: number;
+  readonly grade: number;
+  readonly label: string;
+  /** Linker Rand der Beschriftung. */
+  readonly x: number;
 }
 
 /** Ein Punkt eines Notendiagramms. */
@@ -215,7 +241,7 @@ export interface PlottedPoint extends PlotPoint {
 export interface PlotChart {
   readonly width: number;
   readonly height: number;
-  readonly grid: readonly { y: number; grade: number }[];
+  readonly grid: readonly GridLine[];
   readonly points: readonly PlottedPoint[];
   readonly path: string;
   readonly area: string;
@@ -223,8 +249,11 @@ export interface PlotChart {
   readonly best: number;
 }
 
-/** Notendiagramm: Note 1 oben, Note 6 unten, Punkte gleichmäßig von links nach rechts. */
-export function plotChart(input: readonly PlotPoint[]): PlotChart {
+/**
+ * Notendiagramm: Note 1 oben, Note 6 unten, Punkte gleichmäßig von links nach rechts. Bei Kompetenzstufen (SCRUM-188)
+ * bleibt die Zahlenachse gleich, nur Raster und Beschriftung zeigen die drei Stufen.
+ */
+export function plotChart(input: readonly PlotPoint[], scale: RatingScale = 'grades'): PlotChart {
   const plotWidth = CHART_WIDTH - CHART_LEFT - CHART_RIGHT;
   const plotHeight = CHART_HEIGHT - CHART_TOP - CHART_BOTTOM;
   const y = (grade: number) => CHART_TOP + ((grade - 1) / 5) * plotHeight;
@@ -232,28 +261,38 @@ export function plotChart(input: readonly PlotPoint[]): PlotChart {
     ...entry,
     x: CHART_LEFT + (index * plotWidth) / Math.max(input.length - 1, 1),
     y: y(entry.grade),
-    valueLabel: gradeLabel(entry.grade),
+    valueLabel: scoreLabel(entry.grade, scale),
   }));
+  const grid: GridLine[] =
+    scale === 'levels'
+      ? LEVEL_OPTIONS.map((option) => ({ y: y(option.value), grade: option.value, label: scoreShortLabel(option.value, scale), x: 4 }))
+      : [1, 2, 3, 4, 5, 6].map((grade) => ({ y: y(grade), grade, label: String(grade), x: 24 }));
   const best = points.length ? points.reduce((index, point, at) => (point.grade < points[index].grade ? at : index), 0) : -1;
   return {
     width: CHART_WIDTH,
     height: CHART_HEIGHT,
-    grid: [1, 2, 3, 4, 5, 6].map((grade) => ({ y: y(grade), grade })),
+    grid,
     points,
     path: smoothPath(points),
     area: areaPath(points, CHART_HEIGHT - CHART_BOTTOM),
-    summary: points.map((point) => `${point.label}${point.kind ? ` ${point.kind}` : ''} Note ${gradeLabel(point.grade)}`).join(', '),
+    summary: points.map((point) => `${point.label}${point.kind ? ` ${point.kind}` : ''} ${noteWord(scale)} ${scoreLabel(point.grade, scale)}`).join(', '),
     best,
   };
 }
 
+/** „Note 2,3“ bei Schulnoten, „Stufe kann es“ bei Kompetenzstufen. */
+export function noteWord(scale: RatingScale): string {
+  return scale === 'levels' ? 'Stufe' : 'Note';
+}
+
 /** Verlaufsdiagramm: Note 1 oben, Note 6 unten, ein Punkt je benotetem Event (älteste links). */
-export function trendChart(graded: readonly GradedEvent[]): TrendChart {
+export function trendChart(graded: readonly GradedEvent[], scale: RatingScale = 'grades'): TrendChart {
   return plotChart(
     graded.map((entry) => ({
       grade: entry.grade,
       label: entry.event.date.slice(5),
-      title: `${entry.event.title}: Note ${gradeLabel(entry.grade)}`,
+      title: `${entry.event.title}: ${noteWord(scale)} ${scoreLabel(entry.grade, scale)}`,
     })),
+    scale,
   );
 }

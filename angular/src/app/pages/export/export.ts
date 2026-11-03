@@ -9,6 +9,7 @@ import { PlayerRecordsApi } from '../../core/firebase/player-records.api';
 import { OpponentsService } from '../../core/opponents/opponents.service';
 import { todayIso } from '../../core/shared/dates';
 import { type Player, consentRevokedMessage } from '../../core/player/player';
+import { RatingScaleService } from '../../core/ratings/rating-scale.service';
 import { PROFILE_REPORT_CSS, profileReportHtml } from '../../core/profile/profile-report';
 import { type Absence, absenceFromDoc } from '../../core/records/absence';
 import { type Measurement, measurementFromDoc } from '../../core/records/measurement';
@@ -43,6 +44,7 @@ interface PendingImport {
 export class Export implements OnInit, OnDestroy {
   private readonly team = inject(TeamService);
   private readonly current = inject(CurrentTeam);
+  private readonly ratingScale = inject(RatingScaleService);
   private readonly stats = inject(PlayerStatsService);
   private readonly eventsService = inject(EventsService);
   private readonly opponents = inject(OpponentsService);
@@ -189,7 +191,7 @@ export class Export implements OnInit, OnDestroy {
     if (!player || !entry) return;
     const history = (await this.readHistory([player])).get(player.id)!;
     this.files.print(
-      profileReportHtml({ teamName: this.current.name(), player, items: entry.items, absences: history.absences, measurements: history.measurements, today: todayIso() }),
+      profileReportHtml({ teamName: this.current.name(), player, items: entry.items, absences: history.absences, measurements: history.measurements, today: todayIso(), scale: this.ratingScale.scale() }),
       PROFILE_REPORT_CSS,
     );
     this.workspace.record(`Spielerprofil als PDF vorbereitet (${player.name})`);
