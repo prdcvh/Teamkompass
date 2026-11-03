@@ -10,7 +10,7 @@ import { LineupService } from '../../core/lineup/lineup.service';
 import { todayIso } from '../../core/shared/dates';
 import { positionText } from '../../core/player/player';
 import { averageGrade, gradedEvents } from '../../core/profile/profile';
-import { gradeLabel } from '../../core/ratings/rating';
+import { RatingScaleService } from '../../core/ratings/rating-scale.service';
 import { effectiveStatus } from '../../core/records/availability';
 import { SessionService } from '../../core/auth/session.service';
 import { SyncService } from '../../core/shell/sync.service';
@@ -156,7 +156,8 @@ export class Lineup implements OnInit {
   });
 
   protected positionText = positionText;
-  protected gradeLabel = gradeLabel;
+  /** Noten in der Skala des Teams (SCRUM-188): Schulnoten „2,3“ oder Kompetenzstufe. */
+  protected gradeLabel = inject(RatingScaleService).label;
 
   ngOnInit(): void {
     if (this.isTrainer()) {

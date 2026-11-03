@@ -1,6 +1,7 @@
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { authErrorMessage, errorCode } from '../auth/auth-errors';
 import { TeamSettingsApi } from '../firebase/team-settings.api';
+import { type RatingScale, docFromRatingScale, isRatingScale, storedRatingScale } from '../ratings/rating-scale';
 import { SessionService } from '../auth/session.service';
 import { SyncService } from '../shell/sync.service';
 import { type FederalState, isFederalState } from './federal-states';
@@ -21,6 +22,8 @@ export class TeamSettingsService {
 
   private readonly stored = signal<Readonly<Record<string, unknown>> | null>(null);
   readonly load = signal<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  /** Gespeicherte Bewertungsskala (SCRUM-188); null = nicht gewählt, dann gilt der Standard der Altersklasse. */
+  readonly ratingScale = computed<RatingScale | null>(() => storedRatingScale(this.stored()));
   readonly canWrite = computed(() => this.session.role() === 'trainer');
   readonly defaultLocation = computed<DefaultLocation | null>(() => defaultLocationFromDoc(this.stored()));
   /** Bundesland für den Schulferien-Hinweis; ohne gespeicherten Wert Hessen. */
@@ -76,6 +79,12 @@ export class TeamSettingsService {
   /** Speichert (oder löscht mit null) den Standardort. Rückgabe: false, wenn nicht erlaubt. */
   saveDefaultLocation(location: DefaultLocation | null): boolean {
     return this.save(docFromDefaultLocation(location), 'Der Standardort konnte nicht gespeichert werden.');
+  }
+
+  /** Speichert die Bewertungsskala (nur Trainer, SCRUM-188); gespeicherte Bewertungen bleiben unverändert. */
+  saveRatingScale(scale: RatingScale): boolean {
+    if (!isRatingScale(scale)) return false;
+    return this.save(docFromRatingScale(scale), 'Die Bewertungsskala konnte nicht gespeichert werden.');
   }
 
   /** Speichert das Bundesland des Teams (nur Trainer, SCRUM-186). Rückgabe: false, wenn nicht erlaubt oder ungültig. */

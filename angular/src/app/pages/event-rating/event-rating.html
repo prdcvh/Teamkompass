@@ -139,10 +139,10 @@
             @for (field of gradeFields; track field) {
               <div class="field" role="group" [attr.aria-label]="gradeLabels[field] + ': ' + player.name">
                 <span class="label">{{ gradeLabels[field] }}</span>
-                <div class="chips">
+                <div class="chips" [class.levels]="usesLevels(player)">
                   <button type="button" class="chip" [attr.aria-pressed]="ratings.ratingFor(player.id)[field] === null" [attr.aria-label]="gradeLabels[field] + ' nicht erfasst'" (click)="set(player, field, '')">–</button>
-                  @for (grade of gradeOptions; track grade) {
-                    <button type="button" class="chip" [attr.aria-pressed]="ratings.ratingFor(player.id)[field] === grade" [attr.aria-label]="gradeLabels[field] + ' Note ' + grade" (click)="set(player, field, '' + grade)">{{ grade }}</button>
+                  @for (option of optionsFor(player); track option.value) {
+                    <button type="button" class="chip" [attr.aria-pressed]="ratings.ratingFor(player.id)[field] === option.value" [attr.aria-label]="gradeLabels[field] + ' ' + option.aria" (click)="set(player, field, '' + option.value)">{{ option.label }}</button>
                   }
                 </div>
               </div>
@@ -179,6 +179,9 @@
       }
     } @else {
       <tk-card class="matrix">
+        @if (showLegend()) {
+          <p class="scale-legend muted">Kompetenzstufen: <b>lernt</b> = lernt es noch · <b>kann</b> = kann es · <b>sicher</b> = kann es sicher</p>
+        }
         <div class="table-wrap">
           <table [class.game]="isGame()">
             <thead>
@@ -227,8 +230,8 @@
                     <td>
                       <select class="tk-input grade-select" [attr.aria-label]="gradeLabels[field] + ': ' + player.name" [value]="ratings.ratingFor(player.id)[field] ?? ''" (change)="set(player, field, valueOf($event))">
                         <option value="" [selected]="ratings.ratingFor(player.id)[field] === null">–</option>
-                        @for (grade of gradeOptions; track grade) {
-                          <option [value]="grade" [selected]="ratings.ratingFor(player.id)[field] === grade">{{ grade }}</option>
+                        @for (option of optionsFor(player); track option.value) {
+                          <option [value]="option.value" [title]="option.label" [selected]="ratings.ratingFor(player.id)[field] === option.value">{{ option.short }}</option>
                         }
                       </select>
                     </td>
