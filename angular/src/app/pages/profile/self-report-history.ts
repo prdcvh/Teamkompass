@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, OnInit, computed, inject, input, si
 import { EventsService } from '../../core/events/events.service';
 import { type TeamEvent, exertionLabel, formatDate } from '../../core/events/event';
 import { WELLNESS_FIELDS, WELLNESS_QUESTIONS, type WellnessEntry, wellnessSum, wellnessWord } from '../../core/self-report/self-report';
-import { deviationHint, exertionPairs, wellnessStatus } from '../../core/self-report/self-report-hints';
+import { exertionPairs, lighterHint, wellnessRisk, wellnessStatus } from '../../core/self-report/self-report-hints';
 import { SelfReportsService } from '../../core/self-report/self-reports.service';
 import { todayIso } from '../../core/shared/dates';
 import { Card } from '../../ui/card/card';
@@ -19,8 +19,7 @@ const SHOWN = 8;
 
 /**
  * Angaben des Spielers je Termin (SCRUM-138): Anstrengung (Spieler, bei `compare` auch Trainer) und Befinden mit
- * Verlauf. Trainer und Medizin sehen dazu die Hinweise („deutlich härter als geplant“, „Befinden schlechter als
- * üblich“); Spieler und Eltern sehen nur ihre eigenen Angaben.
+ * Verlauf. Trainer und Medizin sehen dazu den Hinweis „Befinden: Unauffällig / Beobachten / Anpassen“ (Risikowert mit Abklingzeit, SCRUM-177); Spieler und Eltern sehen nur ihre eigenen Angaben.
  */
 @Component({
   selector: 'tk-self-report-history',
@@ -55,12 +54,15 @@ export class SelfReportHistory implements OnInit {
       .sort((a, b) => b.event.date.localeCompare(a.event.date) || (b.event.startTime ?? '').localeCompare(a.event.startTime ?? ''));
   });
   protected readonly shown = computed(() => (this.all() ? this.rows() : this.rows().slice(0, SHOWN)));
-  protected readonly hints = computed(() => {
-    if (!this.compare()) return [];
-    const deviation = deviationHint(exertionPairs(this.events.events(), this.reports.reports()));
-    const wellness = wellnessStatus([...this.reports.wellness().values()], this.today).hint;
-    return [deviation, wellness].filter((hint): hint is string => hint !== null);
-  });
+  /** Risikowert mit Abklingzeit (SCRUM-177); nur für Trainer und Medizin (`compare`), Spieler sehen ihre Angaben, aber keine Bewertung. */
+  protected readonly risk = computed(() =>
+    this.compare() ? wellnessRisk([...this.reports.wellness().values()], exertionPairs(this.events.events(), this.reports.reports()), this.today) : null,
+  );
+  /** Info „leichter als geplant“ (kein Risiko, nur Trainer und Medizin). */
+  protected readonly lighter = computed(() => (this.compare() ? lighterHint(exertionPairs(this.events.events(), this.reports.reports())) : null));
+  protected readonly riskReasons = computed(() =>
+    (this.risk()?.contributions ?? []).map((item) => item.label).join(', '),
+  );
   protected readonly status = computed(() => wellnessStatus([...this.reports.wellness().values()], this.today));
   /** Befindensverlauf: die letzten 12 vollständigen Antworten, älteste zuerst (Höhe = Summe 4–28). */
   protected readonly trend = computed(() =>
