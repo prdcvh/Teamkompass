@@ -811,6 +811,42 @@ service cloud.firestore {
         allow delete: if isTrainer() && request.auth.uid == uid;
       }
 
+      // ---------------------------------------------------------------------------------------------
+      // Lernpfade mit Kompetenzstufen (SCRUM-192, PO-Entscheidung A vom 02.11.2026: der Trainer legt alles selbst an).
+      // - learningPaths/{pathId}: Inhalt eines Pfads (Name, Position, Altersklasse, Stufen mit kurzer Einheit, Link und
+      //   Aufgabe fuer zu Hause). Keine Spielerdaten, fuer die ganze Mannschaft gleich: lesen Trainer sowie Spieler und
+      //   Eltern des Teams (die App zeigt nur die Pfade fuer Position und Altersklasse des Spielers). Schreiben nur der
+      //   Trainer, nur diese Felder, hoechstens 12 Stufen, Zeitpunkt vom Server.
+      // - learningProgress/{playerId}: bestaetigte Stufen EINES Spielers (paths.{pathId}.{levelId} = Datum). Keine Noten
+      //   und kein Gesundheitsdatum, deshalb unabhaengig von der Einwilligung (SCRUM-245). Lesen: Trainer und der eigene
+      //   Spieler bzw. die eigenen Eltern per gezieltem Abruf (Pfadvergleich wie bei playerCards) - nie fremde Spieler,
+      //   nie als Liste. Medizin und Scouts haben keinen Zugriff. Schreiben (bestaetigen/zuruecknehmen) nur der Trainer.
+      // ---------------------------------------------------------------------------------------------
+      match /learningPaths/{pathId} {
+        allow read: if isTrainer() || (isTeamMember() && memberDoc().data.role in ["player", "parent"]);
+        allow create, update: if isTrainer()
+          && request.resource.data.keys().hasOnly(['title', 'position', 'ageGroup', 'levels', 'updatedAt'])
+          && request.resource.data.title is string
+          && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 120
+          && request.resource.data.position is string && request.resource.data.position.size() <= 40
+          && request.resource.data.ageGroup is string && request.resource.data.ageGroup.size() <= 40
+          && request.resource.data.levels is list
+          && request.resource.data.levels.size() <= 12
+          && request.resource.data.updatedAt == request.time;
+        allow delete: if isTrainer();
+      }
+
+      match /learningProgress/{playerId} {
+        allow get: if isTrainer() || isPlayerFor(playerId);
+        allow list: if isTrainer();
+        allow create, update: if isTrainer()
+          && request.resource.data.keys().hasOnly(['playerId', 'paths', 'updatedAt'])
+          && request.resource.data.playerId == playerId
+          && request.resource.data.paths is map
+          && request.resource.data.updatedAt == request.time;
+        allow delete: if isTrainer();
+      }
+
       // Altes Einzeldokument aus dem frueheren Single-Blob-Modell. Die App liest oder schreibt es nicht mehr,
       // die Migration in die neue Struktur ist aus der App entfernt (SCRUM-36).
       // Die Regel bleibt nur, damit ein noch vorhandenes Dokument vom Trainer gelesen/geloescht werden kann.

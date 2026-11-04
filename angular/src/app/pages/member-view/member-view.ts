@@ -42,6 +42,8 @@ import { ConnectEmail } from './connect-email';
 import { RsvpPanel } from './rsvp-panel';
 import { SelfReportPanel } from './self-report-panel';
 import { SelfReportHistory } from '../profile/self-report-history';
+import { LearningSummary } from '../profile/learning-summary';
+import { LearningPanel } from './learning-panel';
 
 /**
  * Die eine Ansicht für Spieler, Eltern, Medizin und Scouts (Figma 01c/01d). Sie zeigt nur, was die Firestore-Regeln
@@ -60,7 +62,7 @@ import { SelfReportHistory } from '../profile/self-report-history';
  */
 @Component({
   selector: 'app-member-view',
-  imports: [RouterLink, Button, Card, InstallHint, Status, ProfileExtras, BreakNotice, LoadReportAction, HomeRanking, ConnectEmail, RsvpPanel, SelfReportPanel, SelfReportHistory],
+  imports: [RouterLink, Button, Card, InstallHint, Status, ProfileExtras, BreakNotice, LoadReportAction, HomeRanking, ConnectEmail, RsvpPanel, SelfReportPanel, SelfReportHistory, LearningPanel, LearningSummary],
   templateUrl: './member-view.html',
   styleUrls: ['../profile/profile.css', './member-view.css', '../../ui/chart/chart.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,

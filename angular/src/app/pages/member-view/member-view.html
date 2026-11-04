@@ -60,6 +60,8 @@
       <tk-self-report-panel [player]="p" />
       @if (!picks()) {
         <app-home-ranking [mobile]="mobile()" />
+        <!-- Lernpfad und nächster Schritt (SCRUM-192), nur Spieler und Eltern. -->
+        <tk-learning-panel [player]="p" />
       }
       <tk-card>
         <div class="header">
@@ -125,6 +127,8 @@
               }
             </ul>
             @if (!scout()) {
+              <!-- Bestätigte Lernpfad-Stufen (SCRUM-192). -->
+              <tk-learning-summary [player]="p" />
               <h2>Verfügbarkeit</h2>
               <ul class="bars">
                 @for (row of attendance(); track row.label) {

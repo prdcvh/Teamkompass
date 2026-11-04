@@ -113,6 +113,25 @@ function seed(): FakeFirebase {
       k5: { type: 'link', title: 'Dehnübungen nach dem Spiel', url: 'https://www.dfb.de/trainer/', description: 'Kurzes Programm für zu Hause.', category: 'Fitness' },
     },
   };
+  // Lernpfade (SCRUM-192): ein Torwart-Pfad (p1 ist Torwart, zwei Stufen bestätigt) und ein Pfad für alle Positionen.
+  fake.learning.paths.set('lp1', {
+    title: 'Torwart: sicher fangen und abwerfen', position: 'TW', ageGroup: 'U14',
+    levels: [
+      { id: 'l1', title: 'Grundstellung und Fangen in Brusthöhe', unit: 'Partner wirft 20 Bälle in Brusthöhe, Hände bilden ein W.', minutes: 3, url: null, homeTask: 'Ball 50-mal gegen die Wand werfen und fangen.' },
+      { id: 'l2', title: 'Flache Bälle aufnehmen', unit: 'Flache Bälle seitlich, Knie ab, Ball an den Körper ziehen.', minutes: 4, url: 'https://www.dfb.de/trainer/', homeTask: '' },
+      { id: 'l3', title: 'Hohe Bälle fangen mit einer sehr langen Beschreibung, damit die Ansicht auch am Handy umbricht', unit: 'Flanken von beiden Seiten, im höchsten Punkt fangen, Knie hoch.', minutes: 5, url: 'https://www.youtube.com/watch?v=abcdefghijk&list=PLabcdefghijklmnopqrstuvwxyz0123456789', homeTask: 'Zehn Minuten Sprungkraft: Hocksprünge und Seilspringen.' },
+      { id: 'l4', title: 'Abwurf und Abschlag', unit: 'Abwurf flach auf den Außenverteidiger, dann Abschlag auf Zonen.', minutes: 5, url: null, homeTask: 'Video zum Abschlag ansehen.' },
+    ],
+  });
+  fake.learning.paths.set('lp2', {
+    title: 'Erster Kontakt', position: '', ageGroup: '',
+    levels: [
+      { id: 'm1', title: 'Ball mit der Innenseite annehmen', unit: 'Zu zweit passen, Ball mit dem ersten Kontakt in den Lauf mitnehmen.', minutes: 3, url: null, homeTask: 'Jeden Tag 5 Minuten gegen die Wand passen.' },
+      { id: 'm2', title: 'Schulterblick vor der Annahme', unit: 'Vor jedem Pass über die Schulter schauen und ansagen, was frei ist.', minutes: 4, url: null, homeTask: '' },
+    ],
+  });
+  fake.learning.progress.set('p1', { playerId: 'p1', paths: { lp1: { l1: '2026-10-13', l2: '2026-10-20' }, lp2: { m1: '2026-10-27' } } });
+  fake.learning.progress.set('p2', { playerId: 'p2', paths: { lp2: { m1: '2026-10-27', m2: '2026-11-03' } } });
   // Scout-Sicht (SCRUM-170) so, wie sie der Trainer-Client aus diesen Daten schreiben würde.
   const players = [...fake.players.players].map(([id, data]) => playerFromDoc(id, data));
   const events = [...fake.events.events].map(([id, data]) => eventFromDoc(id, data));
