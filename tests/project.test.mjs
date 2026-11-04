@@ -342,11 +342,28 @@ test("copy-team: Service-Account-Schluessel sind per .gitignore ausgeschlossen",
 
 test("Angular: Spieler loeschen entfernt Entwicklungsplaene, Abwesenheiten und Messwerte", async () => {
   const service = await read("angular/src/app/core/firebase/players.api.ts");
-  assert.match(service, /PLAYER_SUBCOLLECTIONS = \['developmentPlans', 'absences', 'measurements', 'maturity'\]/);
+  assert.match(service, /PLAYER_SUBCOLLECTIONS = \['developmentPlans', 'absences', 'measurements', 'selfReports', 'wellness', 'maturity'\]/);
   const start = service.indexOf("async deletePlayer(");
   const body = service.slice(start, service.indexOf("\n  }\n", start));
   assert.match(body, /PLAYER_SUBCOLLECTIONS\.map\(\(name\) => getDocs\(collection\(db, \.\.\.base, 'players', id, name\)\)\)/);
   assert.match(body, /children\.flatMap\(\(snapshot\) => snapshot\.docs\.map\(\(entry\) => entry\.ref\)\)/, "Unterdaten des Spielers bleiben beim Loeschen zurueck");
+});
+
+test("Angular: Spieler loeschen kennt jede Unterdaten-Sammlung eines Spielers aus firestore.rules (SCRUM-278)", async () => {
+  const rules = await read("firestore.rules");
+  const start = rules.indexOf("match /players/{playerId} {");
+  assert.ok(start >= 0, "Regel fuer players/{playerId} fehlt");
+  // Bis zur schliessenden Klammer des players-Blocks (Einrueckung 6 Leerzeichen).
+  const block = rules.slice(start, rules.indexOf("\n      }\n", start));
+  const inRules = [...block.matchAll(/match \/(\w+)\/\{\w+\}/g)].map((m) => m[1]).filter((name) => name !== "players");
+  assert.ok(inRules.includes("wellness") && inRules.includes("selfReports"), `Unterdaten nicht erkannt: ${inRules}`);
+  const service = await read("angular/src/app/core/firebase/players.api.ts");
+  const list = service.match(/PLAYER_SUBCOLLECTIONS = \[([^\]]*)\]/);
+  assert.ok(list, "PLAYER_SUBCOLLECTIONS fehlt");
+  const inApp = [...list[1].matchAll(/'(\w+)'/g)].map((m) => m[1]);
+  for (const name of inRules) {
+    assert.ok(inApp.includes(name), `players/{playerId}/${name} bleibt beim Loeschen eines Spielers zurueck`);
+  }
 });
 
 test("Angular: Spieler loeschen entfernt auch die internen Trainer-Notizen", async () => {
