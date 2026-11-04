@@ -30,7 +30,7 @@ beforeEach(async () => {
       coach: { role: "trainer" },
       // Medizin-Zugang (SCRUM-170: neue Kennung "physio").
       medic: { role: "physio" },
-      // Scout-Zugang: neue Konten "scout", bestehende Konten des bisherigen Scout-Zugangs tragen noch "medical".
+      // Scout-Zugang: Kennung "scout". "legacyScout" traegt noch die alte Kennung "medical" (kein Alias mehr, SCRUM-202).
       scout: { role: "scout", email: "scout@example.test" },
       legacyScout: { role: "medical", email: "alt@example.test" },
       oldScout: { role: "scout", expiresAt: past() },
@@ -262,8 +262,8 @@ const SCOUT_FORBIDDEN = [
   "appState/current", "members/pl1"
 ];
 
-test("Scout (neue und bisherige Konten): liest die Scout-Sicht, aber keine Gesundheitsdaten, Notizen oder Rohdaten", async () => {
-  for (const uid of ["scout", "legacyScout"]) {
+test("Scout: liest die Scout-Sicht, aber keine Gesundheitsdaten, Notizen oder Rohdaten", async () => {
+  for (const uid of ["scout"]) {
     await canRead(uid, "scoutProfiles/p1");
     await canRead(uid, "scoutProfiles/p2");
     await assertSucceeds(getDocs(collection(as(uid), t("scoutProfiles"))));
@@ -283,6 +283,25 @@ test("Scout (neue und bisherige Konten): liest die Scout-Sicht, aber keine Gesun
     await assertFails(getDocs(collection(db, t("members"))));
     await assertFails(getDocs(collection(db, t("invites"))));
   }
+});
+
+// SCRUM-202: Die alte Kennung "medical" ist kein Alias fuer "scout" mehr. Ein uebriges Konto hat keine Rolle:
+// kein Fallback auf Scout, Medizin oder Trainer - nur das eigene Mitglieds-Dokument (und was jedes Teammitglied
+// lesen darf: Team-Dokument, meta/breaks) bleibt lesbar.
+test("Altes Konto mit Kennung medical: kein Scout, kein Medizin-Zugang, kein Trainer - liest und schreibt nichts", async () => {
+  const uid = "legacyScout";
+  await canRead(uid, `members/${uid}`);
+  for (const path of ["scoutProfiles/p1", "scoutProfiles/p2", ...SCOUT_FORBIDDEN]) await cannotRead(uid, path);
+  const db = as(uid);
+  await assertFails(getDocs(collection(db, t("scoutProfiles"))));
+  await assertFails(getDocs(collection(db, t("players"))));
+  await assertFails(getDocs(collection(db, t("events"))));
+  await assertFails(getDocs(collection(db, t("members"))));
+  await assertFails(setDoc(doc(db, t("scoutProfiles/p1")), { playerId: "p1", name: "x", entries: [] }));
+  await assertFails(setDoc(doc(db, t("players/p1")), { name: "x" }));
+  await assertFails(updateDoc(doc(db, t(`members/${uid}`)), { role: "trainer" }));
+  await assertFails(updateDoc(doc(db, t(`members/${uid}`)), { role: "scout" }));
+  await assertFails(deleteDoc(doc(db, t("members/pl1"))));
 });
 
 test("Abgelaufener Scout-Zugang sieht auch die Scout-Sicht nicht mehr", async () => {
