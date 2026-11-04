@@ -84,6 +84,12 @@ describe('Registrierung (reine Logik)', () => {
     expect(writes[1].data?.['clubId']).toBe('fc-x');
   });
 
+  it('Trainercode (SCRUM-183): nur Code löschen und eigener Trainer-Zugang im bestehenden Team – kein Team, kein Verein', () => {
+    const writes = registrationWrites({ uid: 'u1', email: 'a@b.de', invite: { ...clubInvite, kind: 'trainer', clubId: 'fc-x', teamId: 'U14' }, draft: { clubName: '', ageGroup: '', teamName: '' } });
+    expect(writes.map((write) => write.path.join('/'))).toEqual(['clubInvites/ABCDEFGHJKLMNPQR', 'teams/U14/members/u1']);
+    expect(writes[1].data).toEqual({ role: 'trainer', email: 'a@b.de', uid: 'u1', createdAt: SERVER_TIME, claimedInviteCode: 'ABCDEFGHJKLMNPQR' });
+  });
+
   it('baut den Registrierungslink', () => {
     expect(registrationLink('https://teamkompass-u14.web.app', 'ABCDEFGHJKLMNPQR')).toBe('https://teamkompass-u14.web.app/registrieren?code=ABCDEFGHJKLMNPQR');
   });

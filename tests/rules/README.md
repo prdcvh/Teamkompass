@@ -43,11 +43,21 @@ Zusammenfassung in einem Schreibvorgang, und dass ein `merge` den Eintrag eines 
 
 `clubs.test.mjs`: mehrere Vereine (SCRUM-180) – zwei Vereine A/B mit je einem Team, ein Altteam ohne
 Team-Dokument/`clubId`/`uid` und ein neues Team ohne Trainer. Prüft: Mitglieder aller Rollen aus Verein A lesen und
-schreiben nichts in Verein B; Vereinsadmin erreicht keinen fremden Verein und sieht im eigenen Verein keine
-Spieler-, Noten- oder Gesundheitsdaten; Teamsuche (`collectionGroup('members')` mit `uid`-Filter) liefert nur eigene
+schreiben nichts in Verein B; Vereinsadmin erreicht keinen fremden Verein und liest im eigenen Verein seit SCRUM-183
+mit, aber ohne Gesundheitsdaten und ohne zu schreiben; Teamsuche (`collectionGroup('members')` mit `uid`-Filter) liefert nur eigene
 Mitgliedschaften; `uid` muss der Dokument-ID entsprechen; `clubId` unveränderlich; Altteams können nicht
 beansprucht werden; Vereinsdokument lesen/ändern; erster Trainer genau einmal; niemand macht sich selbst zum
 Vereinsadmin; Altteams laufen unverändert; das Einmal-Skript (`scripts/assign-clubs-lib.mjs`) ändert keine Rechte.
+
+`club-admin.test.mjs`: Vereinsadmin (SCRUM-183, PO-Entscheidung B) – liest in den Teams des eigenen Vereins wie ein
+Trainer (Zugänge, Termine, Werte/Noten-Kopien, Freigaben, Scout-Sicht, Zusammenfassungen, Gegner, Aufstellung,
+Planung, Pausen, Rangliste, Lernpfade, Förderpläne, Anstrengung, Vereinsübersicht `meta/clubOverview`, Zu-/Absagen nur
+ohne Grund), aber nie Gesundheitsdaten (Spielerdokument, Abwesenheiten, Messwerte, Reife, Befinden, Absagegrund),
+Bewertungsdokumente, Notizen, Spielerkarten, Spieler-Codes als Liste, fremde Einstellungen; schreibt nichts außer Trainer
+entfernen; nichts in fremden Vereinen, Altteams oder Teams ohne Verein. Trainercode (`clubInvites` mit `kind:
+"trainer"`): nur Admin, nur bestehende Teams des eigenen Vereins; einlösen nur mit bestätigter (ggf. passender) E-Mail,
+genau einmal, nur für das eigene Konto, nie durch den Ersteller; niemand macht sich zum Vereinsadmin; die
+Vereinsübersicht schreibt nur der Trainer im festen Format.
 
 `registration.test.mjs`: Registrierung nur mit Einladung (SCRUM-181) – ein Vereinscode legt in einem Schreibvorgang
 Verein, Vereinsadmin, erstes Team und Trainer-Zugang an und wird dabei verbraucht; zweiter Versuch, abgelaufener Code,

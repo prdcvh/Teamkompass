@@ -96,4 +96,34 @@ describe('Register (Seite)', () => {
     expect(writes.find((write) => write.path[0] === 'clubs' && write.path.length === 2)?.data?.['name']).toBe('SV Muster');
     expect(writes.find((write) => write.path.length === 2 && write.path[0] === 'teams')?.data?.['name']).toBe('SV Muster U11');
   });
+  it('Trainercode (SCRUM-183): Beitritt ohne Eingaben, danach zur Übersicht des bestehenden Teams', async () => {
+    const fixture = await render({ code: 'ABCDEFGHJKLMNPQR' });
+    firebase.registration.invites.set('ABCDEFGHJKLMNPQR', {
+      code: 'ABCDEFGHJKLMNPQR',
+      kind: 'trainer',
+      clubId: 'fc-x',
+      teamId: 'U14',
+      teamName: 'FC X U14',
+      expiresAt: new Date(Date.now() + 86_400_000),
+      email: null,
+    });
+    firebase.teams.memberships.set('new-coach', [{ teamId: 'U14', role: 'trainer', playerId: null, expiresAt: null }]);
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    type(fixture, 'email', 'neu@verein.de');
+    type(fixture, 'password', 'Sicher12345678');
+    type(fixture, 'repeat', 'Sicher12345678');
+    (root(fixture).querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit'));
+    await vi.waitFor(() => expect(root(fixture).textContent).toContain('neu@verein.de'));
+    firebase.registration.verified = true;
+    (root(fixture).querySelector('.verify button') as HTMLButtonElement).click();
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(root(fixture).textContent).toContain('FC X U14');
+    });
+    expect(root(fixture).querySelector('h1')?.textContent).toContain('Team beitreten');
+    expect(root(fixture).querySelector('input[name="teamName"]')).toBeNull();
+    (root(fixture).querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit'));
+    await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith('/start'));
+    expect(firebase.registration.committed[0].map((write) => write.path.join('/'))).toEqual(['clubInvites/ABCDEFGHJKLMNPQR', 'teams/U14/members/new-coach']);
+  });
 });
