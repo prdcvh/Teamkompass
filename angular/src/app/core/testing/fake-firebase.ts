@@ -22,6 +22,8 @@ import { SelfReportsApi } from '../firebase/self-reports.api';
 import { TeamSettingsApi } from '../firebase/team-settings.api';
 import { TeamsApi } from '../firebase/teams.api';
 import { RegistrationApi } from '../firebase/registration.api';
+import { ClubApi } from '../firebase/club.api';
+import { FakeClubApi } from './fake-club.api';
 import { FakeTeamsApi } from './fake-teams.api';
 import { FakeRegistrationApi } from './fake-registration.api';
 import { WeatherProvider } from '../weather/weather-provider';
@@ -78,6 +80,7 @@ export class FakeFirebase {
   readonly playerView = new FakePlayerViewApi(this.calls, this.ratings);
   readonly teams = new FakeTeamsApi();
   readonly registration = new FakeRegistrationApi(this.auth);
+  readonly club = new FakeClubApi();
 
   constructor() {
     this.ratings.releaseFor = (playerId) => this.gradeReleases.release(playerId);
@@ -113,5 +116,6 @@ export function provideFakeFirebase(fake: FakeFirebase): Provider[] {
     { provide: PlayerViewApi, useValue: fake.playerView },
     { provide: TeamsApi, useValue: fake.teams },
     { provide: RegistrationApi, useValue: fake.registration },
+    { provide: ClubApi, useValue: fake.club },
   ];
 }
