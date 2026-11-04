@@ -1,0 +1,227 @@
+:host {
+  display: block;
+}
+
+.page {
+  display: grid;
+  gap: var(--tk-space-4);
+  max-width: 960px;
+  padding: var(--tk-space-5);
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: var(--tk-text-title);
+}
+
+h2 {
+  font-size: var(--tk-text-lg);
+}
+
+h3 {
+  font-size: var(--tk-text-md);
+}
+
+h4 {
+  margin-top: var(--tk-space-2);
+  font-size: var(--tk-text-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--tk-muted);
+}
+
+.head {
+  display: grid;
+  gap: var(--tk-space-2);
+}
+
+.muted {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+.error {
+  color: var(--tk-red-dark);
+  font-size: var(--tk-text-sm);
+}
+
+.club-name {
+  margin-top: var(--tk-space-2);
+}
+
+.teams {
+  display: grid;
+  gap: var(--tk-space-4);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr));
+}
+
+.panel {
+  display: grid;
+  gap: var(--tk-space-3);
+  padding: var(--tk-space-4);
+  min-width: 0;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tk-space-3);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tk-space-3);
+  margin: 0;
+}
+
+.facts dt {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+.facts dd {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.facts dd.warn {
+  color: var(--tk-red-dark);
+}
+
+.people {
+  display: grid;
+  gap: var(--tk-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.people li,
+.invite {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tk-space-2);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.email {
+  overflow-wrap: anywhere;
+}
+
+.confirm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tk-space-2);
+  align-items: center;
+}
+
+.invite {
+  font-size: var(--tk-text-sm);
+}
+
+.invite-form {
+  display: grid;
+  gap: var(--tk-space-3);
+}
+
+.field {
+  display: grid;
+  gap: var(--tk-space-2);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tk-space-3);
+}
+
+.invite-result {
+  display: grid;
+  gap: var(--tk-space-2);
+  padding: var(--tk-space-3);
+  background: var(--tk-surface-2);
+  border-radius: var(--tk-radius-lg);
+  justify-items: start;
+}
+
+.invite-result .link {
+  overflow-wrap: anywhere;
+  font-size: var(--tk-text-sm);
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--tk-text-sm);
+}
+
+.table th,
+.table td {
+  padding: var(--tk-space-2);
+  border-bottom: 1px solid var(--tk-line);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table td:nth-child(2) {
+  white-space: normal;
+}
+
+.table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.events {
+  display: grid;
+  gap: var(--tk-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.events li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tk-space-2) var(--tk-space-3);
+  align-items: baseline;
+  padding-bottom: var(--tk-space-2);
+  border-bottom: 1px solid var(--tk-line);
+}
+
+.events .date {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.events .type {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+.events .event-title {
+  flex: 1 1 140px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 599px) {
+  .page {
+    padding: var(--tk-space-4);
+  }
+}

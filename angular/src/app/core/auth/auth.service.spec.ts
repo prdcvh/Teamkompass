@@ -47,6 +47,16 @@ describe('AuthService', () => {
     expect(auth.error()).toContain('keine Teamdaten');
   });
 
+  it('SCRUM-39: offline ohne gespeicherten Zugang bleibt gesperrt mit Offline-Hinweis und ohne Abmeldung', async () => {
+    firebase.access.memberErrors.set('uid-1', { code: 'unavailable' });
+    auth.start(0);
+    firebase.auth.emit({ uid: 'uid-1', isAnonymous: false, email: 'coach@verein.de' });
+    await vi.waitFor(() => expect(auth.status()).toBe('unavailable'));
+    expect(auth.error()).toContain('Ohne Internet');
+    expect(session.role()).toBeNull();
+    expect(firebase.calls).not.toContain('signOut');
+  });
+
   it('meldet einen Trainer mit seiner Rolle an', async () => {
     firebase.access.members.set('uid-1', { role: 'trainer', playerId: null });
     auth.start(0);
