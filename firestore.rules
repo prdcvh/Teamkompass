@@ -541,6 +541,36 @@ service cloud.firestore {
         }
 
         // -----------------------------------------------------------------------------------------
+        // Reife-Kompass (SCRUM-190, PO-Entscheidung 02.11.2026). Ein Dokument "parents" mit Geschlecht fuer die
+        // Formel, Einverstaendnis der Eltern und Groesse von Mutter und Vater (Angaben ueber Dritte). Der Reifestand
+        // selbst wird nie gespeichert, die App rechnet ihn aus Messwerten und diesem Dokument.
+        // - Lesen: nur Trainer und Medizin (Medizin nicht bei widerrufener Einwilligung, wie Messwerte). Spieler,
+        //   Eltern und Scouts nie - ohne die Groesse der Eltern laesst sich der Reifestand nicht berechnen.
+        // - Schreiben: nur Trainer, nur genau diese Felder, Groessen 100-250 cm. Ohne Haekchen "Eltern sind
+        //   einverstanden" (parentsConsent) duerfen keine Groessen gespeichert sein. Fremde Vereine wie bei
+        //   Gesundheitsdaten nur mit dokumentierter Einwilligung (mayStoreHealth). Loeschen: Trainer.
+        // -----------------------------------------------------------------------------------------
+        match /maturity/{docId} {
+          function parentHeightOk(value) {
+            return value == null || ((value is int || value is float) && value >= 100 && value <= 250);
+          }
+          allow read: if isTrainer() || (isPhysio() && !consentRevoked(playerId));
+          allow create, update: if isTrainer()
+            && docId == 'parents'
+            && mayStoreHealth(playerId)
+            && request.resource.data.keys().hasOnly(['playerId', 'sex', 'parentsConsent', 'motherHeight', 'fatherHeight', 'updatedAt'])
+            && request.resource.data.playerId == playerId
+            && request.resource.data.get('sex', '') in ['', 'm', 'f']
+            && request.resource.data.parentsConsent is bool
+            && request.resource.data.get('updatedAt', '') is string
+            && parentHeightOk(request.resource.data.get('motherHeight', null))
+            && parentHeightOk(request.resource.data.get('fatherHeight', null))
+            && (request.resource.data.parentsConsent == true
+              || (request.resource.data.get('motherHeight', null) == null && request.resource.data.get('fatherHeight', null) == null));
+          allow delete: if isTrainer();
+        }
+
+        // -----------------------------------------------------------------------------------------
         // Angaben des Spielers nach einem Termin (SCRUM-138, PO-Entscheidung 02.11.2026). Dokument-ID = Event-ID.
         // - selfReports: Anstrengung 0-10 (kein Gesundheitsdatum, wird ohne Einwilligung abgefragt).
         // - wellness: Befinden (Muedigkeit, Schlaf, Muskelkater, Stress, je 1-7 oder leer) - ein Gesundheitsdatum.
@@ -836,6 +866,42 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly(['emailReminders'])
           && request.resource.data.emailReminders is bool;
         allow delete: if isTrainer() && request.auth.uid == uid;
+      }
+
+      // ---------------------------------------------------------------------------------------------
+      // Lernpfade mit Kompetenzstufen (SCRUM-192, PO-Entscheidung A vom 02.11.2026: der Trainer legt alles selbst an).
+      // - learningPaths/{pathId}: Inhalt eines Pfads (Name, Position, Altersklasse, Stufen mit kurzer Einheit, Link und
+      //   Aufgabe fuer zu Hause). Keine Spielerdaten, fuer die ganze Mannschaft gleich: lesen Trainer sowie Spieler und
+      //   Eltern des Teams (die App zeigt nur die Pfade fuer Position und Altersklasse des Spielers). Schreiben nur der
+      //   Trainer, nur diese Felder, hoechstens 12 Stufen, Zeitpunkt vom Server.
+      // - learningProgress/{playerId}: bestaetigte Stufen EINES Spielers (paths.{pathId}.{levelId} = Datum). Keine Noten
+      //   und kein Gesundheitsdatum, deshalb unabhaengig von der Einwilligung (SCRUM-245). Lesen: Trainer und der eigene
+      //   Spieler bzw. die eigenen Eltern per gezieltem Abruf (Pfadvergleich wie bei playerCards) - nie fremde Spieler,
+      //   nie als Liste. Medizin und Scouts haben keinen Zugriff. Schreiben (bestaetigen/zuruecknehmen) nur der Trainer.
+      // ---------------------------------------------------------------------------------------------
+      match /learningPaths/{pathId} {
+        allow read: if isTrainer() || (isTeamMember() && memberDoc().data.role in ["player", "parent"]);
+        allow create, update: if isTrainer()
+          && request.resource.data.keys().hasOnly(['title', 'position', 'ageGroup', 'levels', 'updatedAt'])
+          && request.resource.data.title is string
+          && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 120
+          && request.resource.data.position is string && request.resource.data.position.size() <= 40
+          && request.resource.data.ageGroup is string && request.resource.data.ageGroup.size() <= 40
+          && request.resource.data.levels is list
+          && request.resource.data.levels.size() <= 12
+          && request.resource.data.updatedAt == request.time;
+        allow delete: if isTrainer();
+      }
+
+      match /learningProgress/{playerId} {
+        allow get: if isTrainer() || isPlayerFor(playerId);
+        allow list: if isTrainer();
+        allow create, update: if isTrainer()
+          && request.resource.data.keys().hasOnly(['playerId', 'paths', 'updatedAt'])
+          && request.resource.data.playerId == playerId
+          && request.resource.data.paths is map
+          && request.resource.data.updatedAt == request.time;
+        allow delete: if isTrainer();
       }
 
       // Altes Einzeldokument aus dem frueheren Single-Blob-Modell. Die App liest oder schreibt es nicht mehr,

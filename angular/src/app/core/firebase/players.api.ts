@@ -5,8 +5,13 @@ import { PlayerViewMode } from '../ratings/player-view-mode';
 import { FirebaseConnection } from './firebase-connection';
 import type { RawDoc, SnapshotMeta } from './types';
 
-/** Unterkollektionen eines Spielers, die beim Löschen mitgehen (Entwicklungspläne, Abwesenheiten, Messwerte). */
-const PLAYER_SUBCOLLECTIONS = ['developmentPlans', 'absences', 'measurements'] as const;
+/**
+ * Unterkollektionen eines Spielers, die beim Löschen mitgehen: Entwicklungspläne, Abwesenheiten, Messwerte, die
+ * Angaben aus dem Check-in nach dem Termin (SCRUM-138: Anstrengung `selfReports`, Befinden `wellness` – ein
+ * Gesundheitsdatum, SCRUM-278) und die Angaben zum Reife-Kompass (`maturity`, SCRUM-190). Muss jede
+ * `players/{playerId}/…`-Sammlung aus firestore.rules enthalten (geprüft in tests/project.test.mjs).
+ */
+const PLAYER_SUBCOLLECTIONS = ['developmentPlans', 'absences', 'measurements', 'selfReports', 'wellness', 'maturity'] as const;
 
 /** Spieler des Teams (players): Echtzeit-Abo, Speichern und Löschen samt aller Unterdaten. */
 @Injectable({ providedIn: 'root' })
@@ -115,7 +120,7 @@ export class PlayersApi {
   /** Löscht den Spieler samt Unterdaten, Bewertungen, internen Notizen und Zu-/Absagen in allen Events und Zusammenfassung (in Blöcken, Limit 500 je Schreibvorgang). */
   async deletePlayer(id: string): Promise<void> {
     const { db } = await this.connection.get();
-    const { collection, doc, getDocs, query, where, writeBatch } = await import('firebase/firestore');
+    const { collection, deleteDoc, doc, getDocs, query, where, writeBatch } = await import('firebase/firestore');
     const base = ['teams', this.team.id()] as const;
     const [events, invites, members, ...children] = await Promise.all([
       getDocs(collection(db, ...base, 'events')),
@@ -146,6 +151,11 @@ export class PlayersApi {
       doc(db, ...base, 'playerCards', id),
       doc(db, ...base, 'players', id), // zuletzt: bricht ein Block ab, bleibt der Spieler sichtbar und der Löschversuch wiederholbar
     ];
+    // Bestätigte Lernpfad-Stufen (SCRUM-192) in einem eigenen Schreibvorgang: kennt eine ältere Regelversion den Pfad noch
+    // nicht (permission-denied), darf das das Löschen des Spielers nicht verhindern.
+    await deleteDoc(doc(db, ...base, 'learningProgress', id)).catch((error: unknown) => {
+      if ((error as { code?: unknown } | null)?.code !== 'permission-denied') throw error;
+    });
     for (let offset = 0; offset < refs.length; offset += 450) {
       const batch = writeBatch(db);
       refs.slice(offset, offset + 450).forEach((ref) => batch.delete(ref));

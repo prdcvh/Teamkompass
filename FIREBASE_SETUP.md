@@ -498,3 +498,17 @@ Diesen Eintrag einsetzen und nur `target` (`main`, `u15` oder `u17`) und `public
   ]
 }
 ```
+
+## 12. Verwaiste Daten gelöschter Spieler entfernen (`scripts/clean-orphans.mjs`, SCRUM-278)
+
+Bis SCRUM-278 hat „Spieler löschen“ die Angaben aus dem Check-in (Anstrengung `selfReports`, Befinden
+`wellness`) nicht mitgelöscht. Wurde seit SCRUM-138 ein Spieler gelöscht, können sie unter
+`teams/<team>/players/<gelöschte-id>/…` liegen geblieben sein. Das Skript findet solche Einträge (nur unter
+Spielern, deren Spielerdokument es nicht mehr gibt) und löscht sie auf Wunsch. Einrichtung wie Abschnitt 7
+(`npm install --no-save firebase-admin`, Service-Account-Schlüssel nie einchecken).
+
+1. Probelauf (Standard, ändert nichts):
+   `GOOGLE_APPLICATION_CREDENTIALS=/pfad/key.json node scripts/clean-orphans.mjs U17`
+2. Ausgabe prüfen (welche gelöschten Spieler, wie viele Einträge je Bereich).
+3. Erst dann löschen: derselbe Aufruf mit `--apply`.
+4. Für jedes Team wiederholen (`mein-team`, `U15`, `U17`, `U14`).

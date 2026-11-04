@@ -60,6 +60,11 @@ Skript `scripts/create-club-invite.mjs` (Logik `scripts/club-invite-lib.mjs`) er
 schreiben, Spieler, Eltern, Medizin, Scout, abgelaufene Trainer und Fremde nicht; und der Befund, dass eine neue Unter-Sammlung
 unter `teams/{teamId}` ohne Regeländerung für alle gesperrt wäre.
 
+`learning.test.mjs`: Lernpfade (SCRUM-192) – `learningPaths/{pathId}` lesen Trainer, Spieler und Eltern, schreiben nur der
+Trainer (nur die vorgesehenen Felder, höchstens 12 Stufen, Zeitpunkt vom Server); `learningProgress/{playerId}` lesen nur
+der Trainer (auch als Liste) und der eigene Spieler bzw. die eigenen Eltern (gezielter Abruf, nie fremde Spieler, nie als
+Liste), bestätigen/zurücknehmen nur der Trainer; Medizin, Scout, abgelaufene Zugänge, Fremde und andere Teams nichts.
+
 `consent.test.mjs`: Einwilligung für Gesundheitsdaten (SCRUM-245) – bei „widerrufen“ lesen Spieler, Eltern und Medizin weder
 Spielerdokument (Status, „verletzt bis/seit“) noch Abwesenheiten, Messwerte oder Absagegründe (der Trainer schon; Noten
 und Förderplan bleiben lesbar); Medizin listet nur mit Filter `consentStatus != revoked`; bereinigte Spielerkarte
@@ -68,3 +73,8 @@ und Förderplan bleiben lesbar); Medizin listet nur mit Filter `consentStatus !=
 „verletzt bis/seit“, Abwesenheiten, Messwerte, Absagegrund) nur mit dokumentierter Einwilligung. Wer „dokumentiert“ setzt,
 trägt die eigene UID ein (`consentByUid`). SCRUM-248: Der Trainer darf in einer Rückmeldung nur den Absagegrund leeren
 (kein anderes Feld, keine neue Rückmeldung). `roles.test.mjs` und `rsvp.test.mjs` laufen dafür im eigenen Team `U14`.
+
+`maturity.test.mjs`: Reife-Kompass (SCRUM-190) unter `players/{playerId}/maturity/parents` (Geschlecht für die Formel,
+Einverständnis der Eltern, Größe von Mutter und Vater) – lesen nur Trainer und Medizin (Medizin nicht bei widerrufener
+Einwilligung), nie Spieler, Eltern oder Scouts; schreiben nur der Trainer, nur diese Felder, Größen 100–250 cm und nur mit
+Häkchen `parentsConsent`; fremde Vereine nur mit dokumentierter Einwilligung.
