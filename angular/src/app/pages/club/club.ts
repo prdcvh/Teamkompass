@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { SessionService } from '../../core/auth/session.service';
 import { type ClubTeamSummary, ClubAdminOverviewService } from '../../core/club/club-admin-overview.service';
 import { gradeLabel } from '../../core/ratings/rating';
 import { formatInviteCode } from '../../core/registration/registration';
@@ -20,6 +21,7 @@ import { Card } from '../../ui/card/card';
 })
 export class Club {
   protected readonly overview = inject(ClubAdminOverviewService);
+  protected readonly me = inject(SessionService).uid;
   protected readonly teamId = signal<string | null>(null);
   /** Team, für das gerade eine Einladung ausgefüllt wird, und die E-Mail dazu. */
   protected readonly inviting = signal<string | null>(null);

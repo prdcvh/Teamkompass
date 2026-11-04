@@ -11,7 +11,7 @@
             E-Mail bestätigen
           }
           @default {
-            {{ reg.invite()?.kind === 'club' ? 'Verein und Team anlegen' : 'Team anlegen' }}
+            {{ reg.invite()?.kind === 'club' ? 'Verein und Team anlegen' : reg.invite()?.kind === 'trainer' ? 'Team beitreten' : 'Team anlegen' }}
           }
         }
       </h1>

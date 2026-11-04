@@ -148,8 +148,10 @@
                     <ul class="people">
                       @for (trainer of team.trainers; track trainer.uid) {
                         <li>
-                          <span class="email">{{ trainer.email || 'Trainer-Konto' }}</span>
-                          @if (confirmRemove() === team.teamId + '/' + trainer.uid) {
+                          <span class="email">{{ trainer.email || 'Trainer-Konto' }}{{ trainer.uid === me() ? ' (du)' : '' }}</span>
+                          @if (trainer.uid === me()) {
+                            <!-- Sich selbst entfernt man hier nicht (sonst fehlt plötzlich der eigene Zugang). -->
+                          } @else if (confirmRemove() === team.teamId + '/' + trainer.uid) {
                             <span class="confirm">
                               <span>Wirklich entfernen?</span>
                               <button tkButton variant="primary" type="button" [disabled]="overview.busy()" (click)="remove(team.teamId, trainer.uid)">Ja, entfernen</button>
