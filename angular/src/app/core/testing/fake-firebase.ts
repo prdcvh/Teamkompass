@@ -14,6 +14,8 @@ import { PlanningApi } from '../firebase/planning.api';
 import { PlayersApi } from '../firebase/players.api';
 import { RankingApi } from '../firebase/ranking.api';
 import { RatingsApi } from '../firebase/ratings.api';
+import { GradeReleasesApi } from '../firebase/grade-releases.api';
+import { PlayerViewApi } from '../firebase/player-view.api';
 import { RsvpApi } from '../firebase/rsvp.api';
 import { ScoutApi } from '../firebase/scout.api';
 import { SelfReportsApi } from '../firebase/self-reports.api';
@@ -39,6 +41,8 @@ import { FakePlayerStatsApi } from './fake-player-stats.api';
 import { FakePlayersApi } from './fake-players.api';
 import { FakeRankingApi } from './fake-ranking.api';
 import { FakeRatingsApi } from './fake-ratings.api';
+import { FakeGradeReleasesApi } from './fake-grade-releases.api';
+import { FakePlayerViewApi } from './fake-player-view.api';
 import { FakeRsvpApi } from './fake-rsvp.api';
 import { FakeScoutApi } from './fake-scout.api';
 import { FakeSelfReportsApi } from './fake-self-reports.api';
@@ -70,10 +74,13 @@ export class FakeFirebase {
   readonly scout = new FakeScoutApi(this.calls);
   readonly selfReports = new FakeSelfReportsApi(this.calls);
   readonly playerStats = new FakePlayerStatsApi(this.calls, this.events, this.ratings);
+  readonly gradeReleases = new FakeGradeReleasesApi(this.calls);
+  readonly playerView = new FakePlayerViewApi(this.calls, this.ratings);
   readonly teams = new FakeTeamsApi();
   readonly registration = new FakeRegistrationApi(this.auth);
 
   constructor() {
+    this.ratings.releaseFor = (playerId) => this.gradeReleases.release(playerId);
     this.events.hasRecords = (id) => (this.ratings.ratings.get(id)?.size ?? 0) > 0 || (this.ratings.privateNotes.get(id)?.size ?? 0) > 0;
   }
 }
@@ -102,6 +109,8 @@ export function provideFakeFirebase(fake: FakeFirebase): Provider[] {
     { provide: ScoutApi, useValue: fake.scout },
     { provide: SelfReportsApi, useValue: fake.selfReports },
     { provide: PlayerStatsApi, useValue: fake.playerStats },
+    { provide: GradeReleasesApi, useValue: fake.gradeReleases },
+    { provide: PlayerViewApi, useValue: fake.playerView },
     { provide: TeamsApi, useValue: fake.teams },
     { provide: RegistrationApi, useValue: fake.registration },
   ];

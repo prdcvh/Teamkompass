@@ -203,4 +203,24 @@ describe('RatingsService', () => {
       expect(ratings.setPoints('p1', '3')).toBe(false);
     });
   });
+
+  // SCRUM-115: Die Noten-Kopie für Spieler bekommt nur bei geänderten Noten einen neuen Zeitpunkt – sonst würden
+  // veröffentlichte Noten nach einer Korrektur der Minuten wieder verschwinden.
+  it('schreibt die Noten für die Spieleransicht nur neu, wenn sich Noten ändern', async () => {
+    const ratings = await setup();
+    ratings.start('e1');
+    await vi.waitFor(() => expect(ratings.load()).toBe('ready'));
+    ratings.setField('p1', 'minutes', '60');
+    await vi.waitFor(() => expect(firebase.calls).toContain('saveRating:e1:p1'));
+    expect(firebase.calls).not.toContain('saveGrades:e1:p1');
+    expect(firebase.ratings.values.get('e1')?.get('p1')).toMatchObject({ minutes: 60, attendance: 'present' });
+    ratings.setField('p1', 'note', 'Neuer Kommentar');
+    await vi.waitFor(() => expect(firebase.calls.filter((call) => call === 'saveRating:e1:p1')).toHaveLength(2));
+    expect(firebase.calls).not.toContain('saveGrades:e1:p1');
+    ratings.setField('p1', 'effort', '1');
+    await vi.waitFor(() => expect(firebase.calls).toContain('saveGrades:e1:p1'));
+    expect(firebase.ratings.grades.get('e1')?.get('p1')).toMatchObject({ effort: 1, playerId: 'p1' });
+    expect(firebase.ratings.grades.get('e1')?.get('p1')?.['note']).toBeUndefined();
+    expect(firebase.ratings.values.get('e1')?.get('p1')?.['note']).toBeUndefined();
+  });
 });

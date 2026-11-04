@@ -259,7 +259,7 @@ export class RsvpService {
       const doc = await this.ratingsApi.readRatingDoc(event.id, player.id);
       const next = rsvpAbsenceRating(doc ? ratingFromDoc(doc) : null, response, { hideReason });
       if (next) {
-        await this.ratingsApi.saveRating(event.id, player.id, docFromRating(next, { clearAuto: true }));
+        await this.ratingsApi.saveRating(event.id, player.id, docFromRating(next, { clearAuto: true }), doc);
         // Nach einer Zusage greift die normale Abwesenheits-Automatik wieder (z. B. inzwischen verletzt gemeldet).
         if (next.attendance === 'open') await this.absences.reconcilePlayer(player, [event]);
       }

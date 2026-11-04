@@ -175,6 +175,11 @@ if (new URLSearchParams(location.search).get('skala') === 'stufen') {
     ['p1', { attendance: 'present', effort: 3, technique: 1.5, tactics: 3, comprehension: 1.5, grade: 2.4, scale: 'levels', note: 'Super mitgemacht', playerId: 'p1' }],
   ]));
 }
+// Noten veröffentlicht (SCRUM-115): ?noten=frei gibt die Noten von p1 bis jetzt frei (unbefristet). Ohne den Parameter
+// sieht der Spieler nur seine Werte.
+if (new URLSearchParams(location.search).get('noten') === 'frei') {
+  fake.gradeReleases.releases.set('p1', { playerId: 'p1', publishedUntil: new Date(), expiresAt: null, createdBy: 'e2e-uid' });
+}
 if (new URLSearchParams(location.search).get('as') === 'fresh') {
   fake.players.players.clear();
   fake.events.events.clear();

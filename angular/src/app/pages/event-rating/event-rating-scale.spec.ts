@@ -116,6 +116,8 @@ describe('Bewertungsskala (SCRUM-188)', () => {
   it('Spieleransicht: Schnitt in der Skala der jüngsten Bewertung, ältere Schulnote bleibt lesbar', async () => {
     setup({ role: 'player' });
     firebase.ratings.ratings.get('e1')!.set('p1', { ...levels, playerId: 'p1' });
+    // Noten sieht der Spieler erst nach der Veröffentlichung (SCRUM-115).
+    firebase.gradeReleases.releases.set('p1', { playerId: 'p1', publishedUntil: new Date(), expiresAt: null, createdBy: 'coach' });
     const fixture = TestBed.createComponent(MemberView);
     await vi.waitFor(() => {
       fixture.detectChanges();

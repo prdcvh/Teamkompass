@@ -9,6 +9,7 @@ import { docFromEvent, eventFromDoc } from '../events/event';
 import { docFromOpponent, opponentFromDoc } from '../opponents/opponent';
 import { docFromPlayer, playerFromDoc } from '../player/player';
 import { docFromRating, ratingFromDoc } from '../ratings/rating';
+import { SERVER_TIME, gradesDoc, valuesDoc } from '../ratings/player-view';
 import { absenceFromDoc, docFromAbsence } from '../records/absence';
 import { docFromMeasurement, measurementFromDoc } from '../records/measurement';
 import { docFromPlan, planFromDoc } from '../records/plan';
@@ -200,7 +201,8 @@ export interface BackupOperation {
 }
 
 /** Schreibliste: dieselben Dokumente und Felder wie die einzelnen Speichern-Funktionen der App (Pfade unterhalb von `teams/{teamId}`). */
-export function backupOperations(backup: Backup, uid: string | null = null): BackupOperation[] {
+export function backupOperations(backup: Backup, uid: string | null = null, options: { playerCopies?: boolean } = {}): BackupOperation[] {
+  const copies = options.playerCopies ?? true;
   const ops: BackupOperation[] = [];
   for (const player of backup.players) {
     // Dokumentierte Einwilligung (SCRUM-245): Die Regeln verlangen beim Eintragen die UID des schreibenden Kontos –
@@ -210,7 +212,14 @@ export function backupOperations(backup: Backup, uid: string | null = null): Bac
   }
   for (const event of backup.events) {
     ops.push({ path: ['events', event.id], data: event.meta, merge: true });
-    for (const [playerId, rating] of Object.entries(event.ratings)) ops.push({ path: ['events', event.id, 'ratings', playerId], data: { ...rating, playerId }, merge: true });
+    for (const [playerId, rating] of Object.entries(event.ratings)) {
+      ops.push({ path: ['events', event.id, 'ratings', playerId], data: { ...rating, playerId }, merge: true });
+      // Kopien für die Spieleransicht (SCRUM-115) wie beim Speichern einer Bewertung; die Noten mit neuem Zeitpunkt.
+      if (copies) {
+        ops.push({ path: ['events', event.id, 'ratingValues', playerId], data: valuesDoc(playerId, rating), merge: false });
+        ops.push({ path: ['events', event.id, 'ratingGrades', playerId], data: { ...gradesDoc(playerId, rating), ratedAt: SERVER_TIME }, merge: false });
+      }
+    }
     for (const [playerId, note] of Object.entries(event.privateNotes)) ops.push({ path: ['events', event.id, 'privateNotes', playerId], data: { playerId, note }, merge: true });
   }
   for (const name of GROUPS) {
