@@ -67,3 +67,8 @@ und Förderplan bleiben lesbar); Medizin listet nur mit Filter `consentStatus !=
 „verletzt bis/seit“, Abwesenheiten, Messwerte, Absagegrund) nur mit dokumentierter Einwilligung. Wer „dokumentiert“ setzt,
 trägt die eigene UID ein (`consentByUid`). SCRUM-248: Der Trainer darf in einer Rückmeldung nur den Absagegrund leeren
 (kein anderes Feld, keine neue Rückmeldung). `roles.test.mjs` und `rsvp.test.mjs` laufen dafür im eigenen Team `U14`.
+
+`maturity.test.mjs`: Reife-Kompass (SCRUM-190) unter `players/{playerId}/maturity/parents` (Geschlecht für die Formel,
+Einverständnis der Eltern, Größe von Mutter und Vater) – lesen nur Trainer und Medizin (Medizin nicht bei widerrufener
+Einwilligung), nie Spieler, Eltern oder Scouts; schreiben nur der Trainer, nur diese Felder, Größen 100–250 cm und nur mit
+Häkchen `parentsConsent`; fremde Vereine nur mit dokumentierter Einwilligung.

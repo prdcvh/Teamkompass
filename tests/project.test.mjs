@@ -342,7 +342,7 @@ test("copy-team: Service-Account-Schluessel sind per .gitignore ausgeschlossen",
 
 test("Angular: Spieler loeschen entfernt Entwicklungsplaene, Abwesenheiten und Messwerte", async () => {
   const service = await read("angular/src/app/core/firebase/players.api.ts");
-  assert.match(service, /PLAYER_SUBCOLLECTIONS = \['developmentPlans', 'absences', 'measurements', 'selfReports', 'wellness'\]/);
+  assert.match(service, /PLAYER_SUBCOLLECTIONS = \['developmentPlans', 'absences', 'measurements', 'selfReports', 'wellness', 'maturity'\]/);
   const start = service.indexOf("async deletePlayer(");
   const body = service.slice(start, service.indexOf("\n  }\n", start));
   assert.match(body, /PLAYER_SUBCOLLECTIONS\.map\(\(name\) => getDocs\(collection\(db, \.\.\.base, 'players', id, name\)\)\)/);
