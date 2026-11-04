@@ -235,7 +235,7 @@ describe('AuthService', () => {
       expect(session.role()).toBe('physio');
     });
 
-    it('SCRUM-170: bisherige Scout-Konten („medical“) werden zu Scouts, nicht zu Medizin', async () => {
+    it('SCRUM-170: Scout-Konten sind Scouts, nicht Medizin', async () => {
       firebase.access.members.set('uid-1', { role: 'scout', playerId: null });
       auth.start(0);
       await auth.signInTrainer('scout@verein.de', 'x');

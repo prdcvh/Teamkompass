@@ -444,7 +444,7 @@ test("Rules-Tests: Lockfile mit Integritaet und CI-Workflow vorhanden (SCRUM-38)
   assert.doesNotMatch(workflow, /secrets\./);
 });
 
-test("Der Begriff „Medizinischer Lesezugang“ ist nirgends mehr sichtbar; „medical“ gilt seit SCRUM-170 als Scout (SCRUM-91)", async () => {
+test("Der Begriff „Medizinischer Lesezugang“ ist nirgends mehr sichtbar; „medical“ gilt seit SCRUM-202 nicht mehr als Scout (SCRUM-91)", async () => {
   const files = [
     "angular/src/app/core/shell/navigation.ts",
     "angular/src/app/core/access/access.service.ts",
@@ -456,7 +456,9 @@ test("Der Begriff „Medizinischer Lesezugang“ ist nirgends mehr sichtbar; „
     const text = await read(file);
     assert.doesNotMatch(text, /medizinische[rnm]? Lesezugang/i, `${file}: alter Begriff sichtbar`);
   }
-  assert.match(await read("firestore.rules"), /role in \["scout", "medical"\]/);
+  const rules = await read("firestore.rules");
+  assert.match(rules, /role == "scout"/);
+  assert.doesNotMatch(rules.replace(/\/\/.*$/gm, ""), /medical/, "firestore.rules: die alte Kennung medical darf nirgends mehr eine Rolle vergeben (SCRUM-202)");
   assert.match(await read("firestore.rules"), /role == "physio"/);
 });
 

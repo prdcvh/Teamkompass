@@ -16,7 +16,7 @@ rules_version = '2';
 //   - "physio" (Medizin-Zugang): liest Spielerliste, Status, Abwesenheiten/Verletzungen, Messwerte und
 //     Termine, keine Noten.
 //   - "scout" (Scout-Zugang): liest nur die bereinigte Scout-Sicht (scoutProfiles), keine
-//     Gesundheitsdaten. "medical" ist die alte Kennung dafuer und gilt weiter als "scout".
+//     Gesundheitsdaten. Die alte Kennung "medical" gilt nicht mehr (SCRUM-202).
 //   Zugaenge koennen ein Ablaufdatum (expiresAt) haben; danach gilt das Mitglied als nicht vorhanden.
 // - Ausserhalb der Teams: Vereinsadmins ("clubs/{clubId}/admins/{uid}") verwalten nur Verein, Teams und
 //   Beitrittscodes und sehen keine Spielerdaten. Wer sich neu registriert, braucht einen Einladungscode
@@ -247,13 +247,13 @@ service cloud.firestore {
       //   (scoutProfiles: Kompetenzprofil, Notenverlauf, Statistik). KEINE Gesundheitsdaten: weder
       //   Spielerdokumente (Status, Verletzt bis ...), Abwesenheiten, Messwerte, Bewertungsdokumente (deren
       //   Rueckmeldung kann einen Abwesenheitsgrund enthalten), interne Notizen noch Event-Notizen.
-      // "medical" ist die alte Kennung des bisherigen "Scout-Zugangs" (SCRUM-91). Entscheidung des PO
-      // (20.10.2026): bestehende Konten werden Scout-Konten. Deshalb gilt "medical" ab sofort als Scout -
-      // die Konten verlieren den Zugriff auf Gesundheitsdaten mit dem Deploy dieser Regeln, ohne dass ein
-      // Dokument umgeschrieben werden muss. Neue "medical"-Konten koennen nicht mehr angelegt werden; der
-      // Medizin-Zugang nutzt die neue, vorher nie vergebene Kennung "physio".
+      // "medical" war die alte Kennung des bisherigen "Scout-Zugangs" (SCRUM-91) und galt seit SCRUM-170 als
+      // Alias fuer "scout". Seit SCRUM-202 ist der Alias entfernt: ein Konto, das noch "medical" traegt, hat
+      // KEINE Rolle mehr und darf ausser dem eigenen Mitglieds-Dokument (und dem Team-Dokument sowie
+      // meta/breaks, die jedes Teammitglied lesen darf) nichts. Vorher scripts/migrate-medical-role.mjs
+      // laufen lassen (FIREBASE_SETUP.md), sonst verlieren alte Scout-Konten den Zugang.
       function isScout() {
-        return isTeamMember() && memberDoc().data.role in ["scout", "medical"];
+        return isTeamMember() && memberDoc().data.role == "scout";
       }
 
       function isPhysio() {

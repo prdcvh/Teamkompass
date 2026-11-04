@@ -512,3 +512,21 @@ Spielern, deren Spielerdokument es nicht mehr gibt) und löscht sie auf Wunsch. 
 2. Ausgabe prüfen (welche gelöschten Spieler, wie viele Einträge je Bereich).
 3. Erst dann löschen: derselbe Aufruf mit `--apply`.
 4. Für jedes Team wiederholen (`mein-team`, `U15`, `U17`, `U14`).
+
+## 13. Alte Rollenkennung `medical` aufräumen (`scripts/migrate-medical-role.mjs`, SCRUM-202)
+
+Der frühere „Scout-Zugang“ (SCRUM-91) hieß `medical`; seit SCRUM-170 galt die Kennung in Regeln und App als Alias für
+`scout`. Der Alias wird entfernt. **Danach hat ein Konto, das noch `members/{uid}.role == "medical"` trägt, keinerlei
+Zugriff mehr** (kein Fallback auf eine andere Rolle). Deshalb muss vorher jedes solche Konto auf `scout` umgestellt
+sein. Einladungen (`invites`) kennen nur `player`/`parent` und sind nicht betroffen.
+
+Das Skript durchsucht die Sammlungsgruppe `members` (alle Teams: `mein-team`, `U15`, `U17`, `U14`, künftige) und stellt
+nur das Feld `role` von `medical` auf `scout`. Es kann gefahrlos mehrfach laufen. Ausführung nur durch den Product Owner:
+
+1. Dienstkonto-Schlüssel wie in Abschnitt 7, Schritt 1 (außerhalb des Repos ablegen, danach löschen).
+2. Einmalig: `npm install --no-save firebase-admin`
+3. **Probelauf (Standard, schreibt nichts)** – listet je Team die betroffenen Konten:
+   `GOOGLE_APPLICATION_CREDENTIALS=/pfad/key.json node scripts/migrate-medical-role.mjs`
+4. Echter Lauf: gleicher Aufruf mit `--apply` am Ende.
+5. Kontrolle: Probelauf erneut – muss `0 Konto/Konten` und „Kein Konto mit medical“ melden. **Erst dann den PR mit
+   dem Entfernen des Alias mergen** (er deployt die Regeln und alle vier Team-Builds).
