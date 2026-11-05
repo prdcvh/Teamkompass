@@ -29,6 +29,26 @@
         }
       </div>
 
+      <tk-card>
+        <div class="panel" data-testid="team-goal">
+          <h2>Teamziel: Check-ins im {{ goal().monthName }}</h2>
+          <p>
+            <strong>{{ goal().count }}</strong>
+            @if (goal().goal !== null) {
+              von {{ goal().goal }} Check-ins{{ goal().reached ? ' – Ziel erreicht!' : '' }}
+            } @else {
+              Check-ins der Mannschaft (Termine in diesem Monat)
+            }
+          </p>
+          @if (goal().percent !== null) {
+            <progress [max]="100" [value]="goal().percent" [attr.aria-label]="'Teamziel: ' + goal().percent + ' Prozent'"></progress>
+          } @else {
+            <p class="muted">Ein Ziel legst du unter Einstellungen fest.</p>
+          }
+          <p class="muted">Gezählt wird gemeinsam als Mannschaft, es gibt keine Rangliste einzelner Spieler.</p>
+        </div>
+      </tk-card>
+
       <section class="columns">
         <tk-card>
           <div class="panel">
