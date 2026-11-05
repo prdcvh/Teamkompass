@@ -166,6 +166,9 @@
       }
     </tk-card>
   </section>
+
+  <!-- Reife-Kompass (SCRUM-190): nur Trainer und Medizin; die Karte blendet sich für andere Rollen selbst aus. -->
+  <tk-maturity-card [editable]="canEdit()" [healthLocked]="healthLocked()" />
   }
 }
 

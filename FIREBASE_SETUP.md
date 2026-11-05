@@ -82,11 +82,23 @@ teams/{teamId}/invites/{code}                        # Einmal-Einladungscodes fu
 teams/{teamId}/players/{playerId}
 teams/{teamId}/players/{playerId}/developmentPlans/{planId}
 teams/{teamId}/events/{eventId}                      # Titel/Datum/Ergebnis, keine Noten
-teams/{teamId}/events/{eventId}/ratings/{playerId}   # individuelle Bewertung
+teams/{teamId}/events/{eventId}/ratings/{playerId}   # individuelle Bewertung (nur Trainer, mit Kommentar)
+teams/{teamId}/events/{eventId}/ratingValues/{playerId}  # Kopie: Werte fuer Spieler/Eltern (SCRUM-115)
+teams/{teamId}/events/{eventId}/ratingGrades/{playerId}  # Kopie: Noten, nur nach Veroeffentlichung lesbar
+teams/{teamId}/gradeReleases/{playerId}              # "Bewertung veroeffentlichen" (bis wann, wie lange)
 teams/{teamId}/opponents/{opponentId}
 ```
 
 Vollstaendig und verbindlich: `firestore.rules` und `docs/architektur-verein-teams.md`.
+
+**Noten fuer Spieler erst nach Veroeffentlichung (SCRUM-115):** Spieler und Eltern lesen nicht mehr die
+Bewertung selbst, sondern zwei Kopien, die die Trainer-App bei jedem Speichern mitschreibt. Bestehende
+Bewertungen uebernimmt die App **einmal automatisch**, sobald nach dem Live-Gang zum ersten Mal ein Trainer
+das Team oeffnet (je Team; Kennzeichen `teams/{teamId}/meta/playerView`). Die Bewertungen selbst werden dabei
+nicht veraendert. Bis dahin sehen Spieler dieses Teams keine Werte; Noten sehen sie erst, wenn der Trainer im
+Spielerprofil "Bewertung veroeffentlichen" klickt (keine automatische Freigabe). Uebernahme wiederholen (z. B.
+nach einem Rueckweg auf einen alten Stand, der die Kopien nicht mitschreibt): das Dokument `meta/playerView`
+loeschen und die App als Trainer oeffnen - danach muessen die Noten neu veroeffentlicht werden.
 
 ## 6. Weitere Mannschaft einrichten
 
@@ -486,3 +498,35 @@ Diesen Eintrag einsetzen und nur `target` (`main`, `u15` oder `u17`) und `public
   ]
 }
 ```
+
+## 12. Verwaiste Daten gelöschter Spieler entfernen (`scripts/clean-orphans.mjs`, SCRUM-278)
+
+Bis SCRUM-278 hat „Spieler löschen“ die Angaben aus dem Check-in (Anstrengung `selfReports`, Befinden
+`wellness`) nicht mitgelöscht. Wurde seit SCRUM-138 ein Spieler gelöscht, können sie unter
+`teams/<team>/players/<gelöschte-id>/…` liegen geblieben sein. Das Skript findet solche Einträge (nur unter
+Spielern, deren Spielerdokument es nicht mehr gibt) und löscht sie auf Wunsch. Einrichtung wie Abschnitt 7
+(`npm install --no-save firebase-admin`, Service-Account-Schlüssel nie einchecken).
+
+1. Probelauf (Standard, ändert nichts):
+   `GOOGLE_APPLICATION_CREDENTIALS=/pfad/key.json node scripts/clean-orphans.mjs U17`
+2. Ausgabe prüfen (welche gelöschten Spieler, wie viele Einträge je Bereich).
+3. Erst dann löschen: derselbe Aufruf mit `--apply`.
+4. Für jedes Team wiederholen (`mein-team`, `U15`, `U17`, `U14`).
+
+## 13. Alte Rollenkennung `medical` aufräumen (`scripts/migrate-medical-role.mjs`, SCRUM-202)
+
+Der frühere „Scout-Zugang“ (SCRUM-91) hieß `medical`; seit SCRUM-170 galt die Kennung in Regeln und App als Alias für
+`scout`. Der Alias wird entfernt. **Danach hat ein Konto, das noch `members/{uid}.role == "medical"` trägt, keinerlei
+Zugriff mehr** (kein Fallback auf eine andere Rolle). Deshalb muss vorher jedes solche Konto auf `scout` umgestellt
+sein. Einladungen (`invites`) kennen nur `player`/`parent` und sind nicht betroffen.
+
+Das Skript durchsucht die Sammlungsgruppe `members` (alle Teams: `mein-team`, `U15`, `U17`, `U14`, künftige) und stellt
+nur das Feld `role` von `medical` auf `scout`. Es kann gefahrlos mehrfach laufen. Ausführung nur durch den Product Owner:
+
+1. Dienstkonto-Schlüssel wie in Abschnitt 7, Schritt 1 (außerhalb des Repos ablegen, danach löschen).
+2. Einmalig: `npm install --no-save firebase-admin`
+3. **Probelauf (Standard, schreibt nichts)** – listet je Team die betroffenen Konten:
+   `GOOGLE_APPLICATION_CREDENTIALS=/pfad/key.json node scripts/migrate-medical-role.mjs`
+4. Echter Lauf: gleicher Aufruf mit `--apply` am Ende.
+5. Kontrolle: Probelauf erneut – muss `0 Konto/Konten` und „Kein Konto mit medical“ melden. **Erst dann den PR mit
+   dem Entfernen des Alias mergen** (er deployt die Regeln und alle vier Team-Builds).

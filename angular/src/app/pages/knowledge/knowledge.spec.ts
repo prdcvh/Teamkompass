@@ -32,7 +32,7 @@ describe('Wissen (Seite, SCRUM-106)', () => {
     input.value = value;
     input.dispatchEvent(new Event(event, { bubbles: true }));
   }
-  const submit = (fixture: { nativeElement: unknown }) => (root(fixture).querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit', { cancelable: true }));
+  const submit = (fixture: { nativeElement: unknown }) => (root(fixture).querySelector('tk-knowledge-dialog form') as HTMLFormElement).dispatchEvent(new Event('submit', { cancelable: true }));
   const editButton = (fixture: { nativeElement: unknown }, title: string) =>
     [...root(fixture).querySelectorAll<HTMLButtonElement>('.row button')].find((b) => b.getAttribute('aria-label') === `Eintrag bearbeiten: ${title}`);
 
@@ -129,11 +129,11 @@ describe('Wissen (Seite, SCRUM-106)', () => {
 
     editButton(fixture, 'Abseitsregel')?.click();
     await fixture.whenStable();
-    (root(fixture).querySelector('form .delete') as HTMLButtonElement).click();
+    (root(fixture).querySelector('tk-knowledge-dialog form .delete') as HTMLButtonElement).click();
     await fixture.whenStable();
     expect(root(fixture).textContent).toContain('Der Eintrag „Abseitsregel“ wird gelöscht');
     expect(firebase.knowledge.knowledge['b']).toBeDefined();
-    const confirm = [...root(fixture).querySelectorAll<HTMLButtonElement>('.confirm-actions button')].find((b) => b.textContent?.includes('Endgültig'));
+    const confirm = [...root(fixture).querySelectorAll<HTMLButtonElement>('.confirm-actions button')].find((b) => b.textContent?.includes('Endgültig') && !b.closest('tk-learning-paths'));
     confirm?.click();
     await vi.waitFor(() => expect(firebase.knowledge.knowledge['b']).toBeUndefined());
   });

@@ -66,6 +66,14 @@ so nicht abfragen). Danach liest die App `teams/{teamId}` (Name, Verein) und `cl
 Vereinsadmins finden „ihre“ Vereine über die gleiche Art Abfrage auf `admins` und die Teams des Vereins
 über `teams where clubId == …`.
 
+> **Nachtrag SCRUM-183 (PO-Entscheidung B vom 02.11.2026):** Der Vereinsadmin liest jetzt in den Teams des eigenen
+> Vereins wie ein Trainer mit – nur lesen, nichts ändern, **ohne Gesundheitsdaten** (kein Spielerdokument, keine
+> Abwesenheiten, Messwerte, Reife-/Befindensdaten, Absagegründe, Bewertungsdokumente mit Rückmeldung, Notizen). Name,
+> Nummer und Positionen kommen aus der Kurzfassung `teams/{teamId}/meta/clubOverview`, die der Trainer-Client schreibt.
+> Er lädt weitere Trainer per Trainercode (`clubInvites`, `kind: "trainer"`) in bestehende Teams ein und entfernt
+> Trainer-Zugänge. Regeln: `isClubAdminOfTeam()` in `firestore.rules`, Tests: `tests/rules/club-admin.test.mjs`. Der
+> Abschnitt unten beschreibt den ursprünglichen Stand.
+
 ### Rolle Vereinsadmin (Empfehlung „nur Verwaltung“)
 
 Darf: Vereinsname/Logo ändern, Teams des Vereins sehen (nur Name/Bezeichnung), neue Teams für den eigenen

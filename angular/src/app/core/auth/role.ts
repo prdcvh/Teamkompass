@@ -9,12 +9,11 @@ export type Role = 'trainer' | 'player' | 'parent' | 'physio' | 'scout';
 const ROLES: readonly Role[] = ['trainer', 'player', 'parent', 'physio', 'scout'];
 
 /**
- * Gespeicherte Kennung → Rolle. `medical` ist die alte Kennung des bisherigen „Scout-Zugangs“ (SCRUM-91); nach
- * Entscheidung des PO werden diese Konten Scout-Konten (die Firestore-Regeln behandeln `medical` ebenso).
- * Unbekannte Werte ergeben null (kein Zugang).
+ * Gespeicherte Kennung → Rolle. Unbekannte Werte ergeben null (kein Zugang) – auch die alte Kennung `medical`
+ * des früheren „Scout-Zugangs“ (SCRUM-91), die seit SCRUM-202 nicht mehr als Scout gilt (die Firestore-Regeln
+ * behandeln sie ebenso).
  */
 export function normalizeRole(value: unknown): Role | null {
-  if (value === 'medical') return 'scout';
   return ROLES.find((role) => role === value) ?? null;
 }
 

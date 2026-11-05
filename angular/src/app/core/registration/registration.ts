@@ -3,11 +3,12 @@ import { type StaffErrors, validateStaffDraft } from '../access/access';
 /**
  * Registrierung nur mit Einladung (SCRUM-181). Ein Code `clubInvites/{code}` legt fest, was beim Einlösen entsteht:
  * - `club`: ein neuer Verein (der neue Trainer wird Vereinsadmin) samt erstem Team – Code vom PO per Skript;
- * - `team`: ein neues Team in einem bestehenden Verein (kein Adminrecht) – Code vom Vereinsadmin.
+ * - `team`: ein neues Team in einem bestehenden Verein (kein Adminrecht) – Code vom Vereinsadmin;
+ * - `trainer` (SCRUM-183): weiterer Trainer in einem BESTEHENDEN Team des Vereins – Code vom Vereinsadmin.
  * Vereins- und Team-ID stehen schon im Code. Alles entsteht in einem einzigen Schreibvorgang, der den Code löscht
  * (firestore.rules prüft genau diese Form; Regeltests: tests/rules/registration.test.mjs).
  */
-export type ClubInviteKind = 'club' | 'team';
+export type ClubInviteKind = 'club' | 'team' | 'trainer';
 
 export interface ClubInvite {
   readonly code: string;
@@ -17,6 +18,8 @@ export interface ClubInvite {
   readonly expiresAt: Date | null;
   /** An diese E-Mail gebunden (klein geschrieben) oder null = jede bestätigte Adresse. */
   readonly email: string | null;
+  /** Nur bei `trainer`: Name des bestehenden Teams (der Eingeladene darf das Team vor dem Beitritt nicht lesen). */
+  readonly teamName?: string;
 }
 
 /** Gleiches Format wie scripts/club-invite-lib.mjs und die Regel für Beitrittscodes: 16 Zeichen ohne 0/O/1/I. */
@@ -160,6 +163,15 @@ export function registrationWrites(input: {
 }): RegistrationWrite[] {
   const { uid, email, invite, draft } = input;
   const writes: RegistrationWrite[] = [{ kind: 'delete', path: ['clubInvites', invite.code] }];
+  if (invite.kind === 'trainer') {
+    // SCRUM-183: Das Team gibt es schon – nur der eigene Trainer-Zugang entsteht (mit dem verbrauchten Code).
+    writes.push({
+      kind: 'set',
+      path: ['teams', invite.teamId, 'members', uid],
+      data: { role: 'trainer', email, uid, createdAt: SERVER_TIME, claimedInviteCode: invite.code },
+    });
+    return writes;
+  }
   if (invite.kind === 'club') {
     writes.push({ kind: 'set', path: ['clubs', invite.clubId], data: { name: draft.clubName.trim(), logoUrl: null, createdAt: SERVER_TIME } });
     writes.push({

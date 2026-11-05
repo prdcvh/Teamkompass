@@ -17,11 +17,12 @@ import { Chip } from '../../ui/chip/chip';
 import { Dialog } from '../../ui/dialog/dialog';
 import { Icon } from '../../ui/icon/icon';
 import { KnowledgeDialog } from './entry-dialog';
+import { LearningPaths } from './learning-paths';
 
-/** Wissen (nur Trainer): Links zu Videos, Playlists und Dokumenten sowie ein Glossar, mit Suche und Filter. */
+/** Wissen (nur Trainer): Links zu Videos, Playlists und Dokumenten sowie ein Glossar, mit Suche und Filter; darunter die Lernpfade (SCRUM-192). */
 @Component({
   selector: 'app-knowledge',
-  imports: [Button, Card, Chip, Dialog, Icon, KnowledgeDialog],
+  imports: [Button, Card, Chip, Dialog, Icon, KnowledgeDialog, LearningPaths],
   templateUrl: './knowledge.html',
   styleUrl: './knowledge.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

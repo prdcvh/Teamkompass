@@ -40,3 +40,16 @@
 .picker {
   flex: 1 1 100%;
 }
+
+/* Hinweis zur Veröffentlichung der Noten (SCRUM-115). */
+.release-note {
+  margin: 0 0 var(--tk-space-3);
+  padding: var(--tk-space-3);
+  border-radius: var(--tk-radius-md);
+  background: var(--tk-soft-amber, #fff4d6);
+  font-size: var(--tk-text-sm);
+  overflow-wrap: anywhere;
+}
+.release-note[data-state='on'] {
+  background: var(--tk-soft-green, #e3f5e8);
+}

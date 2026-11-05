@@ -63,8 +63,8 @@ describe('Zugangsverwaltung (reine Logik)', () => {
     });
     expect(memberEntry({ id: 'u2', data: { role: 'physio', email: 'arzt@x.de' } })).toMatchObject({ role: 'physio', playerId: null, email: 'arzt@x.de', expiresAt: null });
     expect(memberEntry({ id: 'u5', data: { role: 'scout', email: 'scout@x.de' } })).toMatchObject({ role: 'scout', email: 'scout@x.de' });
-    // SCRUM-170: Die alte Kennung „medical“ des bisherigen Scout-Zugangs erscheint als Scout.
-    expect(memberEntry({ id: 'u6', data: { role: 'medical', email: 'alt@x.de' } })).toMatchObject({ role: 'scout', email: 'alt@x.de' });
+    // SCRUM-202: Die alte Kennung „medical“ ist kein Alias für Scout mehr und erscheint nicht in der Liste.
+    expect(memberEntry({ id: 'u6', data: { role: 'medical', email: 'alt@x.de' } })).toBeNull();
     expect(memberEntry({ id: 'u3', data: { role: 'trainer' } })).toBeNull();
     expect(memberEntry({ id: 'u4', data: {} })).toBeNull();
     expect(inviteEntry({ id: 'c1', data: { role: 'player', playerId: 'p1', expiresAt: null } })).toMatchObject({ kind: 'invite', role: 'player', expiresAt: null });
