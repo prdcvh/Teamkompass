@@ -76,6 +76,13 @@ export class TeamService {
         this.squadAbsences.waiting() > 0),
   );
   readonly ready = computed(() => this.active() && !this.loading() && !this.error() && this.squad.load() === 'ready');
+  /**
+   * Datum des Termins zu jedem Check-in der Mannschaft (SCRUM-194), ohne Zuordnung zu Spielern: reicht für das Teamziel
+   * „X Check-ins im Monat“ und verrät nichts über Einzelne. Geladen werden die letzten {@link MEASUREMENT_WINDOW_DAYS} Tage.
+   */
+  readonly checkInDates = computed<readonly string[]>(() =>
+    [...this.selfReports().values()].flatMap((reports) => [...reports.values()].map((report) => report.date)).filter((date) => date !== ''),
+  );
   /** Je Spieler: alle Events mit seiner Bewertung, Abwesenheiten, Messwerte. */
   readonly data = computed<PlayerData[]>(() =>
     this.squad.players().map((player) => ({

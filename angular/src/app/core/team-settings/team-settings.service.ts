@@ -6,6 +6,7 @@ import { SessionService } from '../auth/session.service';
 import { SyncService } from '../shell/sync.service';
 import { type FederalState, isFederalState } from './federal-states';
 import { type GameFormat, isGameFormat } from '../lineup/game-format';
+import { checkInGoalFromDoc, docFromCheckInGoal, isCheckInGoal } from '../streaks/streak';
 import { type DefaultLocation, defaultLocationFromDoc, docFromDefaultLocation, docFromFederalState, docFromGameFormat, federalStateFromDoc, gameFormatFromDoc } from './team-settings';
 
 /**
@@ -30,6 +31,8 @@ export class TeamSettingsService {
   readonly federalState = computed<FederalState>(() => federalStateFromDoc(this.stored()));
   /** Spielform des Teams (SCRUM-187); ohne gespeicherten Wert 11:11. */
   readonly gameFormat = computed<GameFormat>(() => gameFormatFromDoc(this.stored()));
+  /** Teamziel „Check-ins im Monat“ (SCRUM-194); null = keins gesetzt. */
+  readonly checkInGoal = computed<number | null>(() => checkInGoalFromDoc(this.stored()));
   /** Letzter Speicherfehler (für die Anzeige in den Einstellungen); leer, solange alles gespeichert wurde. */
   readonly error = signal('');
 
@@ -97,6 +100,12 @@ export class TeamSettingsService {
   saveGameFormat(format: GameFormat): boolean {
     if (!isGameFormat(format)) return false;
     return this.save(docFromGameFormat(format), 'Die Spielform konnte nicht gespeichert werden.');
+  }
+
+  /** Speichert (oder löscht mit null) das Teamziel „Check-ins im Monat“ (nur Trainer, SCRUM-194). */
+  saveCheckInGoal(goal: number | null): boolean {
+    if (goal !== null && !isCheckInGoal(goal)) return false;
+    return this.save(docFromCheckInGoal(goal), 'Das Teamziel konnte nicht gespeichert werden.');
   }
 
   private save(doc: Record<string, unknown>, failText: string): boolean {

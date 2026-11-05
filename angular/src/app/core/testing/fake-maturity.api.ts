@@ -35,6 +35,14 @@ export class FakeMaturityApi implements Pick<MaturityApi, keyof MaturityApi> {
     return () => set.delete(listener);
   }
 
+  readError: unknown = null;
+
+  async readMaturity(playerId: string): Promise<Readonly<Record<string, unknown>> | null> {
+    this.calls.push(`readMaturity:${playerId}`);
+    if (this.readError) throw this.readError;
+    return this.docs.get(playerId) ?? null;
+  }
+
   async saveMaturity(playerId: string, data: Readonly<Record<string, unknown>>): Promise<void> {
     this.calls.push(`saveMaturity:${playerId}`);
     if (this.saveError) throw this.saveError;
