@@ -992,6 +992,75 @@ service cloud.firestore {
         allow delete: if isTrainer();
       }
 
+      // ---------------------------------------------------------------------------------------------
+      // Situationsraetsel aus Spielszenen (SCRUM-193). Keine Gesundheitsdaten, keine Noten, keine Rangliste.
+      // - puzzles/{puzzleId}: Szene (Bild- oder Video-Link mit Zeitmarke), Frage, 2-4 Antworten, Schwierigkeit 1-3 -
+      //   bewusst OHNE Loesung. Lesen Trainer sowie Spieler und Eltern des Teams; schreiben nur der Trainer.
+      // - puzzleSolutions/{puzzleId}: richtige Antwort und Erklaerung. Trainer lesen alle. Spieler und Eltern nur per
+      //   gezieltem Abruf und erst, wenn die Antwort des eigenen Spielers auf dieses Raetsel existiert - vorher steht die
+      //   Loesung nirgends, wo sie sie lesen koennten. Schreiben nur der Trainer.
+      // - puzzleAnswers/{puzzleId}_{playerId}: die eine Antwort eines Spielers. Anlegen NUR der Spieler selbst (Rolle
+      //   "player", nicht Eltern), nur fuer ein bestehendes Raetsel, nur eine vorhandene Antwortmoeglichkeit, Zeitpunkt
+      //   vom Server. Aendern nie (keine zweite Chance nach dem Blick auf die Erklaerung), loeschen nur der Trainer.
+      //   Lesen: Trainer und der eigene Spieler bzw. die eigenen Eltern (Liste nur mit playerId-Filter) - nie fremde.
+      // Die Raetsel-Wertung wird nicht gespeichert, die App berechnet sie aus den Antworten. Medizin und Scouts: nichts.
+      // ---------------------------------------------------------------------------------------------
+      function puzzlePath(puzzleId) {
+        return /databases/$(database)/documents/teams/$(teamId)/puzzles/$(puzzleId);
+      }
+
+      match /puzzles/{puzzleId} {
+        allow read: if isTrainer() || isClubAdminOfTeam() || (isTeamMember() && memberDoc().data.role in ["player", "parent"]);
+        allow create, update: if isTrainer()
+          && request.resource.data.keys().hasOnly(['title', 'question', 'media', 'mediaUrl', 'videoStart', 'answers', 'level', 'updatedAt'])
+          && request.resource.data.title is string
+          && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 120
+          && request.resource.data.question is string && request.resource.data.question.size() <= 300
+          && request.resource.data.media in ['image', 'video']
+          && request.resource.data.mediaUrl is string
+          && request.resource.data.mediaUrl.size() <= 2000
+          && request.resource.data.mediaUrl.matches('^https://.+')
+          && (request.resource.data.videoStart == null
+            || (request.resource.data.videoStart is int && request.resource.data.videoStart >= 0 && request.resource.data.videoStart <= 36000))
+          && request.resource.data.answers is list
+          && request.resource.data.answers.size() >= 2 && request.resource.data.answers.size() <= 4
+          && request.resource.data.level in [1, 2, 3]
+          && request.resource.data.updatedAt == request.time;
+        allow delete: if isTrainer();
+      }
+
+      match /puzzleSolutions/{puzzleId} {
+        allow read: if isTrainer() || isClubAdminOfTeam();
+        allow get: if isTeamMember()
+          && memberDoc().data.role in ["player", "parent"]
+          && exists(/databases/$(database)/documents/teams/$(teamId)/puzzleAnswers/$(puzzleId + '_' + memberDoc().data.playerId));
+        allow create, update: if isTrainer()
+          && request.resource.data.keys().hasOnly(['correct', 'explanation', 'updatedAt'])
+          && request.resource.data.correct is int
+          && request.resource.data.correct >= 0 && request.resource.data.correct <= 3
+          && request.resource.data.explanation is string && request.resource.data.explanation.size() <= 1000
+          && request.resource.data.updatedAt == request.time;
+        allow delete: if isTrainer();
+      }
+
+      match /puzzleAnswers/{answerId} {
+        allow read: if isTrainer() || isClubAdminOfTeam() || isPlayerFor(resource.data.playerId);
+        allow create: if isTeamMember()
+          && memberDoc().data.role == "player"
+          && request.resource.data.keys().hasOnly(['puzzleId', 'playerId', 'choice', 'by', 'answeredAt'])
+          && request.resource.data.playerId == memberDoc().data.playerId
+          && request.resource.data.puzzleId is string
+          && request.resource.data.playerId is string
+          && answerId == request.resource.data.puzzleId + '_' + request.resource.data.playerId
+          && exists(puzzlePath(request.resource.data.puzzleId))
+          && request.resource.data.choice is int
+          && request.resource.data.choice >= 0
+          && request.resource.data.choice < get(puzzlePath(request.resource.data.puzzleId)).data.answers.size()
+          && request.resource.data.by == 'player'
+          && request.resource.data.answeredAt == request.time;
+        allow delete: if isTrainer();
+      }
+
       // Altes Einzeldokument aus dem frueheren Single-Blob-Modell. Die App liest oder schreibt es nicht mehr,
       // die Migration in die neue Struktur ist aus der App entfernt (SCRUM-36).
       // Die Regel bleibt nur, damit ein noch vorhandenes Dokument vom Trainer gelesen/geloescht werden kann.

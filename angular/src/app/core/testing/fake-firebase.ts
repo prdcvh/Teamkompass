@@ -5,6 +5,7 @@ import { EventsApi } from '../firebase/events.api';
 import { LineupApi } from '../firebase/lineup.api';
 import { KnowledgeApi } from '../firebase/knowledge.api';
 import { LearningApi } from '../firebase/learning.api';
+import { PuzzlesApi } from '../firebase/puzzles.api';
 import { NotificationsApi } from '../firebase/notifications.api';
 import { OpponentsApi } from '../firebase/opponents.api';
 import { PlayerRecordsApi } from '../firebase/player-records.api';
@@ -34,6 +35,7 @@ import { FakeEventsApi } from './fake-events.api';
 import { FakeLineupApi } from './fake-lineup.api';
 import { FakeKnowledgeApi } from './fake-knowledge.api';
 import { FakeLearningApi } from './fake-learning.api';
+import { FakePuzzlesApi } from './fake-puzzles.api';
 import { FakeNotificationsApi } from './fake-notifications.api';
 import { FakeOpponentsApi } from './fake-opponents.api';
 import { FakePlanningApi } from './fake-planning.api';
@@ -63,6 +65,7 @@ export class FakeFirebase {
   readonly lineup = new FakeLineupApi(this.calls);
   readonly knowledge = new FakeKnowledgeApi(this.calls);
   readonly learning = new FakeLearningApi(this.calls);
+  readonly puzzles = new FakePuzzlesApi(this.calls);
   readonly opponents = new FakeOpponentsApi(this.calls);
   readonly ratings = new FakeRatingsApi(this.calls);
   readonly rsvp = new FakeRsvpApi(this.calls);
@@ -98,6 +101,7 @@ export function provideFakeFirebase(fake: FakeFirebase): Provider[] {
     { provide: LineupApi, useValue: fake.lineup },
     { provide: KnowledgeApi, useValue: fake.knowledge },
     { provide: LearningApi, useValue: fake.learning },
+    { provide: PuzzlesApi, useValue: fake.puzzles },
     { provide: OpponentsApi, useValue: fake.opponents },
     { provide: RatingsApi, useValue: fake.ratings },
     { provide: RsvpApi, useValue: fake.rsvp },
