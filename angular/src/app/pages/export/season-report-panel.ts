@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { SessionService } from '../../core/auth/session.service';
 import { revokedPlayers } from '../../core/export/export';
 import { FileOutput } from '../../core/export/file-output';
@@ -48,7 +48,7 @@ import { Dialog } from '../../ui/dialog/dialog';
       <h2>Saisonbericht (PDF)</h2>
       <p class="muted">Anwesenheit, Entwicklung des Kompetenzprofils, erreichte Förderziele, Lernpfad-Stufen und ein Kommentar des Trainers – für einen Spieler oder das ganze Team.</p>
       <div>
-        <button tkButton type="button" [disabled]="players().length === 0" (click)="openDialog()">Saisonbericht erstellen …</button>
+        <button tkButton type="button" [disabled]="players().length === 0" (click)="openDialog()">Saisonbericht zusammenstellen …</button>
       </div>
       @if (done()) {
         <p class="muted" role="status">{{ done() }}</p>
@@ -125,7 +125,7 @@ import { Dialog } from '../../ui/dialog/dialog';
     }
   `,
 })
-export class SeasonReportPanel {
+export class SeasonReportPanel implements OnInit {
   private readonly session = inject(SessionService);
   private readonly team = inject(TeamService);
   private readonly current = inject(CurrentTeam);
@@ -157,8 +157,12 @@ export class SeasonReportPanel {
   protected readonly players = computed(() => this.team.data().map((entry) => entry.player));
   protected readonly selectedId = computed(() => this.players().find((player) => player.id === this.playerId())?.id ?? this.players()[0]?.id ?? '');
 
+  ngOnInit(): void {
+    // Lernpfade früh laden, damit sie beim Erstellen schon da sind.
+    if (this.allowed()) this.learning.start();
+  }
+
   protected openDialog(): void {
-    this.learning.start();
     this.scope.set('one');
     this.playerId.set('');
     this.period.set('season');
