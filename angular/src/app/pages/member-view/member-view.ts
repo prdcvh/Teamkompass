@@ -47,6 +47,7 @@ import { SelfReportHistory } from '../profile/self-report-history';
 import { LearningSummary } from '../profile/learning-summary';
 import { LearningPanel } from './learning-panel';
 import { PuzzlePanel } from './puzzle-panel';
+import { AlertsPanel } from '../../ui/alerts-panel/alerts-panel';
 import { StreakPanel } from './streak-panel';
 
 /**
@@ -67,7 +68,7 @@ import { StreakPanel } from './streak-panel';
  */
 @Component({
   selector: 'app-member-view',
-  imports: [RouterLink, Button, Card, InstallHint, Status, ProfileExtras, BreakNotice, LoadReportAction, HomeRanking, ConnectEmail, RsvpPanel, SelfReportPanel, SelfReportHistory, LearningPanel, LearningSummary, StreakPanel, PuzzlePanel],
+  imports: [RouterLink, Button, Card, InstallHint, Status, ProfileExtras, BreakNotice, LoadReportAction, HomeRanking, ConnectEmail, RsvpPanel, SelfReportPanel, SelfReportHistory, LearningPanel, LearningSummary, AlertsPanel, StreakPanel, PuzzlePanel],
   templateUrl: './member-view.html',
   styleUrls: ['../profile/profile.css', './member-view.css', '../../ui/chart/chart.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,

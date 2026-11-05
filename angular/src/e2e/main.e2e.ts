@@ -73,6 +73,13 @@ function seed(): FakeFirebase {
     fake.selfReports.set('p1', 'selfReports', eventId, { playerId: 'p1', eventId, date, exertion, by: 'player', updatedAt: null });
     fake.selfReports.set('p1', 'wellness', eventId, { playerId: 'p1', eventId, date, fatigue: wellness[0], sleep: wellness[1], soreness: wellness[2], stress: wellness[3], by: 'player', updatedAt: null });
   }
+  // Wenn-dann-Regeln (SCRUM-195): p3 meldet in den letzten Tagen zweimal starken Muskelkater → Hinweis „Schmerz wiederholt“.
+  fake.players.players.set('p3', { ...fake.players.players.get('p3'), consentStatus: 'granted' });
+  for (const daysAgo of [4, 1]) {
+    const day = new Date(Date.now() - daysAgo * 24 * 3600 * 1000);
+    const date = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+    fake.selfReports.set('p3', 'wellness', `schmerz-${daysAgo}`, { playerId: 'p3', eventId: `schmerz-${daysAgo}`, date, fatigue: 3, sleep: 4, soreness: 2, stress: 4, by: 'player', updatedAt: null });
+  }
   const ratings = new Map<string, Record<string, unknown>>();
   const attendances = ['present', 'absent', 'excused', 'late'];
   names.forEach((_, i) => ratings.set(`p${i + 1}`, { attendance: attendances[i % 4], effort: 2, technique: 3, tactics: 2, comprehension: 4, grade: 2.8, note: 'Gute Einstellung im Training, weiter so', playerId: `p${i + 1}` }));
