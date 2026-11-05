@@ -1,0 +1,121 @@
+:host {
+  display: block;
+}
+
+.learning {
+  display: grid;
+  gap: var(--tk-space-3);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--tk-text-lg);
+}
+
+p {
+  margin: 0;
+}
+
+.path,
+.head,
+.next {
+  display: grid;
+  gap: var(--tk-space-2);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.path {
+  gap: var(--tk-space-4);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tk-space-2);
+}
+
+.path-title {
+  font-size: var(--tk-text-lg);
+}
+
+.muted {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+progress {
+  width: 100%;
+  height: 10px;
+  accent-color: var(--tk-green);
+}
+
+.next {
+  padding: var(--tk-space-3);
+  background: var(--tk-soft-blue);
+  border-radius: var(--tk-radius-md);
+}
+
+.eyebrow {
+  color: var(--tk-blue);
+  font-size: var(--tk-text-xs);
+  font-weight: 700;
+  letter-spacing: var(--tk-track-eyebrow);
+  text-transform: uppercase;
+}
+
+.label {
+  font-weight: 600;
+}
+
+.link {
+  color: var(--tk-blue);
+}
+
+.all-done {
+  color: var(--tk-green);
+  font-weight: 600;
+}
+
+.steps {
+  display: grid;
+  gap: var(--tk-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.steps li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: var(--tk-space-2);
+  align-items: start;
+}
+
+.mark {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  font-size: var(--tk-text-sm);
+  font-weight: 700;
+  color: var(--tk-muted);
+  background: var(--tk-soft-neutral);
+  border-radius: var(--tk-radius-pill);
+}
+
+[data-state='done'] .mark {
+  color: var(--tk-on-red);
+  background: var(--tk-green);
+}
+
+[data-state='next'] .mark {
+  color: var(--tk-on-red);
+  background: var(--tk-blue);
+}
+
+.text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}

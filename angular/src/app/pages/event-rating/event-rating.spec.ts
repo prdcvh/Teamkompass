@@ -152,7 +152,7 @@ describe('EventRating (Event bewerten)', () => {
       expect(text(q(fixture, '.progress-label'))).toBe('2 von 3 Spielern erfasst'); // Jonas mit Note, Jan fehlt
       expect(qa(fixture, 'thead th').map(text)).toContain('Tore');
       expect(q<HTMLInputElement>(fixture, 'input[aria-label="Interne Notiz für Jonas Keller"]')?.value).toBe('Vertraulich');
-      expect(q<HTMLInputElement>(fixture, 'input[aria-label="Feedback an Jonas Keller"]')?.value).toBe('Starkes Spiel');
+      expect(q<HTMLInputElement>(fixture, 'input[aria-label="Kommentar zu Jonas Keller"]')?.value).toBe('Starkes Spiel');
     });
 
     it('zeigt bei Trainings keine Spielspalten und keine Option „Nicht im Kader“', async () => {
@@ -191,7 +191,7 @@ describe('EventRating (Event bewerten)', () => {
 
     it('speichert Feedback sichtbar und interne Notiz getrennt', async () => {
       const fixture = await render();
-      pick(q<HTMLInputElement>(fixture, 'input[aria-label="Feedback an Elias Wagner"]')!, 'Gute Laufwege');
+      pick(q<HTMLInputElement>(fixture, 'input[aria-label="Kommentar zu Elias Wagner"]')!, 'Gute Laufwege');
       pick(q<HTMLInputElement>(fixture, 'input[aria-label="Interne Notiz für Elias Wagner"]')!, 'Gespräch nötig');
       await vi.waitFor(() => {
         expect(firebase.ratings.ratings.get('e1')?.get('p2')?.['note']).toBe('Gute Laufwege');

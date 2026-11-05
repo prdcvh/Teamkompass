@@ -15,6 +15,8 @@ export interface RatingReason {
   readonly note: string;
   /** Dieselbe Bewertung ohne Grund. */
   readonly cleaned: Rating;
+  /** Die bisherige Bewertung (damit unveränderte Noten veröffentlicht bleiben, SCRUM-115). */
+  readonly previous?: Rating;
 }
 
 /** Absage mit Grund. */
@@ -49,7 +51,7 @@ export class HealthReasonsService {
     const list: RatingReason[] = [];
     for (const { event, rating } of this.profile.items()) {
       const cleaned = rating ? ratingWithoutReason(rating) : null;
-      if (rating && cleaned) list.push({ event, note: rating.note, cleaned });
+      if (rating && cleaned) list.push({ event, note: rating.note, cleaned, previous: rating });
     }
     return list;
   });
@@ -89,9 +91,9 @@ export class HealthReasonsService {
   async removeAll(playerId: string): Promise<boolean> {
     if (this.session.role() !== 'trainer' || this.playerId() !== playerId) return false;
     let ok = true;
-    for (const { event, cleaned } of this.ratings()) {
+    for (const { event, cleaned, previous } of this.ratings()) {
       try {
-        await this.ratingsApi.saveRating(event.id, playerId, docFromRating(cleaned));
+        await this.ratingsApi.saveRating(event.id, playerId, docFromRating(cleaned), previous ? docFromRating(previous) : undefined);
       } catch (error) {
         console.error(error);
         ok = false;
