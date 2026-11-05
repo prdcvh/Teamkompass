@@ -25,6 +25,9 @@ import { OpponentsService } from '../../core/opponents/opponents.service';
 import { type GeocodedPlace, GeocodingService, GEOCODING_MIN_QUERY, coordsFromPlace, geocodingMessage, placeLabel } from '../../core/geocoding/geocoding.service';
 import { TEAM_HOME_LOCATION } from '../../core/team-settings/team-settings';
 import { todayIso } from '../../core/shared/dates';
+import { BIO_BANDING_HINT } from '../../core/records/bio-banding';
+import { BioBandingService } from '../../core/records/bio-banding.service';
+import { percentText } from '../../core/records/maturity';
 import { Button } from '../../ui/button/button';
 import { Dialog } from '../../ui/dialog/dialog';
 import { Icon } from '../../ui/icon/icon';
@@ -44,6 +47,7 @@ export class EventDialog {
   private readonly events = inject(EventsService);
   private readonly geocoding = inject(GeocodingService);
   private readonly opponents = inject(OpponentsService);
+  private readonly bioBanding = inject(BioBandingService);
 
   readonly open = input(false);
   /** Zu bearbeitendes Event; leer = neues Event anlegen. */
@@ -100,6 +104,15 @@ export class EventDialog {
     return event && event.type === 'Training' && this.canEdit() ? { program: event.warmup ?? null } : null;
   });
 
+  /**
+   * Bio-Banding (SCRUM-191): Vorschlag für Trainingsgruppen nach Reifestand, in der Leseansicht eines Trainings, nur für
+   * Trainer und Medizin (wie der Reife-Kompass). Der Trainer entscheidet; es wird nichts gespeichert.
+   */
+  private readonly bioWanted = computed(() => this.viewing() && this.shown()?.type === 'Training' && this.bioBanding.visible());
+  protected readonly bio = computed(() => (this.bioWanted() ? { state: this.bioBanding.state(), suggestion: this.bioBanding.suggestion() } : null));
+  protected readonly bioHint = BIO_BANDING_HINT;
+  protected readonly percentText = percentText;
+
   /** Gegnerprofile zur Auswahl (nur Trainer bekommen sie geladen, sonst leer). */
   protected readonly profiles = computed(() => [...this.opponents.opponents()].sort((a, b) => a.name.localeCompare(b.name, 'de')));
   /** Leseansicht eines Spiels: Matchplan, Stärken, Schwächen und Bilanz des Gegners (SCRUM-34). */
@@ -140,6 +153,18 @@ export class EventDialog {
         this.resetSearch();
       });
     });
+    // Bio-Banding nur laden, solange die Leseansicht eines Trainings offen ist und die Rolle es sehen darf.
+    effect(() => {
+      const wanted = this.bioWanted();
+      untracked(() => {
+        if (wanted) void this.bioBanding.load();
+        else this.bioBanding.reset();
+      });
+    });
+  }
+
+  protected retryBio(): void {
+    void this.bioBanding.load();
   }
 
   private resetSearch(): void {

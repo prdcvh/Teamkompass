@@ -225,3 +225,24 @@ dd {
   outline: 2px solid var(--tk-red);
   outline-offset: 2px;
 }
+
+.bio-banding {
+  display: grid;
+  gap: var(--tk-space-2);
+  margin-top: var(--tk-space-4);
+}
+
+.bio-banding h3,
+.bio-banding p {
+  margin: 0;
+}
+
+.bio-group {
+  display: grid;
+  gap: 2px;
+}
+
+.bio-group ul {
+  margin: 0;
+  padding-left: var(--tk-space-4);
+}
