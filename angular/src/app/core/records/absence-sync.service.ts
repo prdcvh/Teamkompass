@@ -134,7 +134,7 @@ export class AbsenceSyncService {
       const ratingDoc = await this.ratingsApi.readRatingDoc(event.id, player.id);
       const next = decide(ratingDoc ? ratingFromDoc(ratingDoc) : null);
       if (!next) return 0;
-      await this.ratingsApi.saveRating(event.id, player.id, docFromRating(next, { clearAuto: true }));
+      await this.ratingsApi.saveRating(event.id, player.id, docFromRating(next, { clearAuto: true }), ratingDoc);
       return 1;
     } catch (error) {
       this.fail(error);

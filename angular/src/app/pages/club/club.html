@@ -1,0 +1,222 @@
+@if (teamId(); as id) {
+  <!-- Ein Team ansehen: nur lesen, ohne Gesundheitsdaten. -->
+  <section class="page">
+    <p><a routerLink="/verein">‹ Zurück zur Vereinsübersicht</a></p>
+    @switch (overview.detailState()) {
+      @case ('ready') {
+        @if (overview.detail(); as detail) {
+          <header class="head">
+            <p class="tk-eyebrow">Team ansehen · nur lesen</p>
+            <h1>{{ title(detail.team) }}</h1>
+            <p class="muted">
+              Du siehst das Team wie ein Trainer, kannst aber nichts ändern. Gesundheitsdaten (Verletzungen, Abwesenheiten mit
+              Grund, Messwerte, Befinden) sind für Vereinsadmins gesperrt.
+            </p>
+          </header>
+
+          <tk-card>
+            <div class="panel">
+              <h2>Kader ({{ detail.players.length }})</h2>
+              @if (!detail.team.overview) {
+                <p class="muted">Der Kader erscheint hier, sobald ein Trainer das Team einmal in der App geöffnet hat.</p>
+              } @else if (detail.players.length === 0) {
+                <p class="muted">Noch keine Spieler angelegt.</p>
+              } @else {
+                <div class="table-wrap">
+                  <table class="table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Nr.</th>
+                        <th scope="col">Name</th>
+                        <th scope="col">Position</th>
+                        <th scope="col" class="num">Einsätze</th>
+                        <th scope="col" class="num">Tore</th>
+                        <th scope="col" class="num">Vorl.</th>
+                        <th scope="col" class="num">Ø Note</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (player of detail.players; track player.id) {
+                        <tr>
+                          <td>{{ player.number || '–' }}</td>
+                          <td>{{ player.name }}</td>
+                          <td>{{ player.positions.join(', ') || '–' }}</td>
+                          <td class="num">{{ player.summary?.appearances ?? 0 }}</td>
+                          <td class="num">{{ player.summary?.goals ?? 0 }}</td>
+                          <td class="num">{{ player.summary?.assists ?? 0 }}</td>
+                          <td class="num">{{ grade(player.summary?.average ?? null) }}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+            </div>
+          </tk-card>
+
+          <tk-card>
+            <div class="panel">
+              <h2>Termine ({{ detail.events.length }})</h2>
+              @if (detail.events.length === 0) {
+                <p class="muted">Noch keine Termine.</p>
+              } @else {
+                <ul class="events">
+                  @for (event of detail.events.slice(0, 30); track event.id) {
+                    <li>
+                      <span class="date">{{ date(event.date) }}</span>
+                      <span class="type">{{ event.type }}</span>
+                      <span class="event-title">{{ event.title }}</span>
+                      @if (event.type === 'Spiel' && event.goalsFor !== null && event.goalsAgainst !== null) {
+                        <span class="result">{{ event.goalsFor }}:{{ event.goalsAgainst }}</span>
+                      }
+                    </li>
+                  }
+                </ul>
+                @if (detail.events.length > 30) {
+                  <p class="muted">Gezeigt werden die 30 neuesten Termine.</p>
+                }
+              }
+            </div>
+          </tk-card>
+        }
+      }
+      @case ('missing') {
+        <p class="error" role="alert">Dieses Team gehört nicht zu deinem Verein oder konnte nicht geladen werden.</p>
+      }
+      @default {
+        <p class="muted" role="status">Team wird geladen …</p>
+      }
+    }
+  </section>
+} @else {
+  <section class="page">
+    <header class="head">
+      <p class="tk-eyebrow">Verein</p>
+      <h1>Vereinsübersicht</h1>
+      <p class="muted">
+        Alle Teams deines Vereins. Du kannst in jedes Team hineinschauen (nur lesen) sowie Trainer einladen und entfernen.
+        Gesundheitsdaten siehst du nicht.
+      </p>
+    </header>
+
+    @switch (overview.state()) {
+      @case ('ready') {
+        @for (club of overview.clubs(); track club.clubId) {
+          <h2 class="club-name">{{ club.name || club.clubId }}</h2>
+          @if (club.teams.length === 0) {
+            <p class="muted">Noch keine Teams in diesem Verein.</p>
+          }
+          <div class="teams">
+            @for (team of club.teams; track team.teamId) {
+              <tk-card>
+                <article class="panel team">
+                  <div class="row">
+                    <h3>{{ title(team) }}</h3>
+                    <a tkButton [routerLink]="['/verein', team.teamId]" [attr.aria-label]="'Team ' + title(team) + ' ansehen'">Ansehen</a>
+                  </div>
+                  @if (team.failed) {
+                    <p class="error">Dieses Team konnte nicht geladen werden.</p>
+                  } @else {
+                    <dl class="facts">
+                      <div>
+                        <dt>Spieler</dt>
+                        <dd>{{ team.overview ? team.overview.playerCount : '–' }}</dd>
+                      </div>
+                      <div>
+                        <dt>Einwilligung offen</dt>
+                        <dd [class.warn]="(team.overview?.consentPending ?? 0) > 0">{{ team.overview ? team.overview.consentPending : '–' }}</dd>
+                      </div>
+                      <div>
+                        <dt>Letzter Termin</dt>
+                        <dd>{{ team.lastEvent ? date(team.lastEvent.date) + ' · ' + team.lastEvent.title : '–' }}</dd>
+                      </div>
+                      <div>
+                        <dt>Nächster Termin</dt>
+                        <dd>{{ team.nextEvent ? date(team.nextEvent.date) + ' · ' + team.nextEvent.title : '–' }}</dd>
+                      </div>
+                    </dl>
+                    @if (!team.overview) {
+                      <p class="muted">Spielerzahl und Einwilligungen erscheinen, sobald ein Trainer das Team einmal in der App geöffnet hat.</p>
+                    } @else if (team.overview.consentRevoked > 0) {
+                      <p class="muted">Einwilligung widerrufen: {{ team.overview.consentRevoked }}</p>
+                    }
+
+                    <h4>Trainer</h4>
+                    @if (team.trainers.length === 0) {
+                      <p class="muted">Kein Trainer eingetragen.</p>
+                    }
+                    <ul class="people">
+                      @for (trainer of team.trainers; track trainer.uid) {
+                        <li>
+                          <span class="email">{{ trainer.email || 'Trainer-Konto' }}{{ trainer.uid === me() ? ' (du)' : '' }}</span>
+                          @if (trainer.uid === me()) {
+                            <!-- Sich selbst entfernt man hier nicht (sonst fehlt plötzlich der eigene Zugang). -->
+                          } @else if (confirmRemove() === team.teamId + '/' + trainer.uid) {
+                            <span class="confirm">
+                              <span>Wirklich entfernen?</span>
+                              <button tkButton variant="primary" type="button" [disabled]="overview.busy()" (click)="remove(team.teamId, trainer.uid)">Ja, entfernen</button>
+                              <button tkButton type="button" (click)="confirmRemove.set(null)">Abbrechen</button>
+                            </span>
+                          } @else {
+                            <button tkButton type="button" [disabled]="overview.busy()" (click)="remove(team.teamId, trainer.uid)">Entfernen</button>
+                          }
+                        </li>
+                      }
+                    </ul>
+
+                    @for (invite of team.invites; track invite.code) {
+                      <p class="invite">
+                        <span>Eingeladen: <code>{{ format(invite.code) }}</code> · bis {{ day(invite.expiresAt) }}{{ invite.email ? ' · ' + invite.email : '' }}</span>
+                        <button tkButton type="button" [disabled]="overview.busy()" (click)="overview.revokeInvite(invite.code)">Zurückziehen</button>
+                      </p>
+                    }
+
+                    @if (inviting() === team.teamId) {
+                      <div class="invite-form">
+                        <label class="field">
+                          <span>E-Mail des Trainers (empfohlen: dann gilt der Link nur für diese Adresse)</span>
+                          <input class="tk-input" type="email" autocomplete="off" [value]="email()" (input)="email.set(value($event))" />
+                        </label>
+                        <div class="actions">
+                          <button tkButton variant="primary" type="button" [disabled]="overview.busy()" (click)="sendInvite(club.clubId, team)">Einladung erstellen</button>
+                          <button tkButton type="button" (click)="inviting.set(null)">Abbrechen</button>
+                        </div>
+                      </div>
+                    } @else {
+                      <div>
+                        <button tkButton type="button" [disabled]="overview.busy()" (click)="startInvite(team.teamId)">Trainer einladen</button>
+                      </div>
+                    }
+                    @if (overview.created(); as created) {
+                      @if (created.teamId === team.teamId) {
+                        <div class="invite-result" role="status">
+                          <p>Einladung erstellt. Code <code>{{ format(created.code) }}</code> – gültig bis {{ day(created.expiresAt) }}, nur einmal.</p>
+                          <p class="link"><code>{{ created.link }}</code></p>
+                          <button tkButton type="button" (click)="copy(created.link)">Link kopieren</button>
+                          @if (copied()) {
+                            <span class="muted">Kopiert.</span>
+                          }
+                        </div>
+                      }
+                    }
+                  }
+                </article>
+              </tk-card>
+            }
+          </div>
+        } @empty {
+          <p class="muted">Du bist in keinem Verein Vereinsadmin.</p>
+        }
+        @if (overview.error()) {
+          <p class="error" role="alert">{{ overview.error() }}</p>
+        }
+      }
+      @case ('error') {
+        <p class="error" role="alert">Die Vereinsübersicht konnte nicht geladen werden.</p>
+      }
+      @default {
+        <p class="muted" role="status">Wird geladen …</p>
+      }
+    }
+  </section>
+}

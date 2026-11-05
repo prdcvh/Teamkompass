@@ -38,7 +38,7 @@ function seed(): FakeFirebase {
   const fake = new FakeFirebase();
   fake.access.members.set('e2e-uid', { role: 'trainer', playerId: null });
   fake.access.members.set('e2e-player', { role: 'player', playerId: 'p1' });
-  // Medizin-Zugang und Scout-Zugang (SCRUM-170); „medical“ ist ein bisheriges Scout-Konto und wird zum Scout.
+  // Medizin-Zugang und Scout-Zugang (SCRUM-170).
   fake.access.members.set('e2e-physio', { role: 'physio', playerId: null });
   fake.access.members.set('e2e-scout', { role: 'scout', playerId: null });
   names.forEach((name, i) => {
@@ -113,6 +113,25 @@ function seed(): FakeFirebase {
       k5: { type: 'link', title: 'Dehnübungen nach dem Spiel', url: 'https://www.dfb.de/trainer/', description: 'Kurzes Programm für zu Hause.', category: 'Fitness' },
     },
   };
+  // Lernpfade (SCRUM-192): ein Torwart-Pfad (p1 ist Torwart, zwei Stufen bestätigt) und ein Pfad für alle Positionen.
+  fake.learning.paths.set('lp1', {
+    title: 'Torwart: sicher fangen und abwerfen', position: 'TW', ageGroup: 'U14',
+    levels: [
+      { id: 'l1', title: 'Grundstellung und Fangen in Brusthöhe', unit: 'Partner wirft 20 Bälle in Brusthöhe, Hände bilden ein W.', minutes: 3, url: null, homeTask: 'Ball 50-mal gegen die Wand werfen und fangen.' },
+      { id: 'l2', title: 'Flache Bälle aufnehmen', unit: 'Flache Bälle seitlich, Knie ab, Ball an den Körper ziehen.', minutes: 4, url: 'https://www.dfb.de/trainer/', homeTask: '' },
+      { id: 'l3', title: 'Hohe Bälle fangen mit einer sehr langen Beschreibung, damit die Ansicht auch am Handy umbricht', unit: 'Flanken von beiden Seiten, im höchsten Punkt fangen, Knie hoch.', minutes: 5, url: 'https://www.youtube.com/watch?v=abcdefghijk&list=PLabcdefghijklmnopqrstuvwxyz0123456789', homeTask: 'Zehn Minuten Sprungkraft: Hocksprünge und Seilspringen.' },
+      { id: 'l4', title: 'Abwurf und Abschlag', unit: 'Abwurf flach auf den Außenverteidiger, dann Abschlag auf Zonen.', minutes: 5, url: null, homeTask: 'Video zum Abschlag ansehen.' },
+    ],
+  });
+  fake.learning.paths.set('lp2', {
+    title: 'Erster Kontakt', position: '', ageGroup: '',
+    levels: [
+      { id: 'm1', title: 'Ball mit der Innenseite annehmen', unit: 'Zu zweit passen, Ball mit dem ersten Kontakt in den Lauf mitnehmen.', minutes: 3, url: null, homeTask: 'Jeden Tag 5 Minuten gegen die Wand passen.' },
+      { id: 'm2', title: 'Schulterblick vor der Annahme', unit: 'Vor jedem Pass über die Schulter schauen und ansagen, was frei ist.', minutes: 4, url: null, homeTask: '' },
+    ],
+  });
+  fake.learning.progress.set('p1', { playerId: 'p1', paths: { lp1: { l1: '2026-10-13', l2: '2026-10-20' }, lp2: { m1: '2026-10-27' } } });
+  fake.learning.progress.set('p2', { playerId: 'p2', paths: { lp2: { m1: '2026-10-27', m2: '2026-11-03' } } });
   // Scout-Sicht (SCRUM-170) so, wie sie der Trainer-Client aus diesen Daten schreiben würde.
   const players = [...fake.players.players].map(([id, data]) => playerFromDoc(id, data));
   const events = [...fake.events.events].map(([id, data]) => eventFromDoc(id, data));
@@ -156,6 +175,11 @@ if (new URLSearchParams(location.search).get('skala') === 'stufen') {
     ['p1', { attendance: 'present', effort: 3, technique: 1.5, tactics: 3, comprehension: 1.5, grade: 2.4, scale: 'levels', note: 'Super mitgemacht', playerId: 'p1' }],
   ]));
 }
+// Noten veröffentlicht (SCRUM-115): ?noten=frei gibt die Noten von p1 bis jetzt frei (unbefristet). Ohne den Parameter
+// sieht der Spieler nur seine Werte.
+if (new URLSearchParams(location.search).get('noten') === 'frei') {
+  fake.gradeReleases.releases.set('p1', { playerId: 'p1', publishedUntil: new Date(), expiresAt: null, createdBy: 'e2e-uid' });
+}
 if (new URLSearchParams(location.search).get('as') === 'fresh') {
   fake.players.players.clear();
   fake.events.events.clear();
@@ -169,14 +193,14 @@ bootstrapApplication(App, {
     // Meldet nach dem Start der Anmeldeprüfung einen angemeldeten Trainer.
     provideAppInitializer(() => {
       inject(AuthApi);
-      // ?as=player | player-email | physio | scout | medical | none wählt eine andere Rolle bzw. „nicht angemeldet“ (Anmeldeseite).
+      // ?as=player | player-email | physio | scout | none wählt eine andere Rolle bzw. „nicht angemeldet“ (Anmeldeseite).
       const as = new URLSearchParams(location.search).get('as');
       const user =
         as === 'none' ? null
         : as === 'player' ? { uid: 'e2e-player', isAnonymous: true, email: null }
         : as === 'player-email' ? { uid: 'e2e-player-email', isAnonymous: false, email: 'kind@example.org' }
         : as === 'physio' ? { uid: 'e2e-physio', isAnonymous: false, email: 'physio@example.org' }
-        : as === 'scout' || as === 'medical' ? { uid: 'e2e-scout', isAnonymous: false, email: 'scout@example.org' }
+        : as === 'scout' ? { uid: 'e2e-scout', isAnonymous: false, email: 'scout@example.org' }
         : as === 'multi' ? { uid: 'e2e-multi', isAnonymous: false, email: 'multi@example.org' }
         : { uid: 'e2e-uid', isAnonymous: false, email: 'trainer@example.org' };
       setTimeout(() => fake.auth.emit(user), 0);

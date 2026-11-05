@@ -1,3 +1,4 @@
+import { SERVER_TIME } from '../ratings/player-view';
 import { type CurrentIds, backupOperations, isBackupId, overwriteCount, parseBackup, summarizeBackup, summaryLines, validateBackup } from './backup-import';
 import { buildExport } from './export';
 import type { TeamEvent } from '../events/event';
@@ -92,10 +93,18 @@ describe('Sicherung einspielen: Zusammenfassung und Schreibliste', () => {
     const ops = backupOperations(backup());
     const paths = ops.map((op) => op.path.join('/'));
     expect(paths).toEqual([
-      'players/p1', 'players/p2', 'events/e1', 'events/e1/ratings/p1', 'events/e1/privateNotes/p1', 'events/e2',
+      'players/p1', 'players/p2', 'events/e1', 'events/e1/ratings/p1', 'events/e1/ratingValues/p1', 'events/e1/ratingGrades/p1',
+      'events/e1/privateNotes/p1', 'events/e2',
       'players/p1/developmentPlans/d1', 'players/p1/absences/a1', 'players/p1/measurements/m1', 'opponents/o1', 'meta/lineup',
     ]);
     expect(ops.find((op) => op.path.join('/') === 'events/e1/ratings/p1')!.data['playerId']).toBe('p1');
+    // SCRUM-115: Kopien für die Spieleransicht – ohne Kommentar, die Noten mit Server-Zeit.
+    const values = ops.find((op) => op.path.join('/') === 'events/e1/ratingValues/p1')!.data;
+    expect(Object.keys(values).sort()).toEqual(['assists', 'attendance', 'goals', 'minutes', 'playerId']);
+    const grades = ops.find((op) => op.path.join('/') === 'events/e1/ratingGrades/p1')!.data;
+    expect(grades['ratedAt']).toBe(SERVER_TIME);
+    expect(grades['note']).toBeUndefined();
+    expect(backupOperations(backup(), null, { playerCopies: false }).some((op) => op.path.includes('ratingValues') || op.path.includes('ratingGrades'))).toBe(false);
     expect(ops.find((op) => op.path.join('/') === 'events/e1/privateNotes/p1')!.data).toEqual({ playerId: 'p1', note: 'intern: Gespräch nötig' });
   });
 

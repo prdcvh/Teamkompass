@@ -3,6 +3,7 @@ import { CurrentTeam } from '../../core/team/current-team.service';
 import { type Backup, MAX_BACKUP_BYTES, type CurrentIds, backupOperations, overwriteCount, parseBackup, summarizeBackup, summaryLines, validateBackup } from '../../core/export/backup-import';
 import { EventsService } from '../../core/events/events.service';
 import { buildExport, exportFileName, revokedPlayers } from '../../core/export/export';
+import { PlayerViewMode } from '../../core/ratings/player-view-mode';
 import { BackupApi } from '../../core/firebase/backup.api';
 import { FileOutput } from '../../core/export/file-output';
 import { PlayerRecordsApi } from '../../core/firebase/player-records.api';
@@ -51,6 +52,7 @@ export class Export implements OnInit, OnDestroy {
   private readonly playerRecordsApi = inject(PlayerRecordsApi);
   private readonly files = inject(FileOutput);
   private readonly backupApi = inject(BackupApi);
+  private readonly playerView = inject(PlayerViewMode);
   private readonly workspace = inject(WorkspaceService);
   private readonly session = inject(SessionService);
   protected readonly sync = inject(SyncService);
@@ -268,7 +270,7 @@ export class Export implements OnInit, OnDestroy {
     this.importError.set('');
     this.importDone.set('');
     try {
-      await this.backupApi.writeAll(backupOperations(pending.backup, this.session.uid()));
+      await this.backupApi.writeAll(backupOperations(pending.backup, this.session.uid(), { playerCopies: await this.playerView.writesCopies() }));
       // Die Sicherung schreibt Bewertungen direkt: eingerichtete Zusammenfassungen danach neu berechnen (SCRUM-201).
       const statsOk = this.stats.state() !== 'on' || (await this.stats.rebuild())?.differences.length === 0;
       this.workspace.record(`Sicherung eingespielt (${pending.fileName})`);

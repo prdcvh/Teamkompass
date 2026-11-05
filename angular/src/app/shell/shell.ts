@@ -5,6 +5,7 @@ import { MORE_GROUPS, PRIVACY_ITEM } from '../core/shell/navigation';
 import { showsNavigation } from '../core/auth/role';
 import { SessionService } from '../core/auth/session.service';
 import { RsvpService } from '../core/rsvp/rsvp.service';
+import { ClubOverviewService } from '../core/club/club-overview.service';
 import { ConsentCardService } from '../core/player/consent-card.service';
 import { ScoutPublishService } from '../core/scout/scout-publish.service';
 import { MoreSheet } from './more-sheet/more-sheet';
@@ -39,6 +40,8 @@ export class Shell {
     inject(RsvpService);
     // Einwilligung (SCRUM-245): Trainer pflegen die bereinigten Spielerkarten für widerrufene Einwilligungen.
     inject(ConsentCardService);
+    // Vereinsübersicht (SCRUM-183): Trainer pflegen die Kurzfassung des Kaders für den Vereinsadmin.
+    inject(ClubOverviewService);
   }
 
   protected readonly variant = computed<'desktop' | 'mobile' | 'focused'>(() => {

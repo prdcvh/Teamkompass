@@ -4,20 +4,26 @@ import { AuthApi } from '../firebase/auth.api';
 import { EventsApi } from '../firebase/events.api';
 import { LineupApi } from '../firebase/lineup.api';
 import { KnowledgeApi } from '../firebase/knowledge.api';
+import { LearningApi } from '../firebase/learning.api';
 import { NotificationsApi } from '../firebase/notifications.api';
 import { OpponentsApi } from '../firebase/opponents.api';
 import { PlayerRecordsApi } from '../firebase/player-records.api';
+import { MaturityApi } from '../firebase/maturity.api';
 import { PlayerStatsApi } from '../firebase/player-stats.api';
 import { PlanningApi } from '../firebase/planning.api';
 import { PlayersApi } from '../firebase/players.api';
 import { RankingApi } from '../firebase/ranking.api';
 import { RatingsApi } from '../firebase/ratings.api';
+import { GradeReleasesApi } from '../firebase/grade-releases.api';
+import { PlayerViewApi } from '../firebase/player-view.api';
 import { RsvpApi } from '../firebase/rsvp.api';
 import { ScoutApi } from '../firebase/scout.api';
 import { SelfReportsApi } from '../firebase/self-reports.api';
 import { TeamSettingsApi } from '../firebase/team-settings.api';
 import { TeamsApi } from '../firebase/teams.api';
 import { RegistrationApi } from '../firebase/registration.api';
+import { ClubApi } from '../firebase/club.api';
+import { FakeClubApi } from './fake-club.api';
 import { FakeTeamsApi } from './fake-teams.api';
 import { FakeRegistrationApi } from './fake-registration.api';
 import { WeatherProvider } from '../weather/weather-provider';
@@ -27,14 +33,18 @@ import { FakeAuthApi } from './fake-auth.api';
 import { FakeEventsApi } from './fake-events.api';
 import { FakeLineupApi } from './fake-lineup.api';
 import { FakeKnowledgeApi } from './fake-knowledge.api';
+import { FakeLearningApi } from './fake-learning.api';
 import { FakeNotificationsApi } from './fake-notifications.api';
 import { FakeOpponentsApi } from './fake-opponents.api';
 import { FakePlanningApi } from './fake-planning.api';
 import { FakePlayerRecordsApi } from './fake-player-records.api';
+import { FakeMaturityApi } from './fake-maturity.api';
 import { FakePlayerStatsApi } from './fake-player-stats.api';
 import { FakePlayersApi } from './fake-players.api';
 import { FakeRankingApi } from './fake-ranking.api';
 import { FakeRatingsApi } from './fake-ratings.api';
+import { FakeGradeReleasesApi } from './fake-grade-releases.api';
+import { FakePlayerViewApi } from './fake-player-view.api';
 import { FakeRsvpApi } from './fake-rsvp.api';
 import { FakeScoutApi } from './fake-scout.api';
 import { FakeSelfReportsApi } from './fake-self-reports.api';
@@ -52,21 +62,28 @@ export class FakeFirebase {
   readonly events = new FakeEventsApi(this.calls);
   readonly lineup = new FakeLineupApi(this.calls);
   readonly knowledge = new FakeKnowledgeApi(this.calls);
+  readonly learning = new FakeLearningApi(this.calls);
   readonly opponents = new FakeOpponentsApi(this.calls);
   readonly ratings = new FakeRatingsApi(this.calls);
   readonly rsvp = new FakeRsvpApi(this.calls);
   readonly ranking = new FakeRankingApi(this.calls, this.ratings.privateNotes);
   readonly records = new FakePlayerRecordsApi(this.calls);
+  /** Eigene Aufrufliste: der Reife-Kompass (SCRUM-190) soll die Reihenfolge-Prüfungen anderer Tests nicht ändern. */
+  readonly maturity = new FakeMaturityApi();
   readonly settings = new FakeTeamSettingsApi(this.calls);
   readonly notifications = new FakeNotificationsApi(this.calls);
   readonly planning =new FakePlanningApi(this.calls);
   readonly scout = new FakeScoutApi(this.calls);
   readonly selfReports = new FakeSelfReportsApi(this.calls);
   readonly playerStats = new FakePlayerStatsApi(this.calls, this.events, this.ratings);
+  readonly gradeReleases = new FakeGradeReleasesApi(this.calls);
+  readonly playerView = new FakePlayerViewApi(this.calls, this.ratings);
   readonly teams = new FakeTeamsApi();
   readonly registration = new FakeRegistrationApi(this.auth);
+  readonly club = new FakeClubApi();
 
   constructor() {
+    this.ratings.releaseFor = (playerId) => this.gradeReleases.release(playerId);
     this.events.hasRecords = (id) => (this.ratings.ratings.get(id)?.size ?? 0) > 0 || (this.ratings.privateNotes.get(id)?.size ?? 0) > 0;
   }
 }
@@ -80,11 +97,13 @@ export function provideFakeFirebase(fake: FakeFirebase): Provider[] {
     { provide: EventsApi, useValue: fake.events },
     { provide: LineupApi, useValue: fake.lineup },
     { provide: KnowledgeApi, useValue: fake.knowledge },
+    { provide: LearningApi, useValue: fake.learning },
     { provide: OpponentsApi, useValue: fake.opponents },
     { provide: RatingsApi, useValue: fake.ratings },
     { provide: RsvpApi, useValue: fake.rsvp },
     { provide: RankingApi, useValue: fake.ranking },
     { provide: PlayerRecordsApi, useValue: fake.records },
+    { provide: MaturityApi, useValue: fake.maturity },
     // Seiten zeigen Wetter; Tests sollen nie ins Netz (SCRUM-98).
     { provide: WeatherProvider, useClass: OfflineWeatherProvider },
     { provide: TeamSettingsApi, useValue: fake.settings },
@@ -93,7 +112,10 @@ export function provideFakeFirebase(fake: FakeFirebase): Provider[] {
     { provide: ScoutApi, useValue: fake.scout },
     { provide: SelfReportsApi, useValue: fake.selfReports },
     { provide: PlayerStatsApi, useValue: fake.playerStats },
+    { provide: GradeReleasesApi, useValue: fake.gradeReleases },
+    { provide: PlayerViewApi, useValue: fake.playerView },
     { provide: TeamsApi, useValue: fake.teams },
     { provide: RegistrationApi, useValue: fake.registration },
+    { provide: ClubApi, useValue: fake.club },
   ];
 }
