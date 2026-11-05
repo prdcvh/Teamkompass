@@ -78,6 +78,8 @@ export interface InjuryRisk {
   readonly ratio: number | null;
   /** In wie vielen der 4 Wochen Belastung vorhanden war. */
   readonly weeksWithLoad: number;
+  /** Hinweis „Belastungsspitze“ gesetzt (mit beiden Schutzregeln); für die Wenn-dann-Regeln (SCRUM-195). */
+  readonly spike: boolean;
   /** Einsätze der letzten 4 Wochen. */
   readonly recentEvents: number;
   readonly availability: LoadAvailability;
@@ -165,7 +167,8 @@ export function injuryRisk(
   const infos: string[] = [];
 
   const spike = ratio !== null && ratio >= SPIKE_RATIO;
-  if (spike && weeksWithLoad >= 3 && acute >= usual * SPIKE_MIN_WEEK_INCREASE) {
+  const spikeHint = spike && weeksWithLoad >= 3 && acute >= usual * SPIKE_MIN_WEEK_INCREASE;
+  if (spikeHint) {
     hints.push({ label: `Belastungsspitze (Müdigkeit ${label(ratio)}-fach der Fitness)`, weight: ratio >= STRONG_SPIKE_RATIO ? 2 : 1 });
   } else if (spike && weeksWithLoad < 4) {
     infos.push('Wiedereinstieg – langsam steigern');
@@ -227,6 +230,7 @@ export function injuryRisk(
     form: Math.round(current?.form ?? 0) || 0,
     ratio: ratio === null ? null : roundGrade(ratio),
     weeksWithLoad,
+    spike: spikeHint,
     recentEvents: past.filter((item) => item.ago <= 27).length,
     availability,
   };

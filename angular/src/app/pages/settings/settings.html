@@ -100,6 +100,32 @@
 
   @if (teamSettings.canWrite()) {
     <tk-card>
+      <div class="panel" id="hinweise" data-testid="alert-rules">
+        <h2>Automatische Hinweise (Cloud, für das Team)</h2>
+        <p class="muted">Wenn-dann-Regeln: Schlägt eine eingeschaltete Regel an, erscheint auf der Startseite ein Hinweis mit Protokoll. Die Medizin-Rolle bekommt die Hinweise zu Schmerz und Befinden in ihrer Ansicht.</p>
+        @for (rule of alertRules; track rule.id) {
+          <label class="row rule-row">
+            <span>
+              <strong>{{ rule.title }}</strong>
+              <small class="muted">Wenn: {{ rule.when }}@if (rule.audience.includes('physio')) { Hinweis an Trainer und Medizin.} @else { Hinweis an Trainer.}</small>
+            </span>
+            <input
+              type="checkbox"
+              role="switch"
+              [attr.data-testid]="'alert-rule-' + rule.id"
+              [checked]="teamSettings.alertSwitches()[rule.id]"
+              [disabled]="teamSettings.load() !== 'ready'"
+              (change)="toggleAlertRule(rule.id, $event)"
+            />
+          </label>
+        }
+        <p class="muted">Eine E-Mail dazu kommt erst mit dem Erinnerungsdienst. Sie enthält dann keine Gesundheitsdaten, nur: „{{ alertEmailText }}“</p>
+      </div>
+    </tk-card>
+  }
+
+  @if (teamSettings.canWrite()) {
+    <tk-card>
       <div class="panel" id="teamziel">
         <h2>Teamziel Check-ins (Cloud, für das Team)</h2>
         <label class="field">
