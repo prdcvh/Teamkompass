@@ -271,6 +271,31 @@ describe('Settings (Einstellungen & Datenschutz)', () => {
     });
   });
 
+  describe('Automatische Hinweise (SCRUM-195)', () => {
+    const toggle = (fixture: { nativeElement: unknown }, id: string) => root(fixture).querySelector<HTMLInputElement>(`[data-testid="alert-rule-${id}"]`);
+
+    it('nur Trainer sehen die Schalter; ausschalten speichert in den Teameinstellungen', async () => {
+      expect(toggle(await render('physio'), 'pain')).toBeNull();
+      TestBed.resetTestingModule();
+      expect(toggle(await render('player'), 'pain')).toBeNull();
+      TestBed.resetTestingModule();
+      const fixture = await render('trainer');
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(toggle(fixture, 'pain')?.disabled).toBe(false);
+      });
+      const ids = ['pain', 'wellness', 'loadSpike', 'consentRevoked', 'openRatings'];
+      expect(ids.map((id) => toggle(fixture, id)?.checked)).toEqual([true, true, true, true, true]);
+      expect(root(fixture).querySelector('[data-testid="alert-rules"]')?.textContent).toContain('Bitte schau in die App.');
+      const input = toggle(fixture, 'openRatings')!;
+      input.checked = false;
+      input.dispatchEvent(new Event('change'));
+      await vi.waitFor(() =>
+        expect(firebase.settings.settings).toEqual({ alertRules: { pain: true, wellness: true, loadSpike: true, consentRevoked: true, openRatings: false } }),
+      );
+    });
+  });
+
   describe('Bundesland des Teams (SCRUM-186)', () => {
     const select = (fixture: { nativeElement: unknown }) => root(fixture).querySelector<HTMLSelectElement>('[data-testid="federal-state"]');
 

@@ -1,3 +1,4 @@
+import { ALERT_EMAIL_TEXT, ALERT_RULES, type AlertRuleId } from '../../core/alerts/alert-rules';
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
 import { AccountService } from '../../core/auth/account.service';
@@ -46,6 +47,8 @@ export class Settings {
   /** Bundesland des Teams für den Schulferien-Hinweis (SCRUM-186), nur für Trainer. */
   protected readonly teamSettings = inject(TeamSettingsService);
   protected readonly federalStates = FEDERAL_STATES;
+  protected readonly alertRules = ALERT_RULES;
+  protected readonly alertEmailText = ALERT_EMAIL_TEXT;
   protected readonly gameFormats = GAME_FORMATS;
   protected readonly retentionOptions = RETENTION_OPTIONS;
   protected readonly confirmClear = signal(false);
@@ -67,6 +70,12 @@ export class Settings {
     const value = select.value;
     // Ungültige oder nicht erlaubte Werte: die Auswahl springt auf den gespeicherten Stand zurück.
     if (!isFederalState(value) || !this.teamSettings.saveFederalState(value)) select.value = this.teamSettings.federalState();
+  }
+
+  /** Wenn-dann-Regeln (SCRUM-195): Vorlage ein/aus; bei Fehler springt der Schalter auf den gespeicherten Stand. */
+  protected toggleAlertRule(id: AlertRuleId, event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (!this.teamSettings.saveAlertSwitch(id, input.checked)) input.checked = this.teamSettings.alertSwitches()[id];
   }
 
   protected setGameFormat(event: Event): void {

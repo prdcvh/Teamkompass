@@ -55,6 +55,10 @@
   } @else if (!ready()) {
     <p class="muted" role="status">Bewertungen werden geladen …</p>
   } @else {
+    @if (physio()) {
+      <!-- Wenn-dann-Regeln (SCRUM-195): Hinweise zu Schmerz und Befinden für alle Spieler. -->
+      <tk-alerts-panel />
+    }
     @if (player(); as p) {
       <tk-rsvp-panel />
       <tk-self-report-panel [player]="p" />

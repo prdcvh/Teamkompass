@@ -6,6 +6,7 @@ import { SessionService } from '../auth/session.service';
 import { SyncService } from '../shell/sync.service';
 import { type FederalState, isFederalState } from './federal-states';
 import { type GameFormat, isGameFormat } from '../lineup/game-format';
+import { type AlertRuleId, type AlertSwitches, alertSwitchesFromDoc, docFromAlertSwitches } from '../alerts/alert-rules';
 import { type DefaultLocation, defaultLocationFromDoc, docFromDefaultLocation, docFromFederalState, docFromGameFormat, federalStateFromDoc, gameFormatFromDoc } from './team-settings';
 
 /**
@@ -30,6 +31,8 @@ export class TeamSettingsService {
   readonly federalState = computed<FederalState>(() => federalStateFromDoc(this.stored()));
   /** Spielform des Teams (SCRUM-187); ohne gespeicherten Wert 11:11. */
   readonly gameFormat = computed<GameFormat>(() => gameFormatFromDoc(this.stored()));
+  /** Wenn-dann-Regeln (SCRUM-195): welche Vorlagen eingeschaltet sind; ohne gespeicherten Wert alle an. */
+  readonly alertSwitches = computed<AlertSwitches>(() => alertSwitchesFromDoc(this.stored()));
   /** Letzter Speicherfehler (für die Anzeige in den Einstellungen); leer, solange alles gespeichert wurde. */
   readonly error = signal('');
 
@@ -97,6 +100,11 @@ export class TeamSettingsService {
   saveGameFormat(format: GameFormat): boolean {
     if (!isGameFormat(format)) return false;
     return this.save(docFromGameFormat(format), 'Die Spielform konnte nicht gespeichert werden.');
+  }
+
+  /** Schaltet eine Regel-Vorlage ein oder aus (nur Trainer, SCRUM-195). */
+  saveAlertSwitch(id: AlertRuleId, enabled: boolean): boolean {
+    return this.save(docFromAlertSwitches({ ...this.alertSwitches(), [id]: enabled }), 'Die Einstellung der automatischen Hinweise konnte nicht gespeichert werden.');
   }
 
   private save(doc: Record<string, unknown>, failText: string): boolean {
