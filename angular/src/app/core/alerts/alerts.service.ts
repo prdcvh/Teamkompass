@@ -42,14 +42,16 @@ export class AlertsService {
   /** Befinden je Spieler (fehlt, solange nicht geladen oder nicht lesbar). */
   private readonly wellness = signal<ReadonlyMap<string, readonly WellnessEntry[]>>(new Map());
   private readonly failed = signal<ReadonlySet<string>>(new Set());
-  private readonly waiting = signal<ReadonlySet<string>>(new Set());
 
   readonly ready = computed(() => {
     if (!this.active()) return false;
     const audience = this.audience();
     // Trainer: erst rechnen, wenn die Schalter da sind (sonst blitzen ausgeschaltete Regeln kurz auf); bei Ladefehler gilt der Standard.
     const base = audience === 'trainer' ? this.team.ready() && ['ready', 'error'].includes(this.settings.load()) : this.squad.load() === 'ready';
-    return base && this.waiting().size === 0;
+    // Jeder Spieler braucht eine erste Antwort (Befinden geladen oder nicht lesbar), sonst fehlen Hinweise kurz.
+    const wellness = this.wellness();
+    const failed = this.failed();
+    return base && this.squad.players().every((player) => wellness.has(player.id) || failed.has(player.id));
   });
   /** Befinden mindestens eines Spielers nicht lesbar (Hinweis in der Anzeige). */
   readonly incomplete = computed(() => this.failed().size > 0);
@@ -82,7 +84,7 @@ export class AlertsService {
     effect(() => {
       const audience = this.audience();
       untracked(() => {
-        if (audience !== this.lastAudience) this.stop();
+        if (audience !== this.lastAudience && (audience === null || this.lastAudience !== null)) this.stop();
         this.lastAudience = audience;
       });
     });
@@ -109,7 +111,6 @@ export class AlertsService {
     this.active.set(false);
     this.wellness.set(new Map());
     this.failed.set(new Set());
-    this.waiting.set(new Set());
   }
 
   private reconcile(ids: readonly string[]): void {
@@ -120,15 +121,12 @@ export class AlertsService {
       this.unsubscribers.delete(id);
       this.wellness.update((map) => without(map, id));
       this.failed.update((set) => withoutKey(set, id));
-      this.waiting.update((set) => withoutKey(set, id));
     }
     const generation = this.generation;
     for (const id of ids) {
       if (this.unsubscribers.has(id) || this.opening.has(id)) continue;
       this.opening.add(id);
-      this.waiting.update((set) => new Set(set).add(id));
       const since = addDays(todayIso(), -ALERT_WELLNESS_DAYS);
-      const done = () => this.waiting.update((set) => withoutKey(set, id));
       this.api
         .watchSelfReports(
           id,
@@ -137,14 +135,12 @@ export class AlertsService {
             if (generation !== this.generation) return;
             this.wellness.update((map) => new Map(map).set(id, docs.map((entry) => wellnessFromDoc(entry.id, entry.data))));
             this.failed.update((set) => withoutKey(set, id));
-            done();
           },
           (error) => {
             if (generation !== this.generation) return;
             console.warn('Befinden für die Hinweise nicht lesbar', error);
             this.wellness.update((map) => without(map, id));
             this.failed.update((set) => new Set(set).add(id));
-            done();
           },
           since,
         )
@@ -152,10 +148,7 @@ export class AlertsService {
           if (generation === this.generation) this.opening.delete(id);
           if (generation !== this.generation || !keepNow(this.squad.players(), id)) {
             unsubscribe();
-            if (generation === this.generation) {
-              this.wellness.update((map) => without(map, id));
-              done();
-            }
+            if (generation === this.generation) this.wellness.update((map) => without(map, id));
           } else this.unsubscribers.set(id, unsubscribe);
         })
         .catch((error) => {
@@ -163,7 +156,6 @@ export class AlertsService {
           this.opening.delete(id);
           console.warn('Befinden für die Hinweise nicht lesbar', error);
           this.failed.update((set) => new Set(set).add(id));
-          done();
         });
     }
   }
