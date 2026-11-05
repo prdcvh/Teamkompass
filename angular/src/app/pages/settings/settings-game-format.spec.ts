@@ -35,4 +35,28 @@ describe('Settings: Spielform', () => {
       expect(select(fixture)!.value).toBe('5:5');
     });
   });
+
+  describe('Teamziel Check-ins (SCRUM-194)', () => {
+    const input = (fixture: { nativeElement: unknown }) => root(fixture).querySelector<HTMLInputElement>('[data-testid="check-in-goal"]');
+
+    it('ist nur für Trainer sichtbar, speichert eine ganze Zahl und lehnt Ungültiges ab', async () => {
+      expect(input(await render('player'))).toBeNull();
+      TestBed.resetTestingModule();
+      const fixture = await render('trainer');
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(input(fixture)?.disabled).toBe(false);
+      });
+      const enter = (value: string) => {
+        input(fixture)!.value = value;
+        input(fixture)!.dispatchEvent(new Event('change'));
+      };
+      enter('120');
+      await vi.waitFor(() => expect(firebase.settings.settings).toEqual({ checkInGoal: 120 }));
+      enter('0');
+      fixture.detectChanges();
+      expect(input(fixture)!.value).toBe('120'); // ungültig: springt auf den gespeicherten Stand zurück
+      expect(firebase.settings.settings).toEqual({ checkInGoal: 120 });
+    });
+  });
 });
