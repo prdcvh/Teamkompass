@@ -17,7 +17,7 @@ export class AccessApi {
     const snapshot = await getDoc(doc(db, 'teams', teamId, 'members', uid));
     if (!snapshot.exists()) return null;
     const data = snapshot.data();
-    // Bisherige Scout-Konten tragen noch „medical“ und werden hier zu Scouts (SCRUM-170).
+    // Unbekannte Kennungen (auch die alte „medical“, SCRUM-202) ergeben keine Rolle und damit keinen Zugang.
     const role = normalizeRole(data['role']);
     if (!role) return null;
     const expires = data['expiresAt'] as { toDate?: () => Date } | null | undefined;

@@ -45,6 +45,10 @@ export const routes: Routes = [
     children: [
       // Die eine Ansicht für Spieler, Eltern, Medizin und Scouts (Figma 01c/01d); der Trainer wird zur Übersicht geschickt.
       { path: 'ansicht', canActivate: [memberViewGuard], loadComponent: () => import('./pages/member-view/member-view').then((m) => m.MemberView) },
+      // Vereinsübersicht (SCRUM-183): für Vereinsadmins unabhängig von der Rolle im geöffneten Team; was sie sehen,
+      // entscheiden die Regeln (nur Teams des eigenen Vereins, nur lesen, keine Gesundheitsdaten).
+      { path: 'verein', loadComponent: () => import('./pages/club/club').then((m) => m.Club) },
+      { path: 'verein/:teamId', loadComponent: () => import('./pages/club/club').then((m) => m.Club) },
       {
         path: '',
         canActivateChild: [trainerGuard],

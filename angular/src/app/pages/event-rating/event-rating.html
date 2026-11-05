@@ -178,8 +178,8 @@
               </div>
             }
 
-            <label class="field"><span class="label">Feedback an Spieler (sichtbar)</span>
-              <input class="tk-input" [attr.maxlength]="limits.note" placeholder="Sichtbar für Spieler/Eltern" [value]="ratings.ratingFor(player.id).note" (change)="set(player, 'note', valueOf($event))" />
+            <label class="field"><span class="label">Kommentar (nur Trainer)</span>
+              <input class="tk-input" [attr.maxlength]="limits.note" placeholder="Kommentar (nur für Trainer)" [value]="ratings.ratingFor(player.id).note" (change)="set(player, 'note', valueOf($event))" />
             </label>
             <label class="field"><span class="label">Interne Notiz (nur Trainer)</span>
               <input class="tk-input" [attr.maxlength]="limits.note" placeholder="Nur für Trainer" [value]="ratings.noteFor(player.id)" (change)="setNote(player, valueOf($event))" />
@@ -210,7 +210,7 @@
                   <th scope="col" class="col-count">Tore</th>
                   <th scope="col" class="col-count">Vor&shy;lagen</th>
                 }
-                <th scope="col" class="col-note" title="Diese Notiz sehen Spieler und Eltern in ihrem Profil">Feedback an Spieler (sichtbar)</th>
+                <th scope="col" class="col-note" title="Spieler und Eltern sehen Kommentare nie (SCRUM-115)">Kommentar (nur Trainer)</th>
                 <th scope="col" class="col-note" title="Nur für Trainer sichtbar, Spieler und Eltern bekommen sie nie zu sehen">Interne Notiz (nur Trainer)</th>
               </tr>
             </thead>
@@ -256,7 +256,7 @@
                     <td><input class="tk-input small" type="number" min="0" [max]="limits.goals" [attr.aria-label]="'Tore: ' + player.name" [value]="ratings.ratingFor(player.id).goals ?? ''" (change)="set(player, 'goals', valueOf($event))" /></td>
                     <td><input class="tk-input small" type="number" min="0" [max]="limits.goals" [attr.aria-label]="'Vorlagen: ' + player.name" [value]="ratings.ratingFor(player.id).assists ?? ''" (change)="set(player, 'assists', valueOf($event))" /></td>
                   }
-                  <td><input class="tk-input" [attr.maxlength]="limits.note" [attr.aria-label]="'Feedback an ' + player.name" placeholder="Sichtbar für Spieler/Eltern" [value]="ratings.ratingFor(player.id).note" (change)="set(player, 'note', valueOf($event))" /></td>
+                  <td><input class="tk-input" [attr.maxlength]="limits.note" [attr.aria-label]="'Kommentar zu ' + player.name" placeholder="Kommentar (nur für Trainer)" [value]="ratings.ratingFor(player.id).note" (change)="set(player, 'note', valueOf($event))" /></td>
                   <td><input class="tk-input" [attr.maxlength]="limits.note" [attr.aria-label]="'Interne Notiz für ' + player.name" placeholder="Nur für Trainer" [value]="ratings.noteFor(player.id)" (change)="setNote(player, valueOf($event))" /></td>
                 </tr>
               }
