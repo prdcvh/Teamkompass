@@ -1,0 +1,121 @@
+<section class="paths" aria-labelledby="paths-title">
+  <div class="block-head">
+    <div>
+      <h2 id="paths-title">Lernpfade</h2>
+      <p class="muted">Stufen je Position und Altersklasse, jede mit einer kurzen Einheit (3–5 Minuten) und einer Aufgabe für zu Hause. Du bestätigst, wenn ein Spieler eine Stufe beherrscht. Spieler und Eltern sehen den Pfad und den nächsten Schritt – ohne Noten.</p>
+    </div>
+    @if (learning.load() === 'ready') {
+      <button tkButton variant="primary" type="button" (click)="openNew()">+ Lernpfad anlegen</button>
+    }
+  </div>
+
+  @switch (learning.load()) {
+    @case ('denied') {
+      <div class="notice" role="status">
+        <p>Lernpfade sind in diesem Team noch nicht freigeschaltet. Sie gehen, sobald die neuen Zugriffsregeln veröffentlicht sind.</p>
+      </div>
+    }
+    @case ('error') {
+      <div class="notice error" role="alert">
+        <p>Die Lernpfade konnten nicht geladen werden. Bitte Verbindung prüfen.</p>
+        <button tkButton type="button" (click)="learning.retry()">Erneut versuchen</button>
+      </div>
+    }
+    @case ('ready') {
+      @if (learning.paths().length === 0) {
+        <tk-card>
+          <div class="empty">
+            <p>Noch kein Lernpfad angelegt.</p>
+            <button tkButton variant="primary" type="button" (click)="openNew()">+ Lernpfad anlegen</button>
+          </div>
+        </tk-card>
+      } @else {
+        <ul class="path-list" data-testid="path-list">
+          @for (path of learning.paths(); track path.id) {
+            <li>
+              <tk-card>
+                <div class="path">
+                  <div class="path-head">
+                    <div class="what">
+                      <div class="chips">
+                        <tk-chip tone="blue">{{ positionLabel(path.position) }}</tk-chip>
+                        <tk-chip>{{ ageGroupLabel(path.ageGroup) }}</tk-chip>
+                        <tk-chip>{{ path.levels.length }} {{ path.levels.length === 1 ? 'Stufe' : 'Stufen' }}</tk-chip>
+                      </div>
+                      <strong class="path-title">{{ path.title }}</strong>
+                    </div>
+                    <button tkButton size="sm" type="button" (click)="openEdit(path)" [attr.aria-label]="'Lernpfad bearbeiten: ' + path.title">Bearbeiten</button>
+                  </div>
+                  @if (otherAgeGroup(path)) {
+                    <p class="hint">Dieser Pfad ist für {{ path.ageGroup }} – niemand in diesem Team sieht ihn.</p>
+                  }
+                  <ol class="level-list">
+                    @for (level of path.levels; track level.id; let i = $index) {
+                      <li><span class="step">Stufe {{ i + 1 }}</span> {{ level.title }} <small class="muted">· {{ level.minutes }} Min.</small></li>
+                    }
+                  </ol>
+                  <button
+                    tkButton
+                    size="sm"
+                    type="button"
+                    class="toggle"
+                    [attr.aria-expanded]="expanded() === path.id"
+                    [attr.aria-controls]="'players-' + path.id"
+                    (click)="toggle(path)"
+                  >
+                    {{ expanded() === path.id ? 'Spieler ausblenden' : 'Stufen bestätigen' }}
+                  </button>
+                  @if (expanded() === path.id) {
+                    <div class="players" [id]="'players-' + path.id">
+                      @if (!squadReady()) {
+                        <p class="muted" role="status">Kader wird geladen …</p>
+                      } @else if (rows(path).length === 0) {
+                        <p class="muted">Kein Spieler im Kader passt zu Position und Altersklasse dieses Pfads.</p>
+                      } @else {
+                        <ul class="player-list" data-testid="player-progress">
+                          @for (row of rows(path); track row.player.id) {
+                            <li class="player-row">
+                              <div class="who">
+                                <strong>{{ row.player.number }} · {{ row.player.name }}</strong>
+                                <small class="muted">{{ progressText(row.view) }}@if (row.view.lastDone) { · zuletzt am {{ formatDate(row.view.lastDone.confirmedAt) }}}</small>
+                                <progress [max]="row.view.total" [value]="row.view.done" [attr.aria-label]="row.player.name + ': ' + progressText(row.view)"></progress>
+                                @if (row.view.next; as next) {
+                                  <small>Nächster Schritt: Stufe {{ next.number }} – {{ next.level.title }}</small>
+                                }
+                              </div>
+                              <div class="row-actions">
+                                @if (row.view.next; as next) {
+                                  <button tkButton size="sm" variant="primary" type="button" (click)="confirm(row)" [attr.aria-label]="'Stufe ' + next.number + ' für ' + row.player.name + ' bestätigen'">Stufe {{ next.number }} bestätigen</button>
+                                }
+                                @if (row.view.lastDone; as last) {
+                                  <button tkButton size="sm" type="button" (click)="undo(row)" [attr.aria-label]="'Stufe ' + last.number + ' für ' + row.player.name + ' zurücknehmen'">Zurücknehmen</button>
+                                }
+                              </div>
+                            </li>
+                          }
+                        </ul>
+                      }
+                    </div>
+                  }
+                </div>
+              </tk-card>
+            </li>
+          }
+        </ul>
+      }
+    }
+    @default {
+      <p class="muted" role="status">Lernpfade werden geladen …</p>
+    }
+  }
+</section>
+
+<tk-path-dialog [open]="dialogOpen()" [path]="editing()" (closed)="dialogOpen.set(false)" (deleteRequested)="askDelete($event)" />
+
+<tk-dialog [open]="deleting() !== null" title="Lernpfad löschen?" (closed)="deleting.set(null)">
+  <p>Der Lernpfad „{{ deleting()?.title }}“ wird gelöscht – mit allen bestätigten Stufen der Spieler darin. Das lässt sich nicht rückgängig machen.</p>
+  <div class="confirm-actions">
+    <button tkButton type="button" (click)="deleting.set(null)">Abbrechen</button>
+    <button tkButton type="button" variant="primary" (click)="confirmDelete()">Endgültig löschen</button>
+  </div>
+</tk-dialog>

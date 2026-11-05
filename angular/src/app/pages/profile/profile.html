@@ -78,6 +78,8 @@
 
       @if (trainer()) {
         <tk-consent-panel [player]="p" />
+        <!-- Noten für Spieler/Eltern veröffentlichen (SCRUM-115). -->
+        <tk-grade-release-panel [player]="p" />
       }
 
       <section class="columns">
@@ -116,6 +118,8 @@
               </li>
             }
           </ul>
+          <!-- Bestätigte Lernpfad-Stufen (SCRUM-192). -->
+          <tk-learning-summary [player]="p" />
           <h2>Verfügbarkeit</h2>
           <ul class="bars">
             @for (row of attendance(); track row.label) {

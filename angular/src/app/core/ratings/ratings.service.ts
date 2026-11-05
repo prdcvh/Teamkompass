@@ -137,7 +137,7 @@ export class RatingsService {
     this.ratings.update((map) => new Map(map).set(playerId, rating));
     this.markSyncing();
     void this.ratingsApi
-      .saveRating(eventId, playerId, docFromRating(rating, { clearAuto: clearedAuto }))
+      .saveRating(eventId, playerId, docFromRating(rating, { clearAuto: clearedAuto }), docFromRating(current))
       .then(() => this.sync.clearError())
       .catch((error) => this.failWrite(error, 'Bewertung konnte nicht gespeichert werden.'));
     return true;

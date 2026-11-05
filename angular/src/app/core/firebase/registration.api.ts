@@ -65,7 +65,7 @@ export class RegistrationApi {
     const snapshot = await getDoc(doc(db, 'clubInvites', code));
     if (!snapshot.exists()) return null;
     const data = snapshot.data();
-    const kind = data['kind'] === 'club' || data['kind'] === 'team' ? data['kind'] : null;
+    const kind = data['kind'] === 'club' || data['kind'] === 'team' || data['kind'] === 'trainer' ? data['kind'] : null;
     if (!kind || typeof data['clubId'] !== 'string' || typeof data['teamId'] !== 'string') return null;
     const expires = (data['expiresAt'] as { toDate?: () => Date } | null | undefined)?.toDate?.() ?? null;
     return {
@@ -75,6 +75,7 @@ export class RegistrationApi {
       teamId: data['teamId'],
       expiresAt: expires,
       email: typeof data['email'] === 'string' && data['email'] ? data['email'] : null,
+      ...(kind === 'trainer' ? { teamName: typeof data['teamName'] === 'string' ? data['teamName'] : '' } : {}),
     };
   }
 

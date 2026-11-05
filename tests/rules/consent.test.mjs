@@ -71,8 +71,10 @@ test("Widerrufen: Spieler, Eltern und Medizin lesen keine Gesundheitsdaten, der 
       await assertFails(getDocs(query(collection(as(uid), p(team, "players/p1/measurements")), where("playerId", "==", "p1"))));
       // Absagegrund: gesperrt, solange einer drinsteht.
       await assertFails(getDoc(doc(as(uid), p(team, "events/e1/responses/p1"))));
-      // Noten und Förderplan sind keine Gesundheitsdaten und bleiben lesbar.
-      await assertSucceeds(getDoc(doc(as(uid), p(team, "events/e1/ratings/p1"))));
+      // Werte der Bewertung und Förderplan sind keine Gesundheitsdaten und bleiben lesbar (SCRUM-115: Werte-Kopie;
+      // das Bewertungsdokument mit dem Kommentar liest nur der Trainer).
+      await assertSucceeds(getDoc(doc(as(uid), p(team, "events/e1/ratingValues/p1"))));
+      await assertFails(getDoc(doc(as(uid), p(team, "events/e1/ratings/p1"))));
       await assertSucceeds(getDocs(query(collection(as(uid), p(team, "players/p1/developmentPlans")), where("playerId", "==", "p1"))));
     }
     await assertFails(getDocs(collection(as("medic"), p(team, "players/p1/absences"))));
