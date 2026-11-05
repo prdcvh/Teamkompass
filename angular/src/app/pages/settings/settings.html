@@ -126,6 +126,31 @@
 
   @if (teamSettings.canWrite()) {
     <tk-card>
+      <div class="panel" id="teamziel">
+        <h2>Teamziel Check-ins (Cloud, für das Team)</h2>
+        <label class="field">
+          <span>Check-ins pro Monat (Ziel der Mannschaft)</span>
+          <input
+            class="tk-input"
+            type="number"
+            min="1"
+            max="10000"
+            step="1"
+            inputmode="numeric"
+            data-testid="check-in-goal"
+            placeholder="z. B. 100"
+            [disabled]="teamSettings.load() !== 'ready'"
+            [value]="teamSettings.checkInGoal() ?? ''"
+            (change)="setCheckInGoal($event)"
+          />
+        </label>
+        <p class="muted">Das Ziel zählt die Check-ins der ganzen Mannschaft, nie einzelne Spieler. Es erscheint in der Teamanalyse. Leer lassen, wenn es kein Ziel geben soll.</p>
+      </div>
+    </tk-card>
+  }
+
+  @if (teamSettings.canWrite()) {
+    <tk-card>
       <div class="panel" id="spielform">
         <h2>Spielform (Cloud, für das Team)</h2>
         <label class="field">

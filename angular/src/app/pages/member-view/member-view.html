@@ -62,6 +62,8 @@
     @if (player(); as p) {
       <tk-rsvp-panel />
       <tk-self-report-panel [player]="p" />
+      <!-- Eigene Serien (SCRUM-194): nur Spieler und Eltern, keine Rangliste. -->
+      <tk-streak-panel [player]="p" />
       @if (!picks()) {
         <app-home-ranking [mobile]="mobile()" />
         <!-- Lernpfad und nächster Schritt (SCRUM-192), nur Spieler und Eltern. -->

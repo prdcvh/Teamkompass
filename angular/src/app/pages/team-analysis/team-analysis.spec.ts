@@ -11,7 +11,7 @@ describe('TeamAnalysis (Teamanalyse)', () => {
   const isMobile = signal(false);
   const grades = (grade: number) => ({ attendance: 'present', effort: grade, technique: grade, tactics: grade, comprehension: grade });
 
-  async function render(role: 'trainer' | 'player' = 'trainer', mobile = false, withData = true) {
+  async function render(role: 'trainer' | 'player' = 'trainer', mobile = false, withData = true, seed?: (firebase: FakeFirebase) => void) {
     isMobile.set(mobile);
     firebase = new FakeFirebase();
     if (withData) {
@@ -22,6 +22,7 @@ describe('TeamAnalysis (Teamanalyse)', () => {
       firebase.ratings.ratings.set('e1', new Map([['p1', { ...grades(2), playerId: 'p1' }], ['p2', { ...grades(4), playerId: 'p2' }]]));
       firebase.ratings.ratings.set('e2', new Map([['p1', { ...grades(2), playerId: 'p1' }]]));
     }
+    seed?.(firebase);
     TestBed.configureTestingModule({
       providers: [provideRouter([]), ...provideFakeFirebase(firebase), { provide: LayoutService, useValue: { isMobile } }],
     });
@@ -38,6 +39,28 @@ describe('TeamAnalysis (Teamanalyse)', () => {
       fixture.detectChanges();
       expect(root(fixture).querySelector('.stats')).not.toBeNull();
     });
+
+  it('Teamziel: zählt die Check-ins der Mannschaft im Monat, ohne Spielernamen oder Rangliste (SCRUM-194)', async () => {
+    const month = new Date().toISOString().slice(0, 7);
+    const fixture = await render('trainer', false, false, (fb) => {
+      fb.players.players.set('p1', { name: 'Ali Adler', positions: ['ST'], number: 9, birthdate: '2012-02-05', status: 'Fit' });
+      fb.players.players.set('p2', { name: 'Ben Bär', positions: ['IV'], number: 4, birthdate: '2012-11-06', status: 'Fit' });
+      fb.selfReports.set('p1', 'selfReports', 'e1', { playerId: 'p1', eventId: 'e1', date: `${month}-01`, exertion: 4 });
+      fb.selfReports.set('p1', 'selfReports', 'e2', { playerId: 'p1', eventId: 'e2', date: `${month}-02`, exertion: 4 });
+      fb.selfReports.set('p2', 'selfReports', 'e1', { playerId: 'p2', eventId: 'e1', date: `${month}-01`, exertion: 5 });
+      fb.selfReports.set('p2', 'selfReports', 'e0', { playerId: 'p2', eventId: 'e0', date: '2020-01-01', exertion: 5 });
+      fb.settings.settings = { checkInGoal: 6 };
+    });
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      const goal = root(fixture).querySelector('[data-testid="team-goal"]');
+      expect(goal?.textContent?.replace(/\s+/g, ' ')).toContain('3 von 6 Check-ins');
+    });
+    const goal = root(fixture).querySelector('[data-testid="team-goal"]')!;
+    expect(goal.querySelector('progress')?.getAttribute('value')).toBe('50');
+    expect(goal.textContent).not.toContain('Ali');
+    expect(goal.textContent).toContain('keine Rangliste');
+  });
 
   it('zeigt Kennzahlen, Teamform, Geburtsquartale, Positionsabdeckung und Trainingsfokus', async () => {
     const fixture = await render();
@@ -59,7 +82,7 @@ describe('TeamAnalysis (Teamanalyse)', () => {
     expect(root(fixture).querySelector('svg.chart')?.getAttribute('aria-label')).toContain('Teamnoten nach Event (1 ist die beste Note): ');
     expect(root(fixture).querySelectorAll('svg.chart .dot')).toHaveLength(2);
     const headings = [...root(fixture).querySelectorAll('h2')].map((h) => h.textContent);
-    expect(headings).toEqual(['Teamform', 'Nützliche Kennzahlen', 'Geburtsquartale', 'Positionsabdeckung', 'Trainingsfokus']);
+    expect(headings.filter((heading) => !heading?.startsWith('Teamziel'))).toEqual(['Teamform', 'Nützliche Kennzahlen', 'Geburtsquartale', 'Positionsabdeckung', 'Trainingsfokus']);
     expect(text(fixture)).toContain('Umschalten (Einheiten)');
     expect(text(fixture)).toContain('Knapp besetztIV, LA, ST');
     expect(root(fixture).querySelector('[aria-label="Q1: 1 Spieler"]')).not.toBeNull();

@@ -276,3 +276,7 @@ h2 {
 .bar.amber span {
   background: var(--tk-amber);
 }
+
+progress {
+  width: 100%;
+}

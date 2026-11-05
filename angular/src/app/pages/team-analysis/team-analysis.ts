@@ -11,6 +11,8 @@ import { SessionService } from '../../core/auth/session.service';
 import { SyncService } from '../../core/shell/sync.service';
 import { leaders } from '../../core/team/team';
 import { TeamService } from '../../core/team/team.service';
+import { TeamSettingsService } from '../../core/team-settings/team-settings.service';
+import { teamGoalProgress } from '../../core/streaks/streak';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 
@@ -104,6 +106,16 @@ export class TeamAnalysis implements OnInit {
       .slice(0, 3);
   });
 
+  /** Teamziel „Check-ins im Monat“ (SCRUM-194): nur die Summe der Mannschaft, nie nach Spielern. */
+  protected readonly teamSettings = inject(TeamSettingsService);
+  protected readonly goal = computed(() => {
+    const month = todayIso().slice(0, 7);
+    const progress = teamGoalProgress(this.team.checkInDates(), month, this.teamSettings.checkInGoal());
+    const [year, number] = month.split('-').map(Number);
+    const name = new Intl.DateTimeFormat('de-DE', { month: 'long', timeZone: 'UTC' }).format(new Date(Date.UTC(year, number - 1, 15)));
+    return { ...progress, monthName: name };
+  });
+
   protected readonly focusRows = computed(() => bars(Object.entries(this.focus()).map(([label, value]) => ({ label, value }))));
   protected readonly quarterRows = computed(() => bars(Object.entries(this.quarters()).map(([label, value]) => ({ label, value }))));
   protected readonly positionRows = computed(() => bars(this.coverage().slice(0, 10).map(([label, value]) => ({ label, value }))));
@@ -114,6 +126,9 @@ export class TeamAnalysis implements OnInit {
   protected gradeLabel = (value: number | null): string => scoreLabel(value, this.scale());
 
   ngOnInit(): void {
-    if (this.isTrainer()) this.team.start();
+    if (this.isTrainer()) {
+      this.team.start();
+      this.teamSettings.start();
+    }
   }
 }

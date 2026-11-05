@@ -78,6 +78,14 @@ export class Settings {
     if (!this.teamSettings.saveAlertSwitch(id, input.checked)) input.checked = this.teamSettings.alertSwitches()[id];
   }
 
+  /** Teamziel „Check-ins im Monat“ (SCRUM-194): leer = kein Ziel. Ungültiges springt auf den gespeicherten Stand zurück. */
+  protected setCheckInGoal(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const text = input.value.trim();
+    const goal = text === '' ? null : Number(text);
+    if (!this.teamSettings.saveCheckInGoal(goal)) input.value = String(this.teamSettings.checkInGoal() ?? '');
+  }
+
   protected setGameFormat(event: Event): void {
     const select = event.target as HTMLSelectElement;
     if (!isGameFormat(select.value) || !this.teamSettings.saveGameFormat(select.value)) select.value = this.teamSettings.gameFormat();
