@@ -40,6 +40,39 @@
           </p>
         </section>
       }
+      @if (bio(); as bio) {
+        <section class="bio-banding" aria-label="Bio-Banding" data-test="bio-banding">
+          <h3>Gruppen nach Reifestand (Vorschlag)</h3>
+          <p class="hint">{{ bioHint }}</p>
+          @if (bio.state === 'error') {
+            <p class="error" role="alert">Der Vorschlag konnte nicht geladen werden.</p>
+            <button tkButton size="sm" type="button" (click)="retryBio()">Erneut versuchen</button>
+          } @else if (bio.state !== 'ready' || !bio.suggestion) {
+            <p class="hint" role="status">Vorschlag wird berechnet …</p>
+          } @else {
+            @for (group of bio.suggestion.groups; track group.band) {
+              <div class="bio-group" [attr.data-band]="group.band">
+                <strong>Gruppe {{ group.band }} · {{ group.label }}</strong>
+                @if (group.players.length === 0) {
+                  <span class="hint">niemand</span>
+                } @else {
+                  <ul>
+                    @for (member of group.players; track member.id) {
+                      <li>{{ member.name }} <span class="hint">{{ percentText(member.point.percent) }}</span></li>
+                    }
+                  </ul>
+                }
+              </div>
+            }
+            @if (bio.suggestion.withoutValue > 0) {
+              <p class="hint" data-test="bio-without">
+                Für {{ bio.suggestion.withoutValue }} Spieler gibt es keinen Vorschlag (kein Reifestand oder nicht 12 bis 15 Jahre alt).
+              </p>
+            }
+            <p class="hint">Prozent der erwarteten Erwachsenengröße nach Khamis &amp; Roche; Bänder wie im Bio-Banding der Premier League.</p>
+          }
+        </section>
+      }
       @if (plan(); as plan) {
         <section class="opponent-plan" aria-label="Gegnerprofil">
           <h3>Gegner: {{ plan.profile.name }}</h3>

@@ -31,6 +31,14 @@ export class MaturityApi {
     );
   }
 
+  /** Einmaliges Lesen der Angaben eines Spielers (Bio-Banding, SCRUM-191); null = noch nichts erfasst. */
+  async readMaturity(playerId: string): Promise<Readonly<Record<string, unknown>> | null> {
+    const { db } = await this.connection.get();
+    const { doc, getDoc } = await import('firebase/firestore');
+    const snapshot = await getDoc(doc(db, 'teams', this.team.id(), 'players', playerId, 'maturity', MATURITY_DOC_ID));
+    return snapshot.exists() ? snapshot.data() : null;
+  }
+
   /** Schreibt das Dokument vollständig (die Regeln erlauben genau diese Felder). */
   async saveMaturity(playerId: string, data: Readonly<Record<string, unknown>>): Promise<void> {
     const { db } = await this.connection.get();

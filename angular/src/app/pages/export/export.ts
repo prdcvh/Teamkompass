@@ -23,6 +23,7 @@ import { WorkspaceService } from '../../core/device/workspace.service';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 import { Dialog } from '../../ui/dialog/dialog';
+import { SeasonReportPanel } from './season-report-panel';
 
 type Kind = 'json' | 'pdf';
 
@@ -37,7 +38,7 @@ interface PendingImport {
 /** Daten exportieren: Sicherung aller Teamdaten (JSON) und Spielerprofil als PDF (nur Trainer). */
 @Component({
   selector: 'app-export',
-  imports: [Button, Card, Dialog],
+  imports: [Button, Card, Dialog, SeasonReportPanel],
   templateUrl: './export.html',
   styleUrl: './export.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
