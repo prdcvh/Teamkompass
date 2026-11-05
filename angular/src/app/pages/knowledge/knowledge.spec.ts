@@ -133,7 +133,7 @@ describe('Wissen (Seite, SCRUM-106)', () => {
     await fixture.whenStable();
     expect(root(fixture).textContent).toContain('Der Eintrag „Abseitsregel“ wird gelöscht');
     expect(firebase.knowledge.knowledge['b']).toBeDefined();
-    const confirm = [...root(fixture).querySelectorAll<HTMLButtonElement>('.confirm-actions button')].find((b) => b.textContent?.includes('Endgültig') && !b.closest('tk-learning-paths'));
+    const confirm = [...root(fixture).querySelectorAll<HTMLButtonElement>('.confirm-actions button')].find((b) => b.textContent?.includes('Endgültig') && !b.closest('tk-learning-paths, tk-puzzles'));
     confirm?.click();
     await vi.waitFor(() => expect(firebase.knowledge.knowledge['b']).toBeUndefined());
   });

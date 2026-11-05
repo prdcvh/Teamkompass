@@ -17,11 +17,10 @@ import {
   hasPuzzleErrors,
   puzzleFromDraft,
   puzzlesFromDocs,
-  ratingHistory,
   solutionFromDoc,
-  teamInsights,
   validatePuzzleDraft,
 } from './puzzle';
+import { ratingHistory, teamInsights } from './puzzle-rating';
 
 /** `denied`: die Regeln lehnen ab (Rätsel-Regeln noch nicht veröffentlicht oder Rolle ohne Zugriff). */
 export type PuzzleLoad = 'idle' | 'loading' | 'ready' | 'denied' | 'error';

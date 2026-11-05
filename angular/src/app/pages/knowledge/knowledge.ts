@@ -18,11 +18,12 @@ import { Dialog } from '../../ui/dialog/dialog';
 import { Icon } from '../../ui/icon/icon';
 import { KnowledgeDialog } from './entry-dialog';
 import { LearningPaths } from './learning-paths';
+import { Puzzles } from './puzzles';
 
-/** Wissen (nur Trainer): Links zu Videos, Playlists und Dokumenten sowie ein Glossar, mit Suche und Filter; darunter die Lernpfade (SCRUM-192). */
+/** Wissen (nur Trainer): Links zu Videos, Playlists und Dokumenten sowie ein Glossar, mit Suche und Filter; darunter die Lernpfade (SCRUM-192) und die Situationsrätsel (SCRUM-193). */
 @Component({
   selector: 'app-knowledge',
-  imports: [Button, Card, Chip, Dialog, Icon, KnowledgeDialog, LearningPaths],
+  imports: [Button, Card, Chip, Dialog, Icon, KnowledgeDialog, LearningPaths, Puzzles],
   templateUrl: './knowledge.html',
   styleUrl: './knowledge.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

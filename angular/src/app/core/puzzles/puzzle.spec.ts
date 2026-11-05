@@ -4,23 +4,18 @@ import {
   type PuzzleSolution,
   START_RATING,
   answerFromDoc,
-  deltaLabel,
   docFromPuzzle,
   emptyPuzzleDraft,
-  expectedScore,
   formatSeconds,
   parseTimestamp,
   puzzleFromDoc,
   puzzleFromDraft,
-  puzzleInsight,
-  ratingDelta,
-  ratingHistory,
   solutionFromDoc,
-  teamInsights,
   timestampFromUrl,
   validatePuzzleDraft,
   videoLinkAt,
 } from './puzzle';
+import { deltaLabel, expectedScore, puzzleInsight, ratingDelta, ratingHistory, teamInsights } from './puzzle-rating';
 
 const puzzle = (id: string, level: 1 | 2 | 3, answers = ['Kurz', 'Lang', 'Halten']): Puzzle => ({
   id,
