@@ -3,7 +3,7 @@
     <div>
       <p class="tk-eyebrow">Mannschaft</p>
       <h1>Wissen</h1>
-      <p class="muted">Videos, Playlists, Dokumente und Glossar-Begriffe für die Mannschaft, dazu Lernpfade mit Stufen. Es wird nur verlinkt; nichts wird hochgeladen. Nur Trainer sehen diese Seite; Spieler und Eltern sehen nur ihren Lernpfad in ihrer Ansicht.</p>
+      <p class="muted">Videos, Playlists, Dokumente und Glossar-Begriffe für die Mannschaft, dazu Lernpfade mit Stufen und Situationsrätsel. Es wird nur verlinkt; nichts wird hochgeladen. Nur Trainer sehen diese Seite; Spieler und Eltern sehen nur ihren Lernpfad und die Rätsel in ihrer Ansicht.</p>
     </div>
     @if (knowledge.load() === 'ready') {
       <button tkButton variant="primary" type="button" (click)="openNew()">+ Eintrag anlegen</button>
@@ -104,6 +104,9 @@
 
   <!-- Lernpfade mit Kompetenzstufen (SCRUM-192). -->
   <tk-learning-paths />
+
+  <!-- Situationsrätsel aus Spielszenen mit eigener Wertung (SCRUM-193). -->
+  <tk-puzzles />
 </section>
 
 <tk-knowledge-dialog [open]="dialogOpen()" [entry]="editing()" (closed)="dialogOpen.set(false)" (deleteRequested)="askDelete($event)" />

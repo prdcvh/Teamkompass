@@ -15,6 +15,9 @@ import {
 } from '../../core/events/event';
 import { groupByMonth, sectionEvents } from '../../core/events/event-sections';
 import { EventsService } from '../../core/events/events.service';
+import { ICS_MIME_TYPE, buildIcs, calendarEvents, icsFileName } from '../../core/events/ical';
+import { FileOutput } from '../../core/export/file-output';
+import { CurrentTeam } from '../../core/team/current-team.service';
 import { SquadService } from '../../core/player/squad.service';
 import { isUpcoming, rsvpCounts, rsvpCountsText } from '../../core/rsvp/rsvp';
 import { RsvpService } from '../../core/rsvp/rsvp.service';
@@ -47,6 +50,8 @@ export class Events implements OnInit {
   private readonly weather = inject(WeatherService);
   private readonly rsvp = inject(RsvpService);
   private readonly squad = inject(SquadService);
+  private readonly files = inject(FileOutput);
+  private readonly team = inject(CurrentTeam);
   protected readonly planning = inject(PlanningService);
   private readonly narrow = injectNarrowViewport();
   /** Kartenliste statt Tabelle: auf dem Handy und überall, wo die Tabelle nicht neben das Seitenmenü passt (SCRUM-134). */
@@ -104,6 +109,16 @@ export class Events implements OnInit {
 
   ngOnInit(): void {
     this.events.start();
+  }
+
+  /** Kalenderdatei (SCRUM-179): Zahl der kommenden Termine ab heute (Berliner Datum). */
+  protected readonly calendarCount = computed(() => calendarEvents(this.events.events(), berlinNow(this.weather.now()).date).length);
+
+  /** Lädt die kommenden Termine als .ics-Datei herunter; enthält nur Titel, Zeit und Ort, keine Personendaten. */
+  protected downloadCalendar(): void {
+    const now = this.weather.now();
+    const ics = buildIcs(this.events.events(), { fromDate: berlinNow(now).date, now, calendarName: `TeamKompass ${this.team.name()}`.trim() });
+    this.files.saveText(icsFileName(this.team.id()), ics, ICS_MIME_TYPE);
   }
 
   protected formatDate = formatDate;

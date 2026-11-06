@@ -156,6 +156,18 @@ export class PlayersApi {
     await deleteDoc(doc(db, ...base, 'learningProgress', id)).catch((error: unknown) => {
       if ((error as { code?: unknown } | null)?.code !== 'permission-denied') throw error;
     });
+    // Antworten auf Situationsrätsel (SCRUM-193), ebenso getrennt: ältere Regeln kennen die Sammlung noch nicht.
+    await getDocs(query(collection(db, ...base, 'puzzleAnswers'), where('playerId', '==', id)))
+      .then(async (answers) => {
+        for (let offset = 0; offset < answers.docs.length; offset += 450) {
+          const batch = writeBatch(db);
+          answers.docs.slice(offset, offset + 450).forEach((entry) => batch.delete(entry.ref));
+          await batch.commit();
+        }
+      })
+      .catch((error: unknown) => {
+        if ((error as { code?: unknown } | null)?.code !== 'permission-denied') throw error;
+      });
     for (let offset = 0; offset < refs.length; offset += 450) {
       const batch = writeBatch(db);
       refs.slice(offset, offset + 450).forEach((ref) => batch.delete(ref));

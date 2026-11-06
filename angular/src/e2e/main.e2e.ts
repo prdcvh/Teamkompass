@@ -200,6 +200,18 @@ if (new URLSearchParams(location.search).get('skala') === 'stufen') {
 if (new URLSearchParams(location.search).get('noten') === 'frei') {
   fake.gradeReleases.releases.set('p1', { playerId: 'p1', publishedUntil: new Date(), expiresAt: null, createdBy: 'e2e-uid' });
 }
+// Situationsrätsel (SCRUM-193): drei Szenen; p1 hat eine beantwortet, p2–p4 alle (der Konter ist „noch nicht verstanden“).
+fake.puzzles.puzzles.set('r1', { title: 'Konter nach Ballgewinn im Mittelfeld – wer ist frei?', question: 'Wohin passt du?', media: 'image', mediaUrl: 'https://example.org/teamkompass-szene.svg', videoStart: null, answers: ['Kurz zurück zum Sechser', 'Lang auf die offene rechte Seite', 'Ball halten und auf Hilfe warten'], level: 2 });
+fake.puzzles.solutions.set('r1', { correct: 1, explanation: 'Der Gegner steht ballnah eng. Rechts ist viel Platz und unser Flügelspieler startet schon.' });
+fake.puzzles.puzzles.set('r2', { title: 'Abstoß gegen hohes Pressing', question: 'Wohin spielst du den Ball?', media: 'video', mediaUrl: 'https://www.youtube.com/watch?v=abcdefghijk', videoStart: 83, answers: ['Kurz zum Innenverteidiger', 'Hoch auf den Stürmer'], level: 3 });
+fake.puzzles.solutions.set('r2', { correct: 1, explanation: 'Alle Gegner stehen vorne – der lange Ball überspielt das Pressing.' });
+fake.puzzles.puzzles.set('r3', { title: 'Einwurf an der Mittellinie', question: 'Wer ist frei?', media: 'image', mediaUrl: 'https://example.org/teamkompass-szene.svg', videoStart: null, answers: ['Links', 'Rechts', 'Zurück'], level: 1 });
+fake.puzzles.solutions.set('r3', { correct: 2, explanation: 'Zurück ist frei, vorne wird gedoppelt.' });
+fake.puzzles.answers.set('r3_p1', { puzzleId: 'r3', playerId: 'p1', choice: 2, by: 'player', answeredAt: Date.parse('2026-11-01T17:00:00Z') });
+for (const [index, playerId] of ['p2', 'p3', 'p4'].entries()) {
+  fake.puzzles.answers.set(`r1_${playerId}`, { puzzleId: 'r1', playerId, choice: index === 0 ? 1 : 0, by: 'player', answeredAt: Date.parse('2026-11-02T17:00:00Z') + index });
+  fake.puzzles.answers.set(`r2_${playerId}`, { puzzleId: 'r2', playerId, choice: 1, by: 'player', answeredAt: Date.parse('2026-11-03T17:00:00Z') + index });
+}
 if (new URLSearchParams(location.search).get('as') === 'fresh') {
   fake.players.players.clear();
   fake.events.events.clear();
