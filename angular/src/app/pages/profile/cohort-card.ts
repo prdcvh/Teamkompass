@@ -6,6 +6,7 @@ import type { Player } from '../../core/player/player';
 import { scoreLabel } from '../../core/ratings/rating-scale';
 import { RatingScaleService } from '../../core/ratings/rating-scale.service';
 import { CurrentTeam } from '../../core/team/current-team.service';
+import { TeamService } from '../../core/team/team.service';
 import { Card } from '../../ui/card/card';
 
 /**
@@ -74,6 +75,7 @@ export class CohortCard {
   private readonly session = inject(SessionService);
   private readonly current = inject(CurrentTeam);
   private readonly scale = inject(RatingScaleService).scale;
+  private readonly team = inject(TeamService);
 
   readonly player = input.required<Player>();
 
@@ -85,7 +87,12 @@ export class CohortCard {
 
   constructor() {
     effect(() => {
-      if (this.trainer() && this.current.clubId()) untracked(() => void this.comparison.load());
+      if (!this.trainer() || !this.current.clubId()) return;
+      untracked(() => {
+        // Eigene Werte frisch aus den Teamdaten (gleiche Zahlen wie in der Teamanalyse), andere Teams aus den Kurzfassungen.
+        this.team.start();
+        void this.comparison.load();
+      });
     });
   }
 

@@ -77,6 +77,16 @@ describe('Vereinsvergleich: Kurzfassung eines Teams (SCRUM-197)', () => {
     for (const hidden of ['Verletzt', '2026-12-01', 'privat', 'granted', '2013-04-01']) expect(text).not.toContain(hidden);
   });
 
+  it('Namen nur für die drei Schlüsselspieler, alle anderen ohne Namen', () => {
+    const many = ['Anna', 'Ben', 'Cem', 'Dora', 'Emil'].map((name, i) => player(`q${i}`, name, '2013-01-01'));
+    const grades = [3, 1.5, 2, 4, 2.5];
+    const ev = [event('t1')];
+    const rs = new Map([['t1', new Map(many.map((p, i) => [p.id, rating(grades[i])]))]]);
+    const summary = comparisonFromTeam('U13', many.map((p) => ({ player: p, items: itemsFor(p.id, ev, rs), absences: [], measurements: [] })), ev, rs, '2026-11-06');
+    expect(summary.players.map((p) => p.name)).toEqual(['', 'Ben', 'Cem', '', 'Emil']);
+    expect(keyPlayers(summary).map((p) => p.name)).toEqual(['Ben', 'Cem', 'Emil']);
+  });
+
   it('ohne gesetzte Anwesenheit steht die Teilnahme auf „unbekannt“ statt 0 %', () => {
     const summary = comparisonFromTeam('U13', [], [], new Map(), '2026-11-06');
     expect(summary.team.attendanceRate).toBeNull();

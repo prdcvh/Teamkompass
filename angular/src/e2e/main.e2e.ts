@@ -161,6 +161,19 @@ fake.teams.memberships.set('e2e-multi', [
   { teamId: 'Team0000000000000002', role: 'parent', playerId: 'p1', expiresAt: null },
 ]);
 fake.teams.metas.set('U14', { name: 'Test-Team U14 (Angular)', label: 'U14 Test', clubId: 'test-verein', clubName: 'Test-Verein (Angular-Test)', logoUrl: null });
+// Vereinsvergleich (SCRUM-197): eingeschaltet, zwei weitere Teams des Test-Vereins mit Spielern des Jahrgangs 2012.
+fake.comparison.enabled.add('test-verein');
+const comparisonTeam = (teamName: string, prefix: string, averages: readonly (number | null)[], extra: Record<string, unknown>) => ({
+  version: 1,
+  teamName,
+  team: { playerCount: averages.length, attendanceRate: 84, avgExertion: 6.2, avgGrade: 2.6, trainings: 31, games: 9, focus: { 'Eigener Ballbesitz': 12, 'Gegnerischer Ballbesitz': 14, Umschalten: 5 }, ...extra },
+  players: averages.map((average, i) => ({ id: `${prefix}${i}`, name: `${['Mia', 'Lena', 'Tom', 'Emil', 'Ida', 'Ole'][i % 6]} ${teamName}`, birthYear: i % 2 ? 2012 : 2011, average, rated: average === null ? 0 : 6, attendanceRate: 70 + i * 4 })),
+  updatedAt: { toDate: () => new Date('2026-11-05T18:00:00') },
+});
+fake.comparison.docs.set('test-verein', new Map([
+  ['U15x', comparisonTeam('U15', 'a', [2.1, 2.4, 1.8, 3.1, 2.9, null], {})],
+  ['U13x', comparisonTeam('U13 Jugendförderverein Taunus', 'b', [2.6, 2.2, 3.4, 2.8], { attendanceRate: 91, avgExertion: 5.1, avgGrade: 2.8, focus: { 'Eigener Ballbesitz': 20, 'Gegnerischer Ballbesitz': 4, Umschalten: 6 } })],
+]));
 // Vereinslogo aus der Datenbank (SCRUM-182): ein kleines Beispiel-PNG als data:-URL.
 const SAMPLE_LOGO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAAwklEQVR42u3a0Q2AIAwEUBZxJednG12AhJb2gF6uid/e06jQ2pqKqJ63f5ajZOjrMNHgxyDZwbdC0OFhiF3BIZBT4VMQKyec1VZEVugoBn710QA3who6C2DFpAFGAaIACyI1PAKQgigN8D6sCEAI4X3ToAAzBCdg5V1/CjBErHyokAD3XRBAAAEEEAAGKPEh01rodkCJ5bR2ZDcAym/qKdoq5RtbFK1FiuZu+fY6xYCDYsREM+SjGLPSDLppfjVQBesHTJGigAIPEM8AAAAASUVORK5CYII=';
 fake.teams.metas.set('Team0000000000000002', { name: 'FC Beispiel U15', label: 'U15', clubId: 'c2', clubName: 'FC Beispiel', logoUrl: SAMPLE_LOGO });

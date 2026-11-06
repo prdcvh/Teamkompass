@@ -222,7 +222,8 @@ service cloud.firestore {
       // (und der Vereinsadmin) lesen sie, und nur, solange der Vereinsadmin den Vergleich eingeschaltet hat
       // (clubs/{clubId}.comparisonEnabled == true, Standard aus). Spieler, Eltern, Medizin, Scouts, Trainer fremder
       // Vereine und Teams ohne Verein lesen nichts. Inhalt: je Team Kennzahlen der Teamanalyse, je Spieler nur id, Name,
-      // Jahrgang, Notenschnitt, Zahl der Bewertungen und Teilnahmequote - keine Gesundheitsdaten, Notizen, Rueckmeldungen
+      // Jahrgang, Notenschnitt, Zahl der Bewertungen und Teilnahmequote (Name nur bei den 3 Schluesselspielern, sonst
+      // leer) - keine Gesundheitsdaten, Notizen, Rueckmeldungen
       // oder Elterndaten (hasOnly/Typen sichern die Felder oben und im Teamteil ab).
       // comparisonReaders/{uid} (teamId): Regeln koennen nicht suchen, in welchem Team ein Konto Trainer ist - deshalb
       // traegt der Trainer hier sein Team ein. Der Verweis allein gibt nichts frei: Jeder Lesezugriff prueft live, dass

@@ -17,6 +17,10 @@ describe('CohortCard (Spieler im Jahrgang des Vereins, SCRUM-197)', () => {
   async function render(role: 'trainer' | 'player' | 'parent' | 'physio') {
     const firebase = new FakeFirebase();
     firebase.comparison.enabled.add('club-a');
+    // Eigene Werte rechnet die Karte frisch aus den Teamdaten (Notenschnitt 2, Teilnahme 100 %).
+    firebase.players.players.set('p1', { name: 'Ali', positions: ['ST'], number: 9, birthdate: '2013-03-03', status: 'Fit' });
+    firebase.events.events.set('e1', { type: 'Training', title: 'Training', date: '2026-10-01' });
+    firebase.ratings.ratings.set('e1', new Map([['p1', { attendance: 'present', effort: 2, technique: 2, tactics: 2, comprehension: 2, playerId: 'p1' }]]));
     TestBed.configureTestingModule({ providers: [...provideFakeFirebase(firebase)] });
     const current = TestBed.inject(CurrentTeam);
     current.applyMeta({ name: 'U13', label: 'U13', clubId: 'club-a', clubName: 'Verein A', logoUrl: null });

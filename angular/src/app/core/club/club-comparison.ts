@@ -25,7 +25,10 @@ export const COMPARISON_MAX_PLAYERS = 200;
 /** Wie viele Schlüsselspieler je Team gezeigt werden (wie „Topform“ in der Teamanalyse). */
 export const KEY_PLAYER_COUNT = 3;
 
-/** Ein Spieler in der Kurzfassung – nur diese Felder (kein Status, keine Gesundheitsangaben, kein volles Geburtsdatum). */
+/**
+ * Ein Spieler in der Kurzfassung – nur diese Felder (kein Status, keine Gesundheitsangaben, kein volles Geburtsdatum).
+ * Den Namen tragen nur die Schlüsselspieler, sonst ist er leer.
+ */
 export interface ComparisonPlayer {
   readonly id: string;
   readonly name: string;
@@ -117,6 +120,10 @@ export function comparisonFromTeam(
     })
     .sort((a, b) => a.name.localeCompare(b.name, 'de') || a.id.localeCompare(b.id))
     .slice(0, COMPARISON_MAX_PLAYERS);
+  // Datensparsamkeit: Namen nur für die Schlüsselspieler (die anderen Teams sehen nur sie namentlich); der
+  // Jahrgangsvergleich braucht keine Namen.
+  const named = new Set(keyPlayers({ players }).map((player) => player.id));
+  const shared = players.map((player) => (named.has(player.id) ? player : { ...player, name: '' }));
   return {
     version: CLUB_COMPARISON_VERSION,
     teamName: teamName.slice(0, 100),
@@ -129,7 +136,7 @@ export function comparisonFromTeam(
       games: stats.games,
       focus: Object.fromEntries(TRAINING_FOCUSES.map((name) => [name, focus[name] ?? 0])),
     },
-    players,
+    players: shared,
   };
 }
 

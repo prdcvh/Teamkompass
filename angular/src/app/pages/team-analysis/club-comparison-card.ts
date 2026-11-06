@@ -119,7 +119,7 @@ export class ClubComparisonCard implements OnInit {
       return {
         entry,
         own: entry.teamId === ownId,
-        focus: focus ? `${focus.name} (${focus.share} %)` : '–',
+        focus: focus ? `${focus.name} (${focus.share}\u00a0%)` : '–',
         keys: keyPlayers(entry).map((player) => ({ id: player.id, name: player.name, grade: this.grade(player.average) })),
       };
     });
@@ -134,7 +134,7 @@ export class ClubComparisonCard implements OnInit {
   }
 
   protected percent(value: number | null): string {
-    return value === null ? '–' : `${value} %`;
+    return value === null ? '–' : `${value}\u00a0%`;
   }
 
   protected decimal(value: number | null): string {
