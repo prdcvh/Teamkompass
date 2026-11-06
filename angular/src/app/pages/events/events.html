@@ -34,6 +34,14 @@
   } @else if (events.load() !== 'ready') {
     <p class="muted" role="status">Events werden geladen …</p>
   } @else {
+    <div class="calendar" data-testid="calendar-export">
+      <button tkButton type="button" [disabled]="calendarCount() === 0" (click)="downloadCalendar()">In Kalender übernehmen (.ics)</button>
+      <p class="muted">
+        Lädt alle kommenden Termine (Titel, Datum, Uhrzeit, Ort) als Kalenderdatei. Einmal in den Handykalender importieren; die Datei
+        aktualisiert sich nicht von selbst – nach Änderungen bitte erneut herunterladen.
+      </p>
+    </div>
+
     <div class="filters">
       <label class="search">
         <span class="tk-sr-only">Events suchen</span>
