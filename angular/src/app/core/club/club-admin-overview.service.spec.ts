@@ -105,4 +105,17 @@ describe('ClubAdminOverviewService (Vereinsübersicht, SCRUM-183)', () => {
     expect(await service.removeTrainer('T1', 'pl')).toBe(false);
     expect(service.error()).toContain('Trainer konnte nicht entfernt werden');
   });
+
+  it('Vereinsvergleich (SCRUM-197): Standard aus; einschalten; beim Ausschalten werden die geteilten Werte gelöscht', async () => {
+    await service.load('2026-11-04');
+    expect(service.clubs()[0].comparisonEnabled).toBe(false);
+    expect(await service.setComparison('A', true)).toBe(true);
+    expect(service.clubs()[0].comparisonEnabled).toBe(true);
+    expect(firebase.comparison.enabled.has('A')).toBe(true);
+    firebase.comparison.docs.set('A', new Map([['T1', { version: 1 }]]));
+    expect(await service.setComparison('A', false)).toBe(true);
+    expect(service.clubs()[0].comparisonEnabled).toBe(false);
+    expect(firebase.comparison.calls).toEqual(['enabled:A', 'set:A:true', 'set:A:false', 'deleteAll:A']);
+    expect(firebase.comparison.docs.has('A')).toBe(false);
+  });
 });

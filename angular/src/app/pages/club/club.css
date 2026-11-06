@@ -225,3 +225,19 @@ h4 {
     padding: var(--tk-space-4);
   }
 }
+
+/* Vereinsvergleich (SCRUM-197) */
+.comparison .state {
+  flex: none;
+  padding: 2px var(--tk-space-2);
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+  font-weight: 700;
+  border: 1px solid var(--tk-line);
+  border-radius: 999px;
+}
+
+.comparison .state.on {
+  color: var(--tk-green);
+  border-color: var(--tk-green);
+}
