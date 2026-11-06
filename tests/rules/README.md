@@ -76,6 +76,13 @@ Trainer (nur die vorgesehenen Felder, höchstens 12 Stufen, Zeitpunkt vom Server
 der Trainer (auch als Liste) und der eigene Spieler bzw. die eigenen Eltern (gezielter Abruf, nie fremde Spieler, nie als
 Liste), bestätigen/zurücknehmen nur der Trainer; Medizin, Scout, abgelaufene Zugänge, Fremde und andere Teams nichts.
 
+`puzzles.test.mjs`: Situationsrätsel (SCRUM-193) – `puzzles/{id}` (ohne Lösung) lesen Trainer, Spieler und Eltern, schreiben
+nur der Trainer (https-Link, 2–4 Antworten, Schwierigkeit 1–3); `puzzleSolutions/{id}` lesen Spieler und Eltern erst, wenn die
+Antwort des eigenen Spielers existiert (gezielter Abruf, nie als Liste); `puzzleAnswers/{puzzleId}_{playerId}` legt nur der
+Spieler selbst an (nicht die Eltern), einmal, nur mit vorhandener Antwort und Server-Zeit, ändern nie, löschen nur der
+Trainer; lesen Trainer und der eigene Spieler bzw. die eigenen Eltern (Liste nur mit `playerId`-Filter); Medizin, Scout,
+abgelaufene Zugänge, Fremde und andere Teams nichts.
+
 `consent.test.mjs`: Einwilligung für Gesundheitsdaten (SCRUM-245) – bei „widerrufen“ lesen Spieler, Eltern und Medizin weder
 Spielerdokument (Status, „verletzt bis/seit“) noch Abwesenheiten, Messwerte oder Absagegründe (der Trainer schon; Noten
 und Förderplan bleiben lesbar); Medizin listet nur mit Filter `consentStatus != revoked`; bereinigte Spielerkarte

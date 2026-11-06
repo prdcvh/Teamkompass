@@ -1,0 +1,125 @@
+<section class="puzzles" aria-labelledby="puzzles-title">
+  <div class="block-head">
+    <div>
+      <h2 id="puzzles-title">Situationsrätsel</h2>
+      <p class="muted">Eine Spielszene als Bild oder Video-Link mit Zeitmarke, dazu „Wohin passt du?“ mit 2–4 Antworten und einer kurzen Erklärung. Spieler beantworten jedes Rätsel einmal und sehen danach sofort die Erklärung. Daraus entsteht eine eigene Rätsel-Wertung (Start 1000) – sichtbar nur für den Spieler selbst, seine Eltern und dich. Es gibt keine Rangliste.</p>
+    </div>
+    @if (puzzles.load() === 'ready') {
+      <button tkButton variant="primary" type="button" (click)="openNew()">+ Rätsel anlegen</button>
+    }
+  </div>
+
+  @switch (puzzles.load()) {
+    @case ('denied') {
+      <div class="notice" role="status">
+        <p>Situationsrätsel sind in diesem Team noch nicht freigeschaltet. Sie gehen, sobald die neuen Zugriffsregeln veröffentlicht sind.</p>
+      </div>
+    }
+    @case ('error') {
+      <div class="notice error" role="alert">
+        <p>Die Rätsel konnten nicht geladen werden. Bitte Verbindung prüfen.</p>
+        <button tkButton type="button" (click)="puzzles.retry()">Erneut versuchen</button>
+      </div>
+    }
+    @case ('ready') {
+      @if (puzzles.puzzles().length === 0) {
+        <tk-card>
+          <div class="empty">
+            <p>Noch kein Rätsel angelegt.</p>
+            <button tkButton variant="primary" type="button" (click)="openNew()">+ Rätsel anlegen</button>
+          </div>
+        </tk-card>
+      } @else {
+        <tk-card>
+          <div class="open-block" data-testid="puzzle-not-understood">
+            <h3>Das versteht das Team noch nicht</h3>
+            @if (notUnderstood().length === 0) {
+              <p class="muted">Gerade keine Situation, bei der weniger als die Hälfte richtig lag (gezählt ab {{ minAnswers }} Antworten).</p>
+            } @else {
+              <ul class="open-list">
+                @for (insight of notUnderstood(); track insight.puzzle.id) {
+                  <li>
+                    <strong>{{ insight.puzzle.title }}</strong>
+                    <span class="muted">{{ percent(insight.share) }} richtig ({{ insight.correct }} von {{ insight.total }})@if (insight.commonMistake !== null) { · häufigste falsche Antwort: „{{ insight.puzzle.answers[insight.commonMistake] }}“}</span>
+                  </li>
+                }
+              </ul>
+            }
+          </div>
+        </tk-card>
+
+        <ul class="puzzle-list" data-testid="puzzle-list">
+          @for (insight of insights(); track insight.puzzle.id) {
+            <li>
+              <tk-card>
+                <div class="puzzle">
+                  <div class="puzzle-head">
+                    <div class="what">
+                      <div class="chips">
+                        <tk-chip tone="blue">{{ levelLabel(insight.puzzle.level) }}</tk-chip>
+                        <tk-chip>{{ insight.puzzle.media === 'image' ? 'Bild' : 'Video' + (insight.puzzle.videoStart ? ' ab ' + formatSeconds(insight.puzzle.videoStart) : '') }}</tk-chip>
+                        @if (insight.notUnderstood) {
+                          <tk-chip tone="amber">noch nicht verstanden</tk-chip>
+                        }
+                      </div>
+                      <strong class="puzzle-title">{{ insight.puzzle.title }}</strong>
+                      <span class="muted">{{ insight.puzzle.question }}</span>
+                    </div>
+                    <button tkButton size="sm" type="button" (click)="openEdit(insight.puzzle)" [attr.aria-label]="'Rätsel bearbeiten: ' + insight.puzzle.title">Bearbeiten</button>
+                  </div>
+                  <p class="muted stats">
+                    {{ insight.total }} {{ insight.total === 1 ? 'Antwort' : 'Antworten' }}@if (insight.total > 0) { · {{ percent(insight.share) }} richtig}
+                  </p>
+                  <ul class="dist" [attr.aria-label]="'Antworten auf ' + insight.puzzle.title">
+                    @for (text of insight.puzzle.answers; track $index) {
+                      <li [attr.data-correct]="insight.solution?.correct === $index">
+                        <span class="dist-text">{{ insight.solution?.correct === $index ? '✓ ' : '' }}{{ text }}</span>
+                        <span class="dist-bar" aria-hidden="true"><span [style.width.%]="bar(insight, $index)"></span></span>
+                        <span class="dist-count">{{ insight.counts[$index] }}</span>
+                      </li>
+                    }
+                  </ul>
+                </div>
+              </tk-card>
+            </li>
+          }
+        </ul>
+
+        <tk-card>
+          <div class="ratings">
+            <button tkButton size="sm" type="button" class="toggle" [attr.aria-expanded]="ratingsOpen()" aria-controls="puzzle-ratings" (click)="ratingsOpen.set(!ratingsOpen())">
+              {{ ratingsOpen() ? 'Wertungen ausblenden' : 'Rätsel-Wertung je Spieler' }}
+            </button>
+            @if (ratingsOpen()) {
+              <div id="puzzle-ratings">
+                <p class="muted">Nur für dich: nach Rückennummer, nicht nach Höhe. Jeder Spieler sieht nur seine eigene Wertung.</p>
+                <ul class="rating-list" data-testid="puzzle-ratings">
+                  @for (row of ratings(); track row.player.id) {
+                    <li>
+                      <span>{{ row.player.number }} · {{ row.player.name }}</span>
+                      <span class="muted">{{ row.history.steps.length }} beantwortet, {{ row.history.solved }} richtig</span>
+                      <strong>{{ row.history.rating }}</strong>
+                    </li>
+                  }
+                </ul>
+              </div>
+            }
+          </div>
+        </tk-card>
+      }
+    }
+    @default {
+      <p class="muted" role="status">Rätsel werden geladen …</p>
+    }
+  }
+</section>
+
+<tk-puzzle-dialog [open]="dialogOpen()" [puzzle]="editing()" (closed)="dialogOpen.set(false)" (deleteRequested)="askDelete($event)" />
+
+<tk-dialog [open]="deleting() !== null" title="Rätsel löschen?" (closed)="deleting.set(null)">
+  <p>Das Rätsel „{{ deleting()?.title }}“ wird gelöscht – mit allen Antworten der Spieler darauf. Ihre Wertungen werden ohne dieses Rätsel neu berechnet. Das lässt sich nicht rückgängig machen.</p>
+  <div class="confirm-actions">
+    <button tkButton type="button" (click)="deleting.set(null)">Abbrechen</button>
+    <button tkButton type="button" variant="primary" (click)="confirmDelete()">Endgültig löschen</button>
+  </div>
+</tk-dialog>

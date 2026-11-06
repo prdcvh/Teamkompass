@@ -1,0 +1,221 @@
+:host {
+  display: block;
+}
+
+.puzzles {
+  display: grid;
+  gap: var(--tk-space-3);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--tk-text-lg);
+}
+
+.sub {
+  margin: 0;
+  font-size: var(--tk-text-md);
+}
+
+p {
+  margin: 0;
+}
+
+.muted {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+.eyebrow {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+  font-weight: 600;
+}
+
+.label {
+  font-weight: 600;
+}
+
+.rating {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tk-space-3);
+  align-items: center;
+}
+
+.rating .value {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.rating .muted {
+  flex: 1 1 16rem;
+}
+
+.puzzle,
+.result,
+.done,
+.done-detail {
+  display: grid;
+  gap: var(--tk-space-3);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tk-space-2);
+}
+
+.puzzle-title {
+  font-size: var(--tk-text-lg);
+}
+
+.scene-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tk-touch);
+  padding: var(--tk-space-2) var(--tk-space-3);
+  border: 1px solid var(--tk-line);
+  border-radius: var(--tk-radius-md);
+  color: inherit;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.question {
+  font-weight: 600;
+}
+
+.answers {
+  display: grid;
+  gap: var(--tk-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.answer {
+  display: flex;
+  gap: var(--tk-space-3);
+  align-items: center;
+  width: 100%;
+  min-height: var(--tk-touch);
+  padding: var(--tk-space-2) var(--tk-space-3);
+  border: 1px solid var(--tk-line);
+  border-radius: var(--tk-radius-md);
+  background: var(--tk-surface);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.answer:hover:not(:disabled) {
+  border-color: var(--tk-blue);
+}
+
+.answer:disabled {
+  cursor: default;
+}
+
+.answer[data-state='correct'] {
+  border-color: var(--tk-green);
+  background: var(--tk-soft-green);
+}
+
+.answer[data-state='wrong'] {
+  border-color: var(--tk-red);
+  background: var(--tk-soft-red);
+}
+
+.letter {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  background: var(--tk-surface-2);
+  font-weight: 700;
+}
+
+.verdict {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tk-space-2);
+  font-weight: 700;
+}
+
+.verdict[data-solved='true'] {
+  color: var(--tk-green);
+}
+
+.verdict[data-solved='false'] {
+  color: var(--tk-red);
+}
+
+.delta {
+  color: var(--tk-ink);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.result button {
+  justify-self: start;
+}
+
+.error {
+  color: var(--tk-red);
+  font-size: var(--tk-text-sm);
+}
+
+.done-list {
+  display: grid;
+  gap: var(--tk-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.done-row {
+  display: flex;
+  gap: var(--tk-space-2);
+  align-items: center;
+  width: 100%;
+  min-height: var(--tk-touch);
+  padding: var(--tk-space-1) 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.done-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.mark {
+  flex: none;
+  width: 1.5rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.mark[data-solved='true'] {
+  color: var(--tk-green);
+}
+
+.mark[data-solved='false'] {
+  color: var(--tk-red);
+}
+
+.done-detail {
+  gap: var(--tk-space-2);
+  padding: 0 0 var(--tk-space-2) 2rem;
+}
