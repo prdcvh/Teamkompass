@@ -132,6 +132,9 @@
         </tk-card>
       </section>
 
+      <!-- Jahrgang im Verein (SCRUM-197): nur Trainer, nur wenn der Vereinsadmin den Vergleich eingeschaltet hat. -->
+      <tk-cohort-card [player]="p" />
+
       <tk-load-curve-card [curve]="loadCurve()" [compact]="mobile()" />
 
       <h2 class="section-title">Statistik</h2>

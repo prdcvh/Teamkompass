@@ -82,7 +82,7 @@ describe('TeamAnalysis (Teamanalyse)', () => {
     expect(root(fixture).querySelector('svg.chart')?.getAttribute('aria-label')).toContain('Teamnoten nach Event (1 ist die beste Note): ');
     expect(root(fixture).querySelectorAll('svg.chart .dot')).toHaveLength(2);
     const headings = [...root(fixture).querySelectorAll('h2')].map((h) => h.textContent);
-    expect(headings.filter((heading) => !heading?.startsWith('Teamziel'))).toEqual(['Teamform', 'Nützliche Kennzahlen', 'Geburtsquartale', 'Positionsabdeckung', 'Trainingsfokus']);
+    expect(headings.filter((heading) => !heading?.startsWith('Teamziel'))).toEqual(['Teamform', 'Nützliche Kennzahlen', 'Geburtsquartale', 'Positionsabdeckung', 'Trainingsfokus', 'Vereinsvergleich']);
     expect(text(fixture)).toContain('Umschalten (Einheiten)');
     expect(text(fixture)).toContain('Knapp besetztIV, LA, ST');
     expect(root(fixture).querySelector('[aria-label="Q1: 1 Spieler"]')).not.toBeNull();
