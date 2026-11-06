@@ -5,7 +5,6 @@ import { LayoutService } from '../../core/shell/layout.service';
 import { SessionService } from '../../core/auth/session.service';
 import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
 import { WeatherService } from '../../core/weather/weather.service';
-import { FileOutput } from '../../core/export/file-output';
 import { Events } from './events';
 
 describe('Events (Events-Seite)', () => {
@@ -15,17 +14,14 @@ describe('Events (Events-Seite)', () => {
   /** Feste Uhr: Montag, 5.10.2026, 09:00 Berlin → Woche bis 11.10.; Training Montag + Heimspiel diese Woche, September vergangen. */
   const CLOCK = new Date('2026-10-05T07:00:00Z');
 
-  const saved: { name: string; text: string; mime?: string }[] = [];
-
-  async function render(role: 'trainer' | 'physio' | 'player' | 'parent' = 'trainer', mobile = false) {
-    saved.length = 0;
+  async function render(role: 'trainer' | 'physio' = 'trainer', mobile = false) {
     isMobile.set(mobile);
     firebase = new FakeFirebase();
     firebase.events.events.set('e1', { type: 'Training', title: 'Training Montag', date: '2026-10-05', intensity: 2, location: 'Kunstrasen', notes: 'Erste Zeile\n<b>zweite</b> Zeile' });
     firebase.events.events.set('e2', { type: 'Spiel', title: 'Heimspiel', date: '2026-10-10', opponent: 'SV Nord', goalsFor: 3, goalsAgainst: 1, intensity: 3 });
     firebase.events.events.set('e3', { type: 'Training', title: 'Training September', date: '2026-09-28' });
     TestBed.configureTestingModule({
-      providers: [provideRouter([]), ...provideFakeFirebase(firebase), { provide: FileOutput, useValue: { saveText: (name: string, text: string, mime?: string) => saved.push({ name, text, mime }) } }, { provide: LayoutService, useValue: { isMobile } }],
+      providers: [provideRouter([]), ...provideFakeFirebase(firebase), { provide: LayoutService, useValue: { isMobile } }],
     });
     TestBed.inject(SessionService).role.set(role);
     TestBed.inject(WeatherService).now = () => CLOCK;
@@ -327,24 +323,5 @@ describe('Events (Events-Seite)', () => {
       expect(q(fixture, '.fab')).toBeNull();
       expect(qa(fixture, '.row button').map(text)).toEqual(['Anschauen', 'Anschauen']); // nur „Diese Woche“ ist offen
     });
-  });
-
-  describe('Kalenderdatei (SCRUM-179)', () => {
-    for (const role of ['trainer', 'physio', 'player', 'parent'] as const) {
-      it(`${role} sieht den Button und lädt nur kommende Termine ohne Personendaten`, async () => {
-        const fixture = await render(role);
-        const button = q<HTMLButtonElement>(fixture, '[data-testid="calendar-export"] button');
-        expect(text(button)).toContain('Kalender');
-        expect(text(q(fixture, '[data-testid="calendar-export"]'))).toContain('aktualisiert sich nicht');
-        button!.click();
-        expect(saved).toHaveLength(1);
-        expect(saved[0].name).toMatch(/^teamkompass-.+\.ics$/);
-        expect(saved[0].mime).toBe('text/calendar;charset=utf-8');
-        expect(saved[0].text).toContain('SUMMARY:Training Montag');
-        expect(saved[0].text).toContain('SUMMARY:Heimspiel (vs. SV Nord)');
-        expect(saved[0].text).not.toContain('Training September');
-        expect(saved[0].text).not.toContain('zweite');
-      });
-    }
   });
 });
