@@ -103,6 +103,26 @@
       @case ('ready') {
         @for (club of overview.clubs(); track club.clubId) {
           <h2 class="club-name">{{ club.name || club.clubId }}</h2>
+          <!-- Vereinsvergleich (SCRUM-197): Opt-in je Verein, Standard aus. -->
+          <tk-card>
+            <div class="panel comparison" data-testid="comparison-toggle">
+              <div class="row">
+                <h3>Vereinsvergleich zwischen den Teams</h3>
+                <span class="state" [class.on]="club.comparisonEnabled">{{ club.comparisonEnabled ? 'Eingeschaltet' : 'Ausgeschaltet' }}</span>
+              </div>
+              <p class="muted">
+                Wenn eingeschaltet, sehen die Trainer der Teams deines Vereins die anderen Teams im Vergleich (Teilnahme,
+                Anstrengung, Trainingsfokus, Teamnote, Schlüsselspieler) und jeden Spieler im Vergleich zu seinem Jahrgang im
+                Verein. Spieler, Eltern, Medizin, Scouts und andere Vereine sehen nichts davon. Gesundheitsdaten, Notizen und
+                Elternangaben werden nie geteilt. Beim Ausschalten werden die geteilten Werte gelöscht.
+              </p>
+              <div>
+                <button tkButton [variant]="club.comparisonEnabled ? 'neutral' : 'primary'" type="button" [disabled]="overview.busy()" (click)="overview.setComparison(club.clubId, !club.comparisonEnabled)">
+                  {{ club.comparisonEnabled ? 'Vergleich ausschalten' : 'Vergleich einschalten' }}
+                </button>
+              </div>
+            </div>
+          </tk-card>
           @if (club.teams.length === 0) {
             <p class="muted">Noch keine Teams in diesem Verein.</p>
           }

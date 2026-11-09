@@ -3,6 +3,7 @@ rules_version = '2';
 // Datenmodell:
 // - teams/{teamId}/{meta,members,invites,players,events,opponents,scoutProfiles,playerStats,gradeReleases,notifications}
 // - clubs/{clubId}/admins und clubInvites/{code} fuer Vereine und Registrierung (siehe unten)
+// - clubs/{clubId}/comparison und comparisonReaders fuer den Vereinsvergleich (SCRUM-197, siehe unten)
 // Siehe README/FIREBASE_SETUP.md fuer den Hintergrund. Kernidee:
 // - "teams/{teamId}/members/{uid}" verknuepft eine angemeldete Firebase-Auth-Identitaet mit einer
 //   Rolle und - fuer Spieler und Eltern - der eigenen playerId. Es gibt diese Team-Rollen:
@@ -177,8 +178,11 @@ service cloud.firestore {
       // erlaubt Bilder nur als data:-URL - deshalb liegt das (im Browser auf 256 px verkleinerte) Logo direkt hier, nur
       // als PNG/JPEG/WebP in base64 und hoechstens 100000 Zeichen (~75 KB). Gleiche Grenze in der App
       // (angular/src/app/core/registration/club-logo.ts). Keine fremden Adressen (http...) mehr.
+      // SCRUM-197: Zusaetzlich schaltet der Vereinsadmin hier den Vereinsvergleich ein/aus (comparisonEnabled, bool;
+      // fehlt das Feld, ist der Vergleich aus).
       allow update: if isClubAdmin(clubId)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'logoUrl'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'logoUrl', 'comparisonEnabled'])
+        && request.resource.data.get('comparisonEnabled', false) is bool
         && request.resource.data.name is string
         && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 100
         && (request.resource.data.get('logoUrl', null) == null
@@ -209,6 +213,69 @@ service cloud.firestore {
         allow update: if false;
         // Niemand entfernt sich selbst (der Verein bliebe sonst ggf. ohne Admin).
         allow delete: if isClubAdmin(clubId) && request.auth.uid != uid;
+      }
+
+      // -------------------------------------------------------------------------------------------
+      // Vereinsvergleich (SCRUM-197, PO-Entscheidung vom 06.11.2026: nur innerhalb des eigenen Vereins, ohne Cloud
+      // Function). Bewusst KEIN Zugriff von Trainern auf die Teamdaten anderer Teams: jeder Trainer-Client schreibt eine
+      // Kurzfassung seines Teams (club-comparison.ts) nach comparison/{teamId}; nur Trainer von Teams DESSELBEN Vereins
+      // (und der Vereinsadmin) lesen sie, und nur, solange der Vereinsadmin den Vergleich eingeschaltet hat
+      // (clubs/{clubId}.comparisonEnabled == true, Standard aus). Spieler, Eltern, Medizin, Scouts, Trainer fremder
+      // Vereine und Teams ohne Verein lesen nichts. Inhalt: je Team Kennzahlen der Teamanalyse, je Spieler nur id, Name,
+      // Jahrgang, Notenschnitt, Zahl der Bewertungen und Teilnahmequote (Name nur bei den 3 Schluesselspielern, sonst
+      // leer) - keine Gesundheitsdaten, Notizen, Rueckmeldungen
+      // oder Elterndaten (hasOnly/Typen sichern die Felder oben und im Teamteil ab).
+      // comparisonReaders/{uid} (teamId): Regeln koennen nicht suchen, in welchem Team ein Konto Trainer ist - deshalb
+      // traegt der Trainer hier sein Team ein. Der Verweis allein gibt nichts frei: Jeder Lesezugriff prueft live, dass
+      // das Konto in genau diesem Team (noch) Trainer ist und das Team zu diesem Verein gehoert.
+      // -------------------------------------------------------------------------------------------
+      function comparisonEnabled() {
+        return get(/databases/$(database)/documents/clubs/$(clubId)).data.get('comparisonEnabled', false) == true;
+      }
+
+      // Konto ist (nicht abgelaufener) Trainer des Teams teamId, und das Team gehoert zu diesem Verein.
+      function isTrainerOfClubTeam(teamId) {
+        return signedIn() && teamId is string && teamId.size() > 0
+          && exists(/databases/$(database)/documents/teams/$(teamId))
+          && get(/databases/$(database)/documents/teams/$(teamId)).data.get('clubId', null) == clubId
+          && exists(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid))
+          && get(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid)).data.get('role', null) == "trainer"
+          && (get(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid)).data.get('expiresAt', null) == null
+            || get(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid)).data.get('expiresAt', null) > request.time);
+      }
+
+      function readerPath() {
+        return /databases/$(database)/documents/clubs/$(clubId)/comparisonReaders/$(request.auth.uid);
+      }
+
+      // Trainer eines Teams dieses Vereins (ueber den eigenen Verweis, live geprueft).
+      function isClubTrainer() {
+        return signedIn() && exists(readerPath()) && isTrainerOfClubTeam(get(readerPath()).data.get('teamId', null));
+      }
+
+      match /comparison/{teamId} {
+        // Der Vereinsadmin darf auch bei ausgeschaltetem Vergleich auflisten - nur um beim Ausschalten alles zu loeschen.
+        allow read: if isClubAdmin(clubId) || (comparisonEnabled() && isClubTrainer());
+        allow create, update: if comparisonEnabled() && isTrainerOfClubTeam(teamId)
+          && request.resource.data.keys().hasOnly(['version', 'teamName', 'team', 'players', 'updatedAt'])
+          && request.resource.data.version is int
+          && request.resource.data.teamName is string && request.resource.data.teamName.size() <= 100
+          && request.resource.data.team is map
+          && request.resource.data.team.keys().hasOnly(['playerCount', 'attendanceRate', 'avgExertion', 'avgGrade', 'trainings', 'games', 'focus'])
+          && request.resource.data.team.get('focus', {}) is map
+          && request.resource.data.players is list
+          && request.resource.data.players.size() <= 200
+          && request.resource.data.updatedAt == request.time;
+        allow delete: if isClubAdmin(clubId) || isTrainerOfClubTeam(teamId);
+      }
+
+      match /comparisonReaders/{uid} {
+        allow get: if (signedIn() && request.auth.uid == uid) || isClubAdmin(clubId);
+        allow list: if isClubAdmin(clubId);
+        allow create, update: if signedIn() && request.auth.uid == uid
+          && request.resource.data.keys().hasOnly(['teamId'])
+          && isTrainerOfClubTeam(request.resource.data.teamId);
+        allow delete: if (signedIn() && request.auth.uid == uid) || isClubAdmin(clubId);
       }
     }
 

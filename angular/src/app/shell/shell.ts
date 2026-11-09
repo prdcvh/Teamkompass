@@ -6,6 +6,7 @@ import { showsNavigation } from '../core/auth/role';
 import { SessionService } from '../core/auth/session.service';
 import { RsvpService } from '../core/rsvp/rsvp.service';
 import { ClubOverviewService } from '../core/club/club-overview.service';
+import { ClubComparisonService } from '../core/club/club-comparison.service';
 import { ConsentCardService } from '../core/player/consent-card.service';
 import { ScoutPublishService } from '../core/scout/scout-publish.service';
 import { MoreSheet } from './more-sheet/more-sheet';
@@ -42,6 +43,8 @@ export class Shell {
     inject(ConsentCardService);
     // Vereinsübersicht (SCRUM-183): Trainer pflegen die Kurzfassung des Kaders für den Vereinsadmin.
     inject(ClubOverviewService);
+    // Vereinsvergleich (SCRUM-197): Trainer pflegen die Kurzfassung ihres Teams für die anderen Teams des Vereins.
+    inject(ClubComparisonService);
   }
 
   protected readonly variant = computed<'desktop' | 'mobile' | 'focused'>(() => {

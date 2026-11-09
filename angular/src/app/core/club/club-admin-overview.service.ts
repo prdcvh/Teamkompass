@@ -3,6 +3,7 @@ import { authErrorMessage, errorCode } from '../auth/auth-errors';
 import { SessionService } from '../auth/session.service';
 import { type TeamEvent, eventFromDoc } from '../events/event';
 import { ClubApi } from '../firebase/club.api';
+import { ClubComparisonApi } from '../firebase/club-comparison.api';
 import { RegistrationApi } from '../firebase/registration.api';
 import { type ClubInvite, JOIN_CODE_DAYS, generateJoinCode, registrationLink } from '../registration/registration';
 import { todayIso } from '../shared/dates';
@@ -38,6 +39,8 @@ export interface ClubSummary {
   readonly clubId: string;
   readonly name: string;
   readonly teams: readonly ClubTeamSummary[];
+  /** Vereinsvergleich zwischen den Teams eingeschaltet (SCRUM-197, Standard aus). */
+  readonly comparisonEnabled: boolean;
 }
 
 export interface TeamDetail {
@@ -58,6 +61,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export class ClubAdminOverviewService {
   private readonly api = inject(ClubApi);
   private readonly registration = inject(RegistrationApi);
+  private readonly comparison = inject(ClubComparisonApi);
   private readonly session = inject(SessionService);
 
   readonly state = signal<'idle' | 'loading' | 'ready' | 'error'>('idle');
@@ -84,10 +88,14 @@ export class ClubAdminOverviewService {
   }
 
   private async loadClub(clubId: string, name: string, today: string): Promise<ClubSummary> {
-    const [teams, invites] = await Promise.all([this.api.readTeams(clubId), this.api.readTrainerInvites(clubId).catch(() => [])]);
+    const [teams, invites, comparisonEnabled] = await Promise.all([
+      this.api.readTeams(clubId),
+      this.api.readTrainerInvites(clubId).catch(() => []),
+      this.comparison.readEnabled(clubId).catch(() => false),
+    ]);
     const summaries = await Promise.all(teams.map((team) => this.loadTeam(team, invites, today)));
     summaries.sort((a, b) => (a.label || a.name).localeCompare(b.label || b.name, 'de', { numeric: true }));
-    return { clubId, name, teams: summaries };
+    return { clubId, name, teams: summaries, comparisonEnabled };
   }
 
   private async loadTeam(team: { teamId: string; name: string; label: string }, invites: readonly ClubInvite[], today: string): Promise<ClubTeamSummary> {
@@ -182,6 +190,28 @@ export class ClubAdminOverviewService {
       return true;
     } catch (error) {
       this.error.set(`Trainer konnte nicht entfernt werden. ${authErrorMessage(errorCode(error), this.session.role())}`);
+      return false;
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  /**
+   * Vereinsvergleich ein-/ausschalten (SCRUM-197). Beim Ausschalten werden die Kurzfassungen aller Teams und die
+   * Verweise der Trainer gelöscht – es bleiben keine geteilten Werte liegen. Beim nächsten Einschalten schreiben die
+   * Trainer-Clients sie neu.
+   */
+  async setComparison(clubId: string, enabled: boolean): Promise<boolean> {
+    if (this.busy()) return false;
+    this.busy.set(true);
+    this.error.set('');
+    try {
+      await this.comparison.setEnabled(clubId, enabled);
+      if (!enabled) await this.comparison.deleteAll(clubId);
+      this.clubs.update((clubs) => clubs.map((club) => (club.clubId === clubId ? { ...club, comparisonEnabled: enabled } : club)));
+      return true;
+    } catch (error) {
+      this.error.set(`Vereinsvergleich konnte nicht geändert werden. ${authErrorMessage(errorCode(error), this.session.role())}`);
       return false;
     } finally {
       this.busy.set(false);
