@@ -332,8 +332,6 @@ h2 {
 
 .pitch.dragging .zone {
   min-height: 36px;
-  border-radius: var(--tk-radius-md);
-  outline: 1px dashed var(--tk-green);
 }
 
 .zone.over,

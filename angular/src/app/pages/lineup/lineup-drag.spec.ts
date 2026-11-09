@@ -74,6 +74,13 @@ describe('Lineup – Spieler ziehen (SCRUM-286)', () => {
     el<HTMLButtonElement>(fixture, '.bench button')!.click(); // der Klick, den der Browser nach dem Loslassen schickt
     fixture.detectChanges();
     expect(el(fixture, 'tk-dialog h2')?.textContent).not.toContain('Auf welche Position?');
+    // Die nächste echte Berührung/der nächste Klick wirkt sofort wieder wie gewohnt.
+    const next = el<HTMLButtonElement>(fixture, '.bench button')!;
+    pointer(next, 'pointerdown', 5, 5);
+    pointer(next, 'pointerup', 5, 5);
+    next.click();
+    fixture.detectChanges();
+    expect(el(fixture, 'tk-dialog h2')?.textContent).toContain('Auf welche Position?');
   });
 
   it('hebt beim Ziehen das Ziel hervor und zeigt die Fläche „vom Feld nehmen“', async () => {

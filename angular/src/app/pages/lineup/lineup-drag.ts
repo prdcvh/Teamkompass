@@ -12,7 +12,10 @@ import { type DropTarget, parseDropKey } from '../../core/lineup/lineup-drop';
 const DRAG_THRESHOLD = 6;
 /** Abstand zum Bildschirmrand (px), ab dem beim Ziehen mitgescrollt wird. */
 const EDGE = 56;
-/** Nach dem Loslassen wird der Klick, den der Browser noch hinterherschickt, so lange ignoriert (ms). */
+/**
+ * Nach dem Loslassen schickt der Browser oft noch einen Klick auf den gezogenen Spieler; der soll keinen Dialog öffnen.
+ * Ignoriert wird nur dieser eine: höchstens so lange (ms) und nie über die nächste Berührung/den nächsten Klick hinaus.
+ */
 const CLICK_GRACE = 400;
 
 export interface DragGhost {
@@ -103,7 +106,12 @@ export class LineupDrag {
     this.stop();
     if (!dragged) return;
     this.suppressUntil = Date.now() + CLICK_GRACE;
+    window.addEventListener('pointerdown', this.allowClicks, { capture: true, once: true });
     if (target) this.onDrop(pending.playerId, target);
+  };
+
+  private readonly allowClicks = (): void => {
+    this.suppressUntil = 0;
   };
 
   private readonly cancel = (event: PointerEvent): void => {
