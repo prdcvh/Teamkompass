@@ -4,11 +4,12 @@ import type { TeamEvent } from '../../core/events/event';
 import { EventsService } from '../../core/events/events.service';
 import { SquadService } from '../../core/player/squad.service';
 import { BIO_BANDING_HINT } from '../../core/records/bio-banding';
+import { BioBandingService } from '../../core/records/bio-banding.service';
 import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
-import { EventDialog } from './event-dialog';
+import { EventDetails } from './event-details';
 
-/** Bio-Banding in der Leseansicht eines Trainings (SCRUM-191). Heute = 03.11.2026; Jonas (14,5) mit Reifestand, Elias (14,4) ohne Angaben. */
-describe('EventDialog: Bio-Banding-Vorschlag (SCRUM-191)', () => {
+/** Bio-Banding in den Eventdetails eines Trainings (SCRUM-191; seit SCRUM-285 auf der Bewertungsseite, per Knopf geladen). Heute = 03.11.2026; Jonas (14,5) mit Reifestand, Elias (14,4) ohne Angaben. */
+describe('EventDetails: Bio-Banding-Vorschlag (SCRUM-191)', () => {
   beforeEach(() => vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-11-03T12:00:00') }));
   afterEach(() => vi.useRealTimers());
 
@@ -30,21 +31,34 @@ describe('EventDialog: Bio-Banding-Vorschlag (SCRUM-191)', () => {
     TestBed.inject(SquadService).start();
     await vi.waitFor(() => expect(events.load()).toBe('ready'));
     if (role === 'trainer' || role === 'physio') await vi.waitFor(() => expect(TestBed.inject(SquadService).load()).toBe('ready'));
-    const fixture = TestBed.createComponent(EventDialog);
+    const fixture = TestBed.createComponent(EventDetails);
     fixture.componentRef.setInput('event', events.events().find((entry) => entry.id === 'e1') as TeamEvent);
     fixture.componentRef.setInput('canEdit', role === 'trainer');
-    fixture.componentRef.setInput('open', true);
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
     return { fixture, firebase };
   }
 
+  const toggle = (fixture: { nativeElement: unknown }) =>
+    [...(fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('.bio-toggle button')][0] ?? null;
+  /** Der Vorschlag wird erst auf Knopfdruck geladen (er liest je Spieler Reife-Kompass und Messwerte). */
+  const showBio = async (fixture: { nativeElement: unknown; detectChanges: () => void; whenStable: () => Promise<unknown> }) => {
+    toggle(fixture)!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+  };
   const section = (fixture: { nativeElement: unknown }) => (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('[data-test="bio-banding"]');
   const text = (element: Element | null) => element?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
 
   it('zeigt dem Trainer bei einem Training den Vorschlag mit Hinweistext; nur Spieler mit Reifestand stehen in einer Gruppe', async () => {
-    const { fixture } = await render('trainer');
+    const { fixture, firebase } = await render('trainer');
+    expect(section(fixture)).toBeNull();
+    expect(firebase.maturity.calls.filter((call) => call.startsWith('readMaturity'))).toEqual([]); // nichts ohne Knopfdruck
+    expect(toggle(fixture)!.getAttribute('aria-expanded')).toBe('false');
+    await showBio(fixture);
+    expect(toggle(fixture)!.getAttribute('aria-expanded')).toBe('true');
     await vi.waitFor(() => {
       fixture.detectChanges();
       expect(section(fixture)?.querySelector('.bio-group')).not.toBeNull();
@@ -63,6 +77,7 @@ describe('EventDialog: Bio-Banding-Vorschlag (SCRUM-191)', () => {
 
   it('der Medizin-Rolle wird er ebenfalls gezeigt, Spielern und Scouts nicht (und es wird nichts geladen)', async () => {
     const physio = await render('physio');
+    await showBio(physio.fixture);
     await vi.waitFor(() => {
       physio.fixture.detectChanges();
       expect(section(physio.fixture)?.querySelector('.bio-group')).not.toBeNull();
@@ -70,6 +85,7 @@ describe('EventDialog: Bio-Banding-Vorschlag (SCRUM-191)', () => {
     TestBed.resetTestingModule();
     for (const role of ['player', 'scout'] as const) {
       const { fixture, firebase } = await render(role);
+      expect(toggle(fixture)).toBeNull();
       expect(section(fixture)).toBeNull();
       expect(firebase.maturity.calls.filter((call) => call.startsWith('readMaturity'))).toEqual([]);
       TestBed.resetTestingModule();
@@ -78,6 +94,19 @@ describe('EventDialog: Bio-Banding-Vorschlag (SCRUM-191)', () => {
 
   it('bei einem Spiel gibt es keinen Vorschlag', async () => {
     const { fixture } = await render('trainer', 'Spiel');
+    expect(toggle(fixture)).toBeNull();
     expect(section(fixture)).toBeNull();
+  });
+
+  it('Ausblenden verwirft den Vorschlag wieder', async () => {
+    const { fixture } = await render('trainer');
+    await showBio(fixture);
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(section(fixture)?.querySelector('.bio-group')).not.toBeNull();
+    });
+    await showBio(fixture);
+    expect(section(fixture)).toBeNull();
+    expect(TestBed.inject(BioBandingService).suggestion()).toBeNull();
   });
 });
