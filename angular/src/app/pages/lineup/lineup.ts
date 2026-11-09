@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { EventsService } from '../../core/events/events.service';
 import { formatDate } from '../../core/events/event';
 import { LayoutService } from '../../core/shell/layout.service';
@@ -7,6 +7,8 @@ import { type Assignments, benchOf, fitToFormat, formationName, lineupGrade, lin
 import { PITCH_ZONES, type Zone, outOfPosition } from '../../core/lineup/pitch';
 import { GAME_FORMATS, type GameFormat, ROTATION_HINT, gameFormatInfo, isGameFormat } from '../../core/lineup/game-format';
 import { LineupService } from '../../core/lineup/lineup.service';
+import { type DropTarget, dropPlayer } from '../../core/lineup/lineup-drop';
+import { LineupDrag } from './lineup-drag';
 import { todayIso } from '../../core/shared/dates';
 import { positionText } from '../../core/player/player';
 import { averageGrade, gradedEvents } from '../../core/profile/profile';
@@ -135,6 +137,14 @@ export class Lineup implements OnInit {
   });
   protected readonly query = signal('');
   protected readonly message = signal('');
+  /** Hinweis nach einem Ziehen, das nicht ging (Startelf voll); steht über dem Feld, weil kein Dialog offen ist. */
+  protected readonly dropMessage = signal('');
+  /** Ziehen per Maus/Finger (SCRUM-286); Tippen und Tastatur gehen weiter über den Dialog. */
+  protected readonly drag = new LineupDrag((playerId, target) => this.onDrop(playerId, target));
+
+  constructor() {
+    inject(DestroyRef).onDestroy(() => this.drag.stop());
+  }
 
   protected readonly currentOptionIndex = computed(() => {
     const current = this.name();
@@ -184,14 +194,14 @@ export class Lineup implements OnInit {
   }
 
   protected openZone(zone: Zone, playerId: string | null): void {
-    if (!this.lineup.canEdit()) return;
+    if (!this.lineup.canEdit() || this.drag.clickSuppressed()) return;
     this.query.set('');
     this.message.set('');
     this.target.set({ kind: 'zone', zone, playerId });
   }
 
   protected openBench(playerId: string): void {
-    if (!this.lineup.canEdit()) return;
+    if (!this.lineup.canEdit() || this.drag.clickSuppressed()) return;
     this.message.set('');
     this.target.set({ kind: 'bench', playerId });
   }
@@ -264,6 +274,17 @@ export class Lineup implements OnInit {
     if (this.eventsService.load() === 'error') {
       this.eventsService.stop();
       this.eventsService.start();
+    }
+  }
+
+  /** Spieler per Ziehen abgelegt: dieselben Regeln wie im Dialog (Tauschen, vom Feld nehmen, Startelf voll). */
+  private onDrop(playerId: string, target: DropTarget): void {
+    this.dropMessage.set('');
+    const next = dropPlayer(this.assignments(), playerId, target, this.max());
+    if (next === 'voll') {
+      this.dropMessage.set(`Die Startelf ist bereits voll (${this.max()} Spieler). Zieh den Spieler direkt auf einen Feldspieler, um zu tauschen, oder nimm zuerst jemanden vom Feld.`);
+    } else if (next) {
+      this.apply(next);
     }
   }
 

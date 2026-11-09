@@ -304,3 +304,98 @@ h2 {
   color: var(--tk-red);
   font-size: var(--tk-text-sm);
 }
+
+/* Drag & Drop (SCRUM-286): nur die Griffe fangen Fingerbewegungen ab, sonst scrollt die Seite normal. */
+.chip[data-draggable],
+.grip {
+  touch-action: none;
+  -webkit-touch-callout: none;
+}
+
+.chip,
+.bench button {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.grip {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 40px;
+  margin-left: calc(-1 * var(--tk-space-2));
+  color: var(--tk-muted);
+  font-size: 18px;
+  cursor: grab;
+}
+
+.pitch.dragging .zone {
+  min-height: 36px;
+  border-radius: var(--tk-radius-md);
+  outline: 1px dashed var(--tk-green);
+}
+
+.zone.over,
+.bench-panel.over {
+  background: color-mix(in srgb, var(--tk-green) 22%, transparent);
+  outline: 2px solid var(--tk-green);
+  border-radius: var(--tk-radius-md);
+}
+
+.bench-panel.dragging {
+  outline: 2px dashed var(--tk-line);
+  border-radius: var(--tk-radius-lg);
+}
+
+.chip.over {
+  border-color: var(--tk-green);
+  box-shadow: 0 0 0 3px var(--tk-green);
+}
+
+.drag-source {
+  opacity: 0.4;
+}
+
+.remove-drop {
+  position: fixed;
+  inset-inline: var(--tk-space-4);
+  bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  z-index: 30;
+  max-width: 420px;
+  margin-inline: auto;
+  padding: var(--tk-space-4);
+  color: var(--tk-red);
+  background: var(--tk-surface);
+  border: 2px dashed var(--tk-red);
+  border-radius: var(--tk-radius-lg);
+  box-shadow: var(--tk-shadow-card);
+  font-weight: 700;
+  text-align: center;
+}
+
+.remove-drop.over {
+  color: var(--tk-on-red);
+  background: var(--tk-red);
+  border-style: solid;
+}
+
+.ghost {
+  position: fixed;
+  z-index: 40;
+  padding: 6px 10px;
+  color: var(--tk-ink);
+  background: var(--tk-surface);
+  border: 2px solid var(--tk-green);
+  border-radius: var(--tk-radius-md);
+  box-shadow: var(--tk-shadow-card);
+  font-size: var(--tk-text-sm);
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% - 12px));
+}
+
+.hint {
+  font-size: var(--tk-text-xs);
+}
