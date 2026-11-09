@@ -92,6 +92,26 @@ h2 {
   }
 }
 
+/* Breite Ansicht (SCRUM-287): Teamform-Kurve über die volle Breite statt in einer halben Spalte neben den Kennzahlen,
+   darunter die Kennzahlen im Raster ohne Lücke. */
+.columns.stack {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 1100px) {
+  [data-variant='desktop'] .insights {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  [data-variant='desktop'] .insight.s2 {
+    grid-column: span 2;
+  }
+
+  [data-variant='desktop'] .insight.s3 {
+    grid-column: span 3;
+  }
+}
+
 .panel {
   display: grid;
   gap: var(--tk-space-3);
