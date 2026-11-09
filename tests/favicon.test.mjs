@@ -40,6 +40,14 @@ test('favicon.ico enthält 16, 32 und 48 px als PNG und ist nicht das Angular-St
   assert.deepEqual(sizes, [16, 32, 48]);
 });
 
+test('ngsw-config lädt beide Favicons vorab (auch offline in der installierten App)', () => {
+  const cfg = JSON.parse(readFileSync(join(root, 'angular', 'ngsw-config.json'), 'utf8'));
+  const app = cfg.assetGroups.find((g) => g.name === 'app');
+  assert.equal(app.installMode, 'prefetch');
+  assert.ok(app.resources.files.includes('/favicon.svg'));
+  assert.ok(app.resources.files.includes('/favicon.ico'));
+});
+
 test('keine Angular-Standarddatei mehr im Auslieferungsordner', () => {
   assert.ok(existsSync(join(pub, 'favicon.svg')));
   const ico = readFileSync(join(pub, 'favicon.ico'));
