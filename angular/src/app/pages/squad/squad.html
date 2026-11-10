@@ -100,20 +100,17 @@
         <ul class="cards">
           @for (player of visible(); track player.id) {
             <li>
-              <button
-                type="button"
-                class="player-card"
-                [disabled]="!squad.canWrite()"
-                [attr.aria-label]="squad.canWrite() ? 'Spieler bearbeiten: ' + player.name : null"
-                (click)="openEdit(player)"
-              >
+              <a class="player-card" [routerLink]="['/profile', player.id]" [attr.aria-label]="'Spielerprofil öffnen: ' + player.name">
                 <span class="number">{{ player.number }}</span>
                 <span class="who">
                   <strong>{{ player.name }}</strong>
                   <small>{{ positionText(player) }} · {{ age(player) }} J.@if (injuryNote(player); as note) { · {{ note }}}</small>
                 </span>
                 <tk-status [label]="statusOf(player)" />
-              </button>
+              </a>
+              @if (squad.canWrite()) {
+                <button tkButton size="sm" type="button" class="edit-btn" (click)="openEdit(player)" [attr.aria-label]="'Bearbeiten: ' + player.name">Bearbeiten</button>
+              }
             </li>
           }
         </ul>
@@ -137,7 +134,7 @@
             <tbody>
               @for (player of visible(); track player.id) {
                 <tr>
-                  <td><strong>{{ player.number }} · {{ player.name }}</strong></td>
+                  <td><a class="name-link" [routerLink]="['/profile', player.id]"><strong>{{ player.number }} · {{ player.name }}</strong></a></td>
                   <td>{{ positionText(player) }}</td>
                   <td>{{ age(player) }}</td>
                   <td>
