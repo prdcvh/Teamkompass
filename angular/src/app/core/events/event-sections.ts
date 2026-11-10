@@ -8,6 +8,14 @@ export interface EventSections {
   readonly later: TeamEvent[];
 }
 
+/** Montag der Woche (Mo–So) von `today` (ISO-Datum). */
+export function startOfWeek(today: string): string {
+  const day = new Date(`${today}T00:00:00Z`);
+  const sinceMonday = (day.getUTCDay() + 6) % 7;
+  day.setUTCDate(day.getUTCDate() - sinceMonday);
+  return day.toISOString().slice(0, 10);
+}
+
 /** Sonntag der Woche (Mo–So) von `today` (ISO-Datum). */
 export function endOfWeek(today: string): string {
   const day = new Date(`${today}T00:00:00Z`);
@@ -17,17 +25,18 @@ export function endOfWeek(today: string): string {
 }
 
 /**
- * Teilt Events in vergangene (vor heute), diese Woche (heute bis Sonntag) und spätere (ab nächstem Montag) ein
+ * Teilt Events in vergangene (vor dem Montag der aktuellen Woche), diese Woche (Montag bis Sonntag, auch schon vorbeigegangene Tage; SCRUM-288) und spätere (ab nächstem Montag) ein
  * und sortiert jeden Bereich nach `sort`. In „Chronologisch“ steht bei Vergangenen das jüngste oben,
  * bei Diese Woche/Später das nächste oben (SCRUM-140/141). Ohne gültiges Datum zählt ein Event als vergangen.
  */
 export function sectionEvents(events: readonly TeamEvent[], sort: EventSort, today: string): EventSections {
+  const monday = startOfWeek(today);
   const sunday = endOfWeek(today);
   const past: TeamEvent[] = [];
   const week: TeamEvent[] = [];
   const later: TeamEvent[] = [];
   for (const event of events) {
-    if (!isIsoDate(event.date) || event.date < today) past.push(event);
+    if (!isIsoDate(event.date) || event.date < monday) past.push(event);
     else if (event.date <= sunday) week.push(event);
     else later.push(event);
   }
