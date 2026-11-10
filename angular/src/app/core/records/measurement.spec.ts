@@ -1,18 +1,5 @@
-import {
-  type Measurement,
-  type MeasurementContext,
-  type MeasurementDraft,
-  calculateBmi,
-  docFromMeasurement,
-  draftFromMeasurement,
-  emptyMeasurementDraft,
-  evaluateMeasurement,
-  measurementFromDoc,
-  measurementFromDraft,
-  measurementQuality,
-  measurementText,
-  validateMeasurement,
-} from './measurement';
+import { type Measurement, calculateBmi, docFromMeasurement, measurementFromDoc, measurementQuality, measurementText } from './measurement';
+import { type MeasurementContext, type MeasurementDraft, draftFromMeasurement, emptyMeasurementDraft, evaluateMeasurement, measurementFromDraft, validateMeasurement } from './measurement-draft';
 
 const context: MeasurementContext = { today: '2026-11-10', birthdate: '2012-05-05', others: [] };
 const NOW = '2026-11-10T18:00:00.000Z';

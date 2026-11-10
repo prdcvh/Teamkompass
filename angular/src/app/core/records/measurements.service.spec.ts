@@ -1,6 +1,6 @@
 import type { FakeFirebase } from '../testing/fake-firebase';
 import { setupRecords } from '../testing/records-setup';
-import { draftFromMeasurement, emptyMeasurementDraft } from './measurement';
+import { draftFromMeasurement, emptyMeasurementDraft } from './measurement-draft';
 import { measurementChart } from './measurement-chart';
 
 describe('MeasurementsService', () => {

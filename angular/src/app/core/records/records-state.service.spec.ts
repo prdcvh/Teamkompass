@@ -5,7 +5,7 @@ import { SyncService } from '../shell/sync.service';
 import type { FakeFirebase } from '../testing/fake-firebase';
 import { setupRecords } from '../testing/records-setup';
 import { emptyAbsenceDraft } from './absence';
-import { emptyMeasurementDraft } from './measurement';
+import { emptyMeasurementDraft } from './measurement-draft';
 import { emptyPlanDraft } from './plan';
 
 describe('RecordsStateService', () => {

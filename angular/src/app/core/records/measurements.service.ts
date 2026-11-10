@@ -2,16 +2,8 @@ import { Injectable, computed, inject } from '@angular/core';
 import { PlayerRecordsApi } from '../firebase/player-records.api';
 import { SquadService } from '../player/squad.service';
 import { todayIso } from '../shared/dates';
-import {
-  type Measurement,
-  type MeasurementContext,
-  type MeasurementDraft,
-  type MeasurementErrors,
-  docFromMeasurement,
-  evaluateMeasurement,
-  measurementFromDraft,
-  sortedMeasurements,
-} from './measurement';
+import { type Measurement, docFromMeasurement, sortedMeasurements } from './measurement';
+import { type MeasurementContext, type MeasurementDraft, type MeasurementErrors, evaluateMeasurement, measurementFromDraft } from './measurement-draft';
 import { RecordsStateService } from './records-state.service';
 
 /** Messwerte (Größe, Gewicht, Sitzhöhe) des geladenen Spielers lesen und schreiben (nur Trainer). */

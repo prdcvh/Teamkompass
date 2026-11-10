@@ -34,6 +34,8 @@ export const MAX_WEIGHT_KG = 250;
 export const MIN_SITTING_CM = 30;
 export const MAX_SITTING_CM = 150;
 export const MAX_BOX_CM = 100;
+/** Länge der Angabe Messstation/Methode. */
+export const STATION_MAX = 60;
 
 /** EIGENER VORSCHLAGSWERT (nicht aus SCRUM-251): plausibler Bereich für Jugendspieler; außerhalb "prüfen". */
 export const PLAUSIBLE_HEIGHT_CM: readonly [number, number] = [100, 210];

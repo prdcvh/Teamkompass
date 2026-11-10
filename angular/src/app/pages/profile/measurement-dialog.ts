@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { todayIso } from '../../core/shared/dates';
-import { type Measurement, type MeasurementDraft, type MeasurementErrors, type SittingMode, draftFromMeasurement, emptyMeasurementDraft, evaluateMeasurement } from '../../core/records/measurement';
+import type { Measurement } from '../../core/records/measurement';
+import { type MeasurementDraft, type MeasurementErrors, type SittingMode, draftFromMeasurement, emptyMeasurementDraft, evaluateMeasurement } from '../../core/records/measurement-draft';
 import { FLAG_TEXT, MAX_READINGS, type SeriesResult, decimalText } from '../../core/records/measurement-protocol';
 import { MeasurementsService } from '../../core/records/measurements.service';
 import { Button } from '../../ui/button/button';
