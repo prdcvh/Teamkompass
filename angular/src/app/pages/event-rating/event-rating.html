@@ -5,7 +5,7 @@
       @if (event(); as ev) {
         <h1>{{ ev.title }}</h1>
         <p class="meta">
-          {{ ev.type }} · {{ formatDate(ev.date) }}@if (resultText(ev); as result) { · Ergebnis {{ result }}} · Anstrengung {{ intensity() }}@if (ev.location) { · {{ ev.location }}}@if (isGame()) { · {{ ratings.matchDuration() }} Min.}
+          {{ ev.type }} · {{ formatDate(ev.date) }}@if (resultText(ev); as result) { · Ergebnis {{ result }}}@if (isGame()) { · {{ ratings.matchDuration() }} Min.}
         </p>
         <tk-weather [event]="ev" [showSource]="true" [showClothing]="true" />
         @if (ev.type === 'Training' && ratings.canWrite()) {
@@ -47,6 +47,10 @@
       </div>
     </tk-card>
   } @else {
+    @if (event(); as ev) {
+      <tk-event-details [event]="ev" [canEdit]="eventsService.canWrite()" (editRequested)="startEdit()" />
+    }
+
     @if (lineupView(); as lineup) {
       <tk-card>
         <section class="lineup" aria-label="Aufstellung">
@@ -267,3 +271,8 @@
     }
   }
 </section>
+
+@if (eventsService.canWrite()) {
+  <tk-event-dialog [open]="editing() !== null" [event]="editing()" (closed)="closeEdit()" (deleteRequested)="askDelete($event)" />
+  <tk-event-delete-dialog [event]="deleting()" (closed)="cancelDelete()" (deleted)="onDeleted($event)" />
+}

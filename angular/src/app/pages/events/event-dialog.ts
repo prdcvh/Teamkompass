@@ -4,7 +4,6 @@ import {
   type EventDraft,
   type EventErrors,
   EXERTIONS,
-  exertionLabel,
   MAX_MATCH_DURATION,
   MAX_NOTES_LENGTH,
   MAX_SCORE,
@@ -15,30 +14,23 @@ import {
   TRAINING_FOCUSES,
   draftFromEvent,
   emptyDraft,
-  formatDate,
-  resultText,
 } from '../../core/events/event';
-import { DEFAULT_WARMUP_PROGRAM, WARMUP_INFO_URL, WARMUP_PROGRAMS, type WarmupProgram } from '../../core/events/warmup';
 import { EventsService } from '../../core/events/events.service';
-import { type Opponent, opponentForEvent, opponentNameKey, opponentRecord, recordText } from '../../core/opponents/opponent';
+import { type Opponent, opponentNameKey } from '../../core/opponents/opponent';
 import { OpponentsService } from '../../core/opponents/opponents.service';
 import { type GeocodedPlace, GeocodingService, GEOCODING_MIN_QUERY, coordsFromPlace, geocodingMessage, placeLabel } from '../../core/geocoding/geocoding.service';
 import { TEAM_HOME_LOCATION } from '../../core/team-settings/team-settings';
 import { todayIso } from '../../core/shared/dates';
-import { BIO_BANDING_HINT } from '../../core/records/bio-banding';
-import { BioBandingService } from '../../core/records/bio-banding.service';
-import { percentText } from '../../core/records/maturity';
 import { Button } from '../../ui/button/button';
 import { Dialog } from '../../ui/dialog/dialog';
-import { Icon } from '../../ui/icon/icon';
 
 /**
- * Event ansehen/anlegen/bearbeiten. Bestehende Events öffnen zuerst die Leseansicht; der Stift (nur Trainer)
- * schaltet in den Bearbeiten-Modus (SCRUM-144). Neue Events öffnen direkt das Formular.
+ * Event anlegen/bearbeiten. Die Leseansicht („Anschauen“, SCRUM-144) steht seit SCRUM-285 als Eventdetails oben auf
+ * der Bewertungsseite; deren Stift öffnet diesen Dialog direkt mit dem Formular. Speichern und Abbrechen schließen ihn.
  * Spielfelder (Gegner, Dauer, Ergebnis) erscheinen nur bei Spielen, Trainingsfokus nur bei Trainings. */
 @Component({
   selector: 'tk-event-dialog',
-  imports: [Dialog, Button, Icon],
+  imports: [Dialog, Button],
   templateUrl: './event-dialog.html',
   styleUrl: './event-dialog.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -47,89 +39,25 @@ export class EventDialog {
   private readonly events = inject(EventsService);
   private readonly geocoding = inject(GeocodingService);
   private readonly opponents = inject(OpponentsService);
-  private readonly bioBanding = inject(BioBandingService);
 
   readonly open = input(false);
   /** Zu bearbeitendes Event; leer = neues Event anlegen. */
   readonly event = input<TeamEvent | null>(null);
-  /** Nur Trainer dürfen vom Ansehen ins Bearbeiten wechseln. */
-  readonly canEdit = input(false);
   readonly closed = output<void>();
   readonly deleteRequested = output<TeamEvent>();
 
   protected readonly types = EVENT_TYPES;
   protected readonly exertions = EXERTIONS;
   protected readonly focuses = TRAINING_FOCUSES;
-  protected readonly warmupPrograms = WARMUP_PROGRAMS;
-  protected readonly warmupUrl = WARMUP_INFO_URL;
   protected readonly limits = { title: MAX_TITLE_LENGTH, text: MAX_TEXT_LENGTH, notes: MAX_NOTES_LENGTH, score: MAX_SCORE, duration: MAX_MATCH_DURATION, trainingDuration: MAX_TRAINING_DURATION };
 
   protected readonly draft = signal<EventDraft>(emptyDraft(todayIso()));
   protected readonly errors = signal<EventErrors>({});
   protected readonly editing = computed(() => this.event() !== null);
-  /** true = Formular zeigen (neues Event oder Stift gedrückt), false = Leseansicht. */
-  protected readonly formMode = signal(true);
-  protected readonly viewing = computed(() => this.editing() && (!this.formMode() || !this.canEdit()));
-  protected readonly title = computed(() => (this.viewing() ? 'Event ansehen' : this.editing() ? 'Event bearbeiten' : 'Event anlegen'));
-  /** Anzeigewerte: nach dem Speichern das aktuelle Event aus dem Service, sonst das übergebene. */
-  protected readonly shown = computed(() => {
-    const event = this.event();
-    return event ? (this.events.events().find((entry) => entry.id === event.id) ?? event) : null;
-  });
-  /** Nur gefüllte Felder, in fester Reihenfolge; Notizen getrennt, damit sie Zeilenumbrüche behalten. */
-  protected readonly facts = computed(() => {
-    const event = this.shown();
-    if (!event) return [];
-    const duration = event.type === 'Spiel' ? event.matchDuration : event.durationMinutes;
-    const rows: { label: string; value: string }[] = [
-      { label: 'Typ', value: event.type },
-      { label: 'Titel', value: event.title },
-      { label: 'Datum', value: formatDate(event.date) },
-      { label: 'Startzeit', value: event.startTime ? `${event.startTime} Uhr` : '' },
-      { label: 'Dauer', value: duration ? `${duration} Minuten` : '' },
-      { label: 'Ort', value: event.location },
-      { label: 'Gegner', value: event.type === 'Spiel' ? event.opponent : '' },
-      { label: 'Ergebnis', value: resultText(event) },
-      // Punkte sehen nur Trainer (die Leseansicht gibt es für alle Rollen, die Termine lesen dürfen).
-      { label: 'Punkte vergeben', value: event.type === 'Spiel' && this.canEdit() ? (event.pointsEnabled ? 'Ja' : 'Nein') : '' },
-      { label: 'Anstrengung', value: exertionLabel(event.exertion) },
-      { label: 'Trainingsschwerpunkt', value: event.type === 'Training' ? event.trainingFocus : '' },
-    ];
-    return rows.filter((row) => row.value.trim() !== '');
-  });
-
-  /** Aufwärmprogramm-Haken (SCRUM-178): nur Trainer, nur bei Trainings; zeigt das gespeicherte Programm oder null. */
-  protected readonly warmup = computed(() => {
-    const event = this.shown();
-    return event && event.type === 'Training' && this.canEdit() ? { program: event.warmup ?? null } : null;
-  });
-
-  /**
-   * Bio-Banding (SCRUM-191): Vorschlag für Trainingsgruppen nach Reifestand, in der Leseansicht eines Trainings, nur für
-   * Trainer und Medizin (wie der Reife-Kompass). Der Trainer entscheidet; es wird nichts gespeichert.
-   */
-  private readonly bioWanted = computed(() => this.viewing() && this.shown()?.type === 'Training' && this.bioBanding.visible());
-  protected readonly bio = computed(() => (this.bioWanted() ? { state: this.bioBanding.state(), suggestion: this.bioBanding.suggestion() } : null));
-  protected readonly bioHint = BIO_BANDING_HINT;
-  protected readonly percentText = percentText;
+  protected readonly title = computed(() => (this.editing() ? 'Event bearbeiten' : 'Event anlegen'));
 
   /** Gegnerprofile zur Auswahl (nur Trainer bekommen sie geladen, sonst leer). */
   protected readonly profiles = computed(() => [...this.opponents.opponents()].sort((a, b) => a.name.localeCompare(b.name, 'de')));
-  /** Leseansicht eines Spiels: Matchplan, Stärken, Schwächen und Bilanz des Gegners (SCRUM-34). */
-  protected readonly plan = computed(() => {
-    const event = this.shown();
-    if (!event || !this.canEdit()) return null;
-    const list = this.opponents.opponents();
-    const profile = opponentForEvent(event, list);
-    if (!profile) return null;
-    const details = [
-      { label: 'Matchplan', value: profile.gamePlan },
-      { label: 'Stärken', value: profile.strengths },
-      { label: 'Schwächen', value: profile.weaknesses },
-    ].filter((entry) => entry.value !== '');
-    return { profile, details, recordText: recordText(opponentRecord(profile, this.events.events(), list)) };
-  });
-
   /** Ortssuche: Treffer, Zustand und Meldung. Gesucht wird nur auf Klick, nie beim Tippen. */
   protected readonly places = signal<readonly GeocodedPlace[]>([]);
   protected readonly searchState = signal<'idle' | 'searching' | 'done'>('idle');
@@ -147,24 +75,11 @@ export class EventDialog {
       const event = this.event();
       untracked(() => {
         this.opponents.start(); // startet nur für Trainer
-        this.formMode.set(event === null);
         this.draft.set(event ? draftFromEvent(event) : emptyDraft(todayIso()));
         this.errors.set({});
         this.resetSearch();
       });
     });
-    // Bio-Banding nur laden, solange die Leseansicht eines Trainings offen ist und die Rolle es sehen darf.
-    effect(() => {
-      const wanted = this.bioWanted();
-      untracked(() => {
-        if (wanted) void this.bioBanding.load();
-        else this.bioBanding.reset();
-      });
-    });
-  }
-
-  protected retryBio(): void {
-    void this.bioBanding.load();
   }
 
   private resetSearch(): void {
@@ -220,35 +135,11 @@ export class EventDialog {
     return (event.target as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value;
   }
 
-  protected toggleWarmup(checked: boolean): void {
-    const event = this.shown();
-    if (event) this.events.setWarmup(event.id, checked ? DEFAULT_WARMUP_PROGRAM : null);
-  }
-
-  protected chooseWarmup(program: string): void {
-    const event = this.shown();
-    const chosen: WarmupProgram | undefined = WARMUP_PROGRAMS.find((entry) => entry === program);
-    if (event && chosen) this.events.setWarmup(event.id, chosen);
-  }
-
-  protected startEdit(): void {
-    const event = this.shown();
-    if (!this.canEdit() || !event) return;
-    this.draft.set(draftFromEvent(event));
-    this.errors.set({});
-    this.resetSearch();
-    this.formMode.set(true);
-  }
-
-  /** Abbrechen: bei bestehenden Events zurück in die Leseansicht (Eingaben verworfen), bei neuen Events schließen. */
+  /** Abbrechen verwirft die Eingaben und schließt den Dialog. */
   protected cancel(): void {
-    if (!this.editing()) {
-      this.closed.emit();
-      return;
-    }
     this.resetSearch();
     this.errors.set({});
-    this.formMode.set(false);
+    this.closed.emit();
   }
 
   protected submit(event: Event): void {
@@ -256,8 +147,7 @@ export class EventDialog {
     const errors = this.events.save(this.draft());
     this.errors.set(errors);
     if (Object.keys(errors).length > 0) return;
-    if (this.editing()) this.formMode.set(false);
-    else this.closed.emit();
+    this.closed.emit();
   }
 
   protected askDelete(): void {

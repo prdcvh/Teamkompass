@@ -1,0 +1,32 @@
+<tk-dialog [open]="event() !== null" [title]="choice()?.kind === 'series' ? 'Serien-Termin löschen?' : 'Event löschen?'" (closed)="cancel()">
+  @if (choice(); as c) {
+    @if (c.kind === 'series') {
+      <p>
+        „{{ event()?.title }}“ gehört zu einer Trainingsserie. Soll nur dieser Termin gelöscht werden oder alle Termine der Serie?
+      </p>
+      <p><strong>Nur diesen Termin:</strong> wird mit allen Bewertungen und internen Notizen gelöscht und entsteht nicht neu.</p>
+      @if (c.allAvailable) {
+        <p><strong>Alle Termine der Serie:</strong> die Serie wird gelöscht. Vergangene Termine bleiben immer bestehen.</p>
+        <p class="preview" role="status" data-testid="series-delete-preview">{{ seriesPreview() ?? 'Es wird geprüft, welche Termine schon bewertet sind …' }}</p>
+      } @else {
+        <p class="hint" role="status">Die ganze Serie lässt sich hier gerade nicht löschen: Die Planung ist noch nicht geladen oder die Serie gibt es nicht mehr.</p>
+      }
+    } @else {
+      <p>
+        „{{ event()?.title }}“ wird mit allen Bewertungen und internen Notizen gelöscht. Das lässt sich nicht rückgängig machen.
+      </p>
+    }
+    @if (failed()) {
+      <p class="error" role="alert">Löschen fehlgeschlagen. Bitte Verbindung prüfen und erneut versuchen.</p>
+    }
+    <div class="confirm-actions" [class.stacked]="c.kind === 'series'">
+      <button tkButton type="button" (click)="cancel()">Abbrechen</button>
+      @if (c.kind === 'series') {
+        <button tkButton type="button" variant="primary" class="delete-one" [disabled]="busy()" (click)="confirm()">{{ busy() ? 'Löscht …' : 'Nur diesen Termin' }}</button>
+        <button tkButton type="button" variant="primary" class="delete-series" [disabled]="busy() || !c.allAvailable || seriesPreview() === null" (click)="confirmSeries()">Alle Termine der Serie</button>
+      } @else {
+        <button tkButton type="button" variant="primary" [disabled]="busy()" (click)="confirm()">{{ busy() ? 'Löscht …' : 'Endgültig löschen' }}</button>
+      }
+    </div>
+  }
+</tk-dialog>

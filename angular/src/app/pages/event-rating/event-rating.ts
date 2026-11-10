@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
-import { exertionLabel, formatDate, resultText } from '../../core/events/event';
+import { type TeamEvent, formatDate, resultText } from '../../core/events/event';
 import { EventsService } from '../../core/events/events.service';
 import { LineupService } from '../../core/lineup/lineup.service';
 import { lineupIsEmpty, lineupSummary } from '../../core/lineup/lineup';
@@ -41,6 +41,9 @@ import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 import { Chip, type Tone } from '../../ui/chip/chip';
 import { Weather } from '../../ui/weather/weather';
+import { EventDeleteDialog, type EventDeleted } from '../events/event-delete-dialog';
+import { EventDialog } from '../events/event-dialog';
+import { EventDetails } from './event-details';
 
 /** Spaltenköpfe der Matrix: lange Wörter mit weichen Trennstellen, damit sie in schmalen Spalten umbrechen statt abgeschnitten zu werden. */
 const GRADE_HEADERS: Readonly<Record<GradeField, string>> = {
@@ -53,16 +56,18 @@ const GRADE_HEADERS: Readonly<Record<GradeField, string>> = {
 /**
  * Event bewerten (Figma: Bewertungsmatrix Desktop, Stepper Handy): je Spieler Anwesenheit, vier Teilnoten
  * (daraus die Gesamtnote), bei Spielen Minuten/Tore/Vorlagen, sichtbares Feedback und interne Notiz.
+ * Darüber die Eventdetails; deren Stift (nur Trainer) öffnet das Event-Formular inkl. „Event löschen“ (SCRUM-285).
  */
 @Component({
   selector: 'app-event-rating',
-  imports: [RouterLink, Button, Card, Chip, Weather],
+  imports: [RouterLink, Button, Card, Chip, Weather, EventDetails, EventDialog, EventDeleteDialog],
   templateUrl: './event-rating.html',
   styleUrl: './event-rating.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class EventRating implements OnInit {
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   protected readonly ratings = inject(RatingsService);
   /** Bewertungsskala des Teams (SCRUM-188): Schulnoten oder Kompetenzstufen. */
   protected readonly scale = inject(RatingScaleService).scale;
@@ -94,6 +99,12 @@ export class EventRating implements OnInit {
   protected readonly index = signal(0);
 
   protected readonly event = this.ratings.event;
+  /**
+   * Event im Bearbeiten-Dialog: ein fester Stand beim Klick auf den Stift, damit ein neuer Firestore-Stand (z. B. das
+   * Aufwärmprogramm) die Eingaben im offenen Formular nicht überschreibt. null = Dialog zu.
+   */
+  protected readonly editing = signal<TeamEvent | null>(null);
+  protected readonly deleting = signal<TeamEvent | null>(null);
   protected readonly isGame = computed(() => this.event()?.type === 'Spiel');
   protected readonly ready = computed(() => this.ratings.load() === 'ready' && this.squad.load() === 'ready' && this.eventsService.load() === 'ready');
   protected readonly failed = computed(() => this.ratings.load() === 'error' || this.squad.load() === 'error' || this.eventsService.load() === 'error');
@@ -184,11 +195,6 @@ export class EventRating implements OnInit {
     return ratingScaleOf(this.ratings.ratingFor(player.id), this.scale()) === 'levels';
   }
 
-  protected intensity(): string {
-    const event = this.event();
-    return event ? exertionLabel(event.exertion) : '';
-  }
-
   protected attendanceOf(player: Player): Attendance {
     return this.ratings.ratingFor(player.id).attendance;
   }
@@ -237,6 +243,31 @@ export class EventRating implements OnInit {
   protected setView(value: string): void {
     this.view.set(value as RatingView);
     this.index.set(0);
+  }
+
+  protected startEdit(): void {
+    const event = this.event();
+    if (event && this.eventsService.canWrite()) this.editing.set(event);
+  }
+
+  protected closeEdit(): void {
+    this.editing.set(null);
+  }
+
+  /** „Event löschen“ im Formular: Formular schließen, Rückfrage (inkl. Serien-Auswahl) öffnen. */
+  protected askDelete(event: TeamEvent): void {
+    this.editing.set(null);
+    this.deleting.set(event);
+  }
+
+  protected cancelDelete(): void {
+    this.deleting.set(null);
+  }
+
+  /** Nach dem Löschen gibt es diese Seite nicht mehr: zurück zur Eventliste (dort steht der Fortschritt der Serien-Löschung). */
+  protected onDeleted(result: EventDeleted): void {
+    this.deleting.set(null);
+    void this.router.navigate(['/events'], result.series ? { queryParams: { 'serie-geloescht': '1' } } : {});
   }
 
   protected retry(): void {
