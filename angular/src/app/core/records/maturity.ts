@@ -33,6 +33,7 @@
  *   unter 85 % = spät entwickelt, 85–95 % = im Schnitt, über 95 % = früh entwickelt – geprüft am auf eine
  *   Nachkommastelle gerundeten Prozentwert (so, wie er angezeigt wird). Fachliche Prüfung der Grenzen: SCRUM-251.
  */
+import type { ConsentStatus } from '../player/player';
 import { isIsoDate } from '../shared/dates';
 import { type Measurement, sortedMeasurements } from './measurement';
 
@@ -178,6 +179,14 @@ export interface MaturityInputs {
   /** cm; null = nicht erfasst. */
   readonly motherHeight: number | null;
   readonly fatherHeight: number | null;
+  /**
+   * Nachweis des Einverständnisses der Eltern (SCRUM-252): Tag (JJJJ-MM-TT), an dem ein Trainer das Häkchen gesetzt
+   * hat, und wer (E-Mail zur Anzeige, Konto-ID für die Regeln). Leer = nicht dokumentiert (ältere Einträge von vor
+   * SCRUM-252 oder kein Häkchen).
+   */
+  readonly parentsConsentDate?: string;
+  readonly parentsConsentBy?: string;
+  readonly parentsConsentByUid?: string;
 }
 
 export const EMPTY_MATURITY_INPUTS: MaturityInputs = { sex: null, parentsConsent: false, motherHeight: null, fatherHeight: null };
@@ -191,6 +200,32 @@ export interface MaturityPoint {
   /** Ungerundet; Anzeige über {@link roundPercent}. */
   readonly percent: number;
   readonly band: MaturityBand;
+}
+
+/**
+ * Widerruf (SCRUM-252, Logik aus SCRUM-245): Ist die Einwilligung des Spielers widerrufen, rechnet die App keinen
+ * Reifestand mehr – weder im Profil noch im Bio-Banding-Vorschlag. Gelöscht wird dabei nichts (das macht der Trainer
+ * von Hand über die Aufgabe „Gesundheitsdaten prüfen und löschen“).
+ */
+export function maturityStopped(player: { readonly consentStatus?: ConsentStatus } | null | undefined): boolean {
+  return player?.consentStatus === 'revoked';
+}
+
+/** Text in der Karte, wenn die Berechnung gestoppt ist. */
+export const MATURITY_STOPPED_TEXT =
+  'Die Einwilligung ist widerrufen. Der Reifestand wird deshalb nicht mehr berechnet und lässt sich nicht ergänzen. Gespeicherte Angaben der Eltern kannst du oben bei der Einwilligung unter „Gesundheitsdaten prüfen und löschen“ löschen.';
+
+/**
+ * Die Angaben, mit denen tatsächlich gerechnet werden darf: bei widerrufener Einwilligung keine (dann erscheint kein
+ * Wert), sonst die gespeicherten. Jede Ansicht, die einen Reifestand zeigt, rechnet über diese Funktion.
+ */
+export function maturityInputsForCalculation(inputs: MaturityInputs, player: { readonly consentStatus?: ConsentStatus } | null | undefined): MaturityInputs {
+  return maturityStopped(player) ? EMPTY_MATURITY_INPUTS : inputs;
+}
+
+/** Ist überhaupt etwas gespeichert (Geschlecht, Häkchen oder eine Größe)? Für die Lösch-Aufgabe beim Widerruf. */
+export function hasMaturityData(inputs: MaturityInputs): boolean {
+  return !!inputs.sex || inputs.parentsConsent || inputs.motherHeight !== null || inputs.fatherHeight !== null;
 }
 
 /** Mittelelterngröße (cm) oder null, wenn die Einwilligung oder eine Größe fehlt. */
@@ -249,7 +284,37 @@ export function maturityInputsFromDoc(data: Readonly<Record<string, unknown>> | 
   const parentsConsent = data['parentsConsent'] === true;
   const height = (value: unknown): number | null =>
     parentsConsent && typeof value === 'number' && value >= MIN_PARENT_HEIGHT_CM && value <= MAX_PARENT_HEIGHT_CM ? value : null;
-  return { sex, parentsConsent, motherHeight: height(data['motherHeight']), fatherHeight: height(data['fatherHeight']) };
+  const text = (value: unknown): string => (parentsConsent && typeof value === 'string' ? value : '');
+  return {
+    sex,
+    parentsConsent,
+    motherHeight: height(data['motherHeight']),
+    fatherHeight: height(data['fatherHeight']),
+    parentsConsentDate: isIsoDate(text(data['parentsConsentDate'])) ? text(data['parentsConsentDate']) : '',
+    parentsConsentBy: text(data['parentsConsentBy']),
+    parentsConsentByUid: text(data['parentsConsentByUid']),
+  };
+}
+
+/** Wer trägt gerade ein (für den Nachweis des Einverständnisses der Eltern)? */
+export interface MaturityAuthor {
+  readonly uid: string;
+  readonly email: string;
+  /** Heutiger Tag, JJJJ-MM-TT. */
+  readonly today: string;
+}
+
+/**
+ * Angaben aus dem Formular mit dem Nachweis des Einverständnisses (SCRUM-252): War das Häkchen schon gesetzt, bleibt
+ * der bisherige Nachweis unverändert; wird es neu gesetzt, tragen sich Tag und Konto des Trainers ein; ohne Häkchen
+ * gibt es keinen Nachweis (und keine Größen).
+ */
+export function withParentsConsentRecord(next: MaturityInputs, previous: MaturityInputs, author: MaturityAuthor): MaturityInputs {
+  if (!next.parentsConsent) return { ...next, parentsConsentDate: '', parentsConsentBy: '', parentsConsentByUid: '' };
+  if (previous.parentsConsent) {
+    return { ...next, parentsConsentDate: previous.parentsConsentDate ?? '', parentsConsentBy: previous.parentsConsentBy ?? '', parentsConsentByUid: previous.parentsConsentByUid ?? '' };
+  }
+  return { ...next, parentsConsentDate: author.today, parentsConsentBy: author.email, parentsConsentByUid: author.uid };
 }
 
 /** Angaben → Dokument. Ohne Einverständnis werden die Größen der Eltern immer geleert (so verlangen es die Regeln). */
@@ -260,6 +325,10 @@ export function docFromMaturityInputs(playerId: string, inputs: MaturityInputs, 
     parentsConsent: inputs.parentsConsent,
     motherHeight: inputs.parentsConsent ? inputs.motherHeight : null,
     fatherHeight: inputs.parentsConsent ? inputs.fatherHeight : null,
+    // Nachweis des Einverständnisses (SCRUM-252); ohne Häkchen leer. Leerer Text wird als null gespeichert.
+    parentsConsentDate: inputs.parentsConsent && inputs.parentsConsentDate ? inputs.parentsConsentDate : null,
+    parentsConsentBy: inputs.parentsConsent && inputs.parentsConsentBy ? inputs.parentsConsentBy : null,
+    parentsConsentByUid: inputs.parentsConsent && inputs.parentsConsentByUid ? inputs.parentsConsentByUid : null,
     updatedAt,
   };
 }

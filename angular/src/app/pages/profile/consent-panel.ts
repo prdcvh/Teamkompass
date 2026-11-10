@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { formatDate } from '../../core/events/event';
 import { FileOutput } from '../../core/export/file-output';
 import {
@@ -15,6 +15,8 @@ import {
 import { type Player, draftFromPlayer } from '../../core/player/player';
 import { SquadService } from '../../core/player/squad.service';
 import { AbsencesService } from '../../core/records/absences.service';
+import { hasMaturityData } from '../../core/records/maturity';
+import { MaturityService } from '../../core/records/maturity.service';
 import { MeasurementsService } from '../../core/records/measurements.service';
 import { RecordsStateService } from '../../core/records/records-state.service';
 import { todayIso } from '../../core/shared/dates';
@@ -24,7 +26,7 @@ import { Card } from '../../ui/card/card';
 import { Dialog } from '../../ui/dialog/dialog';
 import { HealthReasonsTask } from './health-reasons-task';
 
-type Pending = 'grant' | 'status' | 'absences' | 'measurements';
+type Pending = 'grant' | 'status' | 'absences' | 'measurements' | 'maturity';
 
 /**
  * Einwilligung im Spielerprofil (nur Trainer, SCRUM-245): Stand der Einwilligung mit Datum und wer sie eingetragen hat,
@@ -49,10 +51,10 @@ type Pending = 'grant' | 'status' | 'absences' | 'measurements';
           <div class="task" role="region" aria-labelledby="task-title">
             <h3 id="task-title">Aufgabe: Gesundheitsdaten prüfen und löschen</h3>
             <p>Die Einwilligung ist widerrufen. Spieler, Eltern und Medizin sehen diese Daten nicht mehr – du schon. Bitte prüfen und löschen, was nicht aus einem anderen Grund aufbewahrt werden muss. Gelöscht wird erst nach deiner Bestätigung.</p>
-            @if (!records.ready()) {
+            @if (!records.ready() || !maturityLoaded()) {
               <p class="muted" role="status">Daten werden geladen …</p>
             } @else if (nothingLeft()) {
-              <p class="done">Keine Gesundheitsdaten mehr gespeichert (Status, Abwesenheiten, Messwerte).</p>
+              <p class="done">Keine Gesundheitsdaten mehr gespeichert (Status, Abwesenheiten, Messwerte, Angaben für den Reife-Kompass).</p>
             } @else {
               <ul>
                 @if (statusStored()) {
@@ -73,7 +75,16 @@ type Pending = 'grant' | 'status' | 'absences' | 'measurements';
                     <button tkButton size="sm" type="button" class="danger" (click)="ask('measurements')">Alle löschen</button>
                   </li>
                 }
+                @if (maturityStored()) {
+                  <li data-test="consent-task-maturity">
+                    <span>Angaben für den Reife-Kompass (Größe der Eltern, Geschlecht für die Formel)</span>
+                    <button tkButton size="sm" type="button" class="danger" (click)="ask('maturity')">Angaben löschen</button>
+                  </li>
+                }
               </ul>
+              @if (maturity.state() === 'error') {
+                <p class="error" role="alert">{{ maturity.error() }}</p>
+              }
             }
             <tk-health-reasons-task [player]="player()" />
           </div>
@@ -112,6 +123,7 @@ export class ConsentPanel {
   protected readonly records = inject(RecordsStateService);
   private readonly absences = inject(AbsencesService);
   private readonly measurements = inject(MeasurementsService);
+  protected readonly maturity = inject(MaturityService);
   private readonly team = inject(CurrentTeam);
   private readonly files = inject(FileOutput);
 
@@ -124,8 +136,16 @@ export class ConsentPanel {
   protected readonly locked = computed(() => !mayStoreHealth(this.player(), this.team.id()));
   protected readonly lockText = computed(() => healthLockedMessage(this.player().name));
   protected readonly statusStored = computed(() => hasHealthFields(this.player()));
+  /** Angaben für den Reife-Kompass (SCRUM-252) dieses Spielers geladen (oder nicht ladbar – dann Fehlermeldung)? */
+  protected readonly maturityLoaded = computed(() => this.maturity.playerId() === this.player().id && ['ready', 'error'].includes(this.maturity.state()));
+  protected readonly maturityStored = computed(() => this.maturityLoaded() && hasMaturityData(this.maturity.inputs()));
   protected readonly nothingLeft = computed(
-    () => !this.statusStored() && this.records.absences().length === 0 && this.records.measurementList().length === 0,
+    () =>
+      !this.statusStored() &&
+      this.records.absences().length === 0 &&
+      this.records.measurementList().length === 0 &&
+      !this.maturityStored() &&
+      this.maturity.state() !== 'error',
   );
   protected readonly stateLabel = computed(() => {
     const player = this.player();
@@ -162,6 +182,8 @@ export class ConsentPanel {
         return `Alle ${this.records.absences().length} Abwesenheiten/Verletzungen von ${name} werden gelöscht. Das lässt sich nicht rückgängig machen.`;
       case 'measurements':
         return `Alle ${this.records.measurementList().length} Messwerte von ${name} werden gelöscht. Das lässt sich nicht rückgängig machen.`;
+      case 'maturity':
+        return `Die Angaben für den Reife-Kompass von ${name} (Größe der Eltern, Einverständnis der Eltern, Geschlecht für die Formel) werden gelöscht. Ein Reifestand lässt sich danach nicht mehr berechnen. Das lässt sich nicht rückgängig machen.`;
       default:
         return '';
     }
@@ -169,6 +191,17 @@ export class ConsentPanel {
   protected readonly confirmLabel = computed(() => (this.pending() === 'grant' ? 'Ja, liegt vor' : this.pending() === 'status' ? 'Zurücksetzen' : 'Endgültig löschen'));
 
   protected formatDate = formatDate;
+
+  constructor() {
+    // Bei Widerruf die Angaben für den Reife-Kompass laden, damit die Aufgabe sie zeigt (gleiches Abo wie die Karte).
+    effect(() => {
+      const id = this.player().id;
+      const revoked = this.revoked();
+      untracked(() => {
+        if (revoked) this.maturity.start(id);
+      });
+    });
+  }
 
   protected ask(kind: Pending): void {
     this.failed.set(false);
@@ -205,6 +238,7 @@ export class ConsentPanel {
       for (const absence of [...this.records.absences()]) if (!(await this.absences.deleteAbsence(absence.id))) return false;
       return true;
     }
+    if (kind === 'maturity') return this.maturity.remove(player.id);
     for (const measurement of [...this.records.measurementList()]) if (!(await this.measurements.deleteMeasurement(measurement.id))) return false;
     return true;
   }

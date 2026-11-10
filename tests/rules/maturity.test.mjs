@@ -7,9 +7,11 @@
 import { test, before, after, beforeEach } from "node:test";
 import { readFileSync } from "node:fs";
 import { initializeTestEnvironment, assertFails, assertSucceeds } from "@firebase/rules-unit-testing";
-import { collection, deleteDoc, doc, getDoc, getDocs, setDoc } from "firebase/firestore";
+import { collection, collectionGroup, deleteDoc, doc, getDoc, getDocs, query, setDoc, where, writeBatch } from "firebase/firestore";
 
 const OWN = "U17";
+const OTHER_OWN = "U15";
+const CLUB = "club-koenigstein";
 const FOREIGN = "Xy7Fremd0000Verein01";
 let env;
 
@@ -39,7 +41,11 @@ beforeEach(async () => {
   await env.clearFirestore();
   await env.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();
+    await setDoc(doc(db, `clubs/${CLUB}/admins/clubadmin`), { role: "admin" });
+    // Trainer eines anderen Teams (gleicher Verein) - darf im Team U17 nichts.
+    await setDoc(doc(db, `teams/${OTHER_OWN}/members/otherCoach`), { role: "trainer" });
     for (const team of [OWN, FOREIGN]) {
+      await setDoc(doc(db, `teams/${team}`), { clubId: CLUB, name: `Team ${team}`, label: "U17", hasTrainer: true });
       for (const [uid, data] of Object.entries(members)) await setDoc(doc(db, `teams/${team}/members/${uid}`), data);
       for (const [id, consentStatus] of Object.entries(consents)) {
         await setDoc(doc(db, `teams/${team}/players/${id}`), { name: id, number: 1, status: "Fit", consentStatus });
@@ -107,4 +113,68 @@ test("Fremder Verein: speichern nur mit dokumentierter Einwilligung", async () =
   await assertSucceeds(setDoc(doc(as("coach"), path(FOREIGN, "p3")), valid("p3")));
   // Loeschen geht immer.
   await assertSucceeds(deleteDoc(doc(as("coach"), path(FOREIGN, "p1"))));
+});
+
+// -------------------------------------------------------------------------------------------------
+// SCRUM-252: Rollen- und Vereinsmatrix, Nachweis des Einverstaendnisses, Widerruf.
+// -------------------------------------------------------------------------------------------------
+
+test("Matrix: Vereinsadmin und Trainer anderer Teams lesen und schreiben nichts", async () => {
+  for (const uid of ["clubadmin", "otherCoach"]) {
+    for (const team of [OWN, FOREIGN]) {
+      await assertFails(getDoc(doc(as(uid), path(team, "p1"))));
+      await assertFails(getDocs(collection(as(uid), `teams/${team}/players/p1/maturity`)));
+      await assertFails(setDoc(doc(as(uid), path(team, "p1")), valid("p1")));
+      await assertFails(deleteDoc(doc(as(uid), path(team, "p1"))));
+    }
+  }
+});
+
+test("Suche ueber alle Teams (collectionGroup) ist fuer niemanden freigegeben", async () => {
+  for (const uid of ["coach", "medic", "scout", "pl1", "parent1", "clubadmin", "otherCoach"]) {
+    await assertFails(getDocs(collectionGroup(as(uid), "maturity")));
+    await assertFails(getDocs(query(collectionGroup(as(uid), "maturity"), where("playerId", "==", "p1"))));
+  }
+});
+
+test("Nachweis: wer das Haekchen neu setzt, traegt sich selbst mit Tag ein", async () => {
+  const ref = (playerId) => doc(as("coach"), path(OWN, playerId));
+  const record = { parentsConsentDate: "2026-11-10", parentsConsentBy: "coach@example.test", parentsConsentByUid: "coach" };
+  // Ausgangslage ohne Haekchen.
+  await env.withSecurityRulesDisabled((ctx) =>
+    setDoc(doc(ctx.firestore(), path(OWN, "p1")), valid("p1", { parentsConsent: false, motherHeight: null, fatherHeight: null })));
+  // Haekchen neu: ohne Nachweis, mit fremdem Konto, mit falschem Datum -> abgelehnt.
+  await assertFails(setDoc(ref("p1"), valid("p1")));
+  await assertFails(setDoc(ref("p1"), valid("p1", { ...record, parentsConsentByUid: "medic" })));
+  await assertFails(setDoc(ref("p1"), valid("p1", { ...record, parentsConsentDate: "10.11.2026" })));
+  await assertSucceeds(setDoc(ref("p1"), valid("p1", record)));
+  // Haekchen bleibt: Nachweis bleibt unveraendert (nicht ueberschreibbar, auch nicht vom selben Trainer).
+  await assertFails(setDoc(ref("p1"), valid("p1", { ...record, parentsConsentDate: "2026-11-11" })));
+  await assertSucceeds(setDoc(ref("p1"), valid("p1", { ...record, motherHeight: 170 })));
+  // Haekchen weg: Groessen und Nachweis weg.
+  await assertFails(setDoc(ref("p1"), valid("p1", { ...record, parentsConsent: false, motherHeight: null, fatherHeight: null })));
+  await assertSucceeds(setDoc(ref("p1"), valid("p1", { parentsConsent: false, motherHeight: null, fatherHeight: null })));
+  // Altbestand (Haekchen ohne Nachweis, vor SCRUM-252) bleibt gueltig und aenderbar.
+  await assertSucceeds(setDoc(ref("p3"), valid("p3", { motherHeight: 171 })));
+});
+
+test("Widerruf: keine neuen Groessen der Eltern, nur loeschen/leeren; Medizin liest nicht", async () => {
+  const ref = doc(as("coach"), path(OWN, "p2"));
+  await assertFails(setDoc(ref, valid("p2", { motherHeight: 160 })));
+  await assertFails(setDoc(ref, valid("p2")));
+  // Leeren (Groessen weg) und loeschen gehen.
+  await assertSucceeds(setDoc(ref, valid("p2", { motherHeight: null, fatherHeight: null })));
+  await assertSucceeds(deleteDoc(ref));
+  await assertFails(getDoc(doc(as("medic"), path(OWN, "p2"))));
+  // Fremder Verein: gleiches Verhalten.
+  await assertFails(setDoc(doc(as("coach"), path(FOREIGN, "p2")), valid("p2")));
+  await assertSucceeds(deleteDoc(doc(as("coach"), path(FOREIGN, "p2"))));
+});
+
+test("Widerruf im selben Schreibvorgang: Groessen duerfen nicht mitgeschrieben werden", async () => {
+  const db = as("coach");
+  const batch = writeBatch(db);
+  batch.set(doc(db, `teams/${OWN}/players/p1`), { name: "p1", number: 1, status: "Fit", consentStatus: "revoked" });
+  batch.set(doc(db, path(OWN, "p1")), valid("p1", { motherHeight: 165 }));
+  await assertFails(batch.commit());
 });

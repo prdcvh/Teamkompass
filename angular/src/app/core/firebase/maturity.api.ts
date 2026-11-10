@@ -45,4 +45,11 @@ export class MaturityApi {
     const { doc, setDoc } = await import('firebase/firestore');
     await setDoc(doc(db, 'teams', this.team.id(), 'players', playerId, 'maturity', MATURITY_DOC_ID), data);
   }
+
+  /** Löscht das Dokument (Trainer; Aufgabe „Gesundheitsdaten prüfen und löschen“, SCRUM-252). */
+  async deleteMaturity(playerId: string): Promise<void> {
+    const { db } = await this.connection.get();
+    const { doc, deleteDoc } = await import('firebase/firestore');
+    await deleteDoc(doc(db, 'teams', this.team.id(), 'players', playerId, 'maturity', MATURITY_DOC_ID));
+  }
 }
