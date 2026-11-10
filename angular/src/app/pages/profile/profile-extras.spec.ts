@@ -33,6 +33,15 @@ describe('Profile: Zusatzdaten', () => {
     expect(q(fixture, 'tk-profile-extras svg')).not.toBeNull(); // Diagramm nur sichtbar, wenn die Messungen jünger als 12 Monate sind
   });
 
+  it('zeigt die Wachstumsgeschwindigkeit mit Tabelle unter den Messwerten (SCRUM-254)', async () => {
+    const fixture = await renderExtras();
+    const card = text(q(fixture, 'tk-growth-velocity-card'));
+    expect(card).toContain('Wachstumsgeschwindigkeit');
+    expect(card).toContain('cm/Jahr');
+    expect(card).toContain('Messqualität nicht dokumentiert');
+    expect(qa(fixture, 'tk-growth-velocity-card tbody tr').length).toBeGreaterThan(0);
+  });
+
   it('die laufende Verletzung überlagert den Status und trennt Verfügbarkeit und Belastung', async () => {
     // Fester Zeitpunkt: der Wachstumshinweis zählt nur Messungen der letzten 90 Tage (SCRUM-157).
     vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-02T12:00:00') });
