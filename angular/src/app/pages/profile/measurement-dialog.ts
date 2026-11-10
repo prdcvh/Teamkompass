@@ -30,7 +30,7 @@ function nowTime(now = new Date()): string {
         @if (draft().legacy) {
           <p class="hint legacy">Bestandsmessung – Messqualität nicht dokumentiert. Es gibt keine Einzelmessungen dazu; für eine dokumentierte Messung bitte eine neue Messung eintragen.</p>
         } @else {
-          <details class="guide" [open]="!draft().id">
+          <details class="guide" [open]="!draft().id && !experienced()">
             <summary>So wird gemessen</summary>
             <ul>
               <li>Schuhe aus, leichte Kleidung, Haare flach.</li>
@@ -174,6 +174,8 @@ export class MeasurementDialog {
   /** Uhrzeit der letzten Messung (Hinweis "ähnliche Tageszeit"). */
   protected readonly lastTime = computed(() => [...this.measurements.measurements()].reverse().find((entry) => entry.time && entry.id !== this.draft().id)?.time ?? '');
   protected readonly sittingOpen = signal(false);
+  /** Für diesen Spieler wurde schon mit dem Messassistenten gemessen: Anleitung startet eingeklappt (mobil kürzer). */
+  protected readonly experienced = computed(() => this.measurements.measurements().some((entry) => !!entry.protocol));
 
   protected readonly summary = computed(() => {
     const evaluation = this.evaluation();
