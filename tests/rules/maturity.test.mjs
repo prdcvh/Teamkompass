@@ -151,7 +151,7 @@ test("Nachweis: wer das Haekchen neu setzt, traegt sich selbst mit Tag ein", asy
   // Haekchen bleibt: Nachweis bleibt unveraendert (nicht ueberschreibbar, auch nicht vom selben Trainer).
   await assertFails(setDoc(ref("p1"), valid("p1", { ...record, parentsConsentDate: "2026-11-11" })));
   await assertSucceeds(setDoc(ref("p1"), valid("p1", { ...record, motherHeight: 170 })));
-  // Haekchen weg: Groessen und Nachweis weg.
+  // Haekchen weg: Groessen und Nachweis weg (die App laesst die Felder dann ganz weg; null ist auch erlaubt).
   await assertFails(setDoc(ref("p1"), valid("p1", { ...record, parentsConsent: false, motherHeight: null, fatherHeight: null })));
   await assertSucceeds(setDoc(ref("p1"), valid("p1", { parentsConsent: false, motherHeight: null, fatherHeight: null })));
   // Altbestand (Haekchen ohne Nachweis, vor SCRUM-252) bleibt gueltig und aenderbar.

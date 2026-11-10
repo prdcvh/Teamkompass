@@ -319,18 +319,22 @@ export function withParentsConsentRecord(next: MaturityInputs, previous: Maturit
 
 /** Angaben → Dokument. Ohne Einverständnis werden die Größen der Eltern immer geleert (so verlangen es die Regeln). */
 export function docFromMaturityInputs(playerId: string, inputs: MaturityInputs, updatedAt: string): Record<string, unknown> {
-  return {
+  const doc: Record<string, unknown> = {
     playerId,
     sex: inputs.sex ?? '',
     parentsConsent: inputs.parentsConsent,
     motherHeight: inputs.parentsConsent ? inputs.motherHeight : null,
     fatherHeight: inputs.parentsConsent ? inputs.fatherHeight : null,
-    // Nachweis des Einverständnisses (SCRUM-252); ohne Häkchen leer. Leerer Text wird als null gespeichert.
-    parentsConsentDate: inputs.parentsConsent && inputs.parentsConsentDate ? inputs.parentsConsentDate : null,
-    parentsConsentBy: inputs.parentsConsent && inputs.parentsConsentBy ? inputs.parentsConsentBy : null,
-    parentsConsentByUid: inputs.parentsConsent && inputs.parentsConsentByUid ? inputs.parentsConsentByUid : null,
     updatedAt,
   };
+  // Nachweis des Einverständnisses (SCRUM-252) nur mit Häkchen und nur, wenn vorhanden. Fehlt er, fehlt das Feld
+  // ganz (das Dokument wird vollständig überschrieben, ein alter Nachweis verschwindet damit).
+  if (inputs.parentsConsent) {
+    if (inputs.parentsConsentDate) doc['parentsConsentDate'] = inputs.parentsConsentDate;
+    if (inputs.parentsConsentBy) doc['parentsConsentBy'] = inputs.parentsConsentBy;
+    if (inputs.parentsConsentByUid) doc['parentsConsentByUid'] = inputs.parentsConsentByUid;
+  }
+  return doc;
 }
 
 /** „93,4 %“ */

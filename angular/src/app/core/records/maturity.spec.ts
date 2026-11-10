@@ -150,9 +150,6 @@ describe('Reife-Kompass: Khamis-Roche (SCRUM-190)', () => {
         parentsConsent: false,
         motherHeight: null,
         fatherHeight: null,
-        parentsConsentDate: null,
-        parentsConsentBy: null,
-        parentsConsentByUid: null,
         updatedAt: '2026-11-03',
       });
       expect(maturityInputsFromDoc({ sex: 'f', parentsConsent: false, motherHeight: 170, fatherHeight: 180 })).toMatchObject({
@@ -234,7 +231,9 @@ describe('Reife-Kompass: Einwilligung, Widerruf und abgeleitete Werte (SCRUM-252
     expect(kept).toMatchObject({ motherHeight: 170, parentsConsentDate: '2026-11-10', parentsConsentByUid: 'uid-1' });
     const removed = withParentsConsentRecord(inputs({ parentsConsent: false }), fresh, author);
     expect(removed).toMatchObject({ parentsConsentDate: '', parentsConsentBy: '', parentsConsentByUid: '' });
-    expect(docFromMaturityInputs('p1', removed, 'x')).toMatchObject({ motherHeight: null, fatherHeight: null, parentsConsentDate: null, parentsConsentBy: null, parentsConsentByUid: null });
+    const removedDoc = docFromMaturityInputs('p1', removed, 'x');
+    expect(removedDoc).toMatchObject({ motherHeight: null, fatherHeight: null });
+    expect(Object.keys(removedDoc).filter((key) => key.startsWith('parentsConsent') && key !== 'parentsConsent')).toEqual([]);
     expect(docFromMaturityInputs('p1', fresh, 'x')).toMatchObject({ parentsConsentDate: '2026-11-10', parentsConsentByUid: 'uid-1' });
     // Gelesen wird der Nachweis nur mit Häkchen und gültigem Datum.
     expect(maturityInputsFromDoc({ parentsConsent: true, parentsConsentDate: '2026-11-10', parentsConsentByUid: 'u' })).toMatchObject({ parentsConsentDate: '2026-11-10' });
