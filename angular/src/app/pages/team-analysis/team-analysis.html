@@ -49,7 +49,7 @@
         </div>
       </tk-card>
 
-      <section class="columns">
+      <section class="columns stack">
         <tk-card>
           <div class="panel">
             <h2>Teamform</h2>
@@ -86,7 +86,7 @@
           <div class="panel">
             <h2>Nützliche Kennzahlen</h2>
             <div class="insights">
-              <article class="insight" data-insight="topform">
+              <article class="insight s2" data-insight="topform">
                 <h3>Topform</h3>
                 @for (entry of topForm(); track entry.player.id) {
                   <p class="insight-row">
@@ -97,7 +97,7 @@
                   <p class="insight-empty">Noch keine Bewertungen.</p>
                 }
               </article>
-              <article class="insight" data-insight="belastung">
+              <article class="insight s2" data-insight="belastung">
                 <h3>Belastung im Blick</h3>
                 @for (entry of loadWatch(); track entry.player.id) {
                   <p class="insight-row">
@@ -111,14 +111,14 @@
                   <p class="insight-empty">Keine Auffälligkeiten.</p>
                 }
               </article>
-              <article class="insight" data-insight="spielauswertung">
+              <article class="insight s2" data-insight="spielauswertung">
                 <h3>Spielauswertung</h3>
                 <div class="figures">
                   <p class="figure"><strong>{{ recordText() }}</strong><span>Siege · Unentschieden · Niederlagen</span></p>
                   <p class="figure"><strong>{{ goalsText() }}</strong><span>Tore erzielt : Gegentore</span></p>
                 </div>
               </article>
-              <article class="insight" data-insight="trainingssteuerung">
+              <article class="insight s3" data-insight="trainingssteuerung">
                 <h3>Trainingssteuerung</h3>
                 <div class="figures small">
                   @for (row of focusRows(); track row.label) {
@@ -126,7 +126,7 @@
                   }
                 </div>
               </article>
-              <article class="insight" data-insight="kaderstruktur">
+              <article class="insight s3" data-insight="kaderstruktur">
                 <h3>Kaderstruktur</h3>
                 <div class="figures small quarters">
                   @for (row of quarterRows(); track row.label) {
