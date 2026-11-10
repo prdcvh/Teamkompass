@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { formatDate } from '../../core/events/event';
 import {
   FRESH_DAYS,
+  MAX_HINT_INTERVAL_DAYS,
   MIN_INTERVAL_DAYS,
   OUTLIER_RATE_CM_PER_YEAR,
   QUALITY_LABELS,
@@ -36,6 +37,7 @@ export class GrowthVelocityCard {
 
   protected readonly minDays = MIN_INTERVAL_DAYS;
   protected readonly outlierRate = OUTLIER_RATE_CM_PER_YEAR;
+  protected readonly maxHintDays = MAX_HINT_INTERVAL_DAYS;
   protected readonly freshDays = FRESH_DAYS;
   protected readonly qualityLabels = QUALITY_LABELS;
   protected readonly statusLabels = STATUS_LABELS;

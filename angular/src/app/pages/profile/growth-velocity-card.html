@@ -45,9 +45,8 @@
             }
           </svg>
           <ul class="legend">
-            <li data-kind="ok"><span class="swatch"></span>zählt für Hinweise</li>
-            <li data-kind="excluded"><span class="swatch"></span>zählt nicht (zu kurz, Ausreißer, markiert)</li>
-            <li data-kind="check"><span class="swatch"></span>Messung prüfen</li>
+            <li data-kind="ok"><span class="swatch"></span>Rate gültig</li>
+            <li data-kind="excluded"><span class="swatch"></span>zählt nicht für Hinweise (Ausreißer, über 365 Tage)</li>
             <li data-kind="gap"><span class="swatch"></span>Messlücke (gestrichelt)</li>
           </ul>
           <p class="muted pad">Die Balken liegen auf einer Zeitachse: Zwischen zwei Messungen wird nichts erfunden, datenlose Zeiträume bleiben leer.</p>
@@ -81,9 +80,11 @@
           </table>
         </div>
         <p class="muted pad">
-          Rate = (Größe neu − Größe alt) / Kalendertage × 365,25. Intervalle unter {{ minDays }} Tagen und Raten über {{ outlierRate }} cm/Jahr
-          gehen nicht in Hinweise ein; ein Hinweis gilt nur, wenn die letzte Messung höchstens {{ freshDays }} Tage zurückliegt.
-          Der Verlauf bleibt immer sichtbar.
+          Rate = (Größe neu − Größe alt) / Kalendertage × 365,25, erst ab {{ minDays }} Tagen Abstand; kürzere Intervalle zeigen nur die Werte.
+          Ein Rückgang ab 0,4 cm heißt „Messung prüfen“ und ergibt nie eine Rate. Für den Hinweis zählt die jüngste gültige Messung
+          (höchstens {{ freshDays }} Tage alt) gegen die jüngste ältere mit {{ minDays }} bis {{ maxHintDays }} Tagen Abstand; Raten über
+          {{ outlierRate }} cm/Jahr gelten als ungeprüfter Ausreißer (eigener Vorschlagswert). Der Verlauf bleibt immer sichtbar.
+          Grundlage: Methodenversion 1.0, Methodendokument §6.
         </p>
       }
     }

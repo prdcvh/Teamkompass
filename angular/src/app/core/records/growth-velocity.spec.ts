@@ -1,4 +1,4 @@
-import { FRESH_DAYS, GAP_DAYS, MIN_INTERVAL_DAYS, OUTLIER_RATE_CM_PER_YEAR, analyzeGrowth, growthRate, growthVelocityChart, rateText } from './growth-velocity';
+import { FRESH_DAYS, GAP_DAYS, OUTLIER_RATE_CM_PER_YEAR, analyzeGrowth, growthRate, growthVelocityChart, rateText } from './growth-velocity';
 
 describe('growth-velocity', () => {
   const m = (id: string, date: string, height: number | null) => ({ id, date, height });
@@ -42,19 +42,56 @@ describe('growth-velocity', () => {
     expect(analyzeGrowth([m('a', '2026-01-01', null), m('b', '2026-04-01', 152)], '2026-04-05').stage).toBe('baseline');
   });
 
-  it('zu kurze Intervalle, negative Differenz und Ausreißer zählen nicht für Hinweise', () => {
-    const short = analyzeGrowth([m('a', '2026-01-01', 150), m('b', `2026-01-${String(MIN_INTERVAL_DAYS)}`, 151)], '2026-02-01');
-    expect(short.intervals[0].days).toBe(MIN_INTERVAL_DAYS - 1);
+  it('89 Tage: keine Rate, 90 Tage: Rate (Methodenversion 1.0 §6)', () => {
+    const short = analyzeGrowth([m('a', '2026-01-01', 150), m('b', '2026-03-31', 152)], '2026-04-05'); // 89 Tage
+    expect(short.intervals[0].days).toBe(89);
     expect(short.intervals[0].status).toBe('too-short');
-    expect(short.intervals[0].rate).not.toBeNull();
+    expect(short.intervals[0].rate).toBeNull();
     expect(short.currentRate).toBeNull();
-    const negative = analyzeGrowth([m('a', '2026-01-01', 152), m('b', '2026-05-01', 150)], '2026-05-02');
-    expect(negative.intervals[0].status).toBe('negative');
-    expect(negative.currentRate).toBeNull();
-    const outlier = analyzeGrowth([m('a', '2026-01-01', 150), m('b', '2026-03-01', 160)], '2026-03-02');
+    expect(growthVelocityChart(short).bars).toHaveLength(0);
+    const ok = analyzeGrowth([m('a', '2026-01-01', 150), m('b', '2026-04-01', 152)], '2026-04-05'); // 90 Tage
+    expect(ok.intervals[0].days).toBe(90);
+    expect(ok.intervals[0].status).toBe('ok');
+    expect(ok.intervals[0].rate).not.toBeNull();
+    expect(ok.currentRate).not.toBeNull();
+  });
+
+  it('Rückgang -0,3 cm: Messrauschen ohne Rate; -0,4 cm: Messung prüfen ohne Rate; nie eine negative Rate', () => {
+    const noise = analyzeGrowth([m('a', '2026-01-01', 150), m('b', '2026-05-01', 149.7)], '2026-05-02');
+    expect(noise.intervals[0].status).toBe('noise');
+    expect(noise.intervals[0].rate).toBeNull();
+    const check = analyzeGrowth([m('a', '2026-01-01', 150), m('b', '2026-05-01', 149.6)], '2026-05-02');
+    expect(check.intervals[0].status).toBe('negative');
+    expect(check.intervals[0].rate).toBeNull();
+    const big = analyzeGrowth([m('a', '2026-01-01', 152), m('b', '2026-05-01', 150)], '2026-05-02');
+    expect(big.intervals[0].status).toBe('negative');
+    expect(big.currentRate).toBeNull();
+  });
+
+  it('365 Tage zählen für Hinweise, 366 Tage zeigen die Rate, zählen aber nicht', () => {
+    const ok = analyzeGrowth([m('a', '2025-01-01', 150), m('b', '2026-01-01', 155)], '2026-01-05'); // 365 Tage
+    expect(ok.intervals[0].days).toBe(365);
+    expect(ok.intervals[0].status).toBe('ok');
+    expect(ok.currentRate).not.toBeNull();
+    const long = analyzeGrowth([m('a', '2024-12-31', 150), m('b', '2026-01-01', 155)], '2026-01-05'); // 366 Tage
+    expect(long.intervals[0].days).toBe(366);
+    expect(long.intervals[0].status).toBe('too-long');
+    expect(long.intervals[0].rate).not.toBeNull();
+    expect(long.currentRate).toBeNull();
+    expect(long.noHintReason).not.toBe('');
+  });
+
+  it('Ausreißer (eigener Vorschlagswert 20 cm/Jahr) zeigt die Rate, zählt aber nicht', () => {
+    const outlier = analyzeGrowth([m('a', '2026-01-01', 150), m('b', '2026-05-01', 157)], '2026-05-02');
     expect((outlier.intervals[0].rate as number) > OUTLIER_RATE_CM_PER_YEAR).toBe(true);
     expect(outlier.intervals[0].status).toBe('outlier');
     expect(outlier.currentRate).toBeNull();
+  });
+
+  it('Vergleichsmessung ist die jüngste ältere Messung mit 90 bis 365 Tagen Abstand, nicht die direkt davor', () => {
+    const analysis = analyzeGrowth([m('a', '2026-01-01', 150), m('b', '2026-03-20', 152), m('c', '2026-04-10', 153)], '2026-04-12');
+    expect(analysis.intervals.map((i) => i.status)).toEqual(['too-short', 'too-short']); // keine Rate je Einzelintervall
+    expect(rateText(analysis.currentRate as number)).toBe(rateText(growthRate(150, 153, 99) as number)); // a -> c, 99 Tage
   });
 
   it('Messlücke wird markiert, der Balken überspannt nur den echten Zeitraum', () => {
@@ -67,22 +104,18 @@ describe('growth-velocity', () => {
     expect(chart.bars[0].width).toBeLessThan(chart.bars[1].width);
   });
 
-  it('Altdaten: kein aktueller Hinweis ohne frische letzte Messung, Verlauf bleibt', () => {
+  it('Datenalter 90 Tage: Hinweis, 91 Tage: kein Hinweis, Verlauf bleibt', () => {
     const data = [m('a', '2025-01-01', 150), m('b', '2025-05-01', 153)];
-    const fresh = analyzeGrowth(data, '2025-05-10');
+    const fresh = analyzeGrowth(data, '2025-07-30'); // 90 Tage alt
+    expect(fresh.dataAgeDays).toBe(90);
     expect(fresh.currentRate).not.toBeNull();
-    const old = analyzeGrowth(data, '2026-05-10');
+    const old = analyzeGrowth(data, '2025-07-31'); // 91 Tage alt
+    expect(old.dataAgeDays).toBe(FRESH_DAYS + 1);
     expect(old.currentRate).toBeNull();
-    expect(old.dataAgeDays).toBeGreaterThan(FRESH_DAYS);
     expect(old.noHintReason).not.toBe('');
     expect(old.intervals).toHaveLength(1);
+    expect(old.intervals[0].rate).not.toBeNull();
     expect(old.lastValidDate).toBe('2025-05-01');
-  });
-
-  it('jüngste Messung in einem ungültigen Intervall: kein aktueller Hinweis', () => {
-    const analysis = analyzeGrowth([m('a', '2026-01-01', 150), m('b', '2026-05-01', 153), m('c', '2026-05-10', 153.5)], '2026-05-12');
-    expect(analysis.lastValidDate).toBe('2026-05-01');
-    expect(analysis.currentRate).toBeNull();
   });
 
   it('Bearbeiten/Löschen rechnet alle Intervalle neu', () => {

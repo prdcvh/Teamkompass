@@ -68,8 +68,7 @@ h2 {
   outline: none;
 }
 
-.chart .bar[data-status='too-short'],
-.chart .bar[data-status='flagged'],
+.chart .bar[data-status='too-long'],
 .chart .bar[data-status='outlier'] {
   fill: var(--tk-muted);
   fill-opacity: 0.45;

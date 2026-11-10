@@ -4,30 +4,34 @@
  * Pro Intervall: (Größe neu − Größe alt) / Kalendertage × 365,25. Es wird nichts interpoliert, nichts geglättet und
  * keine Wachstumsspitze (PHV) aus dem Maximum weniger Messpunkte abgeleitet: Die Ansicht zeigt Messungen und die
  * Intervalle dazwischen, mehr nicht.
+ *
+ * Grenzwerte: Methodenversion 1.0, docs/reife-kompass-methoden.md §6 (SCRUM-251), sofern nicht anders vermerkt.
  */
 import { isIsoDate } from '../shared/dates';
 
 /** Tage pro Jahr für die Umrechnung auf cm/Jahr. */
 export const DAYS_PER_YEAR = 365.25;
 
-/**
- * VORSCHLAGSWERT, noch mit SCRUM-251 (fachliche Grenzwerte) abzugleichen: Intervalle unter 28 Tagen gehen nicht in
- * automatische Verlaufshinweise ein. Begründung: Bei 1 cm Mess- und Ablesefehler wäre die Rate bei 4 Wochen noch
- * ±13 cm/Jahr unsicher; kürzer wird sie praktisch Rauschen.
- */
-export const MIN_INTERVAL_DAYS = 28;
+/** Methodenversion 1.0 §6: Mindestabstand für eine Rate. Kürzere Intervalle zeigen nur die Werte, keine Rate, keinen Hinweis. */
+export const MIN_INTERVAL_DAYS = 90;
+
+/** Methodenversion 1.0 §6: längster Abstand für einen Hinweis. Längere Intervalle zeigen die Rate, zählen aber nicht für Hinweise. */
+export const MAX_HINT_INTERVAL_DAYS = 365;
+
+/** Methodenversion 1.0 §6: Aktualitätsgrenze; die jüngste gültige Größenmessung darf höchstens so alt sein. */
+export const FRESH_DAYS = 90;
+
+/** Methodenversion 1.0 §6: ab einem Rückgang von 0,4 cm "Messung prüfen", keine Rate. */
+export const NEGATIVE_CHECK_CM = 0.4;
 
 /**
- * VORSCHLAGSWERT, noch mit SCRUM-251 abzugleichen: Raten über 20 cm/Jahr gelten als ungeprüfter Ausreißer (auch das
- * stärkste Wachstum im Jugendalter liegt deutlich darunter) und gehen nicht in Hinweise ein.
+ * EIGENER VORSCHLAGSWERT von SCRUM-254, nicht aus SCRUM-251: Raten über 20 cm/Jahr gelten als ungeprüfter Ausreißer
+ * (auch das stärkste Wachstum im Jugendalter liegt deutlich darunter) und gehen nicht in Hinweise ein.
  */
 export const OUTLIER_RATE_CM_PER_YEAR = 20;
 
-/** Ab so vielen Tagen zwischen zwei Messungen gilt das Intervall als Messlücke (nur Darstellung, keine Bewertung). */
+/** Nur Darstellung, eigener Vorschlagswert: ab so vielen Tagen zwischen zwei Messungen gilt das Intervall als Messlücke. */
 export const GAP_DAYS = 240;
-
-/** Ältere letzte Messung als so viele Tage: kein aktueller Hinweis mehr (der Verlauf bleibt sichtbar). */
-export const FRESH_DAYS = 180;
 
 /** Messqualität; Kennzeichen kommen mit SCRUM-253. Bis dahin ist jede vorhandene Messung `undocumented`. */
 export type MeasurementQuality = 'undocumented' | 'verified' | 'flagged';
@@ -54,17 +58,21 @@ export interface GrowthPoint {
 }
 
 export type IntervalStatus =
-  /** Rate zählt für Hinweise. */
+  /** Rate gültig und zählt für Hinweise. */
   | 'ok'
   /** Gleicher Messtag: keine Rate. */
   | 'same-day'
-  /** Kürzer als MIN_INTERVAL_DAYS: Rate wird gezeigt, zählt aber nicht. */
+  /** Kürzer als MIN_INTERVAL_DAYS: keine Rate ("zu kurz für eine Rate"). */
   | 'too-short'
-  /** Größe gesunken: Messung prüfen. */
+  /** Größe um mindestens 0,4 cm gesunken: Messung prüfen, keine Rate. */
   | 'negative'
-  /** Rate über OUTLIER_RATE_CM_PER_YEAR: ungeprüfter Ausreißer. */
+  /** Größe um weniger als 0,4 cm gesunken: Messrauschen, keine Rate (nie eine negative Rate). */
+  | 'noise'
+  /** Rate über OUTLIER_RATE_CM_PER_YEAR: ungeprüfter Ausreißer, Rate sichtbar, zählt nicht. */
   | 'outlier'
-  /** Eine der beiden Messungen ist als auffällig markiert. */
+  /** Länger als MAX_HINT_INTERVAL_DAYS: Rate sichtbar, zählt nicht für Hinweise. */
+  | 'too-long'
+  /** Eine der beiden Messungen ist als auffällig markiert: keine Rate. */
   | 'flagged';
 
 export interface GrowthInterval {
@@ -72,13 +80,11 @@ export interface GrowthInterval {
   readonly to: GrowthPoint;
   readonly days: number;
   readonly diffCm: number;
-  /** cm/Jahr; null bei gleichem Messtag. */
+  /** cm/Jahr; null, wenn keine Rate gezeigt wird (gleicher Tag, zu kurz, gesunken, markiert). Nie negativ. */
   readonly rate: number | null;
   readonly status: IntervalStatus;
   /** Messlücke (>= GAP_DAYS). */
   readonly gap: boolean;
-  /** Geht in automatische Verlaufshinweise ein. */
-  readonly countsForHints: boolean;
 }
 
 export type GrowthStage = 'none' | 'baseline' | 'single-interval' | 'multiple-intervals';
@@ -87,12 +93,12 @@ export interface GrowthAnalysis {
   readonly stage: GrowthStage;
   readonly points: readonly GrowthPoint[];
   readonly intervals: readonly GrowthInterval[];
-  /** Tage seit der letzten Größenmessung; null ohne Messung. */
+  /** Tage seit der jüngsten Größenmessung; null ohne Messung. */
   readonly dataAgeDays: number | null;
   readonly lastMeasurementDate: string | null;
-  /** Ende des letzten Intervalls, das für Hinweise zählt. */
+  /** Jüngste gültige (nicht als auffällig markierte) Größenmessung. */
   readonly lastValidDate: string | null;
-  /** Aktuelle Rate für Hinweise: nur wenn das letzte zählende Intervall bis zur jüngsten Messung reicht und frisch ist. */
+  /** Aktuelle Rate für Hinweise (jüngste gültige Messung gegen die jüngste ältere mit 90 bis 365 Tagen Abstand). */
   readonly currentRate: number | null;
   /** Warum es keinen aktuellen Hinweis gibt (leer, wenn es einen gibt oder keine Messung existiert). */
   readonly noHintReason: string;
@@ -113,22 +119,34 @@ export function rateText(rate: number): string {
   return rate.toFixed(2).replace('.', ',');
 }
 
-function classify(rate: number | null, days: number, diffCm: number, from: GrowthPoint, to: GrowthPoint): IntervalStatus {
-  if (days === 0) return 'same-day';
-  if (from.quality === 'flagged' || to.quality === 'flagged') return 'flagged';
-  if (diffCm < 0) return 'negative';
-  if (days < MIN_INTERVAL_DAYS) return 'too-short';
-  if (rate !== null && rate > OUTLIER_RATE_CM_PER_YEAR) return 'outlier';
-  return 'ok';
+function buildInterval(from: GrowthPoint, to: GrowthPoint): GrowthInterval {
+  const days = daysBetween(from.date, to.date);
+  const diffCm = to.height - from.height;
+  // In Millimetern vergleichen (Gleitkomma): -0,4 cm gilt schon als "prüfen".
+  const diffMm = Math.round(diffCm * 10);
+  const raw = growthRate(from.height, to.height, days);
+  let status: IntervalStatus;
+  if (days === 0) status = 'same-day';
+  else if (from.quality === 'flagged' || to.quality === 'flagged') status = 'flagged';
+  else if (diffMm <= -NEGATIVE_CHECK_CM * 10) status = 'negative';
+  else if (diffMm < 0) status = 'noise';
+  else if (days < MIN_INTERVAL_DAYS) status = 'too-short';
+  else if (raw !== null && raw > OUTLIER_RATE_CM_PER_YEAR) status = 'outlier';
+  else if (days > MAX_HINT_INTERVAL_DAYS) status = 'too-long';
+  else status = 'ok';
+  const showsRate = status === 'ok' || status === 'outlier' || status === 'too-long';
+  return { from, to, days, diffCm, rate: showsRate ? raw : null, status, gap: days >= GAP_DAYS };
 }
 
 export const STATUS_LABELS: Readonly<Record<IntervalStatus, string>> = {
-  ok: 'zählt',
+  ok: 'Rate gültig',
   'same-day': 'gleicher Messtag, keine Rate',
-  'too-short': 'zu kurzer Abstand, zählt nicht',
-  negative: 'Messung prüfen (Größe gesunken)',
-  outlier: 'Ausreißer, ungeprüft',
-  flagged: 'Messung auffällig markiert',
+  'too-short': 'zu kurz für eine Rate',
+  negative: 'Messung prüfen (Größe gesunken), keine Rate',
+  noise: 'kleiner Rückgang, Messrauschen, keine Rate',
+  outlier: 'Ausreißer, ungeprüft, zählt nicht für Hinweise',
+  'too-long': 'Abstand über 365 Tage, zählt nicht für Hinweise',
+  flagged: 'Messung auffällig markiert, keine Rate',
 };
 
 /** Alle Größenmessungen (beliebige Reihenfolge, auch ungeordnet erfasst) → Punkte, Intervalle und Hinweislage. */
@@ -139,29 +157,35 @@ export function analyzeGrowth(measurements: readonly GrowthMeasurement[], today:
     .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
 
   const intervals: GrowthInterval[] = [];
-  for (let index = 1; index < points.length; index++) {
-    const from = points[index - 1];
-    const to = points[index];
-    const days = daysBetween(from.date, to.date);
-    const diffCm = to.height - from.height;
-    const rate = growthRate(from.height, to.height, days);
-    const status = classify(rate, days, diffCm, from, to);
-    intervals.push({ from, to, days, diffCm, rate, status, gap: days >= GAP_DAYS, countsForHints: status === 'ok' });
-  }
+  for (let index = 1; index < points.length; index++) intervals.push(buildInterval(points[index - 1], points[index]));
 
   const stage: GrowthStage =
     points.length === 0 ? 'none' : points.length === 1 ? 'baseline' : points.length === 2 ? 'single-interval' : 'multiple-intervals';
   const last = points[points.length - 1] ?? null;
   const dataAgeDays = last ? Math.max(0, daysBetween(last.date, today)) : null;
-  const lastValid = [...intervals].reverse().find((interval) => interval.countsForHints) ?? null;
+  const validPoints = points.filter((point) => point.quality !== 'flagged');
+  const newest = validPoints[validPoints.length - 1] ?? null;
+  const newestAge = newest ? Math.max(0, daysBetween(newest.date, today)) : null;
 
   let currentRate: number | null = null;
   let noHintReason = '';
   if (last) {
-    if (!lastValid) noHintReason = stage === 'baseline' ? 'Erst eine Messung: Ausgangswert, noch keine Rate.' : 'Kein Intervall erfüllt die Bedingungen für einen Hinweis.';
-    else if (lastValid.to.id !== last.id) noHintReason = 'Die jüngste Messung geht nicht in einen gültigen Hinweis ein (siehe Tabelle).';
-    else if ((dataAgeDays ?? 0) > FRESH_DAYS) noHintReason = `Letzte Messung ${dataAgeDays} Tage alt: kein aktueller Hinweis, der Verlauf bleibt sichtbar.`;
-    else currentRate = lastValid.rate;
+    if (!newest) noHintReason = 'Alle Messungen sind als auffällig markiert: kein Hinweis.';
+    else if (validPoints.length < 2) noHintReason = 'Erst eine Messung: Ausgangswert, noch keine Rate.';
+    else if ((newestAge ?? 0) > FRESH_DAYS) noHintReason = `Letzte gültige Messung ${newestAge} Tage alt (mehr als ${FRESH_DAYS}): kein aktueller Hinweis, der Verlauf bleibt sichtbar.`;
+    else {
+      // Vergleichsmessung: die jüngste ältere Messung mit 90 bis 365 Tagen Abstand (nicht unbedingt die direkt davor).
+      const partner = [...validPoints].reverse().find((point) => {
+        const days = daysBetween(point.date, newest.date);
+        return days >= MIN_INTERVAL_DAYS && days <= MAX_HINT_INTERVAL_DAYS;
+      });
+      if (!partner) noHintReason = `Keine ältere Messung mit ${MIN_INTERVAL_DAYS} bis ${MAX_HINT_INTERVAL_DAYS} Tagen Abstand: zu kurz oder zu lang für eine Rate.`;
+      else {
+        const pair = buildInterval(partner, newest);
+        if (pair.status === 'ok') currentRate = pair.rate;
+        else noHintReason = `Die Messungen vom ${partner.date} und ${newest.date} ergeben keine gültige Rate: ${STATUS_LABELS[pair.status]}.`;
+      }
+    }
   }
 
   return {
@@ -170,7 +194,7 @@ export function analyzeGrowth(measurements: readonly GrowthMeasurement[], today:
     intervals,
     dataAgeDays,
     lastMeasurementDate: last?.date ?? null,
-    lastValidDate: lastValid?.to.date ?? null,
+    lastValidDate: newest?.date ?? null,
     currentRate,
     noHintReason,
   };
