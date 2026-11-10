@@ -65,14 +65,39 @@
       <div class="layout">
         <tk-card>
           <div class="panel">
-            <div class="pitch" role="group" aria-label="Spielfeld">
+            @if (dropMessage()) {
+              <p class="error" role="alert" data-testid="drop-message">{{ dropMessage() }}</p>
+            }
+            @if (lineup.canEdit()) {
+              <p class="muted hint">Tippe auf eine Position oder einen Spieler – oder zieh Spieler zwischen Bank und Feld hin und her.</p>
+            }
+            <div class="pitch" role="group" aria-label="Spielfeld" [class.dragging]="drag.ghost() !== null">
               @for (zone of board(); track zone.zone) {
-                <div class="zone" [class.empty]="zone.chips.length === 0" [style.left.%]="zone.x" [style.top.%]="zone.y" [style.width.%]="zone.width">
+                <div
+                  class="zone"
+                  [class.empty]="zone.chips.length === 0"
+                  [class.over]="drag.over() === 'zone:' + zone.zone"
+                  [attr.data-drop]="'zone:' + zone.zone"
+                  [style.left.%]="zone.x"
+                  [style.top.%]="zone.y"
+                  [style.width.%]="zone.width"
+                >
                   @if (zone.chips.length === 0) {
                     <button type="button" class="slot" (click)="openZone(zone.zone, null)" [attr.aria-label]="'Position ' + zone.zone + ' besetzen'">{{ zone.zone }}</button>
                   }
                   @for (chip of zone.chips; track chip.player.id) {
-                    <button type="button" class="chip" [class.off]="chip.off" (click)="openZone(zone.zone, chip.player.id)" [attr.aria-label]="chip.player.name + ', ' + zone.zone + (chip.off ? ', nicht auf eigener Position' : '') + ', ändern'">
+                    <button
+                      type="button"
+                      class="chip"
+                      [class.off]="chip.off"
+                      [class.drag-source]="drag.ghost()?.playerId === chip.player.id"
+                      [class.over]="drag.over() === 'player:' + zone.zone + ':' + chip.player.id"
+                      [attr.data-drop]="'player:' + zone.zone + ':' + chip.player.id"
+                      [attr.data-draggable]="lineup.canEdit() ? 'true' : null"
+                      (pointerdown)="drag.start($event, chip.player.id, chip.player.number + ' ' + chip.player.name.split(' ')[0], true, lineup.canEdit())"
+                      (click)="openZone(zone.zone, chip.player.id)"
+                      [attr.aria-label]="chip.player.name + ', ' + zone.zone + (chip.off ? ', nicht auf eigener Position' : '') + ', ändern'"
+                    >
                       <em>{{ zone.zone }}</em>
                       <strong>{{ chip.player.number }} {{ chip.player.name.split(' ')[0] }}</strong>
                       <span>Note {{ gradeLabel(chip.grade) }}</span>
@@ -133,7 +158,7 @@
           </tk-card>
 
           <tk-card>
-            <div class="panel">
+            <div class="panel bench-panel" data-drop="bench" [class.over]="drag.over() === 'bench'" [class.dragging]="drag.ghost()?.fromPitch">
               <h2>Bank <span class="count">{{ bench().length ? bench().length + ' Spieler' : 'leer' }}</span></h2>
               @if (bench().length === 0) {
                 <p class="muted">Alle Spieler stehen auf dem Feld.</p>
@@ -141,7 +166,16 @@
                 <ul class="bench">
                   @for (entry of bench(); track entry.player.id) {
                     <li>
-                      <button type="button" (click)="openBench(entry.player.id)" [attr.aria-label]="entry.player.name + ' aufstellen'">
+                      <button
+                        type="button"
+                        [class.drag-source]="drag.ghost()?.playerId === entry.player.id"
+                        (pointerdown)="drag.start($event, entry.player.id, entry.player.number + ' ' + entry.player.name, false, lineup.canEdit())"
+                        (click)="openBench(entry.player.id)"
+                        [attr.aria-label]="entry.player.name + ' aufstellen'"
+                      >
+                        @if (lineup.canEdit()) {
+                          <span class="grip" aria-hidden="true" title="Zum Ziehen hier festhalten">⠿</span>
+                        }
                         <span class="number">{{ entry.player.number }}</span>
                         <span class="who"><strong>{{ entry.player.name }}</strong><small>{{ positionText(entry.player) }}@if (entry.status !== 'Fit') { · {{ entry.status }} }</small></span>
                         <span class="grade">{{ gradeLabel(entry.grade) }}</span>
@@ -154,6 +188,13 @@
           </tk-card>
         </div>
       </div>
+
+      @if (drag.ghost(); as ghost) {
+        @if (ghost.fromPitch) {
+          <div class="remove-drop" data-drop="bench" data-testid="remove-drop" [class.over]="drag.over() === 'bench'">Hier loslassen: vom Feld nehmen</div>
+        }
+        <div class="ghost" aria-hidden="true" [style.left.px]="ghost.x" [style.top.px]="ghost.y">{{ ghost.label }}</div>
+      }
     }
   }
 </section>

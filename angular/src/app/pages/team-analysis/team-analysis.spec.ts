@@ -104,6 +104,14 @@ describe('TeamAnalysis (Teamanalyse)', () => {
     expect(root(fixture).querySelector('.insights [style]')).toBeNull();
   });
 
+  it('legt die Teamform-Kurve über die volle Breite und füllt das Kennzahlen-Raster lückenlos (SCRUM-287)', async () => {
+    const fixture = await render();
+    await ready(fixture);
+    expect(root(fixture).querySelector('.columns.stack .chart')).not.toBeNull();
+    const spans: number[] = [...root(fixture).querySelectorAll('.insights .insight')].map((b) => (b.classList.contains('s2') ? 2 : b.classList.contains('s3') ? 3 : 0));
+    expect(spans.reduce((a, b) => a + b, 0)).toBe(12);
+  });
+
   it('formatiert Bilanz und Torverhältnis', () => {
     expect(formatRecord({ wins: 2, draws: 1, losses: 0 })).toBe('2 S · 1 U · 0 N');
     expect(formatGoals({ goalsFor: 0, goalsAgainst: 0 })).toBe('0:0');
