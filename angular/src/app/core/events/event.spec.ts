@@ -14,7 +14,7 @@ import {
   sortEvents,
   validateDraft,
 } from './event';
-import { endOfWeek, groupByMonth, monthLabel, sectionEvents } from './event-sections';
+import { endOfWeek, startOfWeek, groupByMonth, monthLabel, sectionEvents } from './event-sections';
 
 describe('event (Logik)', () => {
   const draft = (overrides: Partial<EventDraft> = {}): EventDraft => ({ ...emptyDraft('2026-10-06'), title: 'Training Dienstag', ...overrides });
@@ -243,11 +243,24 @@ describe('event (Logik)', () => {
       event({ id: 'far', date: '2027-02-01' }),
     ];
 
-    it('heute zählt zu Diese Woche, frühere Tage der Woche sind vergangen, Sonntag/Montag-Grenze', () => {
-      const sections = sectionEvents(list, 'chronological', '2026-10-07');
-      expect(ids(sections.past)).toEqual(['yesterday', 'past1', 'past2']);
-      expect(ids(sections.week)).toEqual(['today', 'sun']);
+    it('Mittwoch: Events der ganzen Woche (auch Montag/Dienstag) bleiben unter Diese Woche, Vorwoche ist vergangen', () => {
+      const sections = sectionEvents([...list, event({ id: 'monday', date: '2026-10-05' })], 'chronological', '2026-10-07');
+      expect(ids(sections.past)).toEqual(['past1', 'past2']);
+      expect(ids(sections.week)).toEqual(['monday', 'yesterday', 'today', 'sun']);
       expect(ids(sections.later)).toEqual(['mon', 'far']);
+    });
+
+    it('Montag der Folgewoche: die Events der Vorwoche sind vergangen', () => {
+      const sections = sectionEvents(list, 'chronological', '2026-10-12');
+      expect(ids(sections.past)).toEqual(['sun', 'today', 'yesterday', 'past1', 'past2']);
+      expect(ids(sections.week)).toEqual(['mon']);
+      expect(ids(sections.later)).toEqual(['far']);
+    });
+
+    it('startOfWeek: Montag der Mo-So-Woche, auch über den Jahreswechsel', () => {
+      expect(startOfWeek('2026-10-05')).toBe('2026-10-05');
+      expect(startOfWeek('2026-10-11')).toBe('2026-10-05');
+      expect(startOfWeek('2027-01-03')).toBe('2026-12-28');
     });
 
     it('Montag früh: die ganze Woche liegt noch vor uns, der Sonntag davor ist vergangen', () => {
@@ -256,17 +269,18 @@ describe('event (Logik)', () => {
       expect(ids(sections.week)).toEqual(['yesterday', 'today', 'sun']);
     });
 
-    it('Sonntag: nur dieser Tag ist Diese Woche, der Montag danach Später', () => {
+    it('Sonntag: die ganze Woche ist sichtbar, der Montag danach Später', () => {
       const sections = sectionEvents(list, 'chronological', '2026-10-11');
-      expect(ids(sections.week)).toEqual(['sun']);
+      expect(ids(sections.past)).toEqual(['past1', 'past2']);
+      expect(ids(sections.week)).toEqual(['yesterday', 'today', 'sun']);
       expect(ids(sections.later)).toEqual(['mon', 'far']);
     });
 
     it('Jahreswechsel: Woche reicht über den 1. Januar', () => {
       const events = [event({ id: 'a', date: '2026-12-31' }), event({ id: 'b', date: '2027-01-03' }), event({ id: 'c', date: '2027-01-04' }), event({ id: 'd', date: '2026-12-30' })];
       const sections = sectionEvents(events, 'chronological', '2026-12-31');
-      expect(ids(sections.past)).toEqual(['d']);
-      expect(ids(sections.week)).toEqual(['a', 'b']);
+      expect(ids(sections.past)).toEqual([]);
+      expect(ids(sections.week)).toEqual(['d', 'a', 'b']);
       expect(ids(sections.later)).toEqual(['c']);
     });
 
@@ -288,12 +302,12 @@ describe('event (Logik)', () => {
 
     it('Neueste zuerst und Älteste zuerst wirken innerhalb jedes Bereichs', () => {
       const newest = sectionEvents(list, 'date-desc', '2026-10-07');
-      expect(ids(newest.past)).toEqual(['yesterday', 'past1', 'past2']);
-      expect(ids(newest.week)).toEqual(['sun', 'today']);
+      expect(ids(newest.past)).toEqual(['past1', 'past2']);
+      expect(ids(newest.week)).toEqual(['sun', 'today', 'yesterday']);
       expect(ids(newest.later)).toEqual(['far', 'mon']);
       const oldest = sectionEvents(list, 'date-asc', '2026-10-07');
-      expect(ids(oldest.past)).toEqual(['past2', 'past1', 'yesterday']);
-      expect(ids(oldest.week)).toEqual(['today', 'sun']);
+      expect(ids(oldest.past)).toEqual(['past2', 'past1']);
+      expect(ids(oldest.week)).toEqual(['yesterday', 'today', 'sun']);
       expect(ids(oldest.later)).toEqual(['mon', 'far']);
     });
   });

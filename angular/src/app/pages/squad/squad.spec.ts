@@ -1,6 +1,6 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { LayoutService } from '../../core/shell/layout.service';
 import { SessionService } from '../../core/auth/session.service';
 import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
@@ -50,6 +50,7 @@ describe('Squad (Kader-Seite)', () => {
       expect(text(qa(fixture, 'tbody tr')[0])).toContain('TW');
       const counts = qa(fixture, '.metrics .count').map(text);
       expect(counts).toEqual(['2', '0', '1', '0']);
+      expect(qa<HTMLAnchorElement>(fixture, 'tbody a.name-link').map((a) => a.getAttribute('href'))).toEqual(['/profile/p1', '/profile/p2', '/profile/p3']);
       expect(text(q(fixture, '.meta'))).toBe('3 Spieler');
       expect(q(fixture, '.sync')?.getAttribute('data-state')).toBe('saved');
     });
@@ -220,10 +221,21 @@ describe('Squad (Kader-Seite)', () => {
       expect(q(fixture, 'button.fab')?.getAttribute('aria-label')).toBe('Spieler anlegen');
     });
 
-    it('öffnet per Tipp auf die Karte den Dialog mit Status als Auswahlleiste', async () => {
+    it('öffnet per Tipp auf die Karte das Spielerprofil, ohne den Bearbeiten-Dialog', async () => {
       const fixture = await render('trainer', true);
-      qa<HTMLButtonElement>(fixture, '.player-card')[2].click();
+      const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+      const card = qa<HTMLAnchorElement>(fixture, 'a.player-card')[2];
+      card.click();
+      expect(card.getAttribute('href')).toBe('/profile/p3');
+      expect(navigate.mock.calls.map((call) => String(call[0]))).toEqual(['/profile/p3']);
+    });
+
+    it('Bearbeiten-Knopf öffnet den Dialog mit Status als Auswahlleiste und navigiert nicht', async () => {
+      const fixture = await render('trainer', true);
+      const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+      qa<HTMLButtonElement>(fixture, '.cards .edit-btn')[2].click();
       fixture.detectChanges();
+      expect(navigate).not.toHaveBeenCalled();
       expect(q<HTMLInputElement>(fixture, 'input[name="name"]')!.value).toBe('Jan Braun');
       const radios = qa<HTMLButtonElement>(fixture, '[role="radio"]');
       expect(radios.map(text)).toEqual(['Fit', 'Angeschlagen', 'Verletzt', 'Pause']);
@@ -236,7 +248,7 @@ describe('Squad (Kader-Seite)', () => {
 
     it('bedient die Status-Auswahl per Pfeiltasten (nur der gewählte Eintrag ist per Tab erreichbar)', async () => {
       const fixture = await render('trainer', true);
-      qa<HTMLButtonElement>(fixture, '.player-card')[0].click();
+      qa<HTMLButtonElement>(fixture, '.cards .edit-btn')[0].click();
       fixture.detectChanges();
       const radios = () => qa<HTMLButtonElement>(fixture, '[role="radio"]');
       expect(radios().map((r) => r.getAttribute('tabindex'))).toEqual(['0', '-1', '-1', '-1']);
@@ -311,7 +323,7 @@ describe('Squad (Kader-Seite)', () => {
       for (const selector of ['button.fab', '.access-card', 'tk-player-dialog', 'tbody tr button', '.head button']) {
         expect(q(fixture, selector), selector).toBeNull();
       }
-      if (mobile) expect(qa<HTMLButtonElement>(fixture, '.player-card').every((card) => card.disabled)).toBe(true);
+      if (mobile) expect(q(fixture, '.cards .edit-btn')).toBeNull(); // Profil-Link bleibt, Bearbeiten fehlt
       expect(qa(fixture, 'a').filter((a) => a.getAttribute('href') === '/zugaenge')).toHaveLength(0);
     });
   });
