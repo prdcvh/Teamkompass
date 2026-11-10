@@ -128,6 +128,20 @@ describe('risk (Belastungsampel)', () => {
     expect(run('2026-08-01', '2026-09-01').tier).toBe('anpassen');
   });
 
+  it('Messung nur mit Gewicht zählt nicht als 0 cm Größe (SCRUM-302)', () => {
+    const weightOnly = (id: string, date: string): Measurement => ({ id, date, height: null, weight: 40 });
+    // Nur Gewicht, dann Größe: keine zwei Größenmessungen → kein Wachstumshinweis (vorher „150 cm/Monat“).
+    const single = risk([], player(), [], [weightOnly('m1', '2026-09-01'), measurement('m2', '2026-10-01', 150)]);
+    expect(single.tier).toBe('unauffaellig');
+    expect(single.reasons).toEqual([]);
+    // Gewicht-only zwischen zwei Größenmessungen verdrängt die ältere Größenmessung nicht: 150 → 151,3 in einem Monat.
+    const between = risk([], player(), [], [measurement('m1', '2026-09-01', 150), weightOnly('m2', '2026-09-15'), measurement('m3', '2026-10-01', 151.3)]);
+    expect(between.reasons).toEqual(['Starker Wachstumsschub (1,3 cm/Monat)']);
+    // Gewicht-only als jüngste Messung: die letzten beiden Größenmessungen zählen (kein Sprung auf 0 cm).
+    const after = risk([], player(), [], [measurement('m1', '2026-09-01', 150), measurement('m2', '2026-10-01', 150.2), weightOnly('m3', '2026-10-10')]);
+    expect(after.tier).toBe('unauffaellig');
+  });
+
   it('Intensität 1/2/3 wird als Anstrengung 3/5/7 gelesen und fließt so in die Belastung ein', () => {
     expect([1, 2, 3].map(exertionFromLegacyIntensity)).toEqual([3, 5, 7]);
     const event = entry(2).event;
