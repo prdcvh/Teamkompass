@@ -10,8 +10,34 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon-180.png">
   <meta name="theme-color" content="#d8072e">
+
+  <!-- Start-Animation (SCRUM-283): Markup steht direkt hier, die kleine Stil-Datei wird vor dem App-Code geladen, damit sie sofort sichtbar ist. -->
+  <link rel="stylesheet" href="splash.css">
 </head>
 <body>
+  <div id="tk-splash" role="status" aria-live="polite" aria-label="TeamKompass wird geladen">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" aria-hidden="true" focusable="false">
+      <rect width="512" height="512" rx="112" fill="#d8072e"/>
+      <circle cx="256" cy="256" r="168" fill="none" stroke="#fff" stroke-width="28"/>
+      <g fill="#fff">
+        <rect x="244" y="62" width="24" height="44" rx="8"/>
+        <rect x="244" y="406" width="24" height="44" rx="8"/>
+        <rect x="62" y="244" width="44" height="24" rx="8"/>
+        <rect x="406" y="244" width="44" height="24" rx="8"/>
+      </g>
+      <g transform="rotate(35 256 256)">
+        <g class="tk-needle">
+          <path d="M256 118 L300 256 L212 256 Z" fill="#fff"/>
+          <path d="M256 394 L300 256 L212 256 Z" fill="#7a0418"/>
+        </g>
+      </g>
+      <circle cx="256" cy="256" r="26" fill="#fff"/>
+      <circle cx="256" cy="256" r="11" fill="#d8072e"/>
+    </svg>
+    <p class="tk-title">Willkommen bei TeamKompass</p>
+    <p class="tk-hint" id="tk-splash-hint"></p>
+  </div>
+  <script src="splash.js"></script>
   <app-root></app-root>
 </body>
 </html>
