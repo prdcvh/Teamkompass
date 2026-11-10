@@ -235,12 +235,18 @@ export function growthVelocityChart(analysis: GrowthAnalysis): GrowthVelocityCha
       title: `${interval.from.date} bis ${interval.to.date}: ${rateText(rate)} cm/Jahr (${interval.days} Tage, ${STATUS_LABELS[interval.status]}${interval.gap ? ', Messlücke' : ''})`,
     };
   });
+  // Beschriftungen, die sich überlappen würden, entfallen (die Tabelle nennt alle Tage).
+  const ticks: { x: number; text: string }[] = [];
+  for (const point of analysis.points) {
+    const tick = { x: x(point.date), text: point.date.slice(0, 7) };
+    if (ticks.length === 0 || tick.x - ticks[ticks.length - 1].x >= 60) ticks.push(tick);
+  }
   return {
     width: C_WIDTH,
     height: C_HEIGHT,
     zeroY,
     bars,
-    ticks: analysis.points.map((point) => ({ x: x(point.date), text: point.date.slice(0, 7) })),
+    ticks,
     summary: bars.map((bar) => bar.title).join('; '),
   };
 }

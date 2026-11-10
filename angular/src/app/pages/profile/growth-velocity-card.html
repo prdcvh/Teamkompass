@@ -53,7 +53,7 @@
           <p class="muted pad">Die Balken liegen auf einer Zeitachse: Zwischen zwei Messungen wird nichts erfunden, datenlose Zeiträume bleiben leer.</p>
         }
 
-        <div class="table-wrap" tabindex="0" role="region" aria-label="Messintervalle mit Wachstumsgeschwindigkeit">
+        <div class="table-wrap">
           <table>
             <caption class="sr-only">Messintervalle, jüngstes zuerst</caption>
             <thead>
@@ -69,12 +69,12 @@
             <tbody>
               @for (row of rows(); track row.to.id + row.from.id) {
                 <tr [attr.data-status]="row.status">
-                  <td>{{ formatDate(row.from.date) }} – {{ formatDate(row.to.date) }}</td>
-                  <td>{{ row.days }}@if (row.gap) { <span class="pill">Lücke</span> }</td>
-                  <td>{{ num(row.from.height) }} → {{ num(row.to.height) }}</td>
-                  <td>{{ row.rate === null ? '–' : rateText(row.rate) }}</td>
-                  <td>{{ statusLabels[row.status] }}</td>
-                  <td>{{ qualityLabels[row.from.quality] }}@if (row.to.quality !== row.from.quality) { / {{ qualityLabels[row.to.quality] }} }</td>
+                  <td data-label="Von – bis">{{ formatDate(row.from.date) }} – {{ formatDate(row.to.date) }}</td>
+                  <td data-label="Tage">{{ row.days }}@if (row.gap) { <span class="pill">Lücke</span> }</td>
+                  <td data-label="Größe (cm)">{{ num(row.from.height) }} → {{ num(row.to.height) }}</td>
+                  <td data-label="cm/Jahr">{{ row.rate === null ? '–' : rateText(row.rate) }}</td>
+                  <td data-label="Einordnung">{{ statusLabels[row.status] }}</td>
+                  <td data-label="Messqualität">{{ qualityLabels[row.from.quality] }}@if (row.to.quality !== row.from.quality) { / {{ qualityLabels[row.to.quality] }} }</td>
                 </tr>
               }
             </tbody>

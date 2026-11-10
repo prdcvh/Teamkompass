@@ -1,5 +1,11 @@
 :host {
   display: block;
+  min-width: 0;
+}
+
+.block,
+tk-card {
+  min-width: 0;
 }
 
 .block {
@@ -124,9 +130,6 @@ h2 {
   border: 2px dashed var(--tk-chart-1);
 }
 
-.table-wrap {
-  overflow-x: auto;
-}
 
 table {
   width: 100%;
@@ -163,4 +166,48 @@ tr[data-status='negative'] td {
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
+}
+
+/* Schmal: jede Zeile wird zur Karte mit Beschriftung, damit nichts seitlich scrollt. */
+@media (max-width: 860px) {
+  thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  table,
+  tbody,
+  tr,
+  td {
+    display: block;
+  }
+
+  tr {
+    padding: var(--tk-space-2) 0;
+    border-top: 1px solid var(--tk-line);
+  }
+
+  td {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--tk-space-3);
+    padding: 2px var(--tk-space-1);
+    border-top: 0;
+    text-align: right;
+  }
+
+  td::before {
+    content: attr(data-label);
+    flex: none;
+    color: var(--tk-muted);
+    font-weight: 600;
+    text-align: left;
+  }
+
+  td:first-child {
+    white-space: normal;
+  }
 }
