@@ -1,0 +1,92 @@
+<section class="block" aria-labelledby="growth-title">
+  <h2 id="growth-title">Wachstumsgeschwindigkeit</h2>
+  <tk-card>
+    @switch (analysis().stage) {
+      @case ('none') {
+        <p class="muted pad">Noch keine Größenmessung. Ab zwei Messungen an verschiedenen Tagen lässt sich eine Wachstumsgeschwindigkeit berechnen.</p>
+      }
+      @case ('baseline') {
+        <p class="pad" role="status">
+          <span class="pill">Ausgangswert</span>
+          {{ num(analysis().points[0].height) }} cm am {{ formatDate(analysis().points[0].date) }}.
+          <span class="muted">Eine einzelne Messung ergibt noch keine Rate; ab der zweiten Messung wird das Intervall berechnet.</span>
+        </p>
+      }
+      @default {
+        @if (analysis().stage === 'single-interval') {
+          <p class="muted pad">Zwei Messungen ergeben genau eine Intervallrate. Daraus lässt sich keine Wachstumsspitze ableiten.</p>
+        }
+        <dl class="facts">
+          <div><dt>Letzte Größenmessung</dt><dd>{{ formatDate(analysis().lastMeasurementDate ?? '') }} (vor {{ analysis().dataAgeDays }} Tagen)</dd></div>
+          <div><dt>Letzter gültiger Messtag</dt><dd>{{ analysis().lastValidDate ? formatDate(analysis().lastValidDate ?? '') : 'keiner' }}</dd></div>
+          <div>
+            <dt>Aktueller Hinweis</dt>
+            <dd>
+              @if (analysis().currentRate !== null) {
+                {{ rateText(analysis().currentRate ?? 0) }} cm/Jahr
+              } @else {
+                keiner
+              }
+            </dd>
+          </div>
+        </dl>
+        @if (analysis().currentRate === null && analysis().noHintReason) {
+          <p class="muted pad" role="status">{{ analysis().noHintReason }}</p>
+        }
+
+        @if (chart().bars.length > 0) {
+          <svg class="chart" [attr.viewBox]="'0 0 ' + chart().width + ' ' + chart().height" role="img" [attr.aria-label]="'Wachstumsgeschwindigkeit je Messintervall in cm pro Jahr: ' + chart().summary">
+            <line class="grid" x1="0" [attr.x2]="chart().width" [attr.y1]="chart().zeroY" [attr.y2]="chart().zeroY" />
+            @for (bar of chart().bars; track $index) {
+              <rect class="bar" [attr.data-status]="bar.status" [attr.data-gap]="bar.gap" [attr.x]="bar.x" [attr.y]="bar.y" [attr.width]="bar.width" [attr.height]="bar.height" tabindex="0" [attr.aria-label]="bar.title"><title>{{ bar.title }}</title></rect>
+            }
+            @for (tick of chart().ticks; track $index) {
+              <text [attr.x]="tick.x" [attr.y]="chart().height - 12" class="axis small" text-anchor="middle">{{ tick.text }}</text>
+            }
+          </svg>
+          <ul class="legend">
+            <li data-kind="ok"><span class="swatch"></span>Rate gültig</li>
+            <li data-kind="excluded"><span class="swatch"></span>zählt nicht für Hinweise (Ausreißer, über 365 Tage)</li>
+            <li data-kind="gap"><span class="swatch"></span>Messlücke (gestrichelt)</li>
+          </ul>
+          <p class="muted pad">Die Balken liegen auf einer Zeitachse: Zwischen zwei Messungen wird nichts erfunden, datenlose Zeiträume bleiben leer.</p>
+        }
+
+        <div class="table-wrap">
+          <table>
+            <caption class="sr-only">Messintervalle, jüngstes zuerst</caption>
+            <thead>
+              <tr>
+                <th scope="col">Von – bis</th>
+                <th scope="col">Tage</th>
+                <th scope="col">Größe (cm)</th>
+                <th scope="col">cm/Jahr</th>
+                <th scope="col">Einordnung</th>
+                <th scope="col">Messqualität</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of rows(); track row.to.id + row.from.id) {
+                <tr [attr.data-status]="row.status">
+                  <td data-label="Von – bis">{{ formatDate(row.from.date) }} – {{ formatDate(row.to.date) }}</td>
+                  <td data-label="Tage">{{ row.days }}@if (row.gap) { <span class="pill">Lücke</span> }</td>
+                  <td data-label="Größe (cm)">{{ num(row.from.height) }} → {{ num(row.to.height) }}</td>
+                  <td data-label="cm/Jahr">{{ row.rate === null ? '–' : rateText(row.rate) }}</td>
+                  <td data-label="Einordnung">{{ statusLabels[row.status] }}</td>
+                  <td data-label="Messqualität">{{ qualityLabels[row.from.quality] }}@if (row.to.quality !== row.from.quality) { / {{ qualityLabels[row.to.quality] }} }</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <p class="muted pad">
+          Rate = (Größe neu − Größe alt) / Kalendertage × 365,25, erst ab {{ minDays }} Tagen Abstand; kürzere Intervalle zeigen nur die Werte.
+          Ein Rückgang ab 0,4 cm heißt „Messung prüfen“ und ergibt nie eine Rate. Für den Hinweis zählt die jüngste gültige Messung
+          (höchstens {{ freshDays }} Tage alt) gegen die jüngste ältere mit {{ minDays }} bis {{ maxHintDays }} Tagen Abstand; Raten über
+          {{ outlierRate }} cm/Jahr gelten als ungeprüfter Ausreißer (eigener Vorschlagswert). Der Verlauf bleibt immer sichtbar.
+          Grundlage: Methodenversion 1.0, Methodendokument §6.
+        </p>
+      }
+    }
+  </tk-card>
+</section>

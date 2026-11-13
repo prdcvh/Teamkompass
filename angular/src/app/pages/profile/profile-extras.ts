@@ -17,6 +17,7 @@ import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 import { Dialog } from '../../ui/dialog/dialog';
 import { AbsenceDialog } from './absence-dialog';
+import { GrowthVelocityCard } from './growth-velocity-card';
 import { MaturityCard } from './maturity-card';
 import { MeasurementDialog } from './measurement-dialog';
 import { PlanDialog } from './plan-dialog';
@@ -31,7 +32,7 @@ interface Deleting {
 /** Zusatzdaten im Profil: Förderpläne, Abwesenheiten/Verletzungen, Messwerte (mit Verlaufsdiagramm) und Reife-Kompass. */
 @Component({
   selector: 'tk-profile-extras',
-  imports: [FormsModule, Button, Card, Dialog, PlanDialog, AbsenceDialog, MeasurementDialog, MaturityCard],
+  imports: [FormsModule, Button, Card, Dialog, PlanDialog, AbsenceDialog, MeasurementDialog, MaturityCard, GrowthVelocityCard],
   templateUrl: './profile-extras.html',
   styleUrls: ['./profile-extras.css', '../../ui/chart/chart.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
