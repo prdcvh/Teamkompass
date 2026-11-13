@@ -5,7 +5,7 @@ import { SyncService } from '../shell/sync.service';
 import type { FakeFirebase } from '../testing/fake-firebase';
 import { setupRecords } from '../testing/records-setup';
 import { emptyAbsenceDraft } from './absence';
-import { emptyMeasurementDraft } from './measurement';
+import { emptyMeasurementDraft } from './measurement-draft';
 import { emptyPlanDraft } from './plan';
 
 describe('RecordsStateService', () => {
@@ -32,7 +32,7 @@ describe('RecordsStateService', () => {
     expect(state.canWrite()).toBe(false);
     expect(plans.savePlan({ ...emptyPlanDraft(), focus: 'a', goal: 'b' }).focus).toContain('Nur Trainer');
     expect(absences.saveAbsence(absenceDraft()).reason).toContain('Nur Trainer');
-    expect(measurements.saveMeasurement({ ...emptyMeasurementDraft('2026-10-10'), height: '150' }).date).toContain('Nur Trainer');
+    expect(measurements.saveMeasurement({ ...emptyMeasurementDraft('2026-10-10', '17:00'), height: ['150', '150', ''] }).date).toContain('Nur Trainer');
     expect(await plans.deletePlan('dp1')).toBe(false);
     expect(await absences.deleteAbsence('ab1')).toBe(false);
     expect(await measurements.deleteMeasurement('me1')).toBe(false);

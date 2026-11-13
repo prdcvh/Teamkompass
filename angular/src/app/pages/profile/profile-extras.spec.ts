@@ -91,11 +91,75 @@ describe('Profile: Zusatzdaten', () => {
     const dialog = q<HTMLElement>(fixture, 'tk-measurement-dialog')!;
     (dialog.querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit'));
     await settle(fixture);
-    expect(text(dialog.querySelector('#err-height'))).toContain('Größe oder Gewicht');
-    typeInto(dialog.querySelector<HTMLInputElement>('input[name="height"]')!, '160,5');
-    typeInto(dialog.querySelector<HTMLInputElement>('input[name="weight"]')!, '48');
+    expect(text(dialog.querySelector('#err-height'))).toContain('Größe');
+    expect(text(dialog.querySelector('.guide'))).toContain('Schuhe aus');
+    expect(dialog.querySelector('input[name="height3"]')).toBeNull();
+    typeInto(dialog.querySelector<HTMLInputElement>('input[name="height1"]')!, '155,5');
+    typeInto(dialog.querySelector<HTMLInputElement>('input[name="height2"]')!, '156,0');
+    await settle(fixture);
+    // Abweichung 0,5 cm: dritte Messung wird angefordert, Speichern geht noch nicht
+    expect(text(dialog.querySelector('#status-height'))).toContain('drittes Mal');
     (dialog.querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit'));
-    await vi.waitFor(() => expect([...firebase.records.playerRecords.get('p1/measurements')!.values()].some((data) => data['height'] === '160.5' && data['weight'] === '48')).toBe(true));
+    await settle(fixture);
+    expect(text(dialog.querySelector('#err-height'))).toContain('drittes Mal');
+    typeInto(dialog.querySelector<HTMLInputElement>('input[name="height3"]')!, '155,7');
+    typeInto(dialog.querySelector<HTMLInputElement>('input[name="weight1"]')!, '48');
+    await settle(fixture);
+    expect(text(dialog.querySelector('#status-height'))).toContain('Verwendet: 155,7 cm');
+    expect(text(dialog)).toContain('Alter am Messtag');
+    (dialog.querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit'));
+    await vi.waitFor(() =>
+      expect([...firebase.records.playerRecords.get('p1/measurements')!.values()].find((data) => data['height'] === '155.7')).toMatchObject({ weight: '48', heightReadings: [155.5, 156, 155.7], weightReadings: [48], quality: 'verified' }),
+    );
+    await settle(fixture);
+    const items = qa(fixture, 'tk-profile-extras .items li').map(text);
+    expect(items.find((item) => item.includes('155,7 cm'))).toContain('Messung geprüft');
+    expect(items.find((item) => item.includes('155,7 cm'))).toContain('Größe gemessen: 155,5 / 156 / 155,7 cm');
+    expect(items.find((item) => item.includes('150 cm'))).toContain('Messqualität nicht dokumentiert');
+  });
+
+  it('Sitzhöhe mit Sitzkasten und Korrektur einer Bestandsmessung mit Grund', async () => {
+    const fixture = await renderExtras();
+    clickByText(fixture, 'tk-profile-extras .block-head button', '+ Messung');
+    await settle(fixture);
+    const dialog = q<HTMLElement>(fixture, 'tk-measurement-dialog')!;
+    typeInto(dialog.querySelector<HTMLInputElement>('input[name="height1"]')!, '156');
+    typeInto(dialog.querySelector<HTMLInputElement>('input[name="height2"]')!, '156,2');
+    typeInto(dialog.querySelector<HTMLInputElement>('input[name="sitting1"]')!, '120');
+    (dialog.querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit'));
+    await settle(fixture);
+    expect(text(dialog)).toContain('Sitzkastens');
+    typeInto(dialog.querySelector<HTMLInputElement>('input[name="boxHeight"]')!, '40');
+    await settle(fixture);
+    expect(text(dialog)).toContain('Verwendet: 80 cm Sitzhöhe');
+    expect(text(dialog)).toContain('Beinlänge (Größe − Sitzhöhe): 76,1 cm');
+    (dialog.querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit'));
+    await vi.waitFor(() =>
+      expect([...firebase.records.playerRecords.get('p1/measurements')!.values()].find((data) => data['height'] === '156.1')).toMatchObject({ sittingReadings: [120], sittingBoxCm: 40, sittingHeight: 80 }),
+    );
+    await settle(fixture);
+    expect(qa(fixture, 'tk-profile-extras .items li').map(text).find((item) => item.includes('156,1 cm'))).toContain('Sitzhöhe: 80 cm (abgelesen 120 cm, Sitzkasten 40 cm abgezogen)');
+
+    // Bestandsmessung korrigieren: nur mit Grund
+    qa<HTMLButtonElement>(fixture, 'tk-profile-extras button').find((entry) => entry.getAttribute('aria-label') === 'Messung bearbeiten: 01.08.2026')!.click();
+    await settle(fixture);
+    expect(text(dialog)).toContain('Messqualität nicht dokumentiert');
+    expect(dialog.querySelector('input[name="height2"]')).toBeNull();
+    typeInto(dialog.querySelector<HTMLInputElement>('input[name="height1"]')!, '151');
+    (dialog.querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit'));
+    await settle(fixture);
+    expect(text(dialog.querySelector('#err-reason'))).toContain('warum');
+    typeInto(dialog.querySelector<HTMLTextAreaElement>('textarea[name="reason"]')!, 'Tippfehler');
+    (dialog.querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit'));
+    await vi.waitFor(() => expect(firebase.records.playerRecords.get('p1/measurements')!.get('me1')).toMatchObject({ height: '151', changes: [{ reason: 'Tippfehler' }] }));
+    await settle(fixture);
+    expect(qa(fixture, 'tk-profile-extras .items li').map(text).find((item) => item.includes('151 cm'))).toContain('Tippfehler (vorher 150 cm · 40 kg');
+  });
+
+  it('Medizin sieht Einzelmessungen und Sitzhöhe, aber keinen Messassistenten', async () => {
+    const fixture = await renderExtras('physio');
+    expect(q(fixture, 'tk-measurement-dialog')).toBeNull();
+    expect(text(q(fixture, 'tk-profile-extras'))).toContain('Messqualität nicht dokumentiert');
   });
 
   it('löscht erst nach Bestätigung', async () => {
