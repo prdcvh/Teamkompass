@@ -84,4 +84,24 @@ describe('Bio-Banding: Vorschlag für den Kader (SCRUM-191)', () => {
     const result = suggestBioBanding([player('p', 'Pia')], new Map([['p', data]]), today);
     expect(result.groups[3]!.players.map((entry) => entry.id)).toEqual(['p']);
   });
+
+  it('macht für Spieler mit widerrufener Einwilligung keinen Vorschlag, auch wenn Daten übergeben werden (SCRUM-252)', () => {
+    const tall = measure(178, 60);
+    const result = suggestBioBanding(
+      [{ ...player('r', 'Rita'), consentStatus: 'revoked' as const }, { ...player('g', 'Gina'), consentStatus: 'granted' as const }],
+      new Map([
+        ['r', tall],
+        ['g', tall],
+      ]),
+      today,
+    );
+    expect(result.groups.flatMap((group) => group.players.map((entry) => entry.id))).toEqual(['g']);
+    expect(result.withoutValue).toBe(1);
+  });
+
+  it('ohne Häkchen der Eltern (oder nach dem Löschen der Angaben) gibt es keinen Vorschlag mehr', () => {
+    const withoutConsent: BioBandingData = { ...measure(165, 51), inputs: { ...inputs, parentsConsent: false } };
+    const result = suggestBioBanding([player('p', 'Pia')], new Map([['p', withoutConsent]]), today);
+    expect(result.withoutValue).toBe(1);
+  });
 });

@@ -75,6 +75,31 @@ describe('Profil: Einwilligung (SCRUM-245)', () => {
     expect(firebase.records.playerRecords.get('p2/measurements')?.size).toBe(1);
   });
 
+  it('widerrufen: Aufgabe listet die Angaben für den Reife-Kompass und löscht sie erst nach Bestätigung (SCRUM-252)', async () => {
+    const { fixture, firebase } = await renderProfile({
+      id: 'p2',
+      consent: 'revoked',
+      setup: (fb) =>
+        fb.maturity.docs.set('p2', { playerId: 'p2', sex: 'm', parentsConsent: true, motherHeight: 168, fatherHeight: 182, updatedAt: '2026-11-01T10:00:00.000Z' }),
+    });
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(q(fixture, '[data-test="consent-task-maturity"]')).not.toBeNull();
+    });
+    expect(text(q(fixture, '[data-test="consent-task-maturity"]'))).toContain('Größe der Eltern');
+    clickByText(fixture, '.task button', 'Angaben löschen');
+    await settle(fixture);
+    expect(firebase.maturity.docs.has('p2')).toBe(true);
+    expect(qa(fixture, 'tk-dialog').map(text).join(' ')).toContain('Reifestand lässt sich danach nicht mehr berechnen');
+    clickByText(fixture, 'tk-dialog button', 'Endgültig löschen');
+    await vi.waitFor(() => expect(firebase.maturity.docs.has('p2')).toBe(false));
+    expect(firebase.maturity.calls).toContain('deleteMaturity:p2');
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(q(fixture, '[data-test="consent-task-maturity"]')).toBeNull();
+    });
+  });
+
   it('eigenes Team, offen: keine Sperre, Einträge wie bisher', async () => {
     const { fixture } = await renderProfile({ id: 'p2' });
     await vi.waitFor(() => {

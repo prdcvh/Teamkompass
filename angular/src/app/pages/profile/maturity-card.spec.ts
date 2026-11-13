@@ -134,6 +134,87 @@ describe('Profil: Reife-Kompass', () => {
     expect(q(fixture, '.maturity-percent')).toBeNull();
   });
 
+  it('widerrufene Einwilligung: kein Reifestand, kein Verlauf, kein Formular (SCRUM-252)', async () => {
+    const { fixture, firebase } = await renderProfile({
+      setup: (fb) => {
+        measurements(fb);
+        fb.maturity.docs.set('p1', parents);
+        fb.players.players.set('p1', { ...fb.players.players.get('p1'), consentStatus: 'revoked' });
+      },
+    });
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(q(fixture, '[data-test="maturity-stopped"]')).not.toBeNull();
+    });
+    expect(text(q(fixture, '[data-test="maturity-stopped"]'))).toContain('nicht mehr berechnet');
+    expect(q(fixture, '.maturity-percent')).toBeNull();
+    expect(qa(fixture, 'tk-maturity-card .items li')).toHaveLength(0);
+    expect(q(fixture, 'tk-maturity-card form')).toBeNull();
+    // Nichts wurde automatisch gelöscht.
+    expect(firebase.maturity.docs.get('p1')).toMatchObject({ motherHeight: 168 });
+    expect(firebase.maturity.calls.filter((call) => call.startsWith('deleteMaturity') || call.startsWith('saveMaturity'))).toEqual([]);
+  });
+
+  it('neues Häkchen speichert den Nachweis (Tag und Konto) und zeigt ihn an (SCRUM-252)', async () => {
+    const { fixture, firebase } = await renderProfile({ setup: measurements });
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(q(fixture, 'input[name="parentsConsent"]')).not.toBeNull();
+    });
+    const consent = q<HTMLInputElement>(fixture, 'input[name="parentsConsent"]')!;
+    consent.checked = true;
+    consent.dispatchEvent(new Event('change'));
+    await settle(fixture);
+    typeInto(q<HTMLInputElement>(fixture, 'input[name="motherHeight"]')!, '168');
+    typeInto(q<HTMLInputElement>(fixture, 'input[name="fatherHeight"]')!, '182');
+    q<HTMLFormElement>(fixture, 'tk-maturity-card form')!.dispatchEvent(new Event('submit'));
+    await vi.waitFor(() => expect(firebase.maturity.docs.get('p1')).toBeDefined());
+    expect(firebase.maturity.docs.get('p1')).toMatchObject({ parentsConsentDate: '2026-11-03', parentsConsentBy: 'trainer@example.test', parentsConsentByUid: 'uid-trainer' });
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(text(q(fixture, '[data-test="maturity-consent-record"]'))).toContain('eingetragen am 03.11.2026 von trainer@example.test');
+    });
+  });
+
+  describe('Offline und Wiederverbindung (SCRUM-252)', () => {
+    it('Trainer: geänderte Angaben aus dem Server (nach Wiederverbindung) rechnen den Wert neu bzw. nehmen ihn weg', async () => {
+      const { fixture, firebase } = await renderProfile({ setup: measurements });
+      firebase.maturity.set('p1', parents);
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(q(fixture, '.maturity-percent')).not.toBeNull();
+      });
+      const before = text(q(fixture, '.maturity-percent'));
+      firebase.maturity.set('p1', { ...parents, fatherHeight: 192 });
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(text(q(fixture, '.maturity-percent'))).not.toBe(before);
+      });
+      // Angaben auf einem anderen Gerät gelöscht → hier verschwindet der Wert, sobald die Änderung ankommt.
+      firebase.maturity.set('p1', null);
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(q(fixture, '.maturity-percent')).toBeNull();
+      });
+    });
+
+    it('Medizin: lehnt der Server das Abo ab (Widerruf, nach Wiederverbindung), bleibt nichts sichtbar', async () => {
+      const { fixture, firebase } = await renderProfileExtras('physio');
+      firebase.maturity.set('p1', parents);
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(q(fixture, '.maturity-percent')).not.toBeNull();
+      });
+      firebase.maturity.failListeners('p1', Object.assign(new Error('denied'), { code: 'permission-denied' }));
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(q(fixture, '.maturity-percent')).toBeNull();
+      });
+      expect(text(card(fixture))).toContain('konnte nicht geladen werden');
+      expect(TestBed.inject(MaturityService).inputs().motherHeight).toBeNull();
+    });
+  });
+
   it('Medizin sieht den Reifestand, aber kein Formular', async () => {
     const { fixture, firebase } = await renderProfileExtras('physio');
     firebase.maturity.set('p1', parents);

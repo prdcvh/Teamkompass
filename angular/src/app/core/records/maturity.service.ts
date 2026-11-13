@@ -3,7 +3,8 @@ import { authErrorMessage, errorCode } from '../auth/auth-errors';
 import { SessionService } from '../auth/session.service';
 import { MaturityApi } from '../firebase/maturity.api';
 import { SyncService } from '../shell/sync.service';
-import { EMPTY_MATURITY_INPUTS, type MaturityInputs, docFromMaturityInputs, maturityInputsFromDoc } from './maturity';
+import { todayIso } from '../shared/dates';
+import { EMPTY_MATURITY_INPUTS, type MaturityInputs, docFromMaturityInputs, maturityInputsFromDoc, withParentsConsentRecord } from './maturity';
 
 /**
  * Angaben für den Reife-Kompass (SCRUM-190) EINES Spielers: Geschlecht für die Berechnung, Einverständnis der Eltern
@@ -83,13 +84,18 @@ export class MaturityService {
     if (playerId) this.start(playerId);
   }
 
-  /** Speichert die Angaben (nur Trainer). Ohne Einverständnis werden die Größen der Eltern gelöscht. */
+  /**
+   * Speichert die Angaben (nur Trainer). Ohne Einverständnis werden die Größen der Eltern gelöscht. Wird das Häkchen
+   * neu gesetzt, tragen sich heutiger Tag und das eigene Konto als Nachweis ein (SCRUM-252).
+   */
   async save(inputs: MaturityInputs, updatedAt: string): Promise<boolean> {
     const playerId = this.playerId();
-    if (!playerId || !this.canWrite() || this.state() !== 'ready') return false;
+    const uid = this.session.uid();
+    if (!playerId || !uid || !this.canWrite() || this.state() !== 'ready') return false;
+    const record = withParentsConsentRecord(inputs, this.inputs(), { uid, email: this.session.email() ?? '', today: todayIso() });
     if (!this.sync.isFailed()) this.sync.state.set('syncing');
     try {
-      await this.api.saveMaturity(playerId, docFromMaturityInputs(playerId, inputs, updatedAt));
+      await this.api.saveMaturity(playerId, docFromMaturityInputs(playerId, record, updatedAt));
       this.sync.clearError();
       return true;
     } catch (error) {
@@ -99,8 +105,30 @@ export class MaturityService {
     }
   }
 
+  /**
+   * Löscht alle Angaben zum Reife-Kompass dieses Spielers (Geschlecht, Häkchen, Größe der Eltern) – nur Trainer, nur
+   * nach Rückfrage (Aufgabe „Gesundheitsdaten prüfen und löschen“, SCRUM-252). Ohne die Angaben gibt es keinen
+   * Reifestand mehr, auch nicht im Bio-Banding; gespeicherte Reifewerte gibt es nicht.
+   */
+  async remove(playerId: string): Promise<boolean> {
+    if (!this.canWrite()) return false;
+    if (!this.sync.isFailed()) this.sync.state.set('syncing');
+    try {
+      await this.api.deleteMaturity(playerId);
+      if (this.playerId() === playerId) this.inputs.set(EMPTY_MATURITY_INPUTS);
+      this.sync.clearError();
+      return true;
+    } catch (error) {
+      console.error(error);
+      this.sync.fail(`Angaben zum Reife-Kompass konnten nicht gelöscht werden. ${authErrorMessage(errorCode(error), this.session.role())}`);
+      return false;
+    }
+  }
+
   private fail(error: unknown): void {
     console.error(error);
+    // Nichts Altes im Speicher behalten (z. B. Medizin nach einem Widerruf: die Regeln sperren das Abo dann).
+    this.inputs.set(EMPTY_MATURITY_INPUTS);
     this.state.set('error');
     this.error.set(`Der Reife-Kompass konnte nicht geladen werden. ${authErrorMessage(errorCode(error), this.session.role())}`);
   }

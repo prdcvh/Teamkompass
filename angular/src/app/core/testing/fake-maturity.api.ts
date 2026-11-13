@@ -21,6 +21,11 @@ export class FakeMaturityApi implements Pick<MaturityApi, keyof MaturityApi> {
     for (const listener of this.listeners.get(playerId) ?? []) listener.onData(this.docs.get(playerId) ?? null, { fromCache: false, hasPendingWrites: false });
   }
 
+  /** Simuliert, dass der Server ein laufendes Abo ablehnt (z. B. nach Widerruf, sobald das Gerät wieder online ist). */
+  failListeners(playerId: string, error: unknown): void {
+    for (const listener of this.listeners.get(playerId) ?? []) listener.onError(error);
+  }
+
   async watchMaturity(playerId: string, onData: Listener['onData'], onError: Listener['onError']): Promise<() => void> {
     this.calls.push(`watchMaturity:${playerId}`);
     if (this.watchError) {
@@ -47,5 +52,13 @@ export class FakeMaturityApi implements Pick<MaturityApi, keyof MaturityApi> {
     this.calls.push(`saveMaturity:${playerId}`);
     if (this.saveError) throw this.saveError;
     this.set(playerId, { ...data });
+  }
+
+  deleteError: unknown = null;
+
+  async deleteMaturity(playerId: string): Promise<void> {
+    this.calls.push(`deleteMaturity:${playerId}`);
+    if (this.deleteError) throw this.deleteError;
+    this.set(playerId, null);
   }
 }
