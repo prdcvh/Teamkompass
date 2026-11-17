@@ -1,0 +1,127 @@
+<section class="block" aria-labelledby="gl-title">
+  <h2 id="gl-title">Wachstum, Belastung und Befinden</h2>
+  <tk-card>
+    <p class="muted pad">
+      Drei vorhandene Auswertungen auf derselben Zeitachse, zum gemeinsamen Besprechen. Das ist keine Bewertung: Die App leitet daraus keine
+      Verletzung, Diagnose, Sperre oder Teilnahmeentscheidung ab und ändert nichts an Belastung, Teilnahme oder Verfügbarkeit.
+    </p>
+
+    @if (hint(); as detail) {
+      <details class="hint">
+        <summary>Wachstumshinweis: Intervall, Messqualität und Aktualität ansehen</summary>
+        <dl class="facts">
+          <div>
+            <dt>Intervall</dt>
+            <dd>
+              @if (detail.partner) { {{ formatDate(detail.partner.date) }} – {{ formatDate(detail.newest.date) }} ({{ detail.days }} Tage) } @else { nur eine Messung }
+            </dd>
+          </div>
+          <div><dt>Rate</dt><dd>{{ rateText(detail.rate ?? 0) }} cm/Jahr</dd></div>
+          <div>
+            <dt>Aktualität</dt>
+            <dd>
+              Jüngste gültige Messung vor {{ detail.ageDays }} Tagen @if (detail.fresh) { (aktuell, höchstens {{ freshDays }} Tage) } @else { (veraltet, mehr als {{ freshDays }} Tage) }
+            </dd>
+          </div>
+          <div>
+            <dt>Messqualität</dt>
+            <dd>
+              @if (detail.partner) { {{ qualityLabels[detail.partner.quality] }} / }{{ qualityLabels[detail.newest.quality] }}
+            </dd>
+          </div>
+        </dl>
+        @for (check of detail.qualityChecks; track check) {
+          <p class="check" role="status">Messung prüfen: {{ check }}</p>
+        }
+      </details>
+    } @else if (analysis().noHintReason) {
+      <p class="muted pad" role="status">Kein aktueller Wachstumshinweis: {{ analysis().noHintReason }}</p>
+    }
+
+    @if (chart(); as c) {
+      <svg class="chart" [attr.viewBox]="'0 0 ' + c.width + ' ' + c.height" role="img" [attr.aria-label]="c.summary">
+        @for (tick of c.ticks; track tick.x) {
+          <line class="grid" [attr.x1]="tick.x" [attr.x2]="tick.x" [attr.y1]="c.panels[0].top" [attr.y2]="c.panels[2].top + c.panels[2].height" />
+          <text class="axis small" [attr.x]="tick.x" [attr.y]="c.height - 8" text-anchor="middle">{{ tick.text }}</text>
+        }
+        @for (panel of c.panels; track panel.key) {
+          <text class="axis panel-title" [attr.x]="c.left" [attr.y]="panel.top - 6">{{ panel.title }}</text>
+          <rect class="frame" [attr.x]="c.left" [attr.y]="panel.top" [attr.width]="c.right - c.left" [attr.height]="panel.height" />
+          @for (gap of panel.empty; track $index) {
+            <rect class="nodata" [attr.x]="gap.x" [attr.y]="panel.top" [attr.width]="gap.width" [attr.height]="panel.height" />
+          }
+          @if (panel.emptyText) {
+            <text class="axis empty-text" [attr.x]="(c.left + c.right) / 2" [attr.y]="panel.top + panel.height / 2" text-anchor="middle">{{ panel.emptyText }}</text>
+          }
+        }
+        @for (bar of c.bars; track $index) {
+          <rect class="bar" [class.norate]="!bar.hasRate" [attr.x]="bar.x" [attr.y]="bar.y" [attr.width]="bar.width" [attr.height]="bar.height" tabindex="0" [attr.aria-label]="bar.title"><title>{{ bar.title }}</title></rect>
+        }
+        @for (mx of c.measureXs; track $index) {
+          <line class="measure" [attr.x1]="mx" [attr.x2]="mx" [attr.y1]="c.panels[0].top + c.panels[0].height - 6" [attr.y2]="c.panels[0].top + c.panels[0].height" />
+        }
+        @if (c.fitness) { <path class="curve fitness" [attr.d]="c.fitness" /> }
+        @if (c.fatigue) { <path class="curve fatigue" [attr.d]="c.fatigue" /> }
+        @for (dot of c.dots; track $index) {
+          <circle class="dot" [attr.cx]="dot.x" [attr.cy]="dot.y" r="4" tabindex="0" [attr.aria-label]="dot.title"><title>{{ dot.title }}</title></circle>
+        }
+      </svg>
+      <ul class="legend" aria-label="Legende">
+        <li data-kind="rate"><span class="swatch"></span>Wachstumsrate je Messintervall</li>
+        <li data-kind="norate"><span class="swatch"></span>Intervall ohne Rate</li>
+        <li data-kind="fitness"><span class="swatch"></span>Fitness (28 Tage)</li>
+        <li data-kind="fatigue"><span class="swatch"></span>Müdigkeit (7 Tage)</li>
+        <li data-kind="nodata"><span class="swatch"></span>schattiert: keine Daten</li>
+      </ul>
+      <p class="muted pad">Rückblick: {{ days }} Tage. Datenlose Zeiträume bleiben leer; „keine Angaben“ beim Befinden heißt nicht „unauffällig“.</p>
+    } @else {
+      <p class="muted pad">Noch keine Daten aus den letzten {{ days }} Tagen: weder Größenmessung noch Belastung noch Befinden.</p>
+    }
+
+    @if (rows().length > 0) {
+      <div class="table-wrap">
+        <table>
+          <caption class="sr-only">Wachstum, Belastung und Befinden je Messintervall, jüngstes zuerst</caption>
+          <thead>
+            <tr>
+              <th scope="col">Zeitraum</th>
+              <th scope="col">Wachstum</th>
+              <th scope="col">Belastung pro Woche</th>
+              <th scope="col">Befinden</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of rows(); track row.from.id + row.to.id) {
+              <tr>
+                <td data-label="Zeitraum">{{ formatDate(row.from.date) }} – {{ formatDate(row.to.date) }} ({{ row.days }} Tage)</td>
+                <td data-label="Wachstum">
+                  {{ num(row.from.height) }} → {{ num(row.to.height) }} cm,
+                  @if (row.rate !== null) { {{ rateText(row.rate) }} cm/Jahr } @else { keine Rate }
+                  <span class="sub">{{ statusLabels[row.rateStatus] }}</span>
+                </td>
+                <td data-label="Belastung pro Woche">
+                  @switch (row.load.state) {
+                    @case ('none') { keine Belastung erfasst }
+                    @case ('partial') { Ø {{ num(row.load.perWeek ?? 0) }} <span class="sub">nur {{ row.load.coveredDays }} von {{ row.days }} Tagen erfasst</span> }
+                    @default { Ø {{ num(row.load.perWeek ?? 0) }} }
+                  }
+                </td>
+                <td data-label="Befinden">
+                  @switch (row.wellness.state) {
+                    @case ('unreadable') { nicht freigegeben oder nicht lesbar }
+                    @case ('none') { keine Angaben }
+                    @default { Ø {{ num(row.wellness.mean ?? 0) }} von 28 <span class="sub">{{ row.wellness.count }} Angaben</span> }
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+    <p class="muted pad">
+      Belastung = Minuten × Anstrengung der besuchten Termine (wie die Belastungskurve). Ein Zeitraum zählt die Tage nach der ersten bis
+      einschließlich der zweiten Messung.
+    </p>
+  </tk-card>
+</section>

@@ -35,6 +35,7 @@ import { SyncService } from '../../core/shell/sync.service';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 import { Status } from '../../ui/status/status';
+import { GrowthLoadCard } from './growth-load-card';
 import { LoadCurveCard } from './load-curve-card';
 import { LoadReportAction } from './load-report-action';
 import { ProfileExtras } from './profile-extras';
@@ -49,7 +50,7 @@ import { healthLockedMessage, mayStoreHealth } from '../../core/player/consent';
 /** Spielerprofil (Figma: Profil Desktop/Handy): Kopfbereich, Notenverlauf, Kompetenzprofil, Verfügbarkeit, Statistik, Eventhistorie. */
 @Component({
   selector: 'app-profile',
-  imports: [Button, Card, Status, ProfileExtras, LoadReportAction, LoadCurveCard, ConsentPanel, GradeReleasePanel, SelfReportHistory, LearningSummary, CohortCard],
+  imports: [Button, Card, Status, ProfileExtras, LoadReportAction, LoadCurveCard, GrowthLoadCard, ConsentPanel, GradeReleasePanel, SelfReportHistory, LearningSummary, CohortCard],
   templateUrl: './profile.html',
   // Reihenfolge = Kaskade (die Handy-Regeln überschreiben Kopf und Auswertung).
   styleUrls: ['./profile.css', './profile-stats.css', './profile-mobile.css', './profile-risk.css', '../../ui/chart/chart.css'],
