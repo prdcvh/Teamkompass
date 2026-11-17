@@ -180,12 +180,16 @@ export function injuryRisk(
     hints.push({ label: 'Zwei sehr harte Einheiten innerhalb von 48 Stunden', weight: 1 });
   }
 
-  // Wachstumsschub aus den letzten beiden Körpermessungen – nur Messungen der letzten ca. 3 Monate (90 Tage) zählen (SCRUM-157).
-  const sorted = sortedMeasurements(measurements).filter((item) => daysBetween(localMidnight(item.date), today) <= MEASUREMENT_WINDOW_DAYS);
+  // Wachstumsschub aus den letzten beiden Körpermessungen mit Größe – nur Messungen der letzten ca. 3 Monate (90 Tage) zählen
+  // (SCRUM-157). Eine Messung nur mit Gewicht zählt nicht (sonst läse man sie als 0 cm, SCRUM-302) – wie im Belastungsbericht.
+  const sorted = sortedMeasurements(measurements).filter(
+    (item): item is Measurement & { height: number } =>
+      typeof item.height === 'number' && item.height > 0 && daysBetween(localMidnight(item.date), today) <= MEASUREMENT_WINDOW_DAYS,
+  );
   if (sorted.length >= 2) {
     const [prev, last] = sorted.slice(-2);
     const months = daysBetween(localMidnight(prev.date), localMidnight(last.date)) / 30;
-    const growth = months > 0 ? ((last.height ?? 0) - (prev.height ?? 0)) / months : 0;
+    const growth = months > 0 ? (last.height - prev.height) / months : 0;
     if (growth >= 1.2) hints.push({ label: `Starker Wachstumsschub (${label(growth)} cm/Monat)`, weight: 2 });
     else if (growth >= 0.6) hints.push({ label: `Wachstumsschub (${label(growth)} cm/Monat)`, weight: 1 });
   }
