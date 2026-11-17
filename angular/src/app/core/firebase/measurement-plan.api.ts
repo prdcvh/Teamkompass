@@ -30,7 +30,9 @@ export class MeasurementPlanApi {
   /** Setzt den Eintrag eines Spielers; `null` entfernt ihn (zurück zum Vorschlag). Andere Einstellungen bleiben unberührt. */
   async savePlayerPlan(playerId: string, data: Readonly<Record<string, unknown>> | null): Promise<void> {
     const { db } = await this.connection.get();
-    const { doc, setDoc, deleteField } = await import('firebase/firestore');
-    await setDoc(doc(db, 'teams', this.team.id(), 'meta', 'settings'), { measurementPlan: { [playerId]: data ?? deleteField() } }, { merge: true });
+    const { FieldPath, doc, setDoc, deleteField } = await import('firebase/firestore');
+    // mergeFields statt merge: ersetzt den Eintrag dieses Spielers vollständig (ein einfaches merge würde verschachtelte
+    // Felder zusammenführen, und eine aufgehobene Pause bliebe gespeichert); alle anderen Einstellungen bleiben unberührt.
+    await setDoc(doc(db, 'teams', this.team.id(), 'meta', 'settings'), { measurementPlan: { [playerId]: data ?? deleteField() } }, { mergeFields: [new FieldPath('measurementPlan', playerId)] });
   }
 }

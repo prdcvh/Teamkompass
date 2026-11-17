@@ -51,11 +51,13 @@
                 </p>
               }
               <div class="actions">
-                <button tkButton variant="primary" type="button" [disabled]="!recordsReady()" (click)="openAssistant()">Messung eintragen</button>
+                <button tkButton variant="primary" type="button" [disabled]="!recordsReady() || current()?.status === 'no-consent'" (click)="openAssistant()">Messung eintragen</button>
                 <button tkButton type="button" (click)="skip()">Heute nicht dabei – überspringen</button>
                 <button tkButton variant="ghost" type="button" (click)="endRound()">Runde beenden</button>
               </div>
-              @if (!recordsReady()) {
+              @if (current()?.status === 'no-consent') {
+                <p class="muted" role="status">Für diesen Spieler ist die Einwilligung nicht mehr dokumentiert. Bitte überspringen.</p>
+              } @else if (!recordsReady()) {
                 <p class="muted" role="status">Daten des Spielers werden geladen …</p>
               }
             }
