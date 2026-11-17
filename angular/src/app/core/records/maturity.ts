@@ -199,6 +199,11 @@ export interface MaturityInputs {
   readonly parentsConsentDate?: string;
   readonly parentsConsentBy?: string;
   readonly parentsConsentByUid?: string;
+  /**
+   * Zeitpunkt (ISO), zu dem die Angaben zuletzt gespeichert wurden – nur gelesen, für den Eingabestand in der Anzeige
+   * (SCRUM-256). Geschrieben wird er wie bisher über `docFromMaturityInputs(…, updatedAt)`.
+   */
+  readonly updatedAt?: string;
 }
 
 export const EMPTY_MATURITY_INPUTS: MaturityInputs = { sex: null, parentsConsent: false, motherHeight: null, fatherHeight: null };
@@ -305,6 +310,7 @@ export function maturityInputsFromDoc(data: Readonly<Record<string, unknown>> | 
     parentsConsentDate: isIsoDate(text(data['parentsConsentDate'])) ? text(data['parentsConsentDate']) : '',
     parentsConsentBy: text(data['parentsConsentBy']),
     parentsConsentByUid: text(data['parentsConsentByUid']),
+    updatedAt: typeof data['updatedAt'] === 'string' && isIsoDate(data['updatedAt'].slice(0, 10)) ? data['updatedAt'] : '',
   };
 }
 

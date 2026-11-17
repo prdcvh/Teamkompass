@@ -39,8 +39,18 @@ describe('Profil: Reife-Kompass', () => {
     const earlier = expected('2026-04-01', 160, 47);
     const content = text(card(fixture));
     expect(text(q(fixture, '.maturity-percent'))).toBe(percentText(latest.percent));
-    expect(content).toContain('der erwarteten Erwachsenengröße');
-    expect(content).toContain(`erwartete Erwachsenengröße ca. ${Math.round(latest.predictedAdultCm)} cm`);
+    expect(content).toContain('der geschätzten Erwachsenengröße');
+    expect(text(q(fixture, '[data-test="maturity-sentence"]'))).toBe(
+      `Stand 01.10.2026 · etwa ${percentText(latest.percent)} der geschätzten Erwachsenengröße (heute 165 cm, geschätzt ca. ${Math.round(latest.predictedAdultCm)} cm erwachsen)`,
+    );
+    // Datengrundlage, Eingabestand und Methodenversion (SCRUM-256)
+    expect(text(q(fixture, '[data-test="maturity-basis"]'))).toContain('2 mit Größe vom 01.04.2026 bis 01.10.2026, davon 2 mit Reifewert');
+    expect(text(q(fixture, '[data-test="maturity-inputs-date"]'))).toBe('Angaben für die Berechnung gespeichert am 01.11.2026');
+    expect(text(q(fixture, '[data-test="maturity-method"]'))).toContain('Methodenversion 1.0');
+    expect(text(q(fixture, '[data-test="maturity-range"]'))).toContain('keine Sicherheitsangabe');
+    expect(q(fixture, '[data-test="maturity-causes"]')).toBeNull();
+    expect(text(q(fixture, '[data-test="maturity-phv"]'))).toContain('nicht automatisch');
+    expect(text(q(fixture, '[data-test="maturity-help"]'))).toContain('kein Knochenalter');
     expect(content).toContain('Noten und Tests im Licht des Reifestands lesen');
     expect(content).toContain('nicht umgerechnet');
     expect(content).toContain('nur für Trainer und Medizin sichtbar');
@@ -103,6 +113,68 @@ describe('Profil: Reife-Kompass', () => {
     await vi.waitFor(() => {
       fixture.detectChanges();
       expect(q(fixture, '.maturity-percent')).toBeNull();
+    });
+  });
+
+  describe('Datengrundlage und Unsicherheit (SCRUM-256)', () => {
+    it('keine Elternhöhen: Wachstumskurve bleibt, kein Wert, „nicht eingeordnet“ mit konkretem Grund', async () => {
+      const { fixture } = await renderProfile({
+        setup: (firebase) => {
+          measurements(firebase);
+          firebase.maturity.docs.set('p1', { ...parents, motherHeight: null, fatherHeight: null });
+        },
+      });
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(q(fixture, '[data-test="maturity-missing"]')).not.toBeNull();
+      });
+      expect(q(fixture, '.maturity-percent')).toBeNull();
+      expect(q(fixture, '.maturity-band')).toBeNull();
+      expect(text(q(fixture, '[data-test="maturity-status"]'))).toBe('nicht eingeordnet');
+      expect(text(q(fixture, '[data-test="maturity-missing"]'))).toContain('Größe beider Eltern');
+      expect(text(q(fixture, '[data-test="maturity-missing"]'))).toContain('Wachstumskurve oben ist davon unabhängig nutzbar');
+      expect(qa(fixture, 'tk-growth-velocity-card tbody tr').length).toBeGreaterThan(0);
+    });
+
+    it('veraltete Messung: Wert mit Datum, aber keine Einordnung', async () => {
+      vi.setSystemTime(new Date('2027-02-01T12:00:00'));
+      const { fixture } = await renderProfile({
+        setup: (firebase) => {
+          measurements(firebase);
+          firebase.maturity.docs.set('p1', parents);
+        },
+      });
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(q(fixture, '.maturity-percent')).not.toBeNull();
+      });
+      expect(q(fixture, '.maturity-band')).toBeNull();
+      expect(text(q(fixture, '[data-test="maturity-status"]'))).toBe('nicht eingeordnet – Messung veraltet');
+      expect(text(q(fixture, '[data-test="maturity-causes"]'))).toContain('123 Tage alt');
+    });
+
+    it('zur Prüfung markierte Messung: „Einordnung unsicher – prüfen“ mit Ursache, keine Einordnung', async () => {
+      const { fixture } = await renderProfile({
+        setup: (firebase) => {
+          firebase.records.playerRecords.set(
+            'p1/measurements',
+            new Map([
+              ['me1', { date: '2026-04-01', height: '160', weight: '47' }],
+              ['me2', { date: '2026-10-01', height: '165', weight: '51', quality: 'flagged', flags: ['height-range'] }],
+            ]),
+          );
+          firebase.maturity.docs.set('p1', parents);
+        },
+      });
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(q(fixture, '[data-test="maturity-causes"]')).not.toBeNull();
+      });
+      expect(q(fixture, '.maturity-band')).toBeNull();
+      expect(text(q(fixture, '[data-test="maturity-status"]'))).toBe('Einordnung unsicher – prüfen');
+      expect(text(q(fixture, '[data-test="maturity-causes"]'))).toContain('zur Prüfung markiert');
+      expect(text(q(fixture, '[data-test="maturity-causes"]'))).toContain('keine Mehrheit');
+      expect(text(qa(fixture, 'tk-maturity-card .items li')[0])).toContain('Messung prüfen');
     });
   });
 

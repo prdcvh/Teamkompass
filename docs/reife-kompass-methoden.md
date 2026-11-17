@@ -228,6 +228,26 @@ oben sind für die Umsetzung in SCRUM-254 gedacht.
   nicht zwischen gemessen und angegeben und korrigiert nicht → als offener Punkt vermerkt.
 - **Kein medizinisches Urteil:** keine Knochenalter-, Trainingssperre-, Verletzungs- oder Talentaussage.
 
+## 7a. Anzeige der Einordnung (SCRUM-256)
+
+Ändert keine Zahl des Rechners (deshalb weiter Version 1.0), nur, ob die Einordnung als belastbar angezeigt wird.
+Code: `angular/src/app/core/records/maturity-assessment.ts`.
+
+| Lage | Anzeige |
+| --- | --- |
+| kein Wert (Geschlecht, Einverständnis, Elterngrößen, Messung fehlen) | „nicht eingeordnet“ + konkreter Grund; Wachstumskurve unabhängig davon |
+| jüngster Wert älter als 90 Tage (§6) | Wert mit Datum, „nicht eingeordnet – Messung veraltet“ |
+| Widerspruch zum jüngsten Wert | Wert mit Datum, „Einordnung unsicher – prüfen“ + jede Ursache einzeln; keine Mehrheit, kein Mittelwert |
+| sonst | Einordnung nach §4 (PO-Entscheidung, bis SCRUM-386 Option D) |
+
+Widersprüche: jüngste Messung zur Prüfung markiert (SCRUM-253); Größe gegenüber der Nachbarmessung um ≥ 0,4 cm
+gesunken oder > 20 cm/Jahr gestiegen (SCRUM-254); Reifestand gegenüber dem vorigen Wert um **≥ 1,5 Prozentpunkte**
+gesunken (**eigener Vorschlagswert**, größer als die Stufe der Tabellenzeile aus §3.4); Wert über 100 %; neuere
+Größenmessung ohne Gewicht. Fehlerbreite: Bereich des %PAH bei ±5,3 cm (Jungen) / ±4,3 cm (Mädchen) Erwachsenengröße
+(§3.5), ausdrücklich keine Sicherheitsangabe. Keine automatische PHV-Einordnung, kein Moore-Modell. Eine manuelle
+Einordnung der Wachstumsspitze (mit Autor, Datum, Begründung) gibt es noch nicht – sie bräuchte neue Felder in
+`maturity/parents` und damit eine Regeländerung (eigenes Ticket).
+
 ## 8. Quellen
 
 Geprüft = Inhalt am 10.11.2026 selbst eingesehen; nicht geprüft = nicht zugänglich, nur indirekt.
