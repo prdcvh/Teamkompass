@@ -7,7 +7,7 @@ import { RatingsApi } from '../firebase/ratings.api';
 import type { RawDoc, SnapshotMeta } from '../firebase/types';
 import { addDays, todayIso } from '../shared/dates';
 import { type Rating, ratingFromDoc } from '../ratings/rating';
-import { MEASUREMENT_WINDOW_DAYS } from '../analysis/risk';
+import { GROWTH_MEASUREMENT_WINDOW_DAYS, MEASUREMENT_WINDOW_DAYS } from '../analysis/risk';
 import { type Measurement, measurementFromDoc } from '../records/measurement';
 import { SquadAbsencesService } from '../records/squad-absences.service';
 import { SessionService } from '../auth/session.service';
@@ -26,7 +26,8 @@ import { SelfReportsApi } from '../firebase/self-reports.api';
  *
  * Abwesenheiten und Messwerte sind hier nur das Fenster, das die Übersichten brauchen (SCRUM-200): aktuelle
  * Abwesenheiten kommen vom {@link SquadAbsencesService} (ein gemeinsames Abo mit der Kaderliste), Messwerte der letzten
- * {@link MEASUREMENT_WINDOW_DAYS} Tage von hier. Die volle Historie liest das Spielerprofil bzw. der Export.
+ * {@link GROWTH_MEASUREMENT_WINDOW_DAYS} Tage von hier (der Wachstumshinweis vergleicht mit einer Messung bis 365 Tage
+ * vor der jüngsten, SCRUM-305). Die volle Historie liest das Spielerprofil bzw. der Export.
  *
  * Bewertungen (SCRUM-201): Sind die Zusammenfassungen je Spieler eingerichtet ({@link PlayerStatsMode}), reicht ein
  * Abo auf `playerStats` (ein Dokument je Spieler) statt eines Abos je Event mit allen Bewertungen. Daraus entsteht
@@ -179,6 +180,7 @@ export class TeamService {
     const id = key.slice(2);
     const today = todayIso();
     const since = addDays(today, -MEASUREMENT_WINDOW_DAYS);
+    const measurementsSince = addDays(today, -GROWTH_MEASUREMENT_WINDOW_DAYS);
     const onData = (docs: RawDoc[], meta: SnapshotMeta) => {
       if (generation !== this.generation) return;
       if (key === 's:') {
@@ -216,7 +218,7 @@ export class TeamService {
           ? this.ratingsApi.watchRatings(id, onData, onError)
           : key.startsWith('x:')
             ? this.selfReportsApi.watchSelfReports(id, 'selfReports', onData, onError, since)
-            : this.playerRecordsApi.watchRecentMeasurements(id, since, onData, onError);
+            : this.playerRecordsApi.watchRecentMeasurements(id, measurementsSince, onData, onError);
     subscribe
       .then((unsubscribe) => {
         this.opening.delete(key);

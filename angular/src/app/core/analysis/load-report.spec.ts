@@ -127,14 +127,38 @@ describe('buildLoadReport', () => {
 
   it('zeigt Wachstum und Erholungs-Hinweise', () => {
     const measurements: Measurement[] = [
-      { id: 'm1', date: ago(70), height: 160, weight: null },
-      { id: 'm2', date: ago(10), height: 162.4, weight: null },
+      { id: 'm1', date: ago(100), height: 160, weight: null },
+      { id: 'm2', date: ago(10), height: 164, weight: null },
     ];
     const report = build({ measurements, items: [item('h1', 6, 'present', { exertion: 8 }), item('h2', 5, 'present', { exertion: 8 })] });
     expect(report.markers.growth).toHaveLength(1);
-    expect(report.markers.growth[0].perMonth).toBe(1.2);
+    expect(report.markers.growth[0]).toMatchObject({ from: ago(100), to: ago(10), perMonth: 1.4, level: 'strong' });
     expect(report.markers.recovery[0]).toContain('48 Stunden');
     expect(loadReportHtml(report)).toContain('starker Wachstumsschub');
+  });
+
+  it('Wachstum rechnet wie die Belastungsampel: Mindestabstand 90 Tage, keine Hochrechnung kurzer Abstände (SCRUM-305)', () => {
+    // Das Beispiel aus dem Ticket: 0,5 cm an zwei aufeinanderfolgenden Tagen (vorher „15 cm/Monat“).
+    const short = build({ measurements: [{ id: 'm1', date: ago(2), height: 150, weight: null }, { id: 'm2', date: ago(1), height: 150.5, weight: null }] });
+    expect(short.markers.growth.map((row) => row.perMonth)).toEqual([null, null]);
+    expect(short.assessment.reasons.some((reason) => reason.includes('Wachstumsschub'))).toBe(false);
+    const shortHtml = loadReportHtml(short);
+    expect(shortHtml).not.toContain('Wachstumsschub');
+    expect(shortHtml).not.toContain('cm/Monat');
+    expect(shortHtml).toContain('keine Rate');
+
+    // Messung kurz vor der jüngsten wird übersprungen: Vergleich mit der Messung 90 Tage davor – wie die Ampel.
+    const measurements: Measurement[] = [
+      { id: 'm1', date: ago(100), height: 160, weight: null },
+      { id: 'm2', date: ago(12), height: 163.5, weight: null },
+      { id: 'm3', date: ago(10), height: 164, weight: null },
+    ];
+    const report = build({ measurements });
+    expect(report.markers.growth.map((row) => [row.to, row.from, row.perMonth])).toEqual([
+      [ago(12), null, null], // 88 Tage nach m1: zu kurz
+      [ago(10), ago(100), 1.4],
+    ]);
+    expect(report.assessment.reasons).toContain('Starker Wachstumsschub (1,4 cm/Monat)');
   });
 
   it('maskiert alle Nutzertexte', () => {

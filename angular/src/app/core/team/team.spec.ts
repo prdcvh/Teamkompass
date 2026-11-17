@@ -134,7 +134,8 @@ describe('team (Dashboard-Auswertungen)', () => {
       const injured = player('a', { status: 'Verletzt', injuryUntil: '2026-10-20' }); // Verletzt ist Verfügbarkeit, keine Belastungsstufe
       const growing = player('c');
       const fit = player('b');
-      const growth = [{ id: 'm1', date: '2026-09-01', height: 150, weight: 40 }, { id: 'm2', date: '2026-10-01', height: 151.3, weight: 41 }]; // 1,3 cm/Monat
+      // 92 Tage Abstand (Mindestabstand 90, SCRUM-305): 4 cm → 1,3 cm/Monat
+      const growth = [{ id: 'm1', date: '2026-07-01', height: 150, weight: 40 }, { id: 'm2', date: '2026-10-01', height: 154, weight: 41 }];
       const figures = dashboardFigures([data(injured, []), data(fit, []), { ...data(growing, []), measurements: growth }], [], TODAY, NOW);
       expect(figures.highLoad).toBe(1);
     });
