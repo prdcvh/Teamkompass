@@ -32,6 +32,12 @@
  * EINORDNUNG (PO-Entscheidung 02.11.2026)
  *   unter 85 % = spät entwickelt, 85–95 % = im Schnitt, über 95 % = früh entwickelt – geprüft am auf eine
  *   Nachkommastelle gerundeten Prozentwert (so, wie er angezeigt wird). Fachliche Prüfung der Grenzen: SCRUM-251.
+ *   Achtung: Die Grenzen sind nicht altersbezogen und damit kein belegtes Reifetempo (früh/spät im Vergleich zu
+ *   Gleichaltrigen); Entscheidungsvorlage für den PO in docs/reife-kompass-methoden.md, Abschnitt 4.
+ *
+ * METHODENPRÜFUNG (SCRUM-251)
+ *   Methodenmatrix, Quellen, Fehlergrenzen, Übertragbarkeit und Regeln für Verlaufshinweise:
+ *   docs/reife-kompass-methoden.md. Referenzfälle dazu in maturity.spec.ts („Methodenversion 1.0“).
  */
 import { isIsoDate } from '../shared/dates';
 import { type Measurement, sortedMeasurements } from './measurement';
@@ -106,6 +112,12 @@ const GIRLS: readonly CoefficientRow[] = [
 ];
 
 export const KHAMIS_ROCHE_COEFFICIENTS: Readonly<Record<MaturitySex, readonly CoefficientRow[]>> = { m: BOYS, f: GIRLS };
+
+/**
+ * Version der Methodenspezifikation (docs/reife-kompass-methoden.md), nach der dieser Rechner geprüft ist. Jede
+ * Änderung an Formel, Tabelle, Altersregel oder Einordnung erhöht sie zusammen mit dem Dokument.
+ */
+export const MATURITY_METHOD_VERSION = '1.0';
 
 export const CM_PER_INCH = 2.54;
 export const KG_PER_POUND = 0.45359237;
