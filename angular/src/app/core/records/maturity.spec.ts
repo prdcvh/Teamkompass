@@ -150,13 +150,13 @@ describe('Reife-Kompass: Khamis-Roche (SCRUM-190)', () => {
         fatherHeight: null,
         updatedAt: '2026-11-03',
       });
-      expect(maturityInputsFromDoc({ sex: 'f', parentsConsent: false, motherHeight: 170, fatherHeight: 180 })).toEqual({
+      expect(maturityInputsFromDoc({ sex: 'f', parentsConsent: false, motherHeight: 170, fatherHeight: 180 })).toMatchObject({
         sex: 'f',
         parentsConsent: false,
         motherHeight: null,
         fatherHeight: null,
       });
-      expect(maturityInputsFromDoc({ sex: 'x', parentsConsent: true, motherHeight: '170', fatherHeight: 400 })).toEqual({
+      expect(maturityInputsFromDoc({ sex: 'x', parentsConsent: true, motherHeight: '170', fatherHeight: 400 })).toMatchObject({
         sex: null,
         parentsConsent: true,
         motherHeight: null,

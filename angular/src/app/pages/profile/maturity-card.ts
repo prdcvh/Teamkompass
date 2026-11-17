@@ -3,6 +3,7 @@ import { formatDate } from '../../core/events/event';
 import { SquadService } from '../../core/player/squad.service';
 import {
   MATURITY_BAND_LABELS,
+  MATURITY_STOPPED_TEXT,
   MAX_PARENT_HEIGHT_CM,
   MIN_PARENT_HEIGHT_CM,
   type MaturityInputs,
@@ -10,6 +11,8 @@ import {
   decimalAge,
   inMaturityAgeRange,
   maturityHistory,
+  maturityInputsForCalculation,
+  maturityStopped,
   missingMaturityInputs,
   parseParentHeight,
   percentText,
@@ -36,6 +39,8 @@ export const MATURITY_GRADES_HINT =
  * Reife-Kompass im Spielerprofil (SCRUM-190): Reifestand nach Khamis & Roche als Prozent der erwarteten
  * Erwachsenengröße mit Verlauf und Einordnung. Sichtbar nur für Trainer und Medizin; ändern darf nur der Trainer.
  * Spieler, Eltern und Scouts sehen die Karte nicht (und die Regeln sperren die Angaben der Eltern für sie).
+ * Bei widerrufener Einwilligung wird nichts mehr berechnet und nichts ergänzt (SCRUM-252); gelöscht wird über die
+ * Aufgabe in der Einwilligungs-Karte.
  */
 @Component({
   selector: 'tk-maturity-card',
@@ -57,6 +62,8 @@ export const MATURITY_GRADES_HINT =
             </div>
           } @else if (service.state() !== 'ready') {
             <p class="muted pad" role="status">Reife-Kompass wird geladen …</p>
+          } @else if (stopped()) {
+            <p class="consent-warning" role="status" data-test="maturity-stopped">{{ stoppedText }}</p>
           } @else {
             @if (!ageInRange()) {
               <p class="muted pad" data-test="maturity-age">Der Reifestand wird nur für Spieler von 12 bis 15 Jahren angezeigt.</p>
@@ -108,6 +115,9 @@ export const MATURITY_GRADES_HINT =
                   <input type="checkbox" name="parentsConsent" [checked]="draft().parentsConsent" (change)="patch({ parentsConsent: checked($event) })" [disabled]="locked()" />
                   Eltern sind mit der Speicherung ihrer Größe einverstanden
                 </label>
+                @if (service.inputs().parentsConsent) {
+                  <p class="muted" data-test="maturity-consent-record">{{ consentRecord() }}</p>
+                }
                 <div class="grid">
                   <label class="tk-label">
                     Größe Mutter (cm)
@@ -154,12 +164,22 @@ export class MaturityCard {
     return id ? (this.squad.players().find((entry) => entry.id === id) ?? null) : null;
   });
   private readonly birthdate = computed(() => this.player()?.birthdate ?? '');
-  protected readonly history = computed(() => maturityHistory(this.measurements.measurements(), this.birthdate(), this.service.inputs()));
+  /** Einwilligung widerrufen: keine Berechnung, kein Formular (SCRUM-252). */
+  protected readonly stopped = computed(() => maturityStopped(this.player()));
+  /** Nur damit wird gerechnet – bei Widerruf leer, dann gibt es keinen Wert. */
+  private readonly calculationInputs = computed(() => maturityInputsForCalculation(this.service.inputs(), this.player()));
+  protected readonly history = computed(() => maturityHistory(this.measurements.measurements(), this.birthdate(), this.calculationInputs()));
   protected readonly historyNewestFirst = computed(() => [...this.history()].reverse());
   protected readonly latest = computed(() => this.history().at(-1) ?? null);
   /** Nur für Spieler, die heute 12 bis 15 Jahre alt sind (PO, 02.11.2026). */
   protected readonly ageInRange = computed(() => inMaturityAgeRange(decimalAge(this.birthdate(), todayIso())));
-  protected readonly missing = computed(() => missingMaturityInputs(this.service.inputs(), this.birthdate(), this.measurements.measurements()));
+  protected readonly missing = computed(() => missingMaturityInputs(this.calculationInputs(), this.birthdate(), this.measurements.measurements()));
+  /** Nachweis des Einverständnisses der Eltern (SCRUM-252). */
+  protected readonly consentRecord = computed(() => {
+    const { parentsConsentDate, parentsConsentBy } = this.service.inputs();
+    if (!parentsConsentDate) return 'Einverständnis der Eltern ohne Datum eingetragen (vor November 2026).';
+    return `Einverständnis der Eltern eingetragen am ${formatDate(parentsConsentDate)}${parentsConsentBy ? ` von ${parentsConsentBy}` : ''}.`;
+  });
   protected readonly canEdit = computed(() => this.editable() && this.service.canWrite());
   protected readonly locked = computed(() => !!this.healthLocked());
 
@@ -169,6 +189,7 @@ export class MaturityCard {
   protected readonly saved = signal(false);
 
   protected readonly gradesHint = MATURITY_GRADES_HINT;
+  protected readonly stoppedText = MATURITY_STOPPED_TEXT;
   protected readonly formatDate = formatDate;
 
   constructor() {
@@ -232,7 +253,7 @@ export class MaturityCard {
 
   protected async submit(event: Event): Promise<void> {
     event.preventDefault();
-    if (this.busy() || this.locked()) return;
+    if (this.busy() || this.locked() || this.stopped()) return;
     const draft = this.draft();
     const mother = draft.parentsConsent ? parseParentHeight(draft.motherHeight) : null;
     const father = draft.parentsConsent ? parseParentHeight(draft.fatherHeight) : null;

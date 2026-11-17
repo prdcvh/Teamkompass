@@ -667,32 +667,67 @@ service cloud.firestore {
         }
 
         // -----------------------------------------------------------------------------------------
-        // Reife-Kompass (SCRUM-190, PO-Entscheidung 02.11.2026). Ein Dokument "parents" mit Geschlecht fuer die
-        // Formel, Einverstaendnis der Eltern und Groesse von Mutter und Vater (Angaben ueber Dritte). Der Reifestand
-        // selbst wird nie gespeichert, die App rechnet ihn aus Messwerten und diesem Dokument.
+        // Reife-Kompass (SCRUM-190, PO-Entscheidung 02.11.2026; Einwilligung/Widerruf SCRUM-252). Ein Dokument "parents"
+        // mit Geschlecht fuer die Formel, Einverstaendnis der Eltern und Groesse von Mutter und Vater (Angaben ueber
+        // Dritte). Der Reifestand selbst (und jede andere Ableitung) wird nie gespeichert, die App rechnet ihn aus
+        // Messwerten und diesem Dokument. Datenblatt: docs/legal/reife-kompass.md.
         // - Lesen: nur Trainer und Medizin (Medizin nicht bei widerrufener Einwilligung, wie Messwerte). Spieler,
-        //   Eltern und Scouts nie - ohne die Groesse der Eltern laesst sich der Reifestand nicht berechnen.
+        //   Eltern, Scouts, Vereinsadmin und andere Teams nie - ohne die Groesse der Eltern laesst sich der Reifestand
+        //   nicht berechnen. Kein collectionGroup-Zugriff (es gibt keine Regel dafuer).
         // - Schreiben: nur Trainer, nur genau diese Felder, Groessen 100-250 cm. Ohne Haekchen "Eltern sind
-        //   einverstanden" (parentsConsent) duerfen keine Groessen gespeichert sein. Fremde Vereine wie bei
-        //   Gesundheitsdaten nur mit dokumentierter Einwilligung (mayStoreHealth). Loeschen: Trainer.
+        //   einverstanden" (parentsConsent) duerfen keine Groessen und kein Nachweis gespeichert sein. Fremde Vereine
+        //   wie bei Gesundheitsdaten nur mit dokumentierter Einwilligung (mayStoreHealth). Loeschen: Trainer.
+        // - Nachweis (SCRUM-252): Wer das Haekchen neu setzt, traegt sich mit Konto (parentsConsentByUid), Anzeige
+        //   (parentsConsentBy) und Tag (parentsConsentDate) ein; bleibt das Haekchen gesetzt, bleibt der Nachweis
+        //   unveraendert. Eintraege von vor SCRUM-252 ohne Nachweis bleiben gueltig.
+        // - Widerruf (SCRUM-252, wie SCRUM-245): Ist die Einwilligung des Spielers nach dem Schreiben "widerrufen",
+        //   duerfen keine Groessen der Eltern mehr gespeichert werden (keine neue Berechnung). Was schon gespeichert
+        //   ist, bleibt bis der Trainer es loescht - geloescht wird nie automatisch.
+        // Neue Felder (z. B. SCRUM-253): Rohmesswerte wie Sitzhoehe gehoeren in measurements (dort gelten Lesen/
+        // Schreiben/Widerruf schon fuer jedes Feld). Weitere Reife-Angaben in DIESEM Dokument muessen unten in hasOnly
+        // aufgenommen werden; gespeicherte Ableitungen sind nicht vorgesehen.
         // -----------------------------------------------------------------------------------------
         match /maturity/{docId} {
           function parentHeightOk(value) {
             return value == null || ((value is int || value is float) && value >= 100 && value <= 250);
           }
+          function noParentHeights(data) {
+            return data.get('motherHeight', null) == null && data.get('fatherHeight', null) == null;
+          }
+          function revokedAfterWrite() {
+            return existsAfter(playerPath(playerId))
+              && getAfter(playerPath(playerId)).data.get('consentStatus', 'pending') == 'revoked';
+          }
+          function parentsConsentRecordOk(data) {
+            return data.parentsConsent == false
+              ? (data.get('parentsConsentDate', null) == null
+                && data.get('parentsConsentBy', null) == null
+                && data.get('parentsConsentByUid', null) == null)
+              : ((resource != null && resource.data.get('parentsConsent', false) == true
+                  && data.get('parentsConsentDate', null) == resource.data.get('parentsConsentDate', null)
+                  && data.get('parentsConsentBy', null) == resource.data.get('parentsConsentBy', null)
+                  && data.get('parentsConsentByUid', null) == resource.data.get('parentsConsentByUid', null))
+                || ((resource == null || resource.data.get('parentsConsent', false) != true)
+                  && data.get('parentsConsentByUid', null) == request.auth.uid
+                  && data.get('parentsConsentDate', null) is string
+                  && data.get('parentsConsentDate', '').matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+                  && data.get('parentsConsentBy', '') is string
+                  && data.get('parentsConsentBy', '').size() <= 200));
+          }
           allow read: if isTrainer() || (isPhysio() && !consentRevoked(playerId));
           allow create, update: if isTrainer()
             && docId == 'parents'
             && mayStoreHealth(playerId)
-            && request.resource.data.keys().hasOnly(['playerId', 'sex', 'parentsConsent', 'motherHeight', 'fatherHeight', 'updatedAt'])
+            && request.resource.data.keys().hasOnly(['playerId', 'sex', 'parentsConsent', 'motherHeight', 'fatherHeight', 'parentsConsentDate', 'parentsConsentBy', 'parentsConsentByUid', 'updatedAt'])
             && request.resource.data.playerId == playerId
             && request.resource.data.get('sex', '') in ['', 'm', 'f']
             && request.resource.data.parentsConsent is bool
             && request.resource.data.get('updatedAt', '') is string
             && parentHeightOk(request.resource.data.get('motherHeight', null))
             && parentHeightOk(request.resource.data.get('fatherHeight', null))
-            && (request.resource.data.parentsConsent == true
-              || (request.resource.data.get('motherHeight', null) == null && request.resource.data.get('fatherHeight', null) == null));
+            && (request.resource.data.parentsConsent == true || noParentHeights(request.resource.data))
+            && parentsConsentRecordOk(request.resource.data)
+            && (!revokedAfterWrite() || noParentHeights(request.resource.data));
           allow delete: if isTrainer();
         }
 

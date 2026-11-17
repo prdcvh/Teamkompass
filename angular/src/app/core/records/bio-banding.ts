@@ -16,7 +16,8 @@
  * Der Vorschlag ist nur eine Hilfe, der Trainer entscheidet. Er nutzt die jüngste Messung je Spieler (nur Spieler
  * von 12 bis 15 Jahren mit Reifestand); alle anderen bekommen keinen Vorschlag.
  */
-import { type MaturityInputs, type MaturityPoint, decimalAge, inMaturityAgeRange, maturityHistory, roundPercent } from './maturity';
+import type { ConsentStatus } from '../player/player';
+import { type MaturityInputs, type MaturityPoint, decimalAge, inMaturityAgeRange, maturityHistory, maturityInputsForCalculation, roundPercent } from './maturity';
 import type { Measurement } from './measurement';
 
 export type BioBand = 1 | 2 | 3 | 4;
@@ -50,6 +51,8 @@ export interface BioBandingPlayer {
   readonly id: string;
   readonly name: string;
   readonly birthdate: string;
+  /** Bei „widerrufen“ gibt es keinen Vorschlag für den Spieler (SCRUM-252). */
+  readonly consentStatus?: ConsentStatus;
 }
 
 export interface BioBandingData {
@@ -76,7 +79,8 @@ export interface BioBandingSuggestion {
 }
 
 /**
- * Vorschlag für Gruppen. `data` ist null/fehlt für einen Spieler, dessen Angaben nicht geladen werden konnten – er zählt
+ * Vorschlag für Gruppen. Spieler mit widerrufener Einwilligung bekommen nie einen Wert, auch wenn Daten übergeben
+ * werden (SCRUM-252). `data` ist null/fehlt für einen Spieler, dessen Angaben nicht geladen werden konnten – er zählt
  * dann zu den Spielern ohne Vorschlag. `today` bestimmt, wer 12 bis 15 Jahre alt ist.
  */
 export function suggestBioBanding(players: readonly BioBandingPlayer[], data: ReadonlyMap<string, BioBandingData | null>, today: string): BioBandingSuggestion {
@@ -84,7 +88,7 @@ export function suggestBioBanding(players: readonly BioBandingPlayer[], data: Re
   let withoutValue = 0;
   for (const player of players) {
     const entry = data.get(player.id);
-    const point = entry && inMaturityAgeRange(decimalAge(player.birthdate, today)) ? maturityHistory(entry.measurements, player.birthdate, entry.inputs).at(-1) : undefined;
+    const point = entry && inMaturityAgeRange(decimalAge(player.birthdate, today)) ? maturityHistory(entry.measurements, player.birthdate, maturityInputsForCalculation(entry.inputs, player)).at(-1) : undefined;
     if (!point) {
       withoutValue += 1;
       continue;
