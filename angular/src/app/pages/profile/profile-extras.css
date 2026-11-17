@@ -200,3 +200,25 @@ h2 {
   gap: var(--tk-space-1);
   margin: var(--tk-space-2) 0;
 }
+
+/* Messassistent (SCRUM-253): Qualitätskennzeichen und Details je Messung. */
+.items .measurement-meta,
+.items .measurement-detail {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+.items .measurement-meta[data-quality='flagged'],
+.items .measurement-flag {
+  color: var(--tk-ink);
+}
+
+.items .measurement-meta[data-quality='flagged']::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--tk-amber);
+}
