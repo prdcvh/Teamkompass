@@ -92,6 +92,8 @@ h2 {
 
 .panel {
   display: grid;
+  /* Eine Spalte, die schrumpfen darf – sonst weitet ein langer Termin (z. B. heute) die Kachel über den Rand. */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--tk-space-3);
   padding: var(--tk-space-4);
 }
@@ -288,6 +290,10 @@ a:focus-visible {
 
 .live-start {
   justify-self: stretch;
+  min-width: 0;
+  /* Langer Termintitel (Live-Modus heute) umbrechen statt über den Rand zu laufen. */
+  white-space: normal;
+  text-align: center;
   min-height: 56px;
   font-size: var(--tk-text-md, 1rem);
 }
