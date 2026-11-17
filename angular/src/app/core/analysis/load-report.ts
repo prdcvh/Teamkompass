@@ -229,7 +229,12 @@ export function buildLoadReport(input: LoadReportInput): LoadReport {
       const hint = hintRateAt(validPoints, point);
       const base = { to: point.date, toHeight: point.height, from: hint.interval?.from.date ?? null, fromHeight: hint.interval?.from.height ?? null };
       if (hint.rate === null) {
-        const note = hint.interval ? STATUS_LABELS[hint.interval.status] : `zu kurz für eine Rate (keine ältere Messung mit 90 bis 365 Tagen Abstand)`;
+        const first = !validPoints.some((other) => other.date < point.date);
+        const note = hint.interval
+          ? STATUS_LABELS[hint.interval.status]
+          : first
+            ? 'erste Messung, Ausgangswert'
+            : 'zu kurz für eine Rate (keine ältere Messung mit 90 bis 365 Tagen Abstand)';
         return { ...base, perMonth: null, level: null, note };
       }
       const monthly = perMonth(hint.rate);

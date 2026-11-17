@@ -146,6 +146,7 @@ describe('buildLoadReport', () => {
     expect(shortHtml).not.toContain('Wachstumsschub');
     expect(shortHtml).not.toContain('cm/Monat');
     expect(shortHtml).toContain('keine Rate');
+    expect(short.markers.growth.map((row) => row.note)).toEqual(['erste Messung, Ausgangswert', 'zu kurz für eine Rate (keine ältere Messung mit 90 bis 365 Tagen Abstand)']);
 
     // Messung kurz vor der jüngsten wird übersprungen: Vergleich mit der Messung 90 Tage davor – wie die Ampel.
     const measurements: Measurement[] = [
