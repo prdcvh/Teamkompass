@@ -246,7 +246,7 @@ gesunken (**eigener Vorschlagswert**, größer als die Stufe der Tabellenzeile a
 Größenmessung ohne Gewicht. Fehlerbreite: Bereich des %PAH bei ±5,3 cm (Jungen) / ±4,3 cm (Mädchen) Erwachsenengröße
 (§3.5), ausdrücklich keine Sicherheitsangabe. Keine automatische PHV-Einordnung, kein Moore-Modell. Eine manuelle
 Einordnung der Wachstumsspitze (mit Autor, Datum, Begründung) gibt es noch nicht – sie bräuchte neue Felder in
-`maturity/parents` und damit eine Regeländerung (eigenes Ticket).
+`maturity/parents` und damit eine Regeländerung (SCRUM-388). Bio-Banding nutzt diese Prüfung noch nicht (SCRUM-389).
 
 ## 8. Quellen
 

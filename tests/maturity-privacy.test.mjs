@@ -38,7 +38,8 @@ const ALLOWED = {
   "core/records/bio-banding.service.ts": "nur Trainer/Medizin, ohne widerrufene Spieler",
   "pages/event-rating/event-details.ts": "Bio-Banding bei Trainings, nur Trainer/Medizin",
   "pages/profile/maturity-card.ts": "Karte im Profil, nur Trainer/Medizin",
-  "pages/profile/profile-extras.ts": "bindet die Karte ein",
+  "pages/profile/maturity-explanation.ts": "Erklaerung in der Karte (SCRUM-256), bekommt die fertige Einschaetzung von der Karte",
+  "pages/profile/profile-extras.ts":"bindet die Karte ein",
   "pages/profile/consent-panel.ts": "Aufgabe Gesundheitsdaten pruefen und loeschen (nur Trainer)"
 };
 
