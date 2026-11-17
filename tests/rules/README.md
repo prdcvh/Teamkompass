@@ -95,4 +95,7 @@ trägt die eigene UID ein (`consentByUid`). SCRUM-248: Der Trainer darf in einer
 `maturity.test.mjs`: Reife-Kompass (SCRUM-190) unter `players/{playerId}/maturity/parents` (Geschlecht für die Formel,
 Einverständnis der Eltern, Größe von Mutter und Vater) – lesen nur Trainer und Medizin (Medizin nicht bei widerrufener
 Einwilligung), nie Spieler, Eltern oder Scouts; schreiben nur der Trainer, nur diese Felder, Größen 100–250 cm und nur mit
-Häkchen `parentsConsent`; fremde Vereine nur mit dokumentierter Einwilligung.
+Häkchen `parentsConsent`; fremde Vereine nur mit dokumentierter Einwilligung. Seit SCRUM-252 auch: Vereinsadmin und
+Trainer anderer Teams lesen/schreiben nichts, collectionGroup-Abfrage `maturity` für niemanden, Nachweis des
+Einverständnisses (wer das Häkchen neu setzt, trägt eigenes Konto und Tag ein; danach unveränderlich) und Widerruf (keine
+neuen Größen der Eltern, auch nicht im selben Schreibvorgang; leeren und löschen geht). Datenblatt: `docs/legal/reife-kompass.md`.
