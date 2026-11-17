@@ -18,6 +18,7 @@ export const SIDEBAR_ITEMS: readonly NavItem[] = [
   { path: '/teamanalyse', label: 'Teamanalyse', icon: 'chart' },
   { path: '/gegneranalyse', label: 'Gegneranalyse', icon: 'target' },
   { path: '/aufstellung', label: 'Aufstellung', icon: 'diamond' },
+  { path: '/messplan', label: 'Messplan', icon: 'calendar' },
 ];
 
 /** Tab-Leiste am Handy: vier feste Bereiche, „Mehr“ öffnet das Sheet. */
@@ -52,6 +53,7 @@ export const MORE_GROUPS: readonly MoreGroup[] = [
       { path: '/wissen', label: 'Wissen', icon: 'book', hint: 'Videos, Dokumente, Glossar' },
       { path: '/gegneranalyse', label: 'Gegneranalyse', icon: 'target', hint: 'Matchplan & Gegnerprofile' },
       { path: '/teamanalyse', label: 'Teamanalyse', icon: 'chart', hint: 'Form, Kennzahlen, Positionen' },
+      { path: '/messplan', label: 'Messplan', icon: 'calendar', hint: 'Wer wann wieder gemessen wird' },
     ],
   },
   {

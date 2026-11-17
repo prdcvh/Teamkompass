@@ -36,6 +36,8 @@ import { FakeAuthApi } from './fake-auth.api';
 import { FakeEventsApi } from './fake-events.api';
 import { FakeLineupApi } from './fake-lineup.api';
 import { FakeKnowledgeApi } from './fake-knowledge.api';
+import { FakeMeasurementPlanApi } from './fake-measurement-plan.api';
+import { MeasurementPlanApi } from '../firebase/measurement-plan.api';
 import { FakeLearningApi } from './fake-learning.api';
 import { FakePuzzlesApi } from './fake-puzzles.api';
 import { FakeNotificationsApi } from './fake-notifications.api';
@@ -66,6 +68,7 @@ export class FakeFirebase {
   readonly events = new FakeEventsApi(this.calls);
   readonly lineup = new FakeLineupApi(this.calls);
   readonly knowledge = new FakeKnowledgeApi(this.calls);
+  readonly measurementPlan = new FakeMeasurementPlanApi(this.calls);
   readonly learning = new FakeLearningApi(this.calls);
   readonly puzzles = new FakePuzzlesApi(this.calls);
   readonly opponents = new FakeOpponentsApi(this.calls);
@@ -103,6 +106,7 @@ export function provideFakeFirebase(fake: FakeFirebase): Provider[] {
     { provide: EventsApi, useValue: fake.events },
     { provide: LineupApi, useValue: fake.lineup },
     { provide: KnowledgeApi, useValue: fake.knowledge },
+    { provide: MeasurementPlanApi, useValue: fake.measurementPlan },
     { provide: LearningApi, useValue: fake.learning },
     { provide: PuzzlesApi, useValue: fake.puzzles },
     { provide: OpponentsApi, useValue: fake.opponents },

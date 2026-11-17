@@ -1,0 +1,149 @@
+<section class="page">
+  <header class="head">
+    <div>
+      <p class="tk-eyebrow">Mannschaft</p>
+      <h1>Messplan</h1>
+      <p class="muted">
+        Wann wer wieder gemessen wird, damit für jeden teilnehmenden Spieler ein brauchbarer Verlauf entsteht. Der Dreimonatsrhythmus ist ein Vorschlag von
+        uns und keine medizinische Frist; du kannst ihn je Spieler ändern, einen Termin vorziehen oder verschieben und die Planung pausieren. Nur Trainer sehen diese Seite.
+      </p>
+    </div>
+  </header>
+
+  @if (!isTrainer()) {
+    <p class="muted">Den Messplan sehen nur Trainer.</p>
+  } @else {
+    <p class="sync" role="status" [attr.data-state]="sync.state()">
+      {{ sync.label() }}
+      @if (sync.detail()) {
+        <span> – {{ sync.detail() }}</span>
+      }
+    </p>
+
+    @if (plan.load() === 'error') {
+      <div class="notice" role="alert">
+        <p>Der Messplan konnte nicht geladen werden. Bitte Verbindung prüfen.</p>
+        <button tkButton type="button" (click)="plan.retry()">Erneut versuchen</button>
+      </div>
+    } @else if (plan.load() !== 'ready') {
+      <p class="muted" role="status">Messplan wird geladen …</p>
+    } @else {
+      @if (error()) {
+        <p class="notice" role="alert">{{ error() }}</p>
+      }
+
+      @if (round() !== null) {
+        <tk-card>
+          <div class="round" data-testid="round">
+            @if (finished()) {
+              <h2>Messrunde beendet</h2>
+              <p>{{ measured().length }} gemessen, {{ skipped().length }} übersprungen. Übersprungene Spieler haben keine neue Messung bekommen und bleiben im Plan wie zuvor.</p>
+              <div class="actions">
+                <button tkButton variant="primary" type="button" (click)="endRound()">Fertig</button>
+              </div>
+            } @else {
+              <p class="muted" role="status">Spieler {{ position() + 1 }} von {{ round()!.length }}</p>
+              <progress [max]="round()!.length" [value]="position()" aria-label="Fortschritt der Messrunde"></progress>
+              <h2>{{ current()?.name ?? nameOf(currentId()!) }}</h2>
+              @if (current()) {
+                <p class="muted">
+                  Letzte gültige Messung: {{ current()!.lastDate ? formatDate(current()!.lastDate!) : 'noch keine' }}
+                </p>
+              }
+              <div class="actions">
+                <button tkButton variant="primary" type="button" [disabled]="!recordsReady()" (click)="openAssistant()">Messung eintragen</button>
+                <button tkButton type="button" (click)="skip()">Heute nicht dabei – überspringen</button>
+                <button tkButton variant="ghost" type="button" (click)="endRound()">Runde beenden</button>
+              </div>
+              @if (!recordsReady()) {
+                <p class="muted" role="status">Daten des Spielers werden geladen …</p>
+              }
+            }
+          </div>
+        </tk-card>
+        <tk-measurement-dialog [open]="dialogOpen()" (closed)="assistantClosed()" />
+      } @else {
+        <div class="summary" role="status">
+          <tk-chip tone="red">{{ plan.counts().overdue }} überfällig</tk-chip>
+          <tk-chip tone="amber">{{ plan.counts().due }} fällig</tk-chip>
+          <tk-chip tone="blue">{{ plan.counts().baselineMissing }} ohne Baseline</tk-chip>
+          <button tkButton variant="primary" type="button" [disabled]="plan.queue().length === 0" (click)="startRound()">
+            Messrunde starten ({{ plan.queue().length }})
+          </button>
+        </div>
+      }
+
+      @if (inPlan().length === 0) {
+        <tk-card>
+          <div class="empty">
+            <p>Noch kein Spieler im Messplan. Aufgenommen werden Spieler mit dokumentierter Einwilligung (Profil → Einwilligung).</p>
+          </div>
+        </tk-card>
+      } @else {
+        <p class="muted">
+          „Fällig“ gilt ab {{ dueWindow }} Tage vor dem Termin, „überfällig“ erst {{ grace }} Tage danach. Pausierte Spieler werden nie als fällig oder überfällig gezählt.
+        </p>
+        <ul class="list" aria-label="Messplan des Kaders">
+          @for (row of inPlan(); track row.playerId) {
+            <li class="row" [attr.data-status]="row.status">
+              <div class="who">
+                <a [routerLink]="['/profile', row.playerId]">{{ row.name }}</a>
+                <tk-chip [tone]="tone(row.status)">{{ label(row.status) }}</tk-chip>
+              </div>
+              <dl class="facts">
+                <div>
+                  <dt>Letzte gültige Messung</dt>
+                  <dd>{{ row.lastDate ? formatDate(row.lastDate) : 'noch keine' }}</dd>
+                </div>
+                <div>
+                  <dt>Nächster Termin</dt>
+                  <dd>{{ row.nextDue ? formatDate(row.nextDue) : '–' }}{{ row.manual ? ' (von Hand)' : '' }}</dd>
+                </div>
+              </dl>
+              <div class="controls">
+                <label class="tk-label">
+                  Rhythmus
+                  <select class="tk-input" [name]="'interval-' + row.playerId" [disabled]="row.status === 'paused'" (change)="setInterval(row, $event)">
+                    @for (months of intervals; track months) {
+                      <option [value]="months" [selected]="months === row.intervalMonths">{{ months }} {{ months === 1 ? 'Monat' : 'Monate' }}{{ months === 3 ? ' (Vorschlag)' : '' }}</option>
+                    }
+                  </select>
+                </label>
+                <label class="tk-label">
+                  Termin setzen
+                  <input class="tk-input" type="date" [name]="'due-' + row.playerId" [min]="plan.today()" [value]="row.manual ? row.nextDue : ''" [disabled]="row.status === 'paused'" (change)="setDue(row, $event)" />
+                </label>
+                @if (row.manual && row.status !== 'paused') {
+                  <button tkButton size="sm" type="button" (click)="clearDue(row)">Termin zurücknehmen</button>
+                }
+                <button tkButton size="sm" type="button" (click)="togglePause(row)">
+                  {{ row.status === 'paused' ? 'Messplanung fortsetzen' : 'Messplanung pausieren' }}
+                </button>
+              </div>
+            </li>
+          }
+        </ul>
+      }
+
+      @if (outOfPlan().length > 0) {
+        <tk-card>
+          <div class="panel">
+            <h2>Nicht im Messplan</h2>
+            <p class="muted">
+              Für diese Spieler gibt es keinen Messplan, weil die Einwilligung für Gesundheitsdaten nicht dokumentiert ist. Das ist kein Versäumnis: es gibt weder Termine noch
+              Erinnerungen.
+            </p>
+            <ul class="plain">
+              @for (row of outOfPlan(); track row.playerId) {
+                <li>
+                  <a [routerLink]="['/profile', row.playerId]">{{ row.name }}</a>
+                  <span class="muted"> – {{ consentLabels[row.consentStatus] }}</span>
+                </li>
+              }
+            </ul>
+          </div>
+        </tk-card>
+      }
+    }
+  }
+</section>
