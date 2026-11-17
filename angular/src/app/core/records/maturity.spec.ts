@@ -1,6 +1,9 @@
 import type { Measurement } from './measurement';
 import {
+  CM_PER_INCH,
+  KG_PER_POUND,
   KHAMIS_ROCHE_COEFFICIENTS,
+  MATURITY_METHOD_VERSION,
   type MaturityInputs,
   coefficientsFor,
   decimalAge,
@@ -180,5 +183,111 @@ describe('Reife-Kompass: Khamis-Roche (SCRUM-190)', () => {
       expect(missingMaturityInputs(inputs({ fatherHeight: null }), '2012-01-01', ok)).toEqual(['Größe beider Eltern']);
       expect(missingMaturityInputs(inputs(), '', ok)).toEqual(['Geburtsdatum']);
     });
+  });
+});
+
+/**
+ * Referenzfälle der Methodenprüfung (SCRUM-251, docs/reife-kompass-methoden.md, Methodenversion 1.0).
+ * Die erwarteten Zahlen sind unabhängig von der App von Hand in Zoll/Pfund nachgerechnet (Koeffizienten als Literale aus
+ * der erratum-korrigierten Tabelle des UW-MSK-Rechners), nicht aus der App-Funktion abgeleitet.
+ */
+describe('Reife-Kompass: Referenzfälle Methodenversion 1.0 (SCRUM-251)', () => {
+  it('Methodenversion passt zum Dokument', () => {
+    expect(MATURITY_METHOD_VERSION).toBe('1.0');
+  });
+
+  describe('Einheiten', () => {
+    it('rechnet mit den exakten Definitionen von Zoll und Pfund', () => {
+      expect(CM_PER_INCH).toBe(2.54);
+      expect(KG_PER_POUND).toBe(0.45359237);
+    });
+
+    it('Mädchen 12,5 J., 150 cm, 44 kg, Eltern 165/178 cm → 64,1354 Zoll = 162,90 cm, 92,08 %', () => {
+      // Zeile Mädchen 12,5: β0 4.27869, Größe 0.67386, Gewicht −0.04272, Mittelelterngröße 0.3585 (Zoll/Pfund).
+      const inches = 4.27869 + 0.67386 * (150 / 2.54) - 0.04272 * (44 / 0.45359237) + 0.3585 * (171.5 / 2.54);
+      expect(inches).toBeCloseTo(64.1354, 4);
+      const predicted = predictedAdultHeightCm('f', 12.5, 150, 44, (165 + 178) / 2)!;
+      expect(predicted).toBeCloseTo(inches * 2.54, 10);
+      expect(predicted).toBeCloseTo(162.904, 3);
+      expect(percentText((150 / predicted) * 100)).toBe('92,1 %');
+    });
+
+    it('Jungen 13,5 J. (Cumming-Beispiel) stimmt mit der Handrechnung in Zoll/Pfund überein', () => {
+      const inches = -7.1348 + 0.59228 * (172.5 / 2.54) - 0.011624 * (55 / 0.45359237) + 0.61253 * (170.15 / 2.54);
+      expect(predictedAdultHeightCm('m', 13.5, 172.5, 55, 170.15)).toBeCloseTo(inches * 2.54, 10);
+    });
+
+    it('beide Modellspezifikationen (Jungen, Mädchen) liefern bei gleichen Eingaben verschiedene Werte', () => {
+      const boy = predictedAdultHeightCm('m', 13, 157, 48, 166)!;
+      const girl = predictedAdultHeightCm('f', 13, 157, 48, 166)!;
+      expect(girl).toBeCloseTo(163.5025, 3);
+      expect(boy - girl).toBeGreaterThan(10);
+    });
+  });
+
+  describe('Dezimalalter und Schaltjahr', () => {
+    const born = '2012-02-29';
+    const m = (date: string) => measurement(date, 150, 40);
+
+    it('Geburtstag am 29.02.: 12,0 erst am 29.02.2024, 16,0 am 29.02.2028', () => {
+      expect(decimalAge(born, '2024-02-28')).toBeCloseTo(11.99726, 5);
+      expect(decimalAge(born, '2024-02-29')).toBe(12);
+      expect(decimalAge(born, '2025-02-28')).toBeCloseTo(12.99932, 5);
+      expect(decimalAge(born, '2028-02-28')).toBeCloseTo(15.99726, 5);
+      expect(decimalAge(born, '2028-02-29')).toBe(16);
+    });
+
+    it('Altersgrenzen 12,0 ≤ Alter < 16,0 gelten auch für am 29.02. Geborene', () => {
+      expect(maturityAt(m('2024-02-28'), born, inputs())).toBeNull();
+      expect(maturityAt(m('2024-02-29'), born, inputs())).not.toBeNull();
+      expect(maturityAt(m('2028-02-28'), born, inputs())).not.toBeNull();
+      expect(maturityAt(m('2028-02-29'), born, inputs())).toBeNull();
+    });
+
+    it('Tabellenzeile springt am Vierteljahr (nächstes halbes Jahr): 13,2485 → Zeile 13,0, einen Tag später → 13,5', () => {
+      const born2012 = '2012-01-01';
+      const before = decimalAge(born2012, '2025-04-01')!;
+      const after = decimalAge(born2012, '2025-04-02')!;
+      expect(before).toBeCloseTo(13.24846, 5);
+      expect(after).toBeCloseTo(13.2512, 4);
+      expect(coefficientsFor('m', before)?.[0]).toBe(13);
+      expect(coefficientsFor('m', after)?.[0]).toBe(13.5);
+      // Bekannte Stufe der Rundungsregel (Dokument 3.4): ≈ 2,15 cm Unterschied von einem Tag auf den nächsten.
+      const a = maturityAt(measurement('2025-04-01', 172.5, 55), born2012, inputs())!;
+      const b = maturityAt(measurement('2025-04-02', 172.5, 55), born2012, inputs())!;
+      expect(a.predictedAdultCm).toBeCloseTo(186.84, 2);
+      expect(b.predictedAdultCm).toBeCloseTo(184.69, 2);
+    });
+
+    it('15,75–15,99 J. nutzt die Zeile 16,0 (liegt noch in der Tabelle)', () => {
+      expect(coefficientsFor('m', 15.8)?.[0]).toBe(16);
+      expect(coefficientsFor('f', 15.99)?.[0]).toBe(16);
+    });
+  });
+
+  describe('Fehlende und ungültige Angaben', () => {
+    it('Null, negative Werte und ungültiges Alter ergeben keinen Wert', () => {
+      expect(predictedAdultHeightCm('m', 13, 0, 48, 170)).toBeNull();
+      expect(predictedAdultHeightCm('m', 13, 157, -1, 170)).toBeNull();
+      expect(predictedAdultHeightCm('m', 13, 157, 48, 0)).toBeNull();
+      expect(predictedAdultHeightCm('m', Number.NaN, 157, 48, 170)).toBeNull();
+      expect(predictedAdultHeightCm('f', 3.74, 100, 16, 170)).toBeNull();
+      expect(predictedAdultHeightCm('f', 17.76, 165, 55, 170)).toBeNull();
+      expect(decimalAge('2012-01-01', '2025-13-01')).toBeNull();
+    });
+  });
+
+  it('%PAH steigt bei normal wachsenden Kindern mit dem Alter – Grundlage der Entscheidungsvorlage (Dokument 4)', () => {
+    // Erfundener Junge, der jedes Jahr normal wächst (Mittelelterngröße 170 cm): die heutige Einordnung wechselt allein
+    // durch das Älterwerden von „spät“ zu „früh“. Ändert der PO die Einordnung, ändert sich nur die Band-Erwartung.
+    const born = '2010-01-01';
+    const boy = { sex: 'm' as const, parentsConsent: true, motherHeight: 165, fatherHeight: 175 };
+    const history = maturityHistory(
+      [measurement('2022-01-01', 149, 40.5), measurement('2023-01-01', 156, 45.5), measurement('2024-01-01', 163.5, 51), measurement('2025-01-01', 169.5, 56)],
+      born,
+      boy,
+    );
+    expect(history.map((point) => percentText(point.percent))).toEqual(['84,1 %', '87,9 %', '92,1 %', '95,7 %']);
+    expect(history.map((point) => point.band)).toEqual(['late', 'average', 'average', 'early']);
   });
 });
