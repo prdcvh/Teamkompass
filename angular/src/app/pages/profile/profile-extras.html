@@ -151,6 +151,12 @@
               <div>
                 <strong>{{ formatDate(measurement.date) }}</strong>
                 <p>{{ measurementText(measurement) }}</p>
+                <p class="measurement-meta" [attr.data-quality]="quality(measurement)">{{ measurementMeta(measurement) }}</p>
+                @if (showDetails()) {
+                  @for (line of measurementDetails(measurement); track $index) { <p class="measurement-detail">{{ line }}</p> }
+                  @for (flag of measurement.flags ?? []; track flag) { <p class="measurement-detail measurement-flag">Prüfen: {{ flagText[flag] }}</p> }
+                  @for (change of measurement.changes ?? []; track $index) { <p class="measurement-detail measurement-change">{{ changeText(change) }}</p> }
+                }
               </div>
               @if (canEdit()) {
                 <div class="row-actions">
