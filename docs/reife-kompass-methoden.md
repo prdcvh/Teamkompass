@@ -208,9 +208,10 @@ Größe 0,6 cm (Wiederholung nach 7 Tagen), Gewicht 0,3 kg, Sitzhöhe 0,9 cm.
 | Mindestdaten | 1 Messung = Ausgangswert; 2 gültige Messungen mit Mindestabstand = genau 1 Rate; ≥ 3 = Verlauf | SCRUM-254 |
 | PHV | **keine automatische Erkennung** (weder aus Maximum der Raten noch aus %PAH) | eigene Validierung fehlt; Monasterio 2024: beste Übereinstimmung (≈ 80 %) nur durch erfahrene Personen, die die Kurve ansehen |
 
-Die heutige Ampel (SCRUM-157) nimmt zwei beliebige Messungen der letzten 90 Tage ohne Mindestabstand und
-liest eine Messung ohne Größe als 0 cm → falscher „starker Wachstumsschub“: **SCRUM-302** (High). Die Regeln
-oben sind für die Umsetzung in SCRUM-254 gedacht.
+Die Ampel (SCRUM-157) nahm früher zwei beliebige Messungen der letzten 90 Tage ohne Mindestabstand und
+las eine Messung ohne Größe als 0 cm → falscher „starker Wachstumsschub“: behoben in **SCRUM-302** (keine 0 cm)
+und **SCRUM-305** (Belastungsampel und Belastungsbericht nutzen dieselbe Regel wie das Profil aus SCRUM-254:
+Mindestabstand 90 Tage, Vergleichsmessung 90 bis 365 Tage vor der jüngsten, jüngste ≤ 90 Tage alt).
 
 ## 7. Grenzen der Übertragbarkeit
 
@@ -227,6 +228,26 @@ oben sind für die Umsetzung in SCRUM-254 gedacht.
   Studien korrigieren sie (Epstein et al. 1995, angewandt bei Hill et al. 2020). Die App unterscheidet heute
   nicht zwischen gemessen und angegeben und korrigiert nicht → als offener Punkt vermerkt.
 - **Kein medizinisches Urteil:** keine Knochenalter-, Trainingssperre-, Verletzungs- oder Talentaussage.
+
+## 7a. Anzeige der Einordnung (SCRUM-256)
+
+Ändert keine Zahl des Rechners (deshalb weiter Version 1.0), nur, ob die Einordnung als belastbar angezeigt wird.
+Code: `angular/src/app/core/records/maturity-assessment.ts`.
+
+| Lage | Anzeige |
+| --- | --- |
+| kein Wert (Geschlecht, Einverständnis, Elterngrößen, Messung fehlen) | „nicht eingeordnet“ + konkreter Grund; Wachstumskurve unabhängig davon |
+| jüngster Wert älter als 90 Tage (§6) | Wert mit Datum, „nicht eingeordnet – Messung veraltet“ |
+| Widerspruch zum jüngsten Wert | Wert mit Datum, „Einordnung unsicher – prüfen“ + jede Ursache einzeln; keine Mehrheit, kein Mittelwert |
+| sonst | Einordnung nach §4 (PO-Entscheidung, bis SCRUM-386 Option D) |
+
+Widersprüche: jüngste Messung zur Prüfung markiert (SCRUM-253); Größe gegenüber der Nachbarmessung um ≥ 0,4 cm
+gesunken oder > 20 cm/Jahr gestiegen (SCRUM-254); Reifestand gegenüber dem vorigen Wert um **≥ 1,5 Prozentpunkte**
+gesunken (**eigener Vorschlagswert**, größer als die Stufe der Tabellenzeile aus §3.4); Wert über 100 %; neuere
+Größenmessung ohne Gewicht. Fehlerbreite: Bereich des %PAH bei ±5,3 cm (Jungen) / ±4,3 cm (Mädchen) Erwachsenengröße
+(§3.5), ausdrücklich keine Sicherheitsangabe. Keine automatische PHV-Einordnung, kein Moore-Modell. Eine manuelle
+Einordnung der Wachstumsspitze (mit Autor, Datum, Begründung) gibt es noch nicht – sie bräuchte neue Felder in
+`maturity/parents` und damit eine Regeländerung (SCRUM-388). Bio-Banding nutzt diese Prüfung noch nicht (SCRUM-389).
 
 ## 8. Quellen
 

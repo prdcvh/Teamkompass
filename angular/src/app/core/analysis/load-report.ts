@@ -14,6 +14,7 @@ import type { EventRating } from '../profile/profile';
 import type { Attendance } from '../ratings/rating';
 import { type Absence, absenceTitle, activeAbsenceOn, isInjuryAbsence } from '../records/absence';
 import type { Measurement } from '../records/measurement';
+import { type GrowthHintLevel, STATUS_LABELS, growthHintLevel, growthPoints, hintRateAt, perMonth } from '../records/growth-velocity';
 import { addDays, formatDate, isIsoDate } from '../shared/dates';
 import { type InjuryRisk, type LoadAvailability, injuryRisk, sessionLoad, sessionMinutes } from './risk';
 
@@ -71,12 +72,22 @@ export interface LoadReportWeek {
   readonly sessions: number;
 }
 
+/**
+ * Eine Größenmessung im Zeitraum mit der Rate, die die Belastungsampel an diesem Messtag gerechnet hätte (SCRUM-305):
+ * Vergleich mit der jüngsten älteren Messung mit 90 bis 365 Tagen Abstand, sonst keine Rate.
+ */
 export interface LoadReportGrowth {
-  readonly from: string;
+  /** Datum der Vergleichsmessung; null, wenn es keine passende gibt. */
+  readonly from: string | null;
   readonly to: string;
-  readonly fromHeight: number;
+  readonly fromHeight: number | null;
   readonly toHeight: number;
-  readonly perMonth: number;
+  /** cm/Monat (eine Nachkommastelle); null, wenn das Paar für keinen Hinweis zählt. */
+  readonly perMonth: number | null;
+  /** Hinweisstufe wie in der Belastungsampel (aus der ungerundeten Rate). */
+  readonly level: GrowthHintLevel;
+  /** Warum es keine Rate gibt (leer, wenn es eine gibt). */
+  readonly note: string;
 }
 
 export interface LoadReportReturn {
@@ -205,19 +216,30 @@ export function buildLoadReport(input: LoadReportInput): LoadReport {
     }
   }
 
-  // Wachstum: cm pro Monat zwischen zwei Messungen, deren spätere im Zeitraum liegt.
-  const measured = [...input.measurements]
-    .filter((item) => isIsoDate(item.date) && item.date <= asOf && (item.height ?? 0) > 0)
-    .sort((a, b) => a.date.localeCompare(b.date));
-  const growth: LoadReportGrowth[] = [];
-  measured.forEach((item, index) => {
-    if (index === 0 || item.date < from) return;
-    const prev = measured[index - 1];
-    const months = days(prev.date, item.date) / 30;
-    if (months <= 0) return;
-    const perMonth = ((item.height ?? 0) - (prev.height ?? 0)) / months;
-    growth.push({ from: prev.date, to: item.date, fromHeight: prev.height ?? 0, toHeight: item.height ?? 0, perMonth: Math.round(perMonth * 10) / 10 });
-  });
+  // Wachstum (SCRUM-305): je Größenmessung im Zeitraum die Rate, die die Belastungsampel an diesem Tag gerechnet hätte –
+  // gleiche Regel wie Ampel und Profil (90 bis 365 Tage Abstand), keine Hochrechnung aus Messungen kurz hintereinander.
+  const points = growthPoints(input.measurements.filter((item) => item.date <= asOf));
+  const validPoints = points.filter((point) => point.quality !== 'flagged');
+  const growth: LoadReportGrowth[] = points
+    .filter((point) => point.date >= from)
+    .map((point) => {
+      if (point.quality === 'flagged') {
+        return { from: null, to: point.date, fromHeight: null, toHeight: point.height, perMonth: null, level: null, note: STATUS_LABELS.flagged };
+      }
+      const hint = hintRateAt(validPoints, point);
+      const base = { to: point.date, toHeight: point.height, from: hint.interval?.from.date ?? null, fromHeight: hint.interval?.from.height ?? null };
+      if (hint.rate === null) {
+        const first = !validPoints.some((other) => other.date < point.date);
+        const note = hint.interval
+          ? STATUS_LABELS[hint.interval.status]
+          : first
+            ? 'erste Messung, Ausgangswert'
+            : 'zu kurz für eine Rate (keine ältere Messung mit 90 bis 365 Tagen Abstand)';
+        return { ...base, perMonth: null, level: null, note };
+      }
+      const monthly = perMonth(hint.rate);
+      return { ...base, perMonth: Math.round(monthly * 10) / 10, level: growthHintLevel(monthly), note: '' };
+    });
 
   // Rückkehr nach Verletzung/Abwesenheit: Einträge, die den Zeitraum berühren (nur mit Häkchen).
   const returns: LoadReportReturn[] = absences

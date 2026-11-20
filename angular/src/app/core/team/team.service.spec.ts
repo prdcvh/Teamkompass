@@ -137,7 +137,9 @@ describe('TeamService', () => {
       records.set(
         'p1/measurements',
         new Map([
-          ['m-old', { date: day(-400), height: '140', weight: '35' }],
+          ['m-old', { date: day(-500), height: '140', weight: '35' }],
+          // Im Fenster des Wachstumshinweises (90 + 365 Tage, SCRUM-305): Vergleichsmessung bis 365 Tage vor der jüngsten.
+          ['m-450', { date: day(-450), height: '145', weight: '38' }],
           ['m-89', { date: day(-89), height: '150', weight: '40' }],
           ['m-10', { date: day(-10), height: '151', weight: '41' }],
         ]),
@@ -151,7 +153,7 @@ describe('TeamService', () => {
       await settle(team);
       const p1 = team.data().find((entry) => entry.player.id === 'p1')!;
       expect(p1.absences.map((item) => item.id).sort()).toEqual(['ended-3-days-ago', 'ends-today', 'open-injury', 'starts-tomorrow']);
-      expect(p1.measurements.map((item) => item.id).sort()).toEqual(['m-10', 'm-89']);
+      expect(p1.measurements.map((item) => item.id).sort()).toEqual(['m-10', 'm-450', 'm-89']);
       const p2 = team.data().find((entry) => entry.player.id === 'p2')!;
       expect(p2.absences.map((item) => item.id).sort()).toEqual(['ended-14-days-ago', 'ended-yesterday']);
       expect(firebase.calls.filter((call) => call.startsWith('watchPlayerRecords:'))).toEqual([]);
@@ -175,8 +177,8 @@ describe('TeamService', () => {
       team.start();
       await settle(team);
       const after = firebase.records.docsDelivered;
-      expect(before).toBe(2 * 10 + 3);
-      expect(after).toBe(4 + 2 + 2); // 4 + 2 Abwesenheiten, 2 Messwerte
+      expect(before).toBe(2 * 10 + 4);
+      expect(after).toBe(4 + 2 + 3); // 4 + 2 Abwesenheiten, 3 Messwerte
       expect(after).toBeLessThan(before);
     });
 

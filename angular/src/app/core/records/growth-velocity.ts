@@ -149,12 +149,67 @@ export const STATUS_LABELS: Readonly<Record<IntervalStatus, string>> = {
   flagged: 'Messung auffällig markiert, keine Rate',
 };
 
-/** Alle Größenmessungen (beliebige Reihenfolge, auch ungeordnet erfasst) → Punkte, Intervalle und Hinweislage. */
-export function analyzeGrowth(measurements: readonly GrowthMeasurement[], today: string): GrowthAnalysis {
-  const points: GrowthPoint[] = measurements
+export interface HintRate {
+  /** Vergleichsintervall (Vergleichsmessung → `newest`); null, wenn es keine Vergleichsmessung mit 90 bis 365 Tagen gibt. */
+  readonly interval: GrowthInterval | null;
+  /** cm/Jahr, nur wenn das Intervall für Hinweise zählt (Status `ok`), sonst null. */
+  readonly rate: number | null;
+  /** Warum es keine Rate für Hinweise gibt (leer, wenn es eine gibt). */
+  readonly reason: string;
+}
+
+/**
+ * Rate für Hinweise zur Messung `newest` (Methodenversion 1.0 §6): Vergleichsmessung ist die jüngste ältere gültige
+ * Messung mit 90 bis 365 Tagen Abstand (nicht unbedingt die direkt davor). Profil, Belastungsampel und
+ * Belastungsbericht nutzen alle diese eine Regel (SCRUM-305). `validPoints`: gültige (nicht markierte) Punkte, aufsteigend.
+ */
+export function hintRateAt(validPoints: readonly GrowthPoint[], newest: GrowthPoint): HintRate {
+  const partner = [...validPoints].reverse().find((point) => {
+    if (point === newest) return false;
+    const days = daysBetween(point.date, newest.date);
+    return days >= MIN_INTERVAL_DAYS && days <= MAX_HINT_INTERVAL_DAYS;
+  });
+  if (!partner) {
+    return { interval: null, rate: null, reason: `Keine ältere Messung mit ${MIN_INTERVAL_DAYS} bis ${MAX_HINT_INTERVAL_DAYS} Tagen Abstand: zu kurz oder zu lang für eine Rate.` };
+  }
+  const interval = buildInterval(partner, newest);
+  if (interval.status === 'ok') return { interval, rate: interval.rate, reason: '' };
+  return { interval, rate: null, reason: `Die Messungen vom ${partner.date} und ${newest.date} ergeben keine gültige Rate: ${STATUS_LABELS[interval.status]}.` };
+}
+
+/** Gültige Größenmessungen (Größe > 0, gültiges Datum, nicht als auffällig markiert), aufsteigend nach Datum. */
+export function validGrowthPoints(measurements: readonly GrowthMeasurement[]): GrowthPoint[] {
+  return growthPoints(measurements).filter((point) => point.quality !== 'flagged');
+}
+
+/** Alle Größenmessungen (Größe > 0, gültiges Datum), aufsteigend nach Datum; Messungen nur mit Gewicht entfallen. */
+export function growthPoints(measurements: readonly GrowthMeasurement[]): GrowthPoint[] {
+  return measurements
     .filter((item): item is GrowthMeasurement & { height: number } => item.height !== null && item.height > 0 && isIsoDate(item.date))
     .map((item) => ({ id: item.id, date: item.date, height: item.height, quality: item.quality ?? 'undocumented' }))
     .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+}
+
+/** Kemper et al. 2015 (Belastungsampel, SCRUM-137): ab 0,6 cm/Monat ein Hinweis, ab 1,2 cm/Monat ein starker. */
+export const GROWTH_HINT_CM_PER_MONTH = 0.6;
+export const STRONG_GROWTH_HINT_CM_PER_MONTH = 1.2;
+
+/** cm/Jahr → cm/Monat (ein Zwölftel Jahr). */
+export function perMonth(ratePerYear: number): number {
+  return ratePerYear / 12;
+}
+
+export type GrowthHintLevel = 'strong' | 'hint' | null;
+
+export function growthHintLevel(cmPerMonth: number): GrowthHintLevel {
+  if (cmPerMonth >= STRONG_GROWTH_HINT_CM_PER_MONTH) return 'strong';
+  if (cmPerMonth >= GROWTH_HINT_CM_PER_MONTH) return 'hint';
+  return null;
+}
+
+/** Alle Größenmessungen (beliebige Reihenfolge, auch ungeordnet erfasst) → Punkte, Intervalle und Hinweislage. */
+export function analyzeGrowth(measurements: readonly GrowthMeasurement[], today: string): GrowthAnalysis {
+  const points = growthPoints(measurements);
 
   const intervals: GrowthInterval[] = [];
   for (let index = 1; index < points.length; index++) intervals.push(buildInterval(points[index - 1], points[index]));
@@ -174,17 +229,9 @@ export function analyzeGrowth(measurements: readonly GrowthMeasurement[], today:
     else if (validPoints.length < 2) noHintReason = 'Erst eine Messung: Ausgangswert, noch keine Rate.';
     else if ((newestAge ?? 0) > FRESH_DAYS) noHintReason = `Letzte gültige Messung ${newestAge} Tage alt (mehr als ${FRESH_DAYS}): kein aktueller Hinweis, der Verlauf bleibt sichtbar.`;
     else {
-      // Vergleichsmessung: die jüngste ältere Messung mit 90 bis 365 Tagen Abstand (nicht unbedingt die direkt davor).
-      const partner = [...validPoints].reverse().find((point) => {
-        const days = daysBetween(point.date, newest.date);
-        return days >= MIN_INTERVAL_DAYS && days <= MAX_HINT_INTERVAL_DAYS;
-      });
-      if (!partner) noHintReason = `Keine ältere Messung mit ${MIN_INTERVAL_DAYS} bis ${MAX_HINT_INTERVAL_DAYS} Tagen Abstand: zu kurz oder zu lang für eine Rate.`;
-      else {
-        const pair = buildInterval(partner, newest);
-        if (pair.status === 'ok') currentRate = pair.rate;
-        else noHintReason = `Die Messungen vom ${partner.date} und ${newest.date} ergeben keine gültige Rate: ${STATUS_LABELS[pair.status]}.`;
-      }
+      const hint = hintRateAt(validPoints, newest);
+      currentRate = hint.rate;
+      noHintReason = hint.reason;
     }
   }
 

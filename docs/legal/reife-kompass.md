@@ -13,6 +13,7 @@
 | Häkchen „Eltern sind mit der Speicherung ihrer Größe einverstanden“ mit Nachweis (Tag, Konto des Trainers) | dasselbe Dokument (`parentsConsent`, `parentsConsentDate`, `parentsConsentBy`, `parentsConsentByUid`) | Einwilligungsvermerk |
 | Geschlecht für die Formel (Junge/Mädchen, optional) | dasselbe Dokument (`sex`) | Rohdaten |
 | Erwartete Erwachsenengröße, Reifestand in %, Einordnung früh/im Schnitt/spät, Verlauf | **nirgends** – wird bei jeder Anzeige neu gerechnet | Ableitung |
+| Erklärung der Einordnung: Datengrundlage, Fehlerbreite, „nicht eingeordnet“ / „Einordnung unsicher – prüfen“ mit Ursachen (SCRUM-256) | **nirgends** – wird bei jeder Anzeige neu gerechnet, gleiche Rechte und Widerrufs-Stopp wie der Reifestand | Ableitung |
 | Bio-Banding-Vorschlag (Gruppen nach Reifestand) | **nirgends** – einmal beim Aufklappen gerechnet, beim Verlassen der Seite verworfen | Ableitung |
 
 Nicht erfasst und nicht nötig: Namen der Eltern, Pubertätsfragebogen oder andere intime Angaben.
