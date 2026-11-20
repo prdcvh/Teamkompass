@@ -100,6 +100,31 @@ describe('Profil: Einwilligung (SCRUM-245)', () => {
     });
   });
 
+  it('widerrufen: Aufgabe listet die Prüfungen „Wachstum und Belastung“ und löscht sie nach Bestätigung (SCRUM-257)', async () => {
+    const { fixture, firebase } = await renderProfile({
+      id: 'p2',
+      consent: 'revoked',
+      setup: (fb) =>
+        fb.records.playerRecords.set('p2/growthReviews', new Map([
+          ['gr1', { planId: 'dp1', hintKey: 'growthLoad:p2:a>b', date: '2026-10-01', by: 'Trainer', byUid: 'uid-trainer', action: 'Umfang reduziert', createdAt: '2026-10-01T18:00:00.000Z' }],
+        ])),
+    });
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(q(fixture, '[data-test="consent-task-growth-reviews"]')).not.toBeNull();
+    });
+    expect(text(q(fixture, '[data-test="consent-task-growth-reviews"]'))).toContain('1 Prüfung(en)');
+    clickByText(fixture, '[data-test="consent-task-growth-reviews"] button', 'Alle löschen');
+    await settle(fixture);
+    expect(firebase.records.playerRecords.get('p2/growthReviews')?.size).toBe(1);
+    clickByText(fixture, 'tk-dialog button', 'Endgültig löschen');
+    await vi.waitFor(() => expect(firebase.records.playerRecords.get('p2/growthReviews')?.size ?? 0).toBe(0));
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(q(fixture, '[data-test="consent-task-growth-reviews"]')).toBeNull();
+    });
+  });
+
   it('eigenes Team, offen: keine Sperre, Einträge wie bisher', async () => {
     const { fixture } = await renderProfile({ id: 'p2' });
     await vi.waitFor(() => {

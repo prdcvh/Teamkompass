@@ -4,7 +4,7 @@ import { FirebaseConnection } from './firebase-connection';
 import type { RawDoc, SnapshotMeta } from './types';
 
 /** Unterkollektionen eines Spielers, die das Profil verwaltet. */
-export type PlayerRecordKind = 'developmentPlans' | 'absences' | 'measurements';
+export type PlayerRecordKind = 'developmentPlans' | 'absences' | 'measurements' | 'growthReviews';
 
 /** Unterdaten eines Spielers: Förderpläne (mit Selbstreflexion), Abwesenheiten und Messwerte. */
 @Injectable({ providedIn: 'root' })

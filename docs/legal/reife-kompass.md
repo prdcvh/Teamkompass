@@ -15,6 +15,8 @@
 | Erwartete Erwachsenengröße, Reifestand in %, Einordnung früh/im Schnitt/spät, Verlauf | **nirgends** – wird bei jeder Anzeige neu gerechnet | Ableitung |
 | Erklärung der Einordnung: Datengrundlage, Fehlerbreite, „nicht eingeordnet“ / „Einordnung unsicher – prüfen“ mit Ursachen (SCRUM-256) | **nirgends** – wird bei jeder Anzeige neu gerechnet, gleiche Rechte und Widerrufs-Stopp wie der Reifestand | Ableitung |
 | Bio-Banding-Vorschlag (Gruppen nach Reifestand) | **nirgends** – einmal beim Aufklappen gerechnet, beim Verlassen der Seite verworfen | Ableitung |
+| Hinweis „Wachstum und Belastung gemeinsam ansehen“ (SCRUM-257) | **nirgends** – aus Messwerten und Bewertungen neu gerechnet, nur Trainer, bei Widerruf nicht berechnet | Ableitung |
+| Trainerprüfung zu diesem Hinweis: Datum, Name und Konto des Trainers, Maßnahme, Förderplan (SCRUM-257) | `teams/{team}/players/{id}/growthReviews/{prüfung}` – nur Trainer lesen/schreiben, nie geändert, Löschen bei Widerruf über „Gesundheitsdaten prüfen und löschen“ | Notiz, beruht auf Gesundheitsdaten (Details: `docs/reife-kompass-wachstum-belastung-hinweis.md`) |
 
 Nicht erfasst und nicht nötig: Namen der Eltern, Pubertätsfragebogen oder andere intime Angaben.
 Größe der Eltern und Geschlecht sind freiwillig; ohne sie gibt es einfach keinen Reifestand.
