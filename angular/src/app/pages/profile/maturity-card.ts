@@ -2,27 +2,26 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, input, si
 import { formatDate } from '../../core/events/event';
 import { SquadService } from '../../core/player/squad.service';
 import {
-  MATURITY_BAND_LABELS,
   MATURITY_STOPPED_TEXT,
   MAX_PARENT_HEIGHT_CM,
   MIN_PARENT_HEIGHT_CM,
   type MaturityInputs,
   type MaturitySex,
   decimalAge,
+  hasMaturityData,
   inMaturityAgeRange,
-  maturityHistory,
   maturityInputsForCalculation,
   maturityStopped,
-  missingMaturityInputs,
   parseParentHeight,
-  percentText,
 } from '../../core/records/maturity';
+import { assessMaturity } from '../../core/records/maturity-assessment';
 import { MaturityService } from '../../core/records/maturity.service';
 import { MeasurementsService } from '../../core/records/measurements.service';
 import { RecordsStateService } from '../../core/records/records-state.service';
 import { todayIso } from '../../core/shared/dates';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
+import { MATURITY_HELP_LINES, MaturityExplanation } from './maturity-explanation';
 
 interface Draft {
   readonly sex: MaturitySex | '';
@@ -30,10 +29,6 @@ interface Draft {
   readonly motherHeight: string;
   readonly fatherHeight: string;
 }
-
-/** Hinweis neben dem Wert: so sollen Trainer ihn lesen (keine Umrechnung der Noten). */
-export const MATURITY_GRADES_HINT =
-  'Noten und Tests im Licht des Reifestands lesen: Früh entwickelte Spieler haben oft einen körperlichen Vorsprung, spät entwickelte holen ihn meist noch auf. Die Noten werden nicht umgerechnet.';
 
 /**
  * Reife-Kompass im Spielerprofil (SCRUM-190): Reifestand nach Khamis & Roche als Prozent der erwarteten
@@ -44,7 +39,7 @@ export const MATURITY_GRADES_HINT =
  */
 @Component({
   selector: 'tk-maturity-card',
-  imports: [Button, Card],
+  imports: [Button, Card, MaturityExplanation],
   styleUrls: ['./profile-extras.css', './maturity-card.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -67,35 +62,20 @@ export const MATURITY_GRADES_HINT =
           } @else {
             @if (!ageInRange()) {
               <p class="muted pad" data-test="maturity-age">Der Reifestand wird nur für Spieler von 12 bis 15 Jahren angezeigt.</p>
-            } @else if (latest(); as last) {
-              <div class="maturity-now" [attr.data-band]="last.band">
-                <strong class="maturity-percent">{{ percent(last.percent) }}</strong>
-                <span>der erwarteten Erwachsenengröße</span>
-                <span class="pill maturity-band" [attr.data-band]="last.band">{{ bandLabel(last.band) }}</span>
-              </div>
-              <p class="muted">
-                Stand {{ formatDate(last.date) }} · erwartete Erwachsenengröße ca. {{ cm(last.predictedAdultCm) }} cm (Schätzung, meist ± 5 cm)
-              </p>
-              <p class="maturity-hint">{{ gradesHint }}</p>
-              @if (history().length > 1) {
-                <h3>Verlauf</h3>
-                <ul class="items" aria-label="Verlauf des Reifestands">
-                  @for (point of historyNewestFirst(); track point.date) {
-                    <li>
-                      <div>
-                        <strong>{{ formatDate(point.date) }}</strong>
-                        <p>{{ percent(point.percent) }} · {{ bandLabel(point.band) }} · {{ ageText(point.age) }} Jahre</p>
-                      </div>
-                    </li>
-                  }
-                </ul>
-              }
             } @else {
-              <p class="muted pad" data-test="maturity-missing">Für einen Wert fehlt noch: {{ missing().join(', ') }}.</p>
+              <tk-maturity-explanation [assessment]="assessment()" [hasInputs]="hasInputs()" />
             }
             <p class="muted maturity-source">
               Methode: Khamis &amp; Roche (1994) aus Größe, Gewicht und Größe beider Eltern. Einordnung: unter 85 % spät entwickelt, 85–95 % im Schnitt, über 95 % früh entwickelt.
             </p>
+            <details class="maturity-help" data-test="maturity-help">
+              <summary>So liest du den Reife-Kompass</summary>
+              <ul>
+                @for (line of helpLines; track $index) {
+                  <li>{{ line }}</li>
+                }
+              </ul>
+            </details>
 
             @if (canEdit()) {
               <form class="maturity-form" (submit)="submit($event)" novalidate>
@@ -168,12 +148,12 @@ export class MaturityCard {
   protected readonly stopped = computed(() => maturityStopped(this.player()));
   /** Nur damit wird gerechnet – bei Widerruf leer, dann gibt es keinen Wert. */
   private readonly calculationInputs = computed(() => maturityInputsForCalculation(this.service.inputs(), this.player()));
-  protected readonly history = computed(() => maturityHistory(this.measurements.measurements(), this.birthdate(), this.calculationInputs()));
-  protected readonly historyNewestFirst = computed(() => [...this.history()].reverse());
-  protected readonly latest = computed(() => this.history().at(-1) ?? null);
+  /** Einordnung mit Datengrundlage, Unsicherheit und Widersprüchen (SCRUM-256); rechnet nur mit `calculationInputs`. */
+  protected readonly assessment = computed(() => assessMaturity(this.measurements.measurements(), this.birthdate(), this.calculationInputs(), todayIso()));
+  protected readonly hasInputs = computed(() => hasMaturityData(this.calculationInputs()));
   /** Nur für Spieler, die heute 12 bis 15 Jahre alt sind (PO, 02.11.2026). */
   protected readonly ageInRange = computed(() => inMaturityAgeRange(decimalAge(this.birthdate(), todayIso())));
-  protected readonly missing = computed(() => missingMaturityInputs(this.calculationInputs(), this.birthdate(), this.measurements.measurements()));
+  protected readonly helpLines = MATURITY_HELP_LINES;
   /** Nachweis des Einverständnisses der Eltern (SCRUM-252). */
   protected readonly consentRecord = computed(() => {
     const { parentsConsentDate, parentsConsentBy } = this.service.inputs();
@@ -188,7 +168,6 @@ export class MaturityCard {
   protected readonly busy = signal(false);
   protected readonly saved = signal(false);
 
-  protected readonly gradesHint = MATURITY_GRADES_HINT;
   protected readonly stoppedText = MATURITY_STOPPED_TEXT;
   protected readonly formatDate = formatDate;
 
@@ -215,22 +194,6 @@ export class MaturityCard {
         this.formError.set('');
       });
     });
-  }
-
-  protected percent(value: number): string {
-    return percentText(value);
-  }
-
-  protected cm(value: number): string {
-    return String(Math.round(value));
-  }
-
-  protected ageText(age: number): string {
-    return String(Math.floor(age * 10) / 10).replace('.', ',');
-  }
-
-  protected bandLabel(band: keyof typeof MATURITY_BAND_LABELS): string {
-    return MATURITY_BAND_LABELS[band];
   }
 
   protected patch(change: Partial<Draft>): void {
