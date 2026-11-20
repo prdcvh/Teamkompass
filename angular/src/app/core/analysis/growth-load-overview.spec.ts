@@ -83,6 +83,12 @@ describe('Wachstum, Belastung und Befinden (SCRUM-257)', () => {
       expect(detail.fresh).toBe(false);
       expect(detail.qualityChecks).toEqual([]);
     });
+    it('Vergleichsmessung folgt der gemeinsamen Regel (90 bis 365 Tage, nicht die direkt vorherige)', () => {
+      const analysis = analyzeGrowth([m('a', '2026-05-01', 150, 'verified'), m('b', '2026-10-10', 152, 'verified'), m('c', '2026-10-20', 153, 'verified')], TODAY);
+      const detail = hintDetail(analysis, TODAY)!;
+      expect(detail.partner?.date).toBe('2026-05-01');
+      expect(detail.days).toBe(172);
+    });
     it('ohne gültige Messung gibt es keine Details', () => {
       expect(hintDetail(analyzeGrowth([], TODAY), TODAY)).toBeNull();
     });

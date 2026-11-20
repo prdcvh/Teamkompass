@@ -5,7 +5,7 @@
  * Befinden (SCRUM-138). Es entsteht KEIN Risikowert, KEIN Hinweis und KEINE Einordnung wie „verletzt“ oder „nicht
  * einsetzen“; fehlende Daten bleiben als „keine Daten“ sichtbar und werden nie als 0 oder „unauffällig“ gelesen.
  */
-import { type GrowthAnalysis, type GrowthPoint, type IntervalStatus, FRESH_DAYS, MAX_HINT_INTERVAL_DAYS, MIN_INTERVAL_DAYS, daysBetween, rateText } from '../records/growth-velocity';
+import { type GrowthAnalysis, type GrowthPoint, type IntervalStatus, FRESH_DAYS, daysBetween, hintRateAt, rateText } from '../records/growth-velocity';
 import { addDays, isIsoDate } from '../shared/dates';
 import type { LoadCurvePoint } from './load-curve';
 
@@ -98,11 +98,7 @@ export function hintDetail(analysis: GrowthAnalysis, today: string): HintDetail 
   const valid = analysis.points.filter((point) => point.quality !== 'flagged');
   const newest = valid[valid.length - 1];
   if (!newest) return null;
-  const partner =
-    [...valid].reverse().find((point) => {
-      const days = daysBetween(point.date, newest.date);
-      return point !== newest && days >= MIN_INTERVAL_DAYS && days <= MAX_HINT_INTERVAL_DAYS;
-    }) ?? null;
+  const partner = hintRateAt(valid, newest).interval?.from ?? null;
   const ageDays = Math.max(0, daysBetween(newest.date, today));
   const qualityChecks: string[] = [];
   for (const point of partner ? [partner, newest] : [newest]) {
