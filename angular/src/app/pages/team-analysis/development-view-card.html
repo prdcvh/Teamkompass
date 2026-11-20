@@ -1,0 +1,165 @@
+<tk-card>
+  @if (isTrainer()) {
+    <section class="panel" data-testid="development-view" aria-labelledby="development-title">
+      <h2 id="development-title">Entwicklungsansicht: Geburtsquartal und Reifegruppe</h2>
+      <p class="muted">
+        Optional und nur für Trainer. Geburtsquartal und Reifegruppe sind zwei getrennte Merkmale: Wer früh im Jahr geboren
+        ist, ist nicht automatisch früh entwickelt. Die Ansicht zeigt nur eine Verteilung; sie beweist keine Benachteiligung
+        und ändert keine Noten, Rangfolge oder Aufstellung.
+      </p>
+
+      @if (!open()) {
+        <button tkButton type="button" (click)="toggle()" data-testid="development-open">Entwicklungsansicht öffnen</button>
+      } @else {
+        <div class="filters" role="group" aria-label="Zeitraum und Jahrgang">
+          <label>Von <input type="date" [value]="from()" (change)="setFrom($any($event.target).value)" data-testid="development-from" /></label>
+          <label>Bis <input type="date" [value]="to()" (change)="setTo($any($event.target).value)" data-testid="development-to" /></label>
+          <label>
+            Jahrgang
+            <select [value]="cohort()" (change)="setCohort($any($event.target).value)" data-testid="development-cohort">
+              <option value="all" [selected]="cohort() === 'all'">Alle Jahrgänge</option>
+              @for (year of cohorts(); track year) {
+                <option [value]="year" [selected]="cohort() === year">Jahrgang {{ year }}</option>
+              }
+            </select>
+          </label>
+        </div>
+        <div class="presets">
+          <button tkButton size="sm" type="button" (click)="preset(90)">Letzte 3 Monate</button>
+          <button tkButton size="sm" type="button" (click)="preset(180)">Letzte 6 Monate</button>
+          <button tkButton size="sm" type="button" (click)="preset(365)">Letzte 12 Monate</button>
+          <button tkButton size="sm" type="button" (click)="reload()">Daten neu laden</button>
+        </div>
+
+        @switch (service.state()) {
+          @case ('loading') {
+            <p class="muted" role="status">Angaben und Messungen werden geladen …</p>
+          }
+          @case ('error') {
+            <p class="error" role="alert">Die Angaben konnten nicht geladen werden.</p>
+            <button tkButton type="button" (click)="reload()">Erneut versuchen</button>
+          }
+          @case ('ready') {
+            @if (!periodValid()) {
+              <p class="error" role="alert">Bitte einen gültigen Zeitraum wählen (Von nicht nach Bis).</p>
+            } @else if (view(); as v) {
+              <p class="muted" data-testid="development-scope">
+                Zeitraum {{ day(from()) }} bis {{ day(to()) }}, {{ cohort() === 'all' ? 'alle Jahrgänge' : 'Jahrgang ' + cohort() }},
+                {{ v.games }} {{ v.games === 1 ? 'Spiel' : 'Spiele' }} im Zeitraum. Minuten zählen nur, wo sie bei einem Spiel
+                eingetragen wurden.
+              </p>
+
+              @if (v.historic) {
+                <p class="note" data-testid="development-historic">
+                  Der Zeitraum liegt in der Vergangenheit. Die Reife wird nur gezeigt, wenn die Angaben zum Ende des Zeitraums
+                  nachweislich schon so vorlagen; sonst steht „nicht eingeordnet – keine historische Einordnung vorhanden“. Die
+                  heutige Reife wird nicht rückwirkend unterstellt. Nachträglich eingetragene Messungen mit altem Datum lassen
+                  sich nicht erkennen.
+                </p>
+              }
+
+              <dl class="coverage" data-testid="development-coverage">
+                <div><dt>Spieler in der Auswahl</dt><dd>{{ v.playerCount }}</dd></div>
+                <div><dt>Mit Reifegruppe</dt><dd>{{ v.classifiedCount }} von {{ v.playerCount }} ({{ percent(v.classifiedCount, v.playerCount) }})</dd></div>
+                <div><dt>Mit Minuten-Eintrag</dt><dd>{{ v.total.playersWithMinutes }} von {{ v.playerCount }} ({{ percent(v.total.playersWithMinutes, v.playerCount) }})</dd></div>
+              </dl>
+
+              @if (v.playerCount === 0) {
+                <p class="muted">Keine Spieler in dieser Auswahl.</p>
+              } @else {
+                <div class="table-wrap" tabindex="0" role="region" aria-label="Spieler und Minuten je Geburtsquartal und Reifegruppe">
+                  <table data-testid="development-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Geburtsquartal</th>
+                        @for (group of groups; track group) {
+                          <th scope="col" [attr.data-group]="group">{{ groupLabels[group] }}</th>
+                        }
+                        <th scope="col">Gesamt</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (row of v.rows; track row.quarter) {
+                        @if (row.total.players > 0 || row.quarter !== 'unknown') {
+                          <tr [attr.data-quarter]="row.quarter">
+                            <th scope="row">{{ quarterLabels[row.quarter] }}</th>
+                            @for (group of groups; track group) {
+                              <td [attr.data-group]="group" [class.small]="small(row.cells[group])">
+                                @if (row.cells[group].players === 0) {
+                                  <span class="muted">–</span>
+                                } @else {
+                                  <strong>{{ row.cells[group].players }} Spieler</strong>
+                                  <span>{{ row.cells[group].minutes }} Min.</span>
+                                  <small>{{ row.cells[group].playersWithMinutes }} von {{ row.cells[group].players }} mit Minuten</small>
+                                  @if (small(row.cells[group])) {
+                                    <small class="flag">kleine Gruppe</small>
+                                  }
+                                }
+                              </td>
+                            }
+                            <td class="sum">
+                              <strong>{{ row.total.players }} Spieler</strong>
+                              <span>{{ row.total.minutes }} Min.</span>
+                            </td>
+                          </tr>
+                        }
+                      }
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <th scope="row">Gesamt</th>
+                        @for (group of groups; track group) {
+                          <td [attr.data-group]="group" [class.small]="small(v.columnTotals[group])">
+                            <strong>{{ v.columnTotals[group].players }} Spieler</strong>
+                            <span>{{ v.columnTotals[group].minutes }} Min.</span>
+                            <small>fehlte oder nicht im Kader: {{ v.columnTotals[group].missedGames }} von {{ v.columnTotals[group].gameSlots }} möglichen Spielen</small>
+                          </td>
+                        }
+                        <td class="sum"><strong>{{ v.total.players }} Spieler</strong><span>{{ v.total.minutes }} Min.</span></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+
+                <div class="explain" data-testid="development-explain">
+                  <h3>So liest du die Tabelle</h3>
+                  <ul>
+                    @if (reasons().length > 0) {
+                      <li>
+                        <strong>Nicht eingeordnet</strong> ({{ v.columnTotals.unclassified.players }} von {{ v.playerCount }} Spielern), weil:
+                        <ul>
+                          @for (reason of reasons(); track reason.reason) {
+                            <li [attr.data-reason]="reason.reason">
+                              {{ reason.count }} Spieler: {{ reason.text }}
+                              @for (detail of reason.details; track detail) {
+                                <small> – {{ detail }}</small>
+                              }
+                            </li>
+                          }
+                        </ul>
+                        Diese Spieler stehen bewusst in keiner Reifegruppe.
+                      </li>
+                    }
+                    <li>
+                      Gruppen mit weniger als {{ smallBelow }} Spielern sind als „kleine Gruppe“ markiert: Einzelne Spieler
+                      verschieben dort Summen und Durchschnitte stark.
+                    </li>
+                    <li>
+                      Unterschiede in den Minuten können auch an Verletzungen, Sperren, Abwesenheiten oder der Position
+                      liegen. Die Zeile „Gesamt“ nennt, in wie vielen möglichen Spielen Spieler als „fehlt“ oder „nicht im Kader“ eingetragen waren.
+                    </li>
+                    <li>Die Reifegruppe ist eine Schätzung mit Unsicherheit (Reife-Kompass) und kein Urteil über Leistung oder Potenzial.</li>
+                  </ul>
+                </div>
+              }
+              <p class="muted">
+                Für einzelne Spieler und ihre Förderpläne öffnest du das Profil im <a routerLink="/kader">Kader</a>. Die
+                Ansicht ändert keine Noten, Aufstellungen oder Stammdaten.
+              </p>
+            }
+          }
+        }
+      }
+    </section>
+  }
+</tk-card>

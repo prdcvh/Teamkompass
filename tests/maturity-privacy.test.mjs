@@ -31,6 +31,8 @@ const MATURITY_PATH = /'maturity'/;
 // Erlaubte Stellen und warum (das Rechen-Modul core/records/maturity.ts selbst bindet sich nicht ein).
 const ALLOWED = {
   "core/firebase/maturity.api.ts": "Lesen/Schreiben/Loeschen des Dokuments maturity/parents",
+  "core/analysis/development-view.ts": "Entwicklungsansicht (SCRUM-258), rechnet ueber maturityInputsForCalculation, nur Zaehlungen, keine Namen",
+  "core/analysis/development-view.service.ts": "nur Trainer, ohne widerrufene Spieler",
   "core/firebase/players.api.ts": "Spieler loeschen loescht maturity mit",
   "core/records/maturity.service.ts": "nur Trainer/Medizin",
   "core/records/maturity-assessment.ts": "Erklaerung der Einordnung (SCRUM-256), rechnet nur mit den Angaben aus maturityInputsForCalculation",
@@ -75,4 +77,15 @@ test("Regeln: maturity nur fuer Trainer und Medizin, Widerruf sperrt neue Groess
   assert.match(block, /!revokedAfterWrite\(\) \|\| noParentHeights\(request\.resource\.data\)/);
   assert.match(block, /parentsConsentRecordOk\(request\.resource\.data\)/);
   assert.ok(!/collectionGroup|\{path=\*\*\}\/maturity/.test(rules.replace(/\/\/.*$/gm, "")), "kein collectionGroup-Zugriff auf maturity");
+});
+
+test("Entwicklungsansicht (SCRUM-258): nur Trainer, Widerruf und Rechenweg ueber die gemeinsamen Funktionen", async () => {
+  const logic = await read("angular/src/app/core/analysis/development-view.ts");
+  const service = await read("angular/src/app/core/analysis/development-view.service.ts");
+  assert.match(logic, /maturityInputsForCalculation\(/);
+  assert.match(logic, /assessMaturity\(/);
+  assert.match(logic, /isConsentRevoked\(player\)/);
+  assert.match(service, /role\(\) === 'trainer'/);
+  assert.ok(!/physio/.test(service), "Medizin bekommt die Teamauswertung nicht");
+  assert.match(service, /\.filter\(\(player\) => !isConsentRevoked\(player\)\)/);
 });

@@ -16,6 +16,7 @@ import { teamGoalProgress } from '../../core/streaks/streak';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 import { ClubComparisonCard } from './club-comparison-card';
+import { DevelopmentViewCard } from './development-view-card';
 
 interface BarRow {
   readonly label: string;
@@ -42,7 +43,7 @@ export function formatGoals(record: { goalsFor: number; goalsAgainst: number }):
 /** Teamanalyse: Teamform, Kennzahlen, Geburtsquartale, Positionsabdeckung und Trainingsfokus (nur Trainer). */
 @Component({
   selector: 'app-team-analysis',
-  imports: [RouterLink, Button, Card, ClubComparisonCard],
+  imports: [RouterLink, Button, Card, ClubComparisonCard, DevelopmentViewCard],
   templateUrl: './team-analysis.html',
   styleUrls: ['./team-analysis.css', '../../ui/chart/chart.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
