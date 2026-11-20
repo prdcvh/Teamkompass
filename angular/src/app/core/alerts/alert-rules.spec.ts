@@ -161,7 +161,7 @@ describe('alert-rules (Wenn-dann-Regeln)', () => {
       expect(alertSwitchesFromDoc(null)).toEqual(DEFAULT_ALERT_SWITCHES);
       expect(alertSwitchesFromDoc({ alertRules: { pain: false, wellness: 'nein' } })).toEqual({ ...DEFAULT_ALERT_SWITCHES, pain: false });
       expect(docFromAlertSwitches({ ...DEFAULT_ALERT_SWITCHES, openRatings: false })).toEqual({
-        alertRules: { pain: true, wellness: true, loadSpike: true, consentRevoked: true, openRatings: false },
+        alertRules: { pain: true, wellness: true, loadSpike: true, growthLoad: true, consentRevoked: true, openRatings: false },
       });
     });
   });

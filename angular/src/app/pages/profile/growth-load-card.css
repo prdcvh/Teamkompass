@@ -69,6 +69,66 @@ h2 {
   font-size: var(--tk-text-sm);
 }
 
+.review {
+  display: grid;
+  gap: var(--tk-space-2);
+  margin: 0 0 var(--tk-space-3);
+  padding: var(--tk-space-3);
+  border: 1px solid var(--tk-line);
+  border-radius: var(--tk-radius);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.review h3,
+.review h4,
+.review p {
+  margin: 0;
+}
+
+.review h3 {
+  font-size: var(--tk-text-base, 1rem);
+}
+
+.review h4 {
+  font-size: var(--tk-text-sm);
+}
+
+.review .open,
+.review .done {
+  font-size: var(--tk-text-sm);
+}
+
+.review > button {
+  justify-self: start;
+}
+
+.review .error {
+  color: var(--tk-red);
+  font-size: var(--tk-text-sm);
+}
+
+.reviews {
+  display: grid;
+  gap: var(--tk-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.reviews li {
+  display: grid;
+  gap: 2px;
+  padding: var(--tk-space-2);
+  border-radius: var(--tk-radius);
+  background: var(--tk-surface-2, transparent);
+  font-size: var(--tk-text-sm);
+}
+
+.small {
+  font-size: var(--tk-text-xs, 0.75rem);
+}
+
 .chart .frame {
   fill: none;
   stroke: var(--tk-line);

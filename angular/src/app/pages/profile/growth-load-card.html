@@ -6,6 +6,49 @@
       Verletzung, Diagnose, Sperre oder Teilnahmeentscheidung ab und ändert nichts an Belastung, Teilnahme oder Verfügbarkeit.
     </p>
 
+    @if (reviews.visible()) {
+      <section class="review" data-testid="growth-load-review" aria-labelledby="gl-review-title">
+        <h3 id="gl-review-title">Hinweis „Wachstum und Belastung gemeinsam ansehen“</h3>
+        @if (reviews.state() === 'error') {
+          <p class="error" role="alert">{{ reviews.error() }}</p>
+        } @else if (reviews.state() !== 'ready' || !records.ready()) {
+          <p class="muted" role="status">Wird geprüft …</p>
+        } @else if (growthLoad(); as status) {
+          @if (status.review; as done) {
+            <p class="done" data-testid="growth-load-done" role="status">
+              Geprüft am {{ formatDate(done.date) }} von {{ done.by }}. Dieser Hinweis erscheint für dieselben Messungen nicht wieder.
+            </p>
+          } @else if (status.state === 'check-measurement') {
+            <p class="check" data-testid="growth-load-check" role="status">{{ growthLoadText() }}</p>
+            <p class="muted">Erst wenn beide Messungen mit geprüfter Messqualität vorliegen (Messassistent unten bei den Messwerten), lässt sich die Prüfung dokumentieren.</p>
+          } @else {
+            <p class="open" data-testid="growth-load-open" role="status">{{ growthLoadText() }}</p>
+            @if (plans().length === 0) {
+              <p class="muted">Lege zuerst unten einen Förderplan an; die Prüfung wird als Notiz an einem Förderplan gespeichert.</p>
+            } @else {
+              <button tkButton size="sm" type="button" (click)="dialogOpen.set(true)">Prüfung dokumentieren</button>
+              <tk-growth-review-dialog [open]="dialogOpen()" [hintKey]="status.key" [plans]="plans()" (closed)="dialogOpen.set(false)" />
+            }
+          }
+        } @else {
+          <p class="muted" data-testid="growth-load-none">Gerade kein offener Hinweis. Er entsteht nur, wenn ein aktueller Wachstumshinweis seit der jüngsten Messung auf eine Belastungsspitze oder zwei sehr harte Einheiten innerhalb von 48 Stunden trifft.</p>
+        }
+        @if (reviewList().length > 0) {
+          <h4>Dokumentierte Prüfungen</h4>
+          <ul class="reviews">
+            @for (entry of reviewList(); track entry.id) {
+              <li data-testid="growth-review-entry">
+                <strong>{{ formatDate(entry.date) }} · {{ entry.by }}</strong>
+                <span class="sub">Förderplan: {{ entry.plan }}</span>
+                <span>Maßnahme: {{ entry.action }}</span>
+              </li>
+            }
+          </ul>
+        }
+        <p class="muted small">Nur ein Hinweis zum Besprechen: Die App setzt daraus kein „verletzt“ und keine Sperre und ändert nichts an Belastung, Teilnahme oder Verfügbarkeit.</p>
+      </section>
+    }
+
     @if (hint(); as detail) {
       <details class="hint">
         <summary>Wachstumshinweis: Intervall, Messqualität und Aktualität ansehen</summary>

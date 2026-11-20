@@ -36,3 +36,12 @@ test("Spieler, Eltern und Medizin lesen bei widerrufener Einwilligung keine Gesu
   }
   assert.match(rules, /match \/playerCards\/\{playerId\}/);
 });
+
+test("Trainerpruefungen Wachstum und Belastung (SCRUM-257): nur Trainer, kein Speichern bei Widerruf, nie aendern", async () => {
+  const rules = await read("firestore.rules");
+  const block = rules.match(/match \/growthReviews\/\{reviewId\} \{([\s\S]*?)\n        \}/)[1];
+  assert.match(block, /allow read: if isTrainer\(\);/);
+  assert.match(block, /mayStoreHealth\(playerId\)/);
+  assert.match(block, /!consentRevoked\(playerId\)/);
+  assert.ok(!/allow (update|write)/.test(block), "Pruefungen duerfen nicht geaendert werden");
+});

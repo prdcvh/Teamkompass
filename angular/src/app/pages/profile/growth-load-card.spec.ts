@@ -1,5 +1,7 @@
 import { TestBed } from '@angular/core/testing';
-import { renderProfileExtras, q, qa, text } from './testing/profile-fixture';
+import { SessionService } from '../../core/auth/session.service';
+import { addDays } from '../../core/shared/dates';
+import { clickByText, renderProfileExtras, q, qa, settle, text, typeInto } from './testing/profile-fixture';
 
 /** Wachstum, Belastung und Befinden zusammen im Trainerprofil (SCRUM-257). */
 describe('Profil: Wachstum, Belastung und Befinden', () => {
@@ -54,5 +56,77 @@ describe('Profil: Wachstum, Belastung und Befinden', () => {
     expect(text(details)).toContain('Aktualität');
     expect(text(details)).toContain('Messqualität');
     expect(qa(fixture, 'tk-growth-load-card .check').length).toBeGreaterThan(0);
+  });
+
+  describe('Hinweis „Wachstum und Belastung gemeinsam ansehen“ und Trainerprüfung', () => {
+    const TODAY = '2026-10-20';
+    /** Zwölf normale Wochen (2 Trainings à 90 × 5), dann eine Belastungsspitze (4 Termine mit Anstrengung 6). */
+    const withSpike = (quality: string | null) => (firebase: Parameters<NonNullable<Parameters<typeof renderProfileExtras>[1]>>[0]) => {
+      const q1 = quality ? { quality } : {};
+      firebase.records.playerRecords.set('p1/measurements', new Map([
+        ['me1', { date: '2026-06-01', height: '150', ...q1 }],
+        ['me2', { date: '2026-10-10', height: '154', ...q1 }],
+      ]));
+      const days = [...Array.from({ length: 12 }, (_, week) => [7 + week * 7, 9 + week * 7]).flat().map((ago) => [ago, 5]), [5, 6], [3, 6], [1, 6], [0, 6]];
+      days.forEach(([ago, exertion], index) => {
+        firebase.events.events.set(`s${index}`, { type: 'Training', title: 'Training', date: addDays(TODAY, -ago), exertion, durationMinutes: 90 });
+        firebase.ratings.ratings.set(`s${index}`, new Map([['p1', { attendance: 'present' }]]));
+      });
+    };
+    const ready = async (fixture: Awaited<ReturnType<typeof renderProfileExtras>>['fixture'], selector: string) =>
+      vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(q(fixture, selector)).not.toBeNull();
+      });
+
+    it('offener Hinweis: Prüfung mit Förderplan, Datum und Maßnahme dokumentieren; danach geprüft und ohne erneute Aufforderung', async () => {
+      const { fixture, firebase } = await renderProfileExtras('trainer', withSpike('verified'));
+      const session = TestBed.inject(SessionService);
+      session.uid.set('uid-trainer');
+      session.displayName.set('Pascal Trainer');
+      await ready(fixture, '[data-testid="growth-load-open"]');
+      const open = text(q(fixture, '[data-testid="growth-load-open"]'));
+      expect(open).toContain('Belastungsspitze');
+      expect(open).toContain('Befinden: keine Angaben');
+      expect(open).not.toMatch(/verletzt|nicht einsetzen|unauffällig/i);
+      clickByText(fixture, 'tk-growth-load-card button', 'Prüfung dokumentieren');
+      await settle(fixture);
+      const dialog = q(fixture, 'tk-growth-review-dialog')!;
+      expect(text(dialog)).toContain('Pascal Trainer');
+      typeInto(dialog.querySelector<HTMLSelectElement>('select[name="planId"]')!, 'dp1', 'change');
+      typeInto(dialog.querySelector<HTMLTextAreaElement>('textarea[name="action"]')!, 'Sprungumfang zwei Wochen reduziert');
+      dialog.querySelector<HTMLFormElement>('form')!.dispatchEvent(new Event('submit'));
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect([...(firebase.records.playerRecords.get('p1/growthReviews')?.values() ?? [])]).toHaveLength(1);
+      });
+      const saved = [...firebase.records.playerRecords.get('p1/growthReviews')!.values()][0];
+      expect(saved).toMatchObject({ planId: 'dp1', date: TODAY, by: 'Pascal Trainer', byUid: 'uid-trainer', action: 'Sprungumfang zwei Wochen reduziert', playerId: 'p1' });
+      expect(String(saved['hintKey'])).toContain('growthLoad:p1:me1@2026-06-01@150>me2@2026-10-10@154');
+      await ready(fixture, '[data-testid="growth-load-done"]');
+      expect(q(fixture, '[data-testid="growth-load-open"]')).toBeNull();
+      expect(text(q(fixture, '[data-testid="growth-review-entry"]'))).toContain('Förderplan: Orientierung');
+      // Die App ändert dabei nichts am Spieler (Status/Verfügbarkeit).
+      expect(firebase.players.players.get('p1')).toMatchObject({ status: 'Fit' });
+    });
+
+    it('ohne dokumentierte Messqualität zuerst „Messung prüfen“, ohne Knopf zum Dokumentieren', async () => {
+      const { fixture } = await renderProfileExtras('trainer', withSpike(null));
+      await ready(fixture, '[data-testid="growth-load-check"]');
+      expect(text(q(fixture, '[data-testid="growth-load-check"]'))).toMatch(/^Messung prüfen/);
+      expect(qa<HTMLButtonElement>(fixture, 'tk-growth-load-card button').some((button) => text(button) === 'Prüfung dokumentieren')).toBe(false);
+    });
+
+    it('ohne Belastungshinweis kein Hinweis', async () => {
+      const { fixture } = await renderProfileExtras('trainer', withLoad);
+      await ready(fixture, '[data-testid="growth-load-none"]');
+    });
+
+    it('Medizin sieht weder Hinweis noch Prüfungen', async () => {
+      const { fixture, firebase } = await renderProfileExtras('physio', withSpike('verified'));
+      await settle(fixture);
+      expect(q(fixture, '[data-testid="growth-load-review"]')).toBeNull();
+      expect(firebase.calls.some((call) => call.includes('growthReviews'))).toBe(false);
+    });
   });
 });
