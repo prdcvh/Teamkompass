@@ -21,7 +21,9 @@
  *      Wochensteigerungen ab etwa 15 % als kritisch.
  *   Die Ampel ist keine Verletzungswahrscheinlichkeit (Impellizzeri et al. 2020, Zouhal et al. 2021).
  * - Erholung: zwei Einheiten mit Anstrengung ≥ 7 innerhalb von 48 Stunden.
- * - Wachstumsschub: ab 0,6 cm pro Monat ein Hinweis, ab 1,2 cm pro Monat ein starker Hinweis (Kemper et al. 2015).
+ * - Wachstumsschub: ab 0,6 cm pro Monat ein Hinweis, ab 1,2 cm pro Monat ein starker Hinweis (Kemper et al. 2015). Die Rate
+ *   kommt nur aus Messpaaren mit 90 bis 365 Tagen Abstand (Methodenversion 1.0 §6, SCRUM-305), nie aus Messungen kurz
+ *   hintereinander.
  * - Rückkehr nach Verletzung/Abwesenheit wie bisher.
  * - Keine Prozentzahl: drei Stufen (Unauffällig / Beobachten / Anpassen) mit den Gründen als Text. Verletzt/Angeschlagen ist
  *   die getrennte „Verfügbarkeit“ und fließt nicht in die Stufe ein.
@@ -30,7 +32,8 @@ import { DEFAULT_TRAINING_DURATION, type TeamEvent, plannedMinutes } from '../ev
 import type { Player } from '../player/player';
 import { type EventRating } from '../profile/profile';
 import { type Absence, activeAbsenceOn, isInjuryAbsence } from '../records/absence';
-import { type Measurement, sortedMeasurements } from '../records/measurement';
+import { type Measurement } from '../records/measurement';
+import { FRESH_DAYS, MAX_HINT_INTERVAL_DAYS, analyzeGrowth, growthHintLevel, perMonth } from '../records/growth-velocity';
 import { type Rating, roundGrade } from '../ratings/rating';
 import { type LoadCurvePoint, loadCurve, workloadRatio } from './load-curve';
 
@@ -86,12 +89,17 @@ export interface InjuryRisk {
 }
 
 /**
- * Wie weit die Belastungsampel zurückschaut: Messungen der letzten 90 Tage, beendete Verletzungen bis 21 Tage zurück.
- * Die Übersichten laden Abwesenheiten/Messwerte nur in diesem Fenster (SCRUM-200) – wer die Werte ändert, ändert
- * damit auch die Abfragen.
+ * Wie weit die Übersichten zurückschauen: Spielerangaben der letzten 90 Tage, beendete Verletzungen bis 21 Tage zurück,
+ * Messwerte siehe {@link GROWTH_MEASUREMENT_WINDOW_DAYS}. Die Übersichten laden Abwesenheiten/Messwerte nur in diesem
+ * Fenster (SCRUM-200) – wer die Werte ändert, ändert damit auch die Abfragen.
  */
 export const MEASUREMENT_WINDOW_DAYS = 90;
 export const ABSENCE_LOOKBACK_DAYS = 21;
+/**
+ * So weit zurück braucht der Wachstumshinweis Messwerte (SCRUM-305): jüngste Messung bis 90 Tage alt, Vergleichsmessung
+ * bis 365 Tage davor. Die Übersichten laden Messwerte in diesem Fenster.
+ */
+export const GROWTH_MEASUREMENT_WINDOW_DAYS = FRESH_DAYS + MAX_HINT_INTERVAL_DAYS;
 
 const localMidnight = (iso: string) => new Date(`${iso}T00:00:00`);
 const daysBetween = (earlier: Date, later: Date) => (later.getTime() - earlier.getTime()) / 86400000;
@@ -102,6 +110,17 @@ function isoOf(date: Date): string {
 }
 
 const label = (value: number) => roundGrade(value).toFixed(1).replace('.', ',');
+
+/** Wachstumsschub-Hinweis zum Tag `today` (ISO) oder null; Regel siehe {@link analyzeGrowth}. */
+export function growthHint(measurements: readonly Measurement[], today: string): { label: string; weight: number } | null {
+  const rate = analyzeGrowth(measurements.filter((item) => item.date <= today), today).currentRate;
+  if (rate === null) return null;
+  const monthly = perMonth(rate);
+  const level = growthHintLevel(monthly);
+  if (level === 'strong') return { label: `Starker Wachstumsschub (${label(monthly)} cm/Monat)`, weight: 2 };
+  if (level === 'hint') return { label: `Wachstumsschub (${label(monthly)} cm/Monat)`, weight: 1 };
+  return null;
+}
 
 /** Ab diesem Verhältnis Müdigkeit / Fitness ein Hinweis bzw. ein starker Hinweis (siehe Kopfkommentar). */
 export const SPIKE_RATIO = 1.5;
@@ -180,19 +199,12 @@ export function injuryRisk(
     hints.push({ label: 'Zwei sehr harte Einheiten innerhalb von 48 Stunden', weight: 1 });
   }
 
-  // Wachstumsschub aus den letzten beiden Körpermessungen mit Größe – nur Messungen der letzten ca. 3 Monate (90 Tage) zählen
-  // (SCRUM-157). Eine Messung nur mit Gewicht zählt nicht (sonst läse man sie als 0 cm, SCRUM-302) – wie im Belastungsbericht.
-  const sorted = sortedMeasurements(measurements).filter(
-    (item): item is Measurement & { height: number } =>
-      typeof item.height === 'number' && item.height > 0 && daysBetween(localMidnight(item.date), today) <= MEASUREMENT_WINDOW_DAYS,
-  );
-  if (sorted.length >= 2) {
-    const [prev, last] = sorted.slice(-2);
-    const months = daysBetween(localMidnight(prev.date), localMidnight(last.date)) / 30;
-    const growth = months > 0 ? (last.height - prev.height) / months : 0;
-    if (growth >= 1.2) hints.push({ label: `Starker Wachstumsschub (${label(growth)} cm/Monat)`, weight: 2 });
-    else if (growth >= 0.6) hints.push({ label: `Wachstumsschub (${label(growth)} cm/Monat)`, weight: 1 });
-  }
+  // Wachstumsschub (SCRUM-305, Methodenversion 1.0 §6): jüngste gültige Größenmessung höchstens 90 Tage alt, verglichen mit
+  // der jüngsten älteren Messung mit 90 bis 365 Tagen Abstand – dieselbe Regel wie Profil und Belastungsbericht. Messungen
+  // kurz hintereinander ergeben keine Rate (sonst würde Messrauschen zu „cm/Monat“ hochgerechnet). Eine Messung nur mit
+  // Gewicht zählt nicht (SCRUM-302); Messungen nach dem Stichtag zählen nicht.
+  const growth = growthHint(measurements, todayStr);
+  if (growth) hints.push(growth);
 
   // Rückkehr nach Verletzung: das Statusfeld („ca. verletzt bis“) und eine eingetragene Verletzung beschreiben oft dieselbe
   // Rückkehr; deshalb zählt nur die jüngste der beiden.

@@ -76,8 +76,14 @@ export function loadReportHtml(report: LoadReport, logoUrl = ''): string {
   const growth = report.markers.growth.length
     ? report.markers.growth
         .map(
-          (item) =>
-            `<li>${formatDate(item.from)} → ${formatDate(item.to)}: ${comma(item.fromHeight, 1)} → ${comma(item.toHeight, 1)} cm (${comma(item.perMonth, 1)} cm/Monat)${item.perMonth >= 1.2 ? ' – starker Wachstumsschub' : item.perMonth >= 0.6 ? ' – Wachstumsschub' : ''}</li>`,
+          (item) => {
+            const span = item.from !== null && item.fromHeight !== null
+              ? `${formatDate(item.from)} → ${formatDate(item.to)}: ${comma(item.fromHeight, 1)} → ${comma(item.toHeight, 1)} cm`
+              : `${formatDate(item.to)}: ${comma(item.toHeight, 1)} cm`;
+            if (item.perMonth === null) return `<li>${span} – keine Rate: ${e(item.note)}</li>`;
+            const level = item.level === 'strong' ? ' – starker Wachstumsschub' : item.level === 'hint' ? ' – Wachstumsschub' : '';
+            return `<li>${span} (${comma(item.perMonth, 1)} cm/Monat)${level}</li>`;
+          },
         )
         .join('')
     : '<li>Keine Messungen im Zeitraum.</li>';

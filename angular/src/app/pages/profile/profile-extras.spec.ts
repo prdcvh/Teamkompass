@@ -43,7 +43,7 @@ describe('Profile: Zusatzdaten', () => {
   });
 
   it('die laufende Verletzung überlagert den Status und trennt Verfügbarkeit und Belastung', async () => {
-    // Fester Zeitpunkt: der Wachstumshinweis zählt nur Messungen der letzten 90 Tage (SCRUM-157).
+    // Fester Zeitpunkt: der Wachstumshinweis zählt nur frische Messungen (SCRUM-157, SCRUM-305).
     vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-02T12:00:00') });
     const fixture = await renderExtras();
     expect(text(q(fixture, '.status-line'))).toContain('Verletzt');
@@ -53,9 +53,10 @@ describe('Profile: Zusatzdaten', () => {
     expect(risk).not.toContain('%');
     // Verfügbarkeit steht für sich: „Nicht einsetzen“ kommt nur von der Verletzung, nicht aus der Belastungsstufe.
     expect(risk).toContain('Verfügbarkeit: Verletzt – Nicht einsetzen');
-    // Die Stufe kommt hier aus dem starken Wachstumsschub der Messwerte (2,5 cm/Monat), nicht aus der Verletzung.
-    expect(risk).toContain('Starker Wachstumsschub');
-    expect(q(fixture, '.risk')?.getAttribute('data-tier')).toBe('anpassen');
+    // Die Verletzung hebt die Belastungsstufe nicht an. Die beiden Messwerte liegen nur 61 Tage auseinander: zu kurz für
+    // eine Wachstumsrate (Mindestabstand 90 Tage, SCRUM-305), also auch kein Wachstumshinweis (vorher „2,5 cm/Monat“).
+    expect(risk).not.toContain('Wachstumsschub');
+    expect(q(fixture, '.risk')?.getAttribute('data-tier')).toBe('unauffaellig');
   });
 
   it('legt einen Förderplan an und prüft Pflichtfelder', async () => {

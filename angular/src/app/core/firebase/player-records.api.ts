@@ -62,7 +62,7 @@ export class PlayerRecordsApi {
     );
   }
 
-  /** Echtzeit-Abo auf die Messwerte ab dem Stichtag `since` (die Belastungsampel braucht nur die letzten ca. 90 Tage). */
+  /** Echtzeit-Abo auf die Messwerte ab dem Stichtag `since` (die Belastungsampel braucht nur ein begrenztes Fenster). */
   async watchRecentMeasurements(
     playerId: string,
     since: string,

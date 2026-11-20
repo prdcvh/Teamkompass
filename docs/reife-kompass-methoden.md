@@ -208,9 +208,10 @@ Größe 0,6 cm (Wiederholung nach 7 Tagen), Gewicht 0,3 kg, Sitzhöhe 0,9 cm.
 | Mindestdaten | 1 Messung = Ausgangswert; 2 gültige Messungen mit Mindestabstand = genau 1 Rate; ≥ 3 = Verlauf | SCRUM-254 |
 | PHV | **keine automatische Erkennung** (weder aus Maximum der Raten noch aus %PAH) | eigene Validierung fehlt; Monasterio 2024: beste Übereinstimmung (≈ 80 %) nur durch erfahrene Personen, die die Kurve ansehen |
 
-Die heutige Ampel (SCRUM-157) nimmt zwei beliebige Messungen der letzten 90 Tage ohne Mindestabstand und
-liest eine Messung ohne Größe als 0 cm → falscher „starker Wachstumsschub“: **SCRUM-302** (High). Die Regeln
-oben sind für die Umsetzung in SCRUM-254 gedacht.
+Die Ampel (SCRUM-157) nahm früher zwei beliebige Messungen der letzten 90 Tage ohne Mindestabstand und
+las eine Messung ohne Größe als 0 cm → falscher „starker Wachstumsschub“: behoben in **SCRUM-302** (keine 0 cm)
+und **SCRUM-305** (Belastungsampel und Belastungsbericht nutzen dieselbe Regel wie das Profil aus SCRUM-254:
+Mindestabstand 90 Tage, Vergleichsmessung 90 bis 365 Tage vor der jüngsten, jüngste ≤ 90 Tage alt).
 
 ## 7. Grenzen der Übertragbarkeit
 
