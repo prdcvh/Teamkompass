@@ -43,13 +43,13 @@ export type GradeField = (typeof GRADE_FIELDS)[number];
 export const GRADE_LABELS: Readonly<Record<GradeField, string>> = {
   effort: 'Einsatz',
   technique: 'Fehlerquote',
-  tactics: 'Entscheidungsfindung',
+  tactics: 'Spielwirkung',
   comprehension: 'Lernfähigkeit',
 };
 
 /**
  * Gewichtung der Gesamtnote: keine Teilnote darf allein dominieren. Einsatz und Fehlerquote bleiben mit
- * 30 % die stärksten Faktoren, Entscheidungsfindung ist mit 25 % nahezu gleichwertig und Lernfähigkeit
+ * 30 % die stärksten Faktoren, Spielwirkung ist mit 25 % nahezu gleichwertig und Lernfähigkeit
  * bekommt mit 15 % ein Gewicht, das sie tatsächlich beeinflussen kann (gleiche Werte wie die bisherige App).
  */
 export const GRADE_WEIGHTS: Readonly<Record<GradeField, number>> = { effort: 0.3, technique: 0.3, tactics: 0.25, comprehension: 0.15 };

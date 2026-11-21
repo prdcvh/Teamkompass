@@ -49,7 +49,7 @@ import { EventDetails } from './event-details';
 const GRADE_HEADERS: Readonly<Record<GradeField, string>> = {
   ...GRADE_LABELS,
   technique: 'Fehler\u00ADquote',
-  tactics: 'Entschei\u00ADdungs\u00ADfindung',
+  tactics: 'Spiel\u00ADwirkung',
   comprehension: 'Lern\u00ADfähig\u00ADkeit',
 };
 
