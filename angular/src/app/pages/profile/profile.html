@@ -137,6 +137,9 @@
 
       <tk-load-curve-card [curve]="loadCurve()" [compact]="mobile()" />
 
+      <!-- Wachstum, Belastung und Befinden auf einer Zeitachse (SCRUM-257): nur Trainer-Profil, keine Bewertung; Hinweis und Trainerprüfung. -->
+      <tk-growth-load-card [curve]="loadCurve()" [compact]="mobile()" [player]="p" [items]="profile.items()" />
+
       <h2 class="section-title">Statistik</h2>
       <section class="cards" aria-label="Statistik">
         @for (card of cards(); track card.label) {

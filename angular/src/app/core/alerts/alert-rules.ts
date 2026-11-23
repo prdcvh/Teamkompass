@@ -23,6 +23,9 @@
  *   Aufgabe „Gesundheitsdaten prüfen und löschen“ also noch offen ist).
  * - Offene Bewertungen: ein vergangener Termin der letzten 7 Tage, bei dem noch Spieler ohne Bewertung sind; ab dem Tag
  *   nach dem Termin.
+ * - Wachstum und Belastung gemeinsam ansehen (SCRUM-257): aktueller Wachstumshinweis und seit der jüngsten Messung ein
+ *   Belastungshinweis der Ampel; bleibt bis zur Trainerprüfung oder zum Ablauf stehen (growth-load-rule.ts,
+ *   docs/reife-kompass-wachstum-belastung-hinweis.md). Der Schlüssel enthält das Messpaar: gleiche Daten, ein Hinweis.
  *
  * E-Mail (später über den Erinnerungsdienst, SCRUM-101): {@link ALERT_EMAIL_TEXT} ist der einzige Text, den eine E-Mail
  * je enthalten darf – ohne Namen, Regel oder Werte, nur „bitte in die App schauen“.
@@ -37,8 +40,9 @@ import type { Measurement } from '../records/measurement';
 import { hasWellnessAnswer, type WellnessEntry } from '../self-report/self-report';
 import { wellnessStatus } from '../self-report/self-report-hints';
 import { addDays } from '../shared/dates';
+import { type GrowthLoadData, growthLoadDetail, growthLoadMatch } from './growth-load-rule';
 
-export const ALERT_RULE_IDS = ['pain', 'wellness', 'loadSpike', 'consentRevoked', 'openRatings'] as const;
+export const ALERT_RULE_IDS = ['pain', 'wellness', 'loadSpike', 'growthLoad', 'consentRevoked', 'openRatings'] as const;
 export type AlertRuleId = (typeof ALERT_RULE_IDS)[number];
 
 /** Wer den Hinweis sieht. Scouts, Spieler und Eltern nie. */
@@ -88,6 +92,13 @@ export const ALERT_RULES: readonly AlertRule[] = [
     audience: ['trainer'],
   },
   {
+    id: 'growthLoad',
+    title: 'Wachstum und Belastung gemeinsam ansehen',
+    when: 'Ein aktueller Wachstumshinweis (ab 0,6 cm pro Monat) trifft seit der jüngsten Messung auf eine Belastungsspitze oder zwei sehr harte Einheiten innerhalb von 48 Stunden. Ohne geprüfte Messqualität zuerst „Messung prüfen“. Keine Sperre, nichts wird automatisch geändert.',
+    health: true,
+    audience: ['trainer'],
+  },
+  {
     id: 'consentRevoked',
     title: 'Einwilligung widerrufen',
     when: 'Die Einwilligung eines Spielers ist widerrufen und es sind noch Gesundheitsdaten gespeichert.',
@@ -109,7 +120,7 @@ export function alertRule(id: AlertRuleId): AlertRule {
 
 /** Ein/Aus je Vorlage. Standard: alle an (möglichst wenig Handarbeit). */
 export type AlertSwitches = Readonly<Record<AlertRuleId, boolean>>;
-export const DEFAULT_ALERT_SWITCHES: AlertSwitches = { pain: true, wellness: true, loadSpike: true, consentRevoked: true, openRatings: true };
+export const DEFAULT_ALERT_SWITCHES: AlertSwitches = { pain: true, wellness: true, loadSpike: true, growthLoad: true, consentRevoked: true, openRatings: true };
 
 /** Dokument `meta/settings` → Schalter; fehlende oder ungültige Werte gelten als „an“. */
 export function alertSwitchesFromDoc(doc: Readonly<Record<string, unknown>> | null): AlertSwitches {
@@ -123,7 +134,7 @@ export function docFromAlertSwitches(switches: AlertSwitches): Record<string, un
 }
 
 /** Daten eines Spielers für die Regeln. `null` = für diese Rolle nicht lesbar oder nicht geladen (Regel schweigt). */
-export interface AlertPlayerData {
+export interface AlertPlayerData extends GrowthLoadData {
   readonly player: Player;
   /** Alle Termine mit der Bewertung dieses Spielers (Medizin: null, sie liest keine Bewertungen). */
   readonly items: readonly EventRating[] | null;
@@ -176,7 +187,13 @@ export function consentRevokedMatch(data: AlertPlayerData): boolean {
   const { player } = data;
   if (player.consentStatus !== 'revoked') return false;
   const statusStored = player.status !== 'Fit' || !!player.injuryUntil || !!player.injuredSince;
-  return statusStored || data.absences.length > 0 || data.measurements.length > 0 || (data.wellness ?? []).some(hasWellnessAnswer);
+  return (
+    statusStored ||
+    data.absences.length > 0 ||
+    data.measurements.length > 0 ||
+    (data.wellness ?? []).some(hasWellnessAnswer) ||
+    (data.growthReviews ?? []).length > 0
+  );
 }
 
 /** Vergangene Termine der letzten 7 Tage (vor `day`), bei denen noch Spieler ohne Bewertung sind. */
@@ -207,8 +224,8 @@ export function alertMatchesOn(
 ): AlertMatch[] {
   const on = (id: AlertRuleId) => switches[id] && alertRule(id).audience.includes(audience);
   const matches: AlertMatch[] = [];
-  const add = (ruleId: AlertRuleId, data: AlertPlayerData, detail: string) =>
-    matches.push({ key: `${ruleId}:${data.player.id}`, ruleId, playerId: data.player.id, eventId: null, subject: data.player.name, detail });
+  const add = (ruleId: AlertRuleId, data: AlertPlayerData, detail: string, key = `${ruleId}:${data.player.id}`) =>
+    matches.push({ key, ruleId, playerId: data.player.id, eventId: null, subject: data.player.name, detail });
   for (const data of players) {
     if (on('pain')) {
       const pain = painMatch(data.wellness, day);
@@ -221,6 +238,10 @@ export function alertMatchesOn(
     if (on('loadSpike')) {
       const spike = loadSpikeMatch(data, day);
       if (spike) add('loadSpike', data, `Müdigkeit ${comma(spike.ratio ?? 0)}-fach der Fitness`);
+    }
+    if (on('growthLoad')) {
+      const growthLoad = growthLoadMatch(data, day);
+      if (growthLoad) add('growthLoad', data, growthLoadDetail(growthLoad), growthLoad.key);
     }
     if (on('consentRevoked') && consentRevokedMatch(data)) add('consentRevoked', data, 'Gesundheitsdaten prüfen und löschen');
   }

@@ -127,6 +127,8 @@ export const SPIKE_RATIO = 1.5;
 export const STRONG_SPIKE_RATIO = 2;
 /** So viel mehr als eine übliche Trainingswoche (Tage 8–28) müssen die letzten 7 Tage sein, damit eine Spitze zählt. */
 export const SPIKE_MIN_WEEK_INCREASE = 1.15;
+/** Text des Hinweises „zwei sehr harte Einheiten“; die Wenn-dann-Regel „Wachstum und Belastung“ (SCRUM-257) erkennt ihn daran. */
+export const HARD_SESSIONS_REASON = 'Zwei sehr harte Einheiten innerhalb von 48 Stunden';
 
 const tookPart = (rating: Rating | null | undefined) => rating?.attendance === 'present' || rating?.attendance === 'limited';
 
@@ -196,7 +198,7 @@ export function injuryRisk(
   // Zwei sehr harte Einheiten (Anstrengung ≥ 7) innerhalb von 48 Stunden in den letzten 7 Tagen.
   const hard = past.filter((item) => item.ago <= 6 && item.exertion >= 7);
   if (hard.some((item, index) => index > 0 && item.ago - hard[index - 1].ago <= 2)) {
-    hints.push({ label: 'Zwei sehr harte Einheiten innerhalb von 48 Stunden', weight: 1 });
+    hints.push({ label: HARD_SESSIONS_REASON, weight: 1 });
   }
 
   // Wachstumsschub (SCRUM-305, Methodenversion 1.0 §6): jüngste gültige Größenmessung höchstens 90 Tage alt, verglichen mit
