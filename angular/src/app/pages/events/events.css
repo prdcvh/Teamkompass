@@ -5,7 +5,6 @@
 .page {
   display: grid;
   gap: var(--tk-space-4);
-  max-width: 1100px;
   padding: var(--tk-space-5);
 }
 
@@ -135,13 +134,15 @@ td.date {
 
 .cards {
   display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+  column-gap: var(--tk-space-5);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.cards li + li {
-  border-top: 1px solid var(--tk-line);
+.cards li {
+  border-bottom: 1px solid var(--tk-line);
 }
 
 .row {
