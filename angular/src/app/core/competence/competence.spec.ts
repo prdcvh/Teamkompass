@@ -203,6 +203,11 @@ describe('Gesamtindex', () => {
     expect(single.kind === 'insufficient' && single.reasons).toEqual(['Beobachtungen von erst 1 Tag(en) (mindestens 2).']);
   });
 
+  it('ohne jede Beobachtung nur ein kurzer Grund', () => {
+    const cfg = config();
+    expect(competenceIndex(competenceProfile([], cfg, TODAY), cfg)).toEqual({ kind: 'insufficient', reasons: ['Noch keine Beobachtung im Profilzeitraum.'] });
+  });
+
   it('Bereich mit Gewicht 0 braucht keine Abdeckung', () => {
     const cfg = config({ weightProfile: 'foundation', weights: { technique: 40, tactics: 30, physical: 0, psychological: 15, social: 15 } });
     const list = covered().filter((entry) => !entry.criterionId.startsWith('physical.'));

@@ -158,3 +158,8 @@ h2 {
   justify-content: flex-end;
   margin-top: var(--tk-space-3);
 }
+
+/* Hinweis unter „Eventnoten im Schnitt“ (SCRUM-266): bisheriges Modell, getrennt vom Entwicklungsraster. */
+.model-note {
+  margin-bottom: var(--tk-space-3);
+}

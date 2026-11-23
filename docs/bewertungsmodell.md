@@ -205,8 +205,9 @@ Raster oder Index ordnet oder vergleicht. Raster und Index erscheinen nur im Pro
 
 ## 10. Was mit den Altnoten passiert
 
-Nichts. Keine Migration, keine Umbenennung von Feldern, keine neue Berechnung. Die Karte heißt im Profil
-„Eventnoten im Schnitt“ und trägt den Zusatz „bisheriges Modell“. Berichte (PDF, Saisonbericht) bleiben unverändert.
+Nichts. Keine Migration, keine Umbenennung von Feldern, keine neue Berechnung. Die Karte heißt im Trainer-Profil
+„Eventnoten im Schnitt“ und trägt den Zusatz „bisheriges Modell“. Berichte (PDF, Saisonbericht) und die Ansicht für
+Spieler, Eltern und Scouts (dort weiter „Kompetenzprofil“) bleiben unverändert, weil sie das Raster nicht zeigen.
 
 ## 11. Versionierung
 
