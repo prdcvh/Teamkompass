@@ -68,7 +68,8 @@ import { Dialog } from '../../ui/dialog/dialog';
       </tk-card>
     </section>
 
-    @if (canEdit()) {
+    <!-- Nur solange ein Löschen offen ist: sonst stünde eine zweite Bestätigung neben der der Messwerte im Profil. -->
+    @if (canEdit() && deleting() !== null) {
       <tk-dialog [open]="deleting() !== null" title="Feldtest löschen?" (closed)="deleting.set(null)">
         <p>{{ deleting()?.text }} wird mit allen Versuchen gelöscht. Das lässt sich nicht rückgängig machen.</p>
         @if (deleteFailed()) { <p class="error" role="alert">Löschen fehlgeschlagen. Bitte Verbindung prüfen und erneut versuchen.</p> }
