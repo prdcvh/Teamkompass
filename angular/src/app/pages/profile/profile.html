@@ -109,6 +109,11 @@
         </tk-card>
       </section>
 
+      @if (trainer()) {
+        <!-- Taktikdiagnostik (SCRUM-267): Entscheidung und Ausführung getrennt, mit Nenner und Mindestfallzahl; nur Trainer. -->
+        <tk-tactic-diagnostics-card [player]="p" />
+      }
+
       <!-- Jahrgang im Verein (SCRUM-197): nur Trainer, nur wenn der Vereinsadmin den Vergleich eingeschaltet hat. -->
       <tk-cohort-card [player]="p" />
 

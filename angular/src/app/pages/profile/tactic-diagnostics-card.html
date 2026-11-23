@@ -1,0 +1,114 @@
+<section class="block" aria-labelledby="tactic-title">
+  <h2 id="tactic-title" class="section-title">Taktikdiagnostik</h2>
+  <tk-card>
+    @if (store.state() === 'error') {
+      <div class="notice" role="alert">
+        <p>{{ store.error() }}</p>
+        <button tkButton type="button" size="sm" (click)="store.retry()">Erneut versuchen</button>
+      </div>
+    } @else if (store.state() !== 'ready') {
+      <p class="muted" role="status">Szenen werden geladen …</p>
+    } @else if (metrics().scenes === 0) {
+      <p class="muted">
+        Noch keine Szene erfasst. Szenen erfasst du auf der Seite eines Termins unter „Taktikdiagnostik“: Entscheidung und
+        Ausführung werden dort getrennt eingeordnet. Ergänzt die Teilnote „Spielwirkung“.
+      </p>
+    } @else {
+      @let m = metrics();
+      <dl class="facts">
+        <div>
+          <dt>Stichprobe</dt>
+          <dd>
+            {{ m.scenes }} {{ m.scenes === 1 ? 'Szene' : 'Szenen' }} aus {{ m.events }} {{ m.events === 1 ? 'Termin' : 'Terminen' }}
+            ({{ m.games }} aus Spielen, {{ m.trainings }} aus Trainings)
+          </dd>
+        </div>
+        <div>
+          <dt>Zeitfenster</dt>
+          <dd>{{ formatDate(m.from ?? '') }}@if (m.to !== m.from) { – {{ formatDate(m.to ?? '') }}}</dd>
+        </div>
+        <div>
+          <dt>Nicht beurteilbar</dt>
+          <dd>{{ m.unclearDecisions }} Entscheidungen, {{ m.unclearExecutions }} Ausführungen (zählen nicht mit)</dd>
+        </div>
+      </dl>
+
+      <div class="kpis">
+        <article class="kpi" [attr.data-reliable]="m.decisionQuality.reliable">
+          <span>Entscheidungsqualität</span>
+          <strong>{{ ratioText(m.decisionQuality) }}</strong>
+          <small>sinnvolle Entscheidungen von allen beurteilbaren Entscheidungen</small>
+        </article>
+        <article class="kpi" [attr.data-reliable]="m.executionRate.reliable">
+          <span>Ausführungsquote</span>
+          <strong>{{ ratioText(m.executionRate) }}</strong>
+          <small>erfolgreiche Ausführungen von sinnvoll gewählten Aktionen mit beurteilbarer Ausführung</small>
+        </article>
+      </div>
+
+      @if (!m.decisionQuality.reliable || !m.executionRate.reliable) {
+        <p class="muted hint" role="note">
+          Aus wenigen Szenen lässt sich keine taktische Stärke oder Schwäche ablesen. Prozentwerte erscheinen erst ab
+          {{ minCases }} beurteilbaren Szenen je Kennzahl; darunter steht nur die Zählung.
+        </p>
+      }
+
+      @for (table of tables(); track table.key) {
+        @if (table.groups.length > 0) {
+          <h3>{{ table.title }}</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">{{ table.first }}</th>
+                  <th scope="col">Szenen</th>
+                  <th scope="col">Entscheidung</th>
+                  <th scope="col">Ausführung</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (group of table.groups; track group.key) {
+                  <tr>
+                    <td [attr.data-label]="table.first">{{ group.label }}</td>
+                    <td data-label="Szenen">{{ group.metrics.scenes }}</td>
+                    <td data-label="Entscheidung" [attr.title]="ratioTitle(group.metrics.decisionQuality)" [attr.data-reliable]="group.metrics.decisionQuality.reliable">
+                      {{ ratioShort(group.metrics.decisionQuality) }}
+                    </td>
+                    <td data-label="Ausführung" [attr.title]="ratioTitle(group.metrics.executionRate)" [attr.data-reliable]="group.metrics.executionRate.reliable">
+                      {{ ratioShort(group.metrics.executionRate) }}
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      }
+      <p class="muted hint">
+        „2/3“ = 2 von 3, unter der Mindestfallzahl ({{ minCases }}) noch ohne Prozentwert; „–“ = keine beurteilbare Szene.
+        Eine Szene mit mehreren Ereignistypen zählt in jeder ihrer Zeilen.
+      </p>
+
+      <details class="fold">
+        <summary><h3>Alle Szenen · {{ m.scenes }}</h3></summary>
+        <ul class="list">
+          @for (scene of store.scenes(); track scene.id) {
+            <li>
+              <strong>
+                {{ formatDate(scene.eventDate) }} · {{ scene.eventType }} ·
+                {{ scene.eventTitle || 'Termin' }}@if (scene.minute !== null) { · {{ scene.minute }}. Min.}
+              </strong>
+              <span>{{ scene.context }}</span>
+              <small>
+                Entscheidung: {{ decisionLabels[scene.decision] }}@if (scene.execution; as execution) { · Ausführung: {{ executionLabels[execution] }}}@for (type of scene.situations; track type) { · {{ situationLabels[type] }}}
+              </small>
+              @if (scene.videoUrl) {
+                <small class="video">Video (intern, nur Trainer): <span class="url">{{ scene.videoUrl }}</span></small>
+              }
+            </li>
+          }
+        </ul>
+      </details>
+    }
+  </tk-card>
+</section>

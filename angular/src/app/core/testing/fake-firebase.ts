@@ -25,6 +25,8 @@ import { TeamsApi } from '../firebase/teams.api';
 import { RegistrationApi } from '../firebase/registration.api';
 import { ClubApi } from '../firebase/club.api';
 import { ClubComparisonApi } from '../firebase/club-comparison.api';
+import { TacticScenesApi } from '../firebase/tactic-scenes.api';
+import { FakeTacticScenesApi } from './fake-tactic-scenes.api';
 import { FakeClubComparisonApi } from './fake-club-comparison.api';
 import { FakeClubApi } from './fake-club.api';
 import { FakeTeamsApi } from './fake-teams.api';
@@ -90,6 +92,8 @@ export class FakeFirebase {
   readonly registration = new FakeRegistrationApi(this.auth);
   readonly club = new FakeClubApi();
   readonly comparison = new FakeClubComparisonApi();
+  /** Taktikdiagnostik (SCRUM-267), eigene Aufrufliste. */
+  readonly tacticScenes = new FakeTacticScenesApi();
 
   constructor() {
     this.ratings.releaseFor = (playerId) => this.gradeReleases.release(playerId);
@@ -129,5 +133,6 @@ export function provideFakeFirebase(fake: FakeFirebase): Provider[] {
     { provide: RegistrationApi, useValue: fake.registration },
     { provide: ClubApi, useValue: fake.club },
     { provide: ClubComparisonApi, useValue: fake.comparison },
+    { provide: TacticScenesApi, useValue: fake.tacticScenes },
   ];
 }

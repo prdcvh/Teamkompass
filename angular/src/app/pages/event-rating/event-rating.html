@@ -273,6 +273,13 @@
         </div>
       </tk-card>
     }
+
+    <!-- Taktikdiagnostik (SCRUM-267): Szenen mit getrennter Entscheidung/Ausführung, nur Trainer. -->
+    @if (event(); as ev) {
+      @if (ratings.canWrite() && allPlayers().length > 0) {
+        <tk-tactic-scenes-panel [event]="ev" [players]="allPlayers()" />
+      }
+    }
   }
 </section>
 
