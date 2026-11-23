@@ -110,30 +110,7 @@
         }
         <section class="columns">
           @if (gradesShown()) {
-          <tk-card>
-            <h2>Notenverlauf</h2>
-            <svg class="chart" [attr.viewBox]="'0 0 ' + chart().width + ' ' + chart().height" role="img" [attr.aria-label]="graded().length ? (scale() === 'levels' ? 'Verlauf der Kompetenzstufen: ' : 'Notenverlauf (1 ist die beste Note): ') + chart().summary : 'Noch keine benoteten Events vorhanden'">
-              @for (line of chart().grid; track line.grade) {
-                <line x1="54" [attr.y1]="line.y" [attr.x2]="chart().width - 24" [attr.y2]="line.y" class="grid" />
-                <text [attr.x]="line.x" [attr.y]="line.y + 4" class="axis">{{ line.label }}</text>
-              }
-              @if (chart().points.length > 0) {
-                  @if (chart().area) {
-                    <path [attr.d]="chart().area" class="area" />
-                  }
-                  <path [attr.d]="chart().path" class="line" />
-                  @for (point of chart().points; track $index) {
-                    <circle [attr.cx]="point.x" [attr.cy]="point.y" r="6" class="dot" [class.last]="$last" tabindex="0" [attr.aria-label]="point.title"><title>{{ point.title }}</title></circle>
-                    @if ($last || $index === chart().best || chart().points.length <= 8) {
-                      <text [attr.x]="point.x" [attr.y]="point.y - 14" class="value" text-anchor="middle">{{ point.valueLabel }}</text>
-                    }
-                    <text [attr.x]="point.x - 14" [attr.y]="chart().height - 12" class="axis small">{{ point.label }}</text>
-                  }
-                } @else {
-                <text x="54" y="138" class="axis">Noch keine benoteten Events vorhanden.</text>
-              }
-            </svg>
-          </tk-card>
+          <tk-grade-trend-card [graded]="graded()" [scale]="scale()" [today]="today" />
 
           }
           <tk-card>
