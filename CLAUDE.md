@@ -235,8 +235,8 @@ keeps the board current, reports at sprint end).
   report compares the plan with what actually happened.
 - **Manual runs (`/jira-run`) run in the PO's own session (PO,
   2026-10-22).** No new session is fired: the session where the PO typed the
-  command is the main session. Plan, ticket moves and the final report with
-  the report go straight into that chat, with no PushNotification.
+  command is the main session. Plan, ticket moves and the final report go
+  straight into that chat, with no PushNotification.
   Push notifications are only for the automatically scheduled night run.
   Details in `.claude/skills/jira-run/SKILL.md`.
 - **Morning reminder.** A scheduled job (07:49 Europe/Berlin, daily) pushes
