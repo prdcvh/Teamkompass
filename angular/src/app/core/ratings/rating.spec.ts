@@ -1,5 +1,7 @@
 import {
   BLANK_RATING,
+  GRADE_LABELS,
+  GRADE_WEIGHTS,
   type Rating,
   applyChange,
   attendanceTone,
@@ -14,6 +16,12 @@ import {
 } from './rating';
 
 describe('rating (Logik)', () => {
+  it('nennt die Teilnote im Feld tactics „Spielwirkung“; Feldname und Gewicht (25 %) bleiben', () => {
+    expect(GRADE_LABELS.tactics).toBe('Spielwirkung');
+    expect(GRADE_WEIGHTS.tactics).toBe(0.25);
+    expect(docFromRating({ ...BLANK_RATING, tactics: 3 })['tactics']).toBe(3);
+  });
+
   it('ordnet jeder Anwesenheit eine Zeilenfarbe zu (offen = keine)', () => {
     expect(attendanceTone('present')).toBe('green');
     expect(attendanceTone('limited')).toBe('amber');
@@ -25,7 +33,7 @@ describe('rating (Logik)', () => {
   const full = (overrides: Partial<Rating> = {}): Rating => ({ ...BLANK_RATING, attendance: 'present', effort: 2, technique: 2, tactics: 2, comprehension: 2, ...overrides });
 
   describe('Gesamtnote (Kernzahl)', () => {
-    it('gewichtet Einsatz 30 %, Fehlerquote 30 %, Entscheidungsfindung 25 %, Lernfähigkeit 15 %', () => {
+    it('gewichtet Einsatz 30 %, Fehlerquote 30 %, Spielwirkung 25 %, Lernfähigkeit 15 %', () => {
       expect(calculatedGrade(full({ effort: 1, technique: 1, tactics: 1, comprehension: 1 }))).toBe(1);
       expect(calculatedGrade(full({ effort: 6, technique: 6, tactics: 6, comprehension: 6 }))).toBe(6);
       // 1*0.3 + 2*0.3 + 3*0.25 + 4*0.15 = 2.25 → 2,3 (auf eine Nachkommastelle gerundet)
