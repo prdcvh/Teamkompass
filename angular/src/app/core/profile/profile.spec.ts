@@ -100,7 +100,7 @@ describe('profile (Auswertungen)', () => {
       ];
       const skills = skillAverages(gradedEvents(items));
       expect(skills.map((skill) => [skill.label, skill.value])).toEqual([
-        ['Einsatz', 2], ['Fehlerquote', 3], ['Entscheidungsfindung', 3], ['Lernfähigkeit', 4],
+        ['Einsatz', 2], ['Fehlerquote', 3], ['Spielwirkung', 3], ['Lernfähigkeit', 4],
       ]);
       expect(skillAverages([]).every((skill) => skill.value === null)).toBe(true);
     });
