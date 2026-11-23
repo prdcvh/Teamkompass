@@ -152,6 +152,36 @@ export function sessionLoad(event: TeamEvent, rating: Rating): number {
   return sessionMinutes(event, rating) * event.exertion;
 }
 
+const pastLoads = (items: readonly EventRating[], today: Date) =>
+  items
+    .filter(({ rating }) => tookPart(rating))
+    .map(({ event, rating }) => ({ ago: Math.round(daysBetween(localMidnight(event.date), today)), load: sessionLoad(event, rating!), exertion: event.exertion }))
+    .filter((item) => item.ago >= 0)
+    .sort((a, b) => a.ago - b.ago);
+
+/**
+ * Die Spitzenrechnung der Ampel für einen Stichtag (SCRUM-176) – von der Ampel ({@link injuryRisk}) und vom
+ * Belastungsprotokoll (SCRUM-249, Wochenmarkierung) gemeinsam genutzt, damit es nur eine Formel gibt: Verhältnis
+ * Müdigkeit / Fitness ab {@link SPIKE_RATIO} mit den beiden Schutzregeln (siehe Kopfkommentar). `spikeHint` ist das Ergebnis.
+ */
+export function loadSpike(items: readonly EventRating[], todayStr: string) {
+  const today = localMidnight(todayStr);
+  const past = pastLoads(items, today);
+  // Woche 0 = letzte 7 Tage (heute und 6 Tage davor), Woche 1–3 = die 3 Wochen davor.
+  const weekLoads = [0, 1, 2, 3].map((week) => past.filter((item) => item.ago >= week * 7 && item.ago <= week * 7 + 6).reduce((sum, item) => sum + item.load, 0));
+  const acute = weekLoads[0];
+  const baseline = (weekLoads[1] + weekLoads[2] + weekLoads[3]) / 3;
+  const weeksWithLoad = weekLoads.filter((value) => value > 0).length;
+  // Übliche Trainingswoche: Schnitt der Wochen 1–3, in denen trainiert wurde (eine Pausenwoche zieht ihn nicht herunter).
+  const usedWeeks = weekLoads.slice(1).filter((value) => value > 0);
+  const usual = usedWeeks.length ? usedWeeks.reduce((sum, value) => sum + value, 0) / usedWeeks.length : 0;
+  const current = playerLoadCurve(items, todayStr).at(-1);
+  const ratio = acute > 0 ? workloadRatio(current) : null;
+  const spike = ratio !== null && ratio >= SPIKE_RATIO;
+  const spikeHint = spike && weeksWithLoad >= 3 && acute >= usual * SPIKE_MIN_WEEK_INCREASE;
+  return { acute, baseline, weeksWithLoad, current, ratio, spike, spikeHint };
+}
+
 /**
  * @param items alle Events mit der Bewertung dieses Spielers
  * @param now Zeitpunkt der Auswertung (Standard: jetzt); es zählt der Kalendertag
@@ -168,28 +198,12 @@ export function injuryRisk(
   const todayStr = isoOf(today);
 
   // Nur vergangene Termine mit Teilnahme; „ago“ = Tage seit dem Termin (0 = heute).
-  const past = items
-    .filter(({ rating }) => tookPart(rating))
-    .map(({ event, rating }) => ({ ago: Math.round(daysBetween(localMidnight(event.date), today)), load: sessionLoad(event, rating!), exertion: event.exertion }))
-    .filter((item) => item.ago >= 0)
-    .sort((a, b) => a.ago - b.ago);
-
-  // Woche 0 = letzte 7 Tage (heute und 6 Tage davor), Woche 1–3 = die 3 Wochen davor.
-  const weekLoads = [0, 1, 2, 3].map((week) => past.filter((item) => item.ago >= week * 7 && item.ago <= week * 7 + 6).reduce((sum, item) => sum + item.load, 0));
-  const acute = weekLoads[0];
-  const baseline = (weekLoads[1] + weekLoads[2] + weekLoads[3]) / 3;
-  const weeksWithLoad = weekLoads.filter((value) => value > 0).length;
-  // Übliche Trainingswoche: Schnitt der Wochen 1–3, in denen trainiert wurde (eine Pausenwoche zieht ihn nicht herunter).
-  const usedWeeks = weekLoads.slice(1).filter((value) => value > 0);
-  const usual = usedWeeks.length ? usedWeeks.reduce((sum, value) => sum + value, 0) / usedWeeks.length : 0;
-  const current = playerLoadCurve(items, todayStr).at(-1);
-  const ratio = acute > 0 ? workloadRatio(current) : null;
+  const past = pastLoads(items, today);
+  const { acute, baseline, weeksWithLoad, current, ratio, spike, spikeHint } = loadSpike(items, todayStr);
   const hints: { label: string; weight: number }[] = [];
   const infos: string[] = [];
 
-  const spike = ratio !== null && ratio >= SPIKE_RATIO;
-  const spikeHint = spike && weeksWithLoad >= 3 && acute >= usual * SPIKE_MIN_WEEK_INCREASE;
-  if (spikeHint) {
+  if (spikeHint && ratio !== null) {
     hints.push({ label: `Belastungsspitze (Müdigkeit ${label(ratio)}-fach der Fitness)`, weight: ratio >= STRONG_SPIKE_RATIO ? 2 : 1 });
   } else if (spike && weeksWithLoad < 4) {
     infos.push('Wiedereinstieg – langsam steigern');
