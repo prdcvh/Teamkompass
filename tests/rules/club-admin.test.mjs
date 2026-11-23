@@ -26,7 +26,7 @@ after(async () => { await env.cleanup(); });
 const HIDDEN = [
   "players/p1", "players/p2", "players/p1/absences/a1", "players/p1/measurements/m1", "players/p1/maturity/parents",
   "players/p1/wellness/e1", "events/e1/ratings/p1", "events/e1/privateNotes/p1", "events/e1/responses/p1",
-  "playerCards/p2", "notifications/acoach", "meta/playerView", "meta/playerStats", "meta/operations", "appState/current"
+  "playerCards/p2", "notifications/acoach", "meta/playerView", "meta/playerStats", "meta/operations", "meta/measurementPlan", "appState/current"
 ];
 // Was ein Trainer liest und der Vereinsadmin mitlesen darf (keine Gesundheitsdaten).
 const READABLE = [
@@ -69,7 +69,7 @@ async function seedTeam(db, teamId, prefix, clubId) {
   await setDoc(doc(db, t("learningProgress/p1")), { playerId: "p1", paths: {} });
   await setDoc(doc(db, t(`notifications/${prefix}coach`)), { emailReminders: true });
   await setDoc(doc(db, t("appState/current")), { x: 1 });
-  for (const name of ["lineup", "settings", "planning", "breaks", "ranking", "operations", "playerStats", "playerView"]) await setDoc(doc(db, t(`meta/${name}`)), { x: 1 });
+  for (const name of ["lineup", "settings", "planning", "breaks", "ranking", "operations", "playerStats", "playerView", "measurementPlan"]) await setDoc(doc(db, t(`meta/${name}`)), { x: 1 });
   await setDoc(doc(db, t("meta/clubOverview")), { version: 1, playerCount: 2, consentPending: 0, consentRevoked: 1, players: [{}, {}], updatedAt: Timestamp.now() });
 }
 

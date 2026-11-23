@@ -22,7 +22,7 @@ import {
 
 /**
  * Messplan (SCRUM-255) für den Kader: letzte gültige Messung, nächster Termin und Status je Spieler, dazu die
- * Entscheidungen des Trainers (Rhythmus, Termin, Pause). Nur Trainer (die Regeln sperren `meta/settings` für alle
+ * Entscheidungen des Trainers (Rhythmus, Termin, Pause). Nur Trainer (die Regeln sperren `meta/measurementPlan` für alle
  * anderen). Die Messungen werden einmalig je Spieler gelesen (wie das Bio-Banding), und nur für Spieler mit
  * dokumentierter Einwilligung; für alle anderen wird nichts geladen. Beim Abmelden wird alles verworfen.
  */
