@@ -433,15 +433,17 @@ tr[data-tone='grey'] td,
   content: '✓ ';
 }
 
-/* Matrix mit Notenstufen: breitere Notenspalten, damit Wörter wie „befriedigend“ lesbar bleiben; darunter scrollt die Matrix im Kasten. */
-table.words { min-width: 1150px; }
-table.words.game { min-width: 1480px; }
+/* Matrix mit Notenstufen: breitere Notenspalten und kleinere Schrift im Auswahlfeld, damit die Wörter möglichst lesbar bleiben; sie passt weiter ohne seitliches Scrollen in die Breite (volles Wort als Tooltip und Vorlesetext). */
 table.words .col-player { width: 13%; }
 table.words .col-attendance { width: 12%; }
 table.words .col-grade { width: 11.5%; }
 table.words .col-note { width: 10%; }
-table.words.game .col-grade { width: 10.5%; }
+table.words.game .col-grade { width: 9.5%; }
 table.words.game .col-player { width: 11%; }
 table.words.game .col-attendance { width: 11%; }
 table.words.game .col-total { width: 5%; }
-table.words.game .col-note { width: 6%; }
+table.words.game .col-note { width: 6.5%; }
+table.words .grade-select {
+  padding-inline: 6px 2px;
+  font-size: 0.8rem;
+}
