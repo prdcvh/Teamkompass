@@ -27,7 +27,7 @@ import { Card } from '../../ui/card/card';
             Zeitraum
             <select [value]="periodKey()" (change)="setPeriod($any($event.target).value)" data-testid="trend-period">
               @for (option of periods; track option.value) {
-                <option [value]="option.value">{{ option.label }}</option>
+                <option [value]="option.value" [selected]="option.value === periodKey()">{{ option.label }}</option>
               }
             </select>
           </label>
@@ -55,7 +55,7 @@ import { Card } from '../../ui/card/card';
             }
             @for (point of chart().points; track $index) {
               <circle [attr.cx]="point.x" [attr.cy]="point.y" r="6" class="dot" [class.last]="$last" tabindex="0" [attr.aria-label]="point.title"><title>{{ point.title }}</title></circle>
-              @if ($last || $index === chart().best || chart().points.length <= 8) {
+              @if (point.showValue) {
                 <text [attr.x]="point.x" [attr.y]="point.y - 14" class="value" text-anchor="middle">{{ point.valueLabel }}</text>
               }
             }
@@ -64,7 +64,7 @@ import { Card } from '../../ui/card/card';
           }
         </svg>
         <div class="development" [attr.data-state]="development().state" data-testid="trend-development">
-          <p><span>Entwicklung</span> <strong>{{ development().label }}</strong></p>
+          <p class="result"><span>Entwicklung</span><strong>{{ development().label }}</strong></p>
           @if (development().detail) {
             <p class="detail">{{ development().detail }}</p>
           }

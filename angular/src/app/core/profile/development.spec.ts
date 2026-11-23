@@ -208,6 +208,15 @@ describe('Entwicklung über die Zeit (SCRUM-265)', () => {
       expect(chart.ticks).toHaveLength(6);
     });
 
+    it('sehr kurzer Zeitraum: Anfang und Ende beschriftet; dichte Werte überlappen nicht', () => {
+      const chart = trendChart(gradedEvents(series([['2026-10-10', 2.6], ['2026-10-11', 2.6], ['2026-10-13', 2.6]])));
+      expect(chart.ticks.map((tick) => tick.label)).toEqual(['10.10.', '13.10.']);
+      // Abstand 1 Tag von 3 = 227 Einheiten: alle beschriftet; dichter als 44 Einheiten nur der letzte.
+      expect(chart.points.map((point) => point.showValue)).toEqual([true, true, true]);
+      const dense = trendChart(gradedEvents(series([['2026-10-10', 2.6], ['2026-10-13', 2.6]])), 'grades', { from: '2026-07-01', to: '2026-11-23' });
+      expect(dense.points.map((point) => point.showValue)).toEqual([false, true]);
+    });
+
     it('Lücken über 6 Wochen werden gestrichelt statt durchgezogen', () => {
       const chart = trendChart(gradedEvents(series([['2026-05-01', 3], ['2026-05-08', 3], ['2026-09-01', 2], ['2026-09-08', 2]])));
       expect(chart.gaps).toHaveLength(1);

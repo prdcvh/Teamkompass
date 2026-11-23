@@ -72,7 +72,7 @@
                   } @else {
                     <circle [attr.cx]="point.x" [attr.cy]="point.y" r="6" class="dot" [class.last]="$last" tabindex="0" [attr.aria-label]="point.title + ' (Training)'"><title>{{ point.title }}</title></circle>
                   }
-                  @if ($last || $index === teamForm().best || teamForm().points.length <= 8) {
+                  @if (point.showValue) {
                     <text [attr.x]="point.x" [attr.y]="point.y - 14" class="value" text-anchor="middle">{{ point.valueLabel }}</text>
                   }
                 }

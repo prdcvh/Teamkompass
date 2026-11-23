@@ -61,6 +61,8 @@ export interface PlottedPoint extends PlotPoint {
   readonly x: number;
   readonly y: number;
   readonly valueLabel: string;
+  /** Wert am Punkt beschriften? Der letzte immer, sonst nur mit genug Abstand zur nächsten Beschriftung. */
+  readonly showValue: boolean;
 }
 
 export interface PlotChart {
@@ -95,6 +97,9 @@ export interface PlotOptions {
   readonly groupChangeLabel?: string;
 }
 
+/** Mindestabstand zweier Wertbeschriftungen in Diagrammeinheiten. */
+const MIN_LABEL_GAP = 44;
+
 const MONTH_SHORT = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
 
 /** Achsenbeschriftung für eine Datumsachse: bis gut 3 Monate alle 14 Tage, darüber Monatsanfänge (höchstens 8). */
@@ -109,6 +114,8 @@ function timeTicks(from: string, to: string, xOf: (date: string) => number): Axi
       const iso = date.toISOString().slice(0, 10);
       ticks.push({ x: xOf(iso), label: `${iso.slice(8, 10)}.${iso.slice(5, 7)}.` });
     }
+    // Sehr kurzer Zeitraum: auch das Ende beschriften, damit die Spanne lesbar ist.
+    if (span < 14) ticks.push({ x: xOf(to), label: `${to.slice(8, 10)}.${to.slice(5, 7)}.` });
     return ticks;
   }
   const months: string[] = [];
@@ -152,7 +159,7 @@ export function plotChart(input: readonly PlotPoint[], scale: RatingScale = 'gra
   const to = timeScaled ? (options.to && isIsoDate(options.to) && options.to > sorted[sorted.length - 1] ? options.to : sorted[sorted.length - 1]) : '';
   const span = timeScaled ? daysBetween(from, to) : 0;
   const xOfDate = (date: string) => CHART_LEFT + (span > 0 ? (daysBetween(from, date) / span) * plotWidth : 0);
-  const points = input.map((entry, index) => ({
+  const placed = input.map((entry, index) => ({
     ...entry,
     x: timeScaled ? xOfDate(entry.date!) : CHART_LEFT + (index * plotWidth) / Math.max(input.length - 1, 1),
     y: y(entry.grade),
@@ -162,7 +169,19 @@ export function plotChart(input: readonly PlotPoint[], scale: RatingScale = 'gra
     scale === 'levels'
       ? LEVEL_OPTIONS.map((option) => ({ y: y(option.value), grade: option.value, label: scoreShortLabel(option.value, scale), x: 4 }))
       : [1, 2, 3, 4, 5, 6].map((grade) => ({ y: y(grade), grade, label: String(grade), x: 24 }));
-  const best = points.length ? points.reduce((index, point, at) => (point.grade < points[index].grade ? at : index), 0) : -1;
+  const best = placed.length ? placed.reduce((index, point, at) => (point.grade < placed[index].grade ? at : index), 0) : -1;
+  // Beschriftung von rechts nach links: der letzte Punkt immer, der beste und (bei bis zu 8 Punkten) alle übrigen nur,
+  // wenn sie nicht in die vorige Beschriftung laufen (dichte Punkte auf der Zeitachse, SCRUM-265).
+  const show = placed.map(() => false);
+  let labelledX = Infinity;
+  for (let index = placed.length - 1; index >= 0; index -= 1) {
+    const wanted = index === placed.length - 1 || index === best || placed.length <= 8;
+    if (wanted && (index === placed.length - 1 || labelledX - placed[index].x >= MIN_LABEL_GAP)) {
+      show[index] = true;
+      labelledX = placed[index].x;
+    }
+  }
+  const points = placed.map((point, index) => ({ ...point, showValue: show[index] }));
   // Abschnitte: neuer Abschnitt bei Wechsel der Gruppe (Markierung) oder bei einer Lücke über 6 Wochen (gestrichelt).
   const segments: (typeof points)[] = [];
   const markers: ChartMarker[] = [];

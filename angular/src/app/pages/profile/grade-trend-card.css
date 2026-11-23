@@ -48,6 +48,13 @@
   margin: 0;
 }
 
+.result {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--tk-space-2);
+}
+
 .development > p:first-child span {
   color: var(--tk-muted);
 }
@@ -81,4 +88,14 @@ details summary {
 
 details p {
   margin: 0;
+}
+
+/* Handy: das Diagramm wird auf gut ein Drittel verkleinert – Beschriftungen in Diagrammeinheiten größer setzen. */
+@media (max-width: 600px) {
+  .chart .axis,
+  .chart .axis.small,
+  .chart .value,
+  .chart .marker-label {
+    font-size: 20px;
+  }
 }
