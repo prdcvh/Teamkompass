@@ -38,7 +38,7 @@ describe('profileReportHtml', () => {
   });
 
   it('zeigt Kennzahlen, Kompetenzprofil und Bestleistungen', () => {
-    expect(html).toContain('<span>Ø Note</span><strong>2,0</strong>');
+    expect(html).toContain('<span>Ø Note</span><strong>gut (2,0)</strong>');
     expect(html).toContain('<span>Tore + Vorlagen</span><strong>1 + 0</strong>');
     expect(html).toContain('Einsatz');
     expect(html).toContain('01.10.2026');
