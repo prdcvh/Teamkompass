@@ -8,16 +8,8 @@ import { SquadService } from '../player/squad.service';
 import { todayIso } from '../shared/dates';
 import { SyncService } from '../shell/sync.service';
 import { CurrentTeam } from '../team/current-team.service';
-import {
-  type FieldTestPlayerDraft,
-  type FieldTestResult,
-  type FieldTestSessionDraft,
-  type FieldTestSessionEvaluation,
-  docFromFieldTest,
-  evaluateSession,
-  fieldTestHistory,
-  resultsFromSession,
-} from './field-test';
+import { type FieldTestResult, docFromFieldTest, fieldTestHistory } from './field-test';
+import { type FieldTestPlayerDraft, type FieldTestSessionDraft, type FieldTestSessionEvaluation, evaluateSession, resultsFromSession } from './field-test-session';
 import { RecordsStateService } from './records-state.service';
 
 export interface SaveSessionResult {

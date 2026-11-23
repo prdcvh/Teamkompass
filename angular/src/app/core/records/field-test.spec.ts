@@ -1,15 +1,5 @@
-import {
-  type FieldTestResult,
-  type FieldTestSessionDraft,
-  aggregateResult,
-  compareResults,
-  docFromFieldTest,
-  evaluateSession,
-  fieldTestFromDoc,
-  fieldTestHistory,
-  isFieldTestDoc,
-  resultsFromSession,
-} from './field-test';
+import { type FieldTestResult, aggregateResult, compareResults, docFromFieldTest, fieldTestFromDoc, fieldTestHistory, isFieldTestDoc } from './field-test';
+import { type FieldTestSessionDraft, evaluateSession, resultsFromSession } from './field-test-session';
 import { FIELD_TEST_PROTOCOLS, aggregationText, currentProtocol, currentProtocols, findProtocol } from './field-test-protocols';
 import { growthMeasurementsFromDocs } from './measurement';
 

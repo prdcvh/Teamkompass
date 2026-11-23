@@ -3,16 +3,8 @@ import { RouterLink } from '@angular/router';
 import { SessionService } from '../../core/auth/session.service';
 import { CONSENT_LABELS, type Player } from '../../core/player/player';
 import { SquadService } from '../../core/player/squad.service';
-import {
-  CONDITIONS_MAX,
-  type FieldTestPlayerDraft,
-  type FieldTestSessionDraft,
-  type FieldTestSessionErrors,
-  MIN_TEST_DATE,
-  TESTER_MAX,
-  attemptError,
-  evaluateSession,
-} from '../../core/records/field-test';
+import { CONDITIONS_MAX, MIN_TEST_DATE, TESTER_MAX } from '../../core/records/field-test';
+import { type FieldTestPlayerDraft, type FieldTestSessionDraft, type FieldTestSessionErrors, attemptError, evaluateSession } from '../../core/records/field-test-session';
 import {
   DIRECTION_LABELS,
   type FieldTestMethod,
