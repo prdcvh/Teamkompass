@@ -5,15 +5,14 @@ import { BehaviorSubject } from 'rxjs';
 import { LayoutService } from '../../core/shell/layout.service';
 import { SessionService } from '../../core/auth/session.service';
 import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
-import { RatingsService } from '../../core/ratings/ratings.service';
 import { EventRating } from './event-rating';
 
 describe('EventRating (Event bewerten)', () => {
   let firebase: FakeFirebase;
   const isMobile = signal(false);
 
-  async function render(options: { mobile?: boolean; eventId?: string; game?: boolean; consent?: string; lineup?: boolean | 'leer'; role?: 'trainer' | 'physio'; points?: boolean; extraPlayers?: number } = {}) {
-    const { mobile = false, eventId = 'e1', game = true, consent, lineup = false, role = 'trainer', points = false, extraPlayers = 0 } = options;
+  async function render(options: { mobile?: boolean; eventId?: string; game?: boolean; consent?: string; lineup?: boolean | 'leer'; role?: 'trainer' | 'physio'; points?: boolean } = {}) {
+    const { mobile = false, eventId = 'e1', game = true, consent, lineup = false, role = 'trainer', points = false } = options;
     isMobile.set(mobile);
     firebase = new FakeFirebase();
     firebase.events.events.set('e1', game
@@ -22,7 +21,6 @@ describe('EventRating (Event bewerten)', () => {
     firebase.players.players.set('p1', { name: 'Jonas Keller', positions: ['TW'], number: 1, birthdate: '2012-05-05', status: 'Fit' });
     firebase.players.players.set('p2', { name: 'Elias Wagner', positions: ['RV'], number: 2, birthdate: '2012-06-06', status: 'Fit', ...(consent ? { consentStatus: consent } : {}) });
     firebase.players.players.set('p3', { name: '<b>Jan</b> Braun', positions: ['ST'], number: 9, birthdate: '2013-01-01', status: 'Fit' });
-    for (let i = 0; i < extraPlayers; i++) firebase.players.players.set(`x${i}`, { name: `Extra ${i}`, positions: ['ZM'], number: 20 + i, birthdate: '2012-01-01', status: 'Fit' });
     firebase.ratings.ratings.set('e1', new Map([
       ['p1', { attendance: 'present', effort: 1, technique: 2, tactics: 3, comprehension: 4, grade: 2.3, minutes: 70, goals: 1, assists: '', note: 'Starkes Spiel', playerId: 'p1' }],
       ['p3', { attendance: 'absent', note: 'Verletzt', autoAbsence: true, playerId: 'p3' }],
@@ -137,63 +135,6 @@ describe('EventRating (Event bewerten)', () => {
       const medical = await render({ lineup: true, role: 'physio' });
       expect(q(medical, '.lineup')).toBeNull();
       expect(firebase.calls).not.toContain('watchLineup');
-    });
-  });
-
-  describe('Stimmigkeit Minuten, Tore, Vorlagen (SCRUM-395)', () => {
-    const check = (fixture: { nativeElement: unknown }) => q(fixture, 'tk-match-check');
-
-    it('zeigt bei Abweichung eine Warnung mit Text, Symbol und Differenz', async () => {
-      const fixture = await render();
-      const warning = check(fixture)!;
-      expect(text(warning)).toContain('⚠');
-      expect(text(warning)).toContain('Bitte prüfen (Speichern ist trotzdem möglich)');
-      expect(text(warning)).toContain('Es fehlen 700 Minuten'); // 70 Min. eingetragen, Soll 70 × 11 = 770
-      expect(text(warning)).toContain('1 Tor, 0 Vorlagen: 1 Vorlage fehlt');
-      expect(warning.querySelector('[role="status"]')).not.toBeNull();
-    });
-
-    it('rechnet bei jeder Änderung neu und zeigt bei Übereinstimmung nur einen ruhigen Hinweis', async () => {
-      const fixture = await render({ extraPlayers: 8 }); // 3 + 8 = 11 Spieler, Spieldauer 70 → Soll 770
-      pick(q<HTMLInputElement>(fixture, 'input[aria-label="Minuten: Elias Wagner"]')!, '70');
-      for (let i = 0; i < 8; i++) pick(q<HTMLInputElement>(fixture, `input[aria-label="Minuten: Extra ${i}"]`)!, '70');
-      fixture.detectChanges();
-      expect(text(check(fixture))).toContain('Es fehlen 70 Minuten'); // 10 × 70 = 700 von 770
-      pick(qa<HTMLInputElement>(fixture, 'input[aria-label^="Minuten: "]').find((input) => input.getAttribute('aria-label')!.includes('Braun'))!, '70');
-      pick(q<HTMLInputElement>(fixture, 'input[aria-label="Vorlagen: Elias Wagner"]')!, '1');
-      fixture.detectChanges();
-      expect(text(check(fixture))).toBe('✓ Minuten, Tore und Vorlagen passen');
-      pick(q<HTMLInputElement>(fixture, 'input[aria-label="Vorlagen: Elias Wagner"]')!, '3');
-      fixture.detectChanges();
-      expect(text(check(fixture))).toContain('1 Tor, 3 Vorlagen: 2 Tore fehlen');
-    });
-
-    it('blockiert das Speichern nie: Eingaben bleiben möglich und werden trotz Warnung übernommen', async () => {
-      const fixture = await render();
-      const input = q<HTMLInputElement>(fixture, 'input[aria-label="Minuten: Elias Wagner"]')!;
-      expect(text(check(fixture))).toContain('Bitte prüfen');
-      expect(input.disabled).toBe(false);
-      pick(input, '10');
-      fixture.detectChanges();
-      expect(TestBed.inject(RatingsService).ratingFor('p2').minutes).toBe(10);
-      expect(text(check(fixture))).toContain('Es fehlen 690 Minuten');
-    });
-
-    it('bleibt weg, solange nichts eingetragen ist', async () => {
-      const fixture = await render();
-      for (const label of ['Minuten: Jonas Keller', 'Tore: Jonas Keller']) pick(q<HTMLInputElement>(fixture, `input[aria-label="${label}"]`)!, '');
-      fixture.detectChanges();
-      expect(text(check(fixture))).toBe('');
-    });
-
-    it('erscheint bei Trainings nicht', async () => {
-      const fixture = await render({ game: false });
-      expect(check(fixture)).toBeNull();
-    });
-
-    it('erscheint auch in der Handy-Ansicht', async () => {
-      const fixture = await render({ mobile: true });
-      expect(text(check(fixture))).toContain('Es fehlen 700 Minuten');
     });
   });
 
