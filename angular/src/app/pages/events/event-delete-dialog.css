@@ -1,0 +1,38 @@
+.error {
+  color: var(--tk-red);
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--tk-space-2);
+}
+
+.confirm-actions.stacked {
+  flex-wrap: wrap;
+}
+
+.preview,
+.hint {
+  margin: 0 0 var(--tk-space-3);
+  padding: var(--tk-space-3);
+  color: var(--tk-ink);
+  background: var(--tk-field);
+  border-radius: var(--tk-radius-md, 8px);
+  font-size: var(--tk-text-sm);
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .confirm-actions.stacked {
+    flex-direction: column;
+  }
+
+  .confirm-actions.stacked button:first-child {
+    order: 3;
+  }
+
+  .confirm-actions.stacked button {
+    width: 100%;
+  }
+}

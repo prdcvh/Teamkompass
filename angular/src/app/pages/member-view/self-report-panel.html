@@ -1,0 +1,62 @@
+@if (reports.canAnswer()) {
+  @for (item of open(); track item.event.id) {
+    <tk-card>
+      <section class="sr" [attr.aria-labelledby]="'sr-' + item.event.id">
+        <div class="sr-head">
+          <div>
+            <h2 [id]="'sr-' + item.event.id">Wie anstrengend war das heute?</h2>
+            <small>{{ title(item.event) }} · {{ detail(item.event) }}</small>
+          </div>
+          @if (exertionOf(item.event) !== null) {
+            <span class="sr-done">{{ saved().has(item.event.id) ? 'Gespeichert' : 'Beantwortet' }}</span>
+          }
+        </div>
+        <p class="sr-hint">{{ notice() }}</p>
+        <form class="sr-form" (submit)="submit($event, item.event)">
+          <label class="tk-label">
+            <span class="sr-label">Anstrengung{{ parent() ? ' (für ' + player().name + ')' : '' }}</span>
+            <select class="tk-input" name="exertion" required [attr.aria-label]="'Anstrengung: ' + title(item.event)">
+              <option value="" [selected]="exertionOf(item.event) === null" disabled>Bitte wählen</option>
+              @for (entry of exertions; track entry.value) {
+                <option [value]="entry.value" [selected]="exertionOf(item.event) === entry.value">{{ entry.label }}</option>
+              }
+            </select>
+          </label>
+          @if (showWellness()) {
+            <fieldset class="sr-wellness">
+              <legend>Wie geht es dir? <span class="sr-optional">(freiwillig)</span></legend>
+              @for (field of fields; track field) {
+                <label class="tk-label">
+                  <span class="sr-label">{{ questions[field].label }}</span>
+                  <select class="tk-input" [name]="field" [attr.aria-label]="questions[field].label + ': ' + title(item.event)">
+                    <option value="" [selected]="wellnessOf(item.event, field) === null">– überspringen –</option>
+                    @for (entry of options(field); track entry.value) {
+                      <option [value]="entry.value" [selected]="wellnessOf(item.event, field) === entry.value">{{ entry.label }}</option>
+                    }
+                  </select>
+                </label>
+              }
+            </fieldset>
+          }
+          <div class="sr-actions">
+            <button tkButton variant="primary" type="submit" [disabled]="reports.saving()">Speichern</button>
+            <small class="sr-label">{{ until(item.event) }}. Du kannst deine Angabe bis dahin ändern.</small>
+          </div>
+        </form>
+      </section>
+    </tk-card>
+  }
+
+  @if (week(); as w) {
+    <tk-card>
+      <section class="sr" aria-labelledby="sr-week">
+        <h2 id="sr-week">{{ parent() ? 'Belastung diese Woche' : 'Deine Belastung diese Woche' }}</h2>
+        <div class="sr-week">
+          <article class="stat"><span>Letzte 7 Tage</span><strong>{{ number(w.load) }}</strong></article>
+          <article class="stat"><span>Schnitt der 3 Wochen davor</span><strong>{{ number(w.baseline) }}</strong></article>
+        </div>
+        <p class="sr-hint">Belastung = Minuten × Anstrengung. Hast du deine Anstrengung angegeben, zählt dein Wert, sonst der des Trainerteams.</p>
+      </section>
+    </tk-card>
+  }
+}

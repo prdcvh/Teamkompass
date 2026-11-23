@@ -1,0 +1,136 @@
+/* Reife-Kompass (SCRUM-190). Grundlayout (block, items, pill, notice) aus profile-extras.css. */
+h3 {
+  margin: var(--tk-space-3) 0 0;
+  font-size: var(--tk-text-md);
+}
+
+.maturity-now {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--tk-space-2);
+  padding-top: var(--tk-space-2);
+}
+
+.maturity-percent {
+  font-size: var(--tk-text-title);
+}
+
+.maturity-band[data-band='early'] {
+  color: var(--tk-amber);
+}
+
+.maturity-band[data-band='late'] {
+  color: var(--tk-chart-1);
+}
+
+.maturity-hint {
+  margin: var(--tk-space-2) 0 0;
+  padding: var(--tk-space-2) var(--tk-space-3);
+  background: var(--tk-field);
+  border-radius: var(--tk-radius-md);
+  font-size: var(--tk-text-sm);
+}
+
+.maturity-source {
+  margin-top: var(--tk-space-3);
+}
+
+.maturity-form {
+  display: grid;
+  gap: var(--tk-space-3);
+  margin-top: var(--tk-space-3);
+  padding-top: var(--tk-space-3);
+  border-top: 1px solid var(--tk-line);
+}
+
+.maturity-form .tk-label {
+  display: grid;
+  gap: 6px;
+}
+
+.maturity-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tk-space-2);
+  font-size: var(--tk-text-sm);
+}
+
+.maturity-consent input {
+  margin-top: 3px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--tk-space-3);
+}
+
+@media (max-width: 480px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Erklärung der Einordnung (SCRUM-256). */
+.maturity-causes {
+  margin: var(--tk-space-2) 0 0;
+  padding: var(--tk-space-2) var(--tk-space-3);
+  border-left: 3px solid var(--tk-amber);
+  background: var(--tk-field);
+  border-radius: var(--tk-radius-md);
+  font-size: var(--tk-text-sm);
+}
+
+.maturity-causes ul {
+  margin: var(--tk-space-1) 0;
+  padding-left: 1.2em;
+}
+
+.maturity-causes p {
+  margin: 0;
+}
+
+.maturity-facts {
+  display: grid;
+  gap: var(--tk-space-2);
+  margin: var(--tk-space-2) 0 0;
+}
+
+.maturity-facts div {
+  display: grid;
+  grid-template-columns: minmax(8rem, 12rem) 1fr;
+  gap: var(--tk-space-2);
+}
+
+.maturity-facts dt {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+.maturity-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.maturity-help {
+  margin-top: var(--tk-space-3);
+  font-size: var(--tk-text-sm);
+}
+
+.maturity-help summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.maturity-help ul {
+  margin: var(--tk-space-2) 0 0;
+  padding-left: 1.2em;
+}
+
+@media (max-width: 480px) {
+  .maturity-facts div {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}

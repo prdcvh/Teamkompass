@@ -99,7 +99,7 @@ function dateOf(value: unknown): Date | null {
 
 /**
  * members-Dokument → Eintrag; Trainer-Konten werden hier nicht verwaltet (wie in der Referenz) und ergeben null.
- * Bisherige Scout-Konten mit der alten Kennung „medical“ erscheinen als Scout (SCRUM-170).
+ * Konten mit unbekannter Kennung (auch der alten „medical“, SCRUM-202) ergeben ebenfalls null.
  */
 export function memberEntry(doc: RawDoc): AccessEntry | null {
   const role = normalizeRole(doc.data['role']);

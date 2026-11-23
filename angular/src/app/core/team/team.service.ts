@@ -7,7 +7,7 @@ import { RatingsApi } from '../firebase/ratings.api';
 import type { RawDoc, SnapshotMeta } from '../firebase/types';
 import { addDays, todayIso } from '../shared/dates';
 import { type Rating, ratingFromDoc } from '../ratings/rating';
-import { MEASUREMENT_WINDOW_DAYS } from '../analysis/risk';
+import { GROWTH_MEASUREMENT_WINDOW_DAYS, MEASUREMENT_WINDOW_DAYS } from '../analysis/risk';
 import { type Measurement, measurementFromDoc } from '../records/measurement';
 import { SquadAbsencesService } from '../records/squad-absences.service';
 import { SessionService } from '../auth/session.service';
@@ -16,6 +16,8 @@ import { SyncService } from '../shell/sync.service';
 import { type PlayerData, type RatingsByEvent, itemsFor } from './team';
 import { ratingsFromDocs, ratingsFromPlayerStats } from './player-stats';
 import { PlayerStatsMode } from './player-stats-mode';
+import { type SelfReport, selfReportFromDoc, withSelfExertion } from '../self-report/self-report';
+import { SelfReportsApi } from '../firebase/self-reports.api';
 
 /**
  * Daten für die Teamauswertung (Start-Dashboard): Bewertungen aller Spieler je Event sowie Abwesenheiten und
@@ -24,7 +26,8 @@ import { PlayerStatsMode } from './player-stats-mode';
  *
  * Abwesenheiten und Messwerte sind hier nur das Fenster, das die Übersichten brauchen (SCRUM-200): aktuelle
  * Abwesenheiten kommen vom {@link SquadAbsencesService} (ein gemeinsames Abo mit der Kaderliste), Messwerte der letzten
- * {@link MEASUREMENT_WINDOW_DAYS} Tage von hier. Die volle Historie liest das Spielerprofil bzw. der Export.
+ * {@link GROWTH_MEASUREMENT_WINDOW_DAYS} Tage von hier (der Wachstumshinweis vergleicht mit einer Messung bis 365 Tage
+ * vor der jüngsten, SCRUM-305). Die volle Historie liest das Spielerprofil bzw. der Export.
  *
  * Bewertungen (SCRUM-201): Sind die Zusammenfassungen je Spieler eingerichtet ({@link PlayerStatsMode}), reicht ein
  * Abo auf `playerStats` (ein Dokument je Spieler) statt eines Abos je Event mit allen Bewertungen. Daraus entsteht
@@ -43,6 +46,7 @@ export class TeamService {
   private readonly squadAbsences = inject(SquadAbsencesService);
   private readonly statsApi = inject(PlayerStatsApi);
   private readonly statsMode = inject(PlayerStatsMode);
+  private readonly selfReportsApi = inject(SelfReportsApi);
 
   readonly active = signal(false);
   readonly events = computed(() => this.eventsService.events());
@@ -57,6 +61,8 @@ export class TeamService {
   /** Bewertungen kommen aus den Zusammenfassungen (Abo `s:` aktiv). */
   private readonly fromStats = signal(false);
   private readonly measurements = signal<ReadonlyMap<string, readonly Measurement[]>>(new Map());
+  /** Anstrengung, die die Spieler selbst angegeben haben (SCRUM-138), je Spieler und Event. */
+  private readonly selfReports = signal<ReadonlyMap<string, ReadonlyMap<string, SelfReport>>>(new Map());
   /** Abos, auf deren erste Antwort noch gewartet wird. */
   private readonly waiting = signal(0);
 
@@ -71,11 +77,18 @@ export class TeamService {
         this.squadAbsences.waiting() > 0),
   );
   readonly ready = computed(() => this.active() && !this.loading() && !this.error() && this.squad.load() === 'ready');
+  /**
+   * Datum des Termins zu jedem Check-in der Mannschaft (SCRUM-194), ohne Zuordnung zu Spielern: reicht für das Teamziel
+   * „X Check-ins im Monat“ und verrät nichts über Einzelne. Geladen werden die letzten {@link MEASUREMENT_WINDOW_DAYS} Tage.
+   */
+  readonly checkInDates = computed<readonly string[]>(() =>
+    [...this.selfReports().values()].flatMap((reports) => [...reports.values()].map((report) => report.date)).filter((date) => date !== ''),
+  );
   /** Je Spieler: alle Events mit seiner Bewertung, Abwesenheiten, Messwerte. */
   readonly data = computed<PlayerData[]>(() =>
     this.squad.players().map((player) => ({
       player,
-      items: itemsFor(player.id, this.eventsService.events(), this.ratingsByEvent()),
+      items: withSelfExertion(itemsFor(player.id, this.eventsService.events(), this.ratingsByEvent()), this.selfReports().get(player.id) ?? new Map()),
       absences: this.squadAbsences.byPlayer().get(player.id) ?? [],
       measurements: this.measurements().get(player.id) ?? [],
     })),
@@ -93,7 +106,7 @@ export class TeamService {
       const ratingKeys = stats === 'on' ? ['s:'] : stats === 'loading' ? [] : this.eventsService.events().map((event) => `r:${event.id}`);
       const wanted = [
         ...ratingKeys,
-        ...this.squad.players().flatMap((player) => [`m:${player.id}`]),
+        ...this.squad.players().flatMap((player) => [`m:${player.id}`, `x:${player.id}`]),
       ];
       if (this.active()) untracked(() => this.reconcile(wanted));
     });
@@ -123,6 +136,7 @@ export class TeamService {
     this.stats.set([]);
     this.fromStats.set(false);
     this.measurements.set(new Map());
+    this.selfReports.set(new Map());
     this.waiting.set(0);
     this.ownError.set('');
   }
@@ -158,6 +172,7 @@ export class TeamService {
       this.stats.set([]);
       this.fromStats.set(false);
     } else if (key.startsWith('r:')) this.ratings.update((map) => without(map, id));
+    else if (key.startsWith('x:')) this.selfReports.update((map) => without(map, id));
     else this.measurements.update((map) => without(map, id));
   }
 
@@ -165,6 +180,7 @@ export class TeamService {
     const id = key.slice(2);
     const today = todayIso();
     const since = addDays(today, -MEASUREMENT_WINDOW_DAYS);
+    const measurementsSince = addDays(today, -GROWTH_MEASUREMENT_WINDOW_DAYS);
     const onData = (docs: RawDoc[], meta: SnapshotMeta) => {
       if (generation !== this.generation) return;
       if (key === 's:') {
@@ -173,6 +189,12 @@ export class TeamService {
       } else if (key.startsWith('r:')) {
         const byPlayer = new Map<string, Rating>(docs.map((entry) => [entry.id, ratingFromDoc(entry.data)]));
         this.ratings.update((map) => new Map(map).set(id, byPlayer));
+      } else if (key.startsWith('x:')) {
+        const reports = docs.flatMap((entry) => {
+          const report = selfReportFromDoc(entry.id, entry.data);
+          return report ? [[entry.id, report] as const] : [];
+        });
+        this.selfReports.update((map) => new Map(map).set(id, new Map(reports)));
       } else {
         this.measurements.update((map) => new Map(map).set(id, docs.map((entry) => measurementFromDoc(entry.id, entry.data, today))));
       }
@@ -181,14 +203,22 @@ export class TeamService {
       this.sync.applySnapshot(meta);
     };
     const onError = (error: unknown) => {
-      if (generation === this.generation) this.fail(error);
+      if (generation !== this.generation) return;
+      // Spielerangaben (SCRUM-138) sind eine Ergänzung: Ohne sie rechnet die Ampel mit dem Trainerwert weiter.
+      if (key.startsWith('x:')) {
+        console.warn('Spielerangaben nicht lesbar', error);
+        this.pending.delete(key);
+        this.waiting.set(this.pending.size);
+      } else this.fail(error);
     };
     const subscribe =
       key === 's:'
         ? this.statsApi.watchPlayerStats(onData, onError)
         : key.startsWith('r:')
           ? this.ratingsApi.watchRatings(id, onData, onError)
-          : this.playerRecordsApi.watchRecentMeasurements(id, since, onData, onError);
+          : key.startsWith('x:')
+            ? this.selfReportsApi.watchSelfReports(id, 'selfReports', onData, onError, since)
+            : this.playerRecordsApi.watchRecentMeasurements(id, measurementsSince, onData, onError);
     subscribe
       .then((unsubscribe) => {
         this.opening.delete(key);
@@ -197,7 +227,7 @@ export class TeamService {
       })
       .catch((error) => {
         this.opening.delete(key);
-        if (generation === this.generation) this.fail(error);
+        onError(error);
       });
   }
 

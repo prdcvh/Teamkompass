@@ -21,8 +21,10 @@ export function eventTeamGrade(ratings: ReadonlyMap<string, Rating> | undefined)
 }
 
 export interface TeamStats {
-  /** Alle Spiel-Events (auch künftige). */
+  /** Spiele bis heute (Datum heute oder früher). */
   readonly games: number;
+  /** Kommende Spiele (Datum nach heute); Spiele ohne Datum zählen nirgends. */
+  readonly gamesPlanned: number;
   /** Bilanz nur aus Spielen bis heute. */
   readonly record: TeamRecord;
   /** Mittel der Event-Durchschnitte von Events bis heute; null ohne Noten. */
@@ -39,10 +41,10 @@ export interface TeamStats {
 
 /**
  * Event hat schon stattgefunden (Datum heute oder früher; `today` als JJJJ-MM-TT, lokaler Kalendertag).
- * Gleiche Grenze wie die Bilanz (`matchResult`): Events ohne Datum zählen mit.
+ * Einheitliche Grenze „bis heute“ der ganzen Teamanalyse (wie im Spielerprofil): Events ohne Datum zählen nicht.
  */
 export function isPastOrToday(event: TeamEvent, today: string): boolean {
-  return !event.date || event.date <= today;
+  return !!event.date && event.date <= today;
 }
 
 export function teamStats(events: readonly TeamEvent[], ratings: RatingsByEvent, today: string): TeamStats {
@@ -53,8 +55,9 @@ export function teamStats(events: readonly TeamEvent[], ratings: RatingsByEvent,
     .filter((attendance) => attendance !== 'excluded' && attendance !== 'open');
   const attended = attendances.filter((attendance) => attendance === 'present' || attendance === 'limited').length;
   return {
-    games: events.filter((event) => event.type === 'Spiel').length,
-    record: teamRecord(events, today),
+    games: past.filter((event) => event.type === 'Spiel').length,
+    gamesPlanned: events.filter((event) => event.type === 'Spiel' && !!event.date && event.date > today).length,
+    record: teamRecord(past, today),
     avgGrade: eventGrades.length ? roundGrade(eventGrades.reduce((sum, grade) => sum + grade, 0) / eventGrades.length) : null,
     attendanceRate: attendances.length ? Math.round((attended / attendances.length) * 100) : 0,
     avgIntensity: past.length ? roundGrade(past.reduce((sum, event) => sum + event.exertion, 0) / past.length) : null,
@@ -95,16 +98,17 @@ export function thinPositions(coverage: readonly [string, number][], limit = 6):
 export function trainingFocusCounts(events: readonly TeamEvent[], today: string): Record<string, number> {
   const counts: Record<string, number> = Object.fromEntries(TRAINING_FOCUSES.map((focus) => [focus, 0]));
   for (const event of events) {
-    if (event.type !== 'Training' || event.date > today) continue;
+    if (event.type !== 'Training' || !isPastOrToday(event, today)) continue;
     const focus = event.trainingFocus || TRAINING_FOCUSES[0];
     counts[focus] = (counts[focus] ?? 0) + 1;
   }
   return counts;
 }
 
-/** Teamnote je Event (älteste links); Spiele und Trainings sind unterscheidbar (`kind`). */
-export function teamTrend(events: readonly TeamEvent[], ratings: RatingsByEvent): PlotChart {
-  const points = [...events]
+/** Teamnote je Event bis heute (älteste links); Spiele und Trainings sind unterscheidbar (`kind`). */
+export function teamTrend(events: readonly TeamEvent[], ratings: RatingsByEvent, today: string): PlotChart {
+  const points = events
+    .filter((event) => isPastOrToday(event, today))
     .sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title, 'de'))
     .map((event) => ({ event, grade: eventTeamGrade(ratings.get(event.id)) }))
     .filter((entry): entry is { event: TeamEvent; grade: number } => entry.grade !== null)

@@ -111,7 +111,7 @@ describe('Export (Daten exportieren)', () => {
     byText(fixture, 'Sicherung herunterladen')!.click();
     await settle(fixture);
     expect(saved).toHaveLength(0);
-    const dialog = root(fixture).querySelector('tk-dialog')!;
+    const dialog = root(fixture).querySelector('tk-dialog:not(.season-dialog)')!;
     expect(dialog.textContent).toContain('<b>Ben</b>');
     expect(dialog.textContent).toContain('widerrufen');
     byText(fixture, 'Trotzdem exportieren')!.click();
@@ -163,7 +163,7 @@ describe('Export (Daten exportieren)', () => {
     byText(fixture, 'Bericht erstellen')!.click();
     await settle(fixture);
     expect(printed).toHaveLength(1);
-    expect(root(fixture).querySelector('tk-dialog')!.textContent).toContain('widerrufen');
+    expect([...root(fixture).querySelectorAll('tk-dialog:not(.season-dialog)')].map((dialog) => dialog.textContent).join(' ')).toContain('widerrufen');
   });
 
   it('meldet einen Fehler beim Export und lädt nichts herunter', async () => {

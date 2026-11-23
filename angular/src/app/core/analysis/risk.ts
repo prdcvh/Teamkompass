@@ -5,11 +5,25 @@
  * - Belastung pro Termin = Minuten × Anstrengung (0–10). Minuten: bei Spielen die gespielten Minuten, sonst die Dauer
  *   des Termins (Training: Standard 90); „eingeschränkt“ ohne eingetragene Minuten zählt 60 % der Dauer.
  * - Nur vergangene Termine zählen (SCRUM-136).
- * - Wochenvergleich: die letzten 7 Tage gegen den Schnitt der 3 Wochen davor (Tage 8–28), ohne Überschneidung.
- *   Die Spitzenwarnung (ab dem 1,5-fachen) gibt es nur, wenn in mindestens 3 der 4 Wochen Belastung vorhanden ist; sonst
- *   erscheint nur der Hinweis „Wiedereinstieg – langsam steigern“. So steht nach einer Pause nicht der ganze Kader auf „Anpassen“.
+ * - Belastungsspitze (SCRUM-176): abklingende Mittel statt fester Wochenfenster (load-curve.ts). Verglichen wird die
+ *   Müdigkeit (Mittel über 7 Tage) mit der Fitness (Mittel über 28 Tage): ab dem 1,5-fachen ein Hinweis, ab dem 2-fachen
+ *   ein starker Hinweis. Schwellen nach Gabbett 2016 (BJSM 50:273–280: Bereich 0,8–1,3 unauffällig, ab 1,5 kritisch) und
+ *   Murray et al. 2017 (BJSM 51:749–754: Verhältnis über 2,0 mit deutlich erhöhtem Risiko, EWMA empfindlicher).
+ *   Zwei Schutzregeln gegen Fehlalarme:
+ *   1. Wiedereinstieg (Regel aus SCRUM-137): die Spitzenwarnung gibt es nur, wenn in mindestens 3 der 4 Wochen Belastung
+ *      vorhanden ist; sonst nur der Hinweis „Wiedereinstieg – langsam steigern“. So steht nach einer Pause nicht der
+ *      ganze Kader auf „Anpassen“.
+ *   2. Die letzten 7 Tage müssen mindestens 15 % über einer üblichen Trainingswoche liegen (Schnitt der Wochen davor,
+ *      Tage 8–28, in denen trainiert wurde); sonst bei Lücken in den 4 Wochen ebenfalls „Wiedereinstieg“. Das abklingende
+ *      Mittel über 7 Tage springt direkt nach jeder Einheit hoch (bei zwei Einheiten an zwei Tagen hintereinander auch im
+ *      ganz normalen Wochenrhythmus auf ≈ 1,5) und braucht nach einer Pause mehr als 4 Wochen, bis die Fitness wieder
+ *      aufgebaut ist; ohne diese Regel gäbe es dort Hinweise ohne echte Steigerung. 15 %: Gabbett 2016 nennt
+ *      Wochensteigerungen ab etwa 15 % als kritisch.
+ *   Die Ampel ist keine Verletzungswahrscheinlichkeit (Impellizzeri et al. 2020, Zouhal et al. 2021).
  * - Erholung: zwei Einheiten mit Anstrengung ≥ 7 innerhalb von 48 Stunden.
- * - Wachstumsschub: ab 0,6 cm pro Monat ein Hinweis, ab 1,2 cm pro Monat ein starker Hinweis (Kemper et al. 2015).
+ * - Wachstumsschub: ab 0,6 cm pro Monat ein Hinweis, ab 1,2 cm pro Monat ein starker Hinweis (Kemper et al. 2015). Die Rate
+ *   kommt nur aus Messpaaren mit 90 bis 365 Tagen Abstand (Methodenversion 1.0 §6, SCRUM-305), nie aus Messungen kurz
+ *   hintereinander.
  * - Rückkehr nach Verletzung/Abwesenheit wie bisher.
  * - Keine Prozentzahl: drei Stufen (Unauffällig / Beobachten / Anpassen) mit den Gründen als Text. Verletzt/Angeschlagen ist
  *   die getrennte „Verfügbarkeit“ und fließt nicht in die Stufe ein.
@@ -18,8 +32,10 @@ import { DEFAULT_TRAINING_DURATION, type TeamEvent, plannedMinutes } from '../ev
 import type { Player } from '../player/player';
 import { type EventRating } from '../profile/profile';
 import { type Absence, activeAbsenceOn, isInjuryAbsence } from '../records/absence';
-import { type Measurement, sortedMeasurements } from '../records/measurement';
+import { type Measurement } from '../records/measurement';
+import { FRESH_DAYS, MAX_HINT_INTERVAL_DAYS, analyzeGrowth, growthHintLevel, perMonth } from '../records/growth-velocity';
 import { type Rating, roundGrade } from '../ratings/rating';
+import { type LoadCurvePoint, loadCurve, workloadRatio } from './load-curve';
 
 export type RiskTier = 'unauffaellig' | 'beobachten' | 'anpassen';
 export type AvailabilityKey = 'fit' | 'angeschlagen' | 'verletzt';
@@ -55,20 +71,35 @@ export interface InjuryRisk {
   readonly load: number;
   /** Schnitt der 3 Wochen davor (Tage 8–28). */
   readonly baseline: number;
+  /** Müdigkeit (abklingendes Mittel über 7 Tage), pro Woche (SCRUM-176). */
+  readonly fatigue: number;
+  /** Fitness (abklingendes Mittel über 28 Tage), pro Woche. */
+  readonly fitness: number;
+  /** Form = Fitness − Müdigkeit. */
+  readonly form: number;
+  /** Müdigkeit / Fitness (eine Nachkommastelle); ohne Belastung `null`. */
+  readonly ratio: number | null;
   /** In wie vielen der 4 Wochen Belastung vorhanden war. */
   readonly weeksWithLoad: number;
+  /** Hinweis „Belastungsspitze“ gesetzt (mit beiden Schutzregeln); für die Wenn-dann-Regeln (SCRUM-195). */
+  readonly spike: boolean;
   /** Einsätze der letzten 4 Wochen. */
   readonly recentEvents: number;
   readonly availability: LoadAvailability;
 }
 
 /**
- * Wie weit die Belastungsampel zurückschaut: Messungen der letzten 90 Tage, beendete Verletzungen bis 21 Tage zurück.
- * Die Übersichten laden Abwesenheiten/Messwerte nur in diesem Fenster (SCRUM-200) – wer die Werte ändert, ändert
- * damit auch die Abfragen.
+ * Wie weit die Übersichten zurückschauen: Spielerangaben der letzten 90 Tage, beendete Verletzungen bis 21 Tage zurück,
+ * Messwerte siehe {@link GROWTH_MEASUREMENT_WINDOW_DAYS}. Die Übersichten laden Abwesenheiten/Messwerte nur in diesem
+ * Fenster (SCRUM-200) – wer die Werte ändert, ändert damit auch die Abfragen.
  */
 export const MEASUREMENT_WINDOW_DAYS = 90;
 export const ABSENCE_LOOKBACK_DAYS = 21;
+/**
+ * So weit zurück braucht der Wachstumshinweis Messwerte (SCRUM-305): jüngste Messung bis 90 Tage alt, Vergleichsmessung
+ * bis 365 Tage davor. Die Übersichten laden Messwerte in diesem Fenster.
+ */
+export const GROWTH_MEASUREMENT_WINDOW_DAYS = FRESH_DAYS + MAX_HINT_INTERVAL_DAYS;
 
 const localMidnight = (iso: string) => new Date(`${iso}T00:00:00`);
 const daysBetween = (earlier: Date, later: Date) => (later.getTime() - earlier.getTime()) / 86400000;
@@ -79,6 +110,35 @@ function isoOf(date: Date): string {
 }
 
 const label = (value: number) => roundGrade(value).toFixed(1).replace('.', ',');
+
+/** Wachstumsschub-Hinweis zum Tag `today` (ISO) oder null; Regel siehe {@link analyzeGrowth}. */
+export function growthHint(measurements: readonly Measurement[], today: string): { label: string; weight: number } | null {
+  const rate = analyzeGrowth(measurements.filter((item) => item.date <= today), today).currentRate;
+  if (rate === null) return null;
+  const monthly = perMonth(rate);
+  const level = growthHintLevel(monthly);
+  if (level === 'strong') return { label: `Starker Wachstumsschub (${label(monthly)} cm/Monat)`, weight: 2 };
+  if (level === 'hint') return { label: `Wachstumsschub (${label(monthly)} cm/Monat)`, weight: 1 };
+  return null;
+}
+
+/** Ab diesem Verhältnis Müdigkeit / Fitness ein Hinweis bzw. ein starker Hinweis (siehe Kopfkommentar). */
+export const SPIKE_RATIO = 1.5;
+export const STRONG_SPIKE_RATIO = 2;
+/** So viel mehr als eine übliche Trainingswoche (Tage 8–28) müssen die letzten 7 Tage sein, damit eine Spitze zählt. */
+export const SPIKE_MIN_WEEK_INCREASE = 1.15;
+/** Text des Hinweises „zwei sehr harte Einheiten“; die Wenn-dann-Regel „Wachstum und Belastung“ (SCRUM-257) erkennt ihn daran. */
+export const HARD_SESSIONS_REASON = 'Zwei sehr harte Einheiten innerhalb von 48 Stunden';
+
+const tookPart = (rating: Rating | null | undefined) => rating?.attendance === 'present' || rating?.attendance === 'limited';
+
+/** Müdigkeit, Fitness und Form eines Spielers für jeden Tag bis `today` (nur vergangene Termine mit Teilnahme). */
+export function playerLoadCurve(items: readonly EventRating[], today: string): LoadCurvePoint[] {
+  return loadCurve(
+    items.filter(({ rating }) => tookPart(rating)).map(({ event, rating }) => ({ date: event.date, load: sessionLoad(event, rating!) })),
+    today,
+  );
+}
 
 /** Minuten eines Spielers bei diesem Termin. */
 export function sessionMinutes(event: TeamEvent, rating: Rating): number {
@@ -109,7 +169,7 @@ export function injuryRisk(
 
   // Nur vergangene Termine mit Teilnahme; „ago“ = Tage seit dem Termin (0 = heute).
   const past = items
-    .filter(({ rating }) => rating?.attendance === 'present' || rating?.attendance === 'limited')
+    .filter(({ rating }) => tookPart(rating))
     .map(({ event, rating }) => ({ ago: Math.round(daysBetween(localMidnight(event.date), today)), load: sessionLoad(event, rating!), exertion: event.exertion }))
     .filter((item) => item.ago >= 0)
     .sort((a, b) => a.ago - b.ago);
@@ -119,32 +179,34 @@ export function injuryRisk(
   const acute = weekLoads[0];
   const baseline = (weekLoads[1] + weekLoads[2] + weekLoads[3]) / 3;
   const weeksWithLoad = weekLoads.filter((value) => value > 0).length;
-  const ratio = baseline > 0 ? acute / baseline : null;
+  // Übliche Trainingswoche: Schnitt der Wochen 1–3, in denen trainiert wurde (eine Pausenwoche zieht ihn nicht herunter).
+  const usedWeeks = weekLoads.slice(1).filter((value) => value > 0);
+  const usual = usedWeeks.length ? usedWeeks.reduce((sum, value) => sum + value, 0) / usedWeeks.length : 0;
+  const current = playerLoadCurve(items, todayStr).at(-1);
+  const ratio = acute > 0 ? workloadRatio(current) : null;
   const hints: { label: string; weight: number }[] = [];
   const infos: string[] = [];
 
-  const spike = acute > 0 && (ratio === null || ratio >= 1.5);
-  if (spike && weeksWithLoad >= 3 && ratio !== null) {
-    hints.push({ label: `Belastungsspitze (${label(ratio)}-fach des Schnitts der 3 Wochen davor)`, weight: ratio >= 2 ? 2 : 1 });
-  } else if (spike) {
+  const spike = ratio !== null && ratio >= SPIKE_RATIO;
+  const spikeHint = spike && weeksWithLoad >= 3 && acute >= usual * SPIKE_MIN_WEEK_INCREASE;
+  if (spikeHint) {
+    hints.push({ label: `Belastungsspitze (Müdigkeit ${label(ratio)}-fach der Fitness)`, weight: ratio >= STRONG_SPIKE_RATIO ? 2 : 1 });
+  } else if (spike && weeksWithLoad < 4) {
     infos.push('Wiedereinstieg – langsam steigern');
   }
 
   // Zwei sehr harte Einheiten (Anstrengung ≥ 7) innerhalb von 48 Stunden in den letzten 7 Tagen.
   const hard = past.filter((item) => item.ago <= 6 && item.exertion >= 7);
   if (hard.some((item, index) => index > 0 && item.ago - hard[index - 1].ago <= 2)) {
-    hints.push({ label: 'Zwei sehr harte Einheiten innerhalb von 48 Stunden', weight: 1 });
+    hints.push({ label: HARD_SESSIONS_REASON, weight: 1 });
   }
 
-  // Wachstumsschub aus den letzten beiden Körpermessungen – nur Messungen der letzten ca. 3 Monate (90 Tage) zählen (SCRUM-157).
-  const sorted = sortedMeasurements(measurements).filter((item) => daysBetween(localMidnight(item.date), today) <= MEASUREMENT_WINDOW_DAYS);
-  if (sorted.length >= 2) {
-    const [prev, last] = sorted.slice(-2);
-    const months = daysBetween(localMidnight(prev.date), localMidnight(last.date)) / 30;
-    const growth = months > 0 ? ((last.height ?? 0) - (prev.height ?? 0)) / months : 0;
-    if (growth >= 1.2) hints.push({ label: `Starker Wachstumsschub (${label(growth)} cm/Monat)`, weight: 2 });
-    else if (growth >= 0.6) hints.push({ label: `Wachstumsschub (${label(growth)} cm/Monat)`, weight: 1 });
-  }
+  // Wachstumsschub (SCRUM-305, Methodenversion 1.0 §6): jüngste gültige Größenmessung höchstens 90 Tage alt, verglichen mit
+  // der jüngsten älteren Messung mit 90 bis 365 Tagen Abstand – dieselbe Regel wie Profil und Belastungsbericht. Messungen
+  // kurz hintereinander ergeben keine Rate (sonst würde Messrauschen zu „cm/Monat“ hochgerechnet). Eine Messung nur mit
+  // Gewicht zählt nicht (SCRUM-302); Messungen nach dem Stichtag zählen nicht.
+  const growth = growthHint(measurements, todayStr);
+  if (growth) hints.push(growth);
 
   // Rückkehr nach Verletzung: das Statusfeld („ca. verletzt bis“) und eine eingetragene Verletzung beschreiben oft dieselbe
   // Rückkehr; deshalb zählt nur die jüngste der beiden.
@@ -181,7 +243,12 @@ export function injuryRisk(
     reason: reasons.join(' · ') || 'Keine auffälligen Belastungsfaktoren',
     load: roundGrade(acute),
     baseline: roundGrade(baseline),
+    fatigue: Math.round(current?.fatigue ?? 0),
+    fitness: Math.round(current?.fitness ?? 0),
+    form: Math.round(current?.form ?? 0) || 0,
+    ratio: ratio === null ? null : roundGrade(ratio),
     weeksWithLoad,
+    spike: spikeHint,
     recentEvents: past.filter((item) => item.ago <= 27).length,
     availability,
   };

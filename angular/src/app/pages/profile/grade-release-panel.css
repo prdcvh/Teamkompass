@@ -1,0 +1,65 @@
+/* Bewertung veröffentlichen im Spielerprofil (SCRUM-115). */
+:host {
+  display: block;
+}
+.release {
+  display: grid;
+  gap: var(--tk-space-3);
+  justify-items: start;
+  min-width: 0;
+}
+.release > * {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* Lange Beschriftungen umbrechen statt über den Rand zu ragen (Handy, 360 px). */
+.release button {
+  max-width: 100%;
+  white-space: normal;
+  line-height: 1.25;
+  text-align: left;
+  padding-block: 8px;
+}
+.head,
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tk-space-2);
+}
+h2,
+p {
+  margin: 0;
+}
+h2 {
+  font-size: var(--tk-text-lg, 18px);
+}
+.pill {
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: var(--tk-text-sm);
+  font-weight: 600;
+  background: var(--tk-soft-amber, #fff4d6);
+  color: var(--tk-ink, inherit);
+}
+.pill[data-state='on'] {
+  background: var(--tk-soft-green, #e3f5e8);
+}
+.muted {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+.error {
+  color: var(--tk-red-dark);
+}
+form {
+  display: grid;
+  gap: var(--tk-space-2);
+}
+.confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--tk-space-2);
+  margin-top: var(--tk-space-3);
+}

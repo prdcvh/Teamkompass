@@ -38,13 +38,13 @@ function seed(): FakeFirebase {
   const fake = new FakeFirebase();
   fake.access.members.set('e2e-uid', { role: 'trainer', playerId: null });
   fake.access.members.set('e2e-player', { role: 'player', playerId: 'p1' });
-  // Medizin-Zugang und Scout-Zugang (SCRUM-170); „medical“ ist ein bisheriges Scout-Konto und wird zum Scout.
+  // Medizin-Zugang und Scout-Zugang (SCRUM-170).
   fake.access.members.set('e2e-physio', { role: 'physio', playerId: null });
   fake.access.members.set('e2e-scout', { role: 'scout', playerId: null });
   names.forEach((name, i) => {
     fake.players.players.set(`p${i + 1}`, {
       name, positions: [['TW', 'IV', 'ZM', 'ST', 'LA'][i % 5]], number: i + 1, birthdate: '2012-05-05',
-      status: ['Fit', 'Angeschlagen', 'Verletzt', 'Pause'][i % 4], ...(i === 4 ? { consentStatus: 'revoked' } : {}),
+      status: ['Fit', 'Angeschlagen', 'Verletzt', 'Pause'][i % 4], consentStatus: i === 4 ? 'revoked' : 'pending',
     });
   });
   fake.events.events.set('e1', { type: 'Training', title: 'Spiel in die Tiefe', date: '2026-10-13', intensity: 3, location: 'Sportplatz am Hang 1, Königstein im Taunus', startTime: '18:00', durationMinutes: 90 });
@@ -62,6 +62,24 @@ function seed(): FakeFirebase {
   // Zu-/Absagen (SCRUM-205) zum Training morgen: eine Absage der Eltern mit langem Grund, eine Zusage.
   fake.rsvp.set('e4', 'p2', { playerId: 'p2', status: 'no', reason: 'Familienfeier bei den Großeltern in Norddeutschland, wir sind erst Sonntag zurück', by: 'parent' });
   fake.rsvp.set('e4', 'p3', { playerId: 'p3', status: 'yes', reason: '', by: 'player' });
+  // Anstrengung und Befinden (SCRUM-138): Spieler p1 (Einwilligung dokumentiert) war gestern beim Training – die Frage ist
+  // offen; zu drei früheren Terminen gibt es schon Angaben (eine deutlich härter als der Trainerwert).
+  fake.players.players.set('p1', { ...fake.players.players.get('p1'), consentStatus: 'granted' });
+  const yesterday = new Date(Date.now() - 24 * 3600 * 1000);
+  const yesterdayIso = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+  fake.events.events.set('gestern', { type: 'Training', title: 'Training gestern', date: yesterdayIso, exertion: 4, location: 'Kunstrasen - heim', startTime: '17:30', durationMinutes: 90 });
+  fake.ratings.ratings.set('gestern', new Map([['p1', { attendance: 'present', playerId: 'p1' }]]));
+  for (const [eventId, date, exertion, wellness] of [['e1', '2026-10-13', 7, [4, 3, 3, 4]], ['e2', '2026-10-10', 9, [5, 5, 3, 4]], ['serie-s1-2026-10-27', '2026-10-27', 6, [6, 5, 6, 5]]] as const) {
+    fake.selfReports.set('p1', 'selfReports', eventId, { playerId: 'p1', eventId, date, exertion, by: 'player', updatedAt: null });
+    fake.selfReports.set('p1', 'wellness', eventId, { playerId: 'p1', eventId, date, fatigue: wellness[0], sleep: wellness[1], soreness: wellness[2], stress: wellness[3], by: 'player', updatedAt: null });
+  }
+  // Wenn-dann-Regeln (SCRUM-195): p3 meldet in den letzten Tagen zweimal starken Muskelkater → Hinweis „Schmerz wiederholt“.
+  fake.players.players.set('p3', { ...fake.players.players.get('p3'), consentStatus: 'granted' });
+  for (const daysAgo of [4, 1]) {
+    const day = new Date(Date.now() - daysAgo * 24 * 3600 * 1000);
+    const date = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+    fake.selfReports.set('p3', 'wellness', `schmerz-${daysAgo}`, { playerId: 'p3', eventId: `schmerz-${daysAgo}`, date, fatigue: 3, sleep: 4, soreness: 2, stress: 4, by: 'player', updatedAt: null });
+  }
   const ratings = new Map<string, Record<string, unknown>>();
   const attendances = ['present', 'absent', 'excused', 'late'];
   names.forEach((_, i) => ratings.set(`p${i + 1}`, { attendance: attendances[i % 4], effort: 2, technique: 3, tactics: 2, comprehension: 4, grade: 2.8, note: 'Gute Einstellung im Training, weiter so', playerId: `p${i + 1}` }));
@@ -78,7 +96,7 @@ function seed(): FakeFirebase {
   // Laufende Abwesenheiten (SCRUM-164): der Kader zeigt dafür „Gesperrt“ / „Abwesend“ samt eigener Zähler.
   fake.records.playerRecords.set('p2/absences', new Map([['ab2', { kind: 'absence', label: 'Sperre', from: '2026-01-01', to: '2099-12-31' }]]));
   fake.records.playerRecords.set('p6/absences', new Map([['ab3', { kind: 'absence', label: 'Klassenfahrt', from: '2026-01-01', to: '2099-12-31' }]]));
-  fake.records.playerRecords.set('p1/measurements', new Map([['me1', { date: '2026-07-01', height: '150', weight: '40' }], ['me2', { date: '2026-09-01', height: '152', weight: '41' }]]));
+  fake.records.playerRecords.set('p1/measurements', new Map([['me1', { date: '2026-07-01', height: '150', weight: '40' }], ['me2', { date: '2026-09-01', height: '152', weight: '41' }], ['me3', { date: '2026-09-10', height: '152.3', weight: '41' }], ['me0', { date: '2025-12-01', height: '147', weight: '38' }]]));
   fake.planning.doc = {
     series: {
       s1: { weekday: 2, startTime: '17:30', durationMinutes: 90, location: 'Kunstrasen - heim', locationCoords: null, title: '', trainingFocus: 'Eigener Ballbesitz', intensity: 2, startDate: '2026-10-20', endDate: '2027-03-30' },
@@ -102,6 +120,25 @@ function seed(): FakeFirebase {
       k5: { type: 'link', title: 'Dehnübungen nach dem Spiel', url: 'https://www.dfb.de/trainer/', description: 'Kurzes Programm für zu Hause.', category: 'Fitness' },
     },
   };
+  // Lernpfade (SCRUM-192): ein Torwart-Pfad (p1 ist Torwart, zwei Stufen bestätigt) und ein Pfad für alle Positionen.
+  fake.learning.paths.set('lp1', {
+    title: 'Torwart: sicher fangen und abwerfen', position: 'TW', ageGroup: 'U14',
+    levels: [
+      { id: 'l1', title: 'Grundstellung und Fangen in Brusthöhe', unit: 'Partner wirft 20 Bälle in Brusthöhe, Hände bilden ein W.', minutes: 3, url: null, homeTask: 'Ball 50-mal gegen die Wand werfen und fangen.' },
+      { id: 'l2', title: 'Flache Bälle aufnehmen', unit: 'Flache Bälle seitlich, Knie ab, Ball an den Körper ziehen.', minutes: 4, url: 'https://www.dfb.de/trainer/', homeTask: '' },
+      { id: 'l3', title: 'Hohe Bälle fangen mit einer sehr langen Beschreibung, damit die Ansicht auch am Handy umbricht', unit: 'Flanken von beiden Seiten, im höchsten Punkt fangen, Knie hoch.', minutes: 5, url: 'https://www.youtube.com/watch?v=abcdefghijk&list=PLabcdefghijklmnopqrstuvwxyz0123456789', homeTask: 'Zehn Minuten Sprungkraft: Hocksprünge und Seilspringen.' },
+      { id: 'l4', title: 'Abwurf und Abschlag', unit: 'Abwurf flach auf den Außenverteidiger, dann Abschlag auf Zonen.', minutes: 5, url: null, homeTask: 'Video zum Abschlag ansehen.' },
+    ],
+  });
+  fake.learning.paths.set('lp2', {
+    title: 'Erster Kontakt', position: '', ageGroup: '',
+    levels: [
+      { id: 'm1', title: 'Ball mit der Innenseite annehmen', unit: 'Zu zweit passen, Ball mit dem ersten Kontakt in den Lauf mitnehmen.', minutes: 3, url: null, homeTask: 'Jeden Tag 5 Minuten gegen die Wand passen.' },
+      { id: 'm2', title: 'Schulterblick vor der Annahme', unit: 'Vor jedem Pass über die Schulter schauen und ansagen, was frei ist.', minutes: 4, url: null, homeTask: '' },
+    ],
+  });
+  fake.learning.progress.set('p1', { playerId: 'p1', paths: { lp1: { l1: '2026-10-13', l2: '2026-10-20' }, lp2: { m1: '2026-10-27' } } });
+  fake.learning.progress.set('p2', { playerId: 'p2', paths: { lp2: { m1: '2026-10-27', m2: '2026-11-03' } } });
   // Scout-Sicht (SCRUM-170) so, wie sie der Trainer-Client aus diesen Daten schreiben würde.
   const players = [...fake.players.players].map(([id, data]) => playerFromDoc(id, data));
   const events = [...fake.events.events].map(([id, data]) => eventFromDoc(id, data));
@@ -124,6 +161,19 @@ fake.teams.memberships.set('e2e-multi', [
   { teamId: 'Team0000000000000002', role: 'parent', playerId: 'p1', expiresAt: null },
 ]);
 fake.teams.metas.set('U14', { name: 'Test-Team U14 (Angular)', label: 'U14 Test', clubId: 'test-verein', clubName: 'Test-Verein (Angular-Test)', logoUrl: null });
+// Vereinsvergleich (SCRUM-197): eingeschaltet, zwei weitere Teams des Test-Vereins mit Spielern des Jahrgangs 2012.
+fake.comparison.enabled.add('test-verein');
+const comparisonTeam = (teamName: string, prefix: string, averages: readonly (number | null)[], extra: Record<string, unknown>) => ({
+  version: 1,
+  teamName,
+  team: { playerCount: averages.length, attendanceRate: 84, avgExertion: 6.2, avgGrade: 2.6, trainings: 31, games: 9, focus: { 'Eigener Ballbesitz': 12, 'Gegnerischer Ballbesitz': 14, Umschalten: 5 }, ...extra },
+  players: averages.map((average, i) => ({ id: `${prefix}${i}`, name: `${['Mia', 'Lena', 'Tom', 'Emil', 'Ida', 'Ole'][i % 6]} ${teamName}`, birthYear: i % 2 ? 2012 : 2011, average, rated: average === null ? 0 : 6, attendanceRate: 70 + i * 4 })),
+  updatedAt: { toDate: () => new Date('2026-11-05T18:00:00') },
+});
+fake.comparison.docs.set('test-verein', new Map([
+  ['U15x', comparisonTeam('U15', 'a', [2.1, 2.4, 1.8, 3.1, 2.9, null], {})],
+  ['U13x', comparisonTeam('U13 Jugendförderverein Taunus', 'b', [2.6, 2.2, 3.4, 2.8], { attendanceRate: 91, avgExertion: 5.1, avgGrade: 2.8, focus: { 'Eigener Ballbesitz': 20, 'Gegnerischer Ballbesitz': 4, Umschalten: 6 } })],
+]));
 // Vereinslogo aus der Datenbank (SCRUM-182): ein kleines Beispiel-PNG als data:-URL.
 const SAMPLE_LOGO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAAwklEQVR42u3a0Q2AIAwEUBZxJednG12AhJb2gF6uid/e06jQ2pqKqJ63f5ajZOjrMNHgxyDZwbdC0OFhiF3BIZBT4VMQKyec1VZEVugoBn710QA3who6C2DFpAFGAaIACyI1PAKQgigN8D6sCEAI4X3ToAAzBCdg5V1/CjBErHyokAD3XRBAAAEEEAAGKPEh01rodkCJ5bR2ZDcAym/qKdoq5RtbFK1FiuZu+fY6xYCDYsREM+SjGLPSDLppfjVQBesHTJGigAIPEM8AAAAASUVORK5CYII=';
 fake.teams.metas.set('Team0000000000000002', { name: 'FC Beispiel U15', label: 'U15', clubId: 'c2', clubName: 'FC Beispiel', logoUrl: SAMPLE_LOGO });
@@ -137,6 +187,31 @@ fake.access.members.set('e2e-player-email', { role: 'player', playerId: 'p1' });
 // Netz zurück, bis der Browser wieder online ist.
 window.addEventListener('offline', () => fake.ratings.goOffline());
 window.addEventListener('online', () => fake.ratings.goOnline());
+// Bewertungsskala (SCRUM-188): ?skala=stufen stellt das Team auf Kompetenzstufen; p1 hat dann zusätzlich eine mit Stufen
+// vergebene Bewertung (gespeichert als 4,5 / 3 / 1,5 mit scale: 'levels'), die ältere Schulnote bleibt daneben stehen.
+if (new URLSearchParams(location.search).get('skala') === 'stufen') {
+  fake.settings.settings = { ratingScale: 'levels' };
+  fake.ratings.ratings.set('serie-s1-2026-10-20', new Map([
+    ['p1', { attendance: 'present', effort: 3, technique: 1.5, tactics: 3, comprehension: 1.5, grade: 2.4, scale: 'levels', note: 'Super mitgemacht', playerId: 'p1' }],
+  ]));
+}
+// Noten veröffentlicht (SCRUM-115): ?noten=frei gibt die Noten von p1 bis jetzt frei (unbefristet). Ohne den Parameter
+// sieht der Spieler nur seine Werte.
+if (new URLSearchParams(location.search).get('noten') === 'frei') {
+  fake.gradeReleases.releases.set('p1', { playerId: 'p1', publishedUntil: new Date(), expiresAt: null, createdBy: 'e2e-uid' });
+}
+// Situationsrätsel (SCRUM-193): drei Szenen; p1 hat eine beantwortet, p2–p4 alle (der Konter ist „noch nicht verstanden“).
+fake.puzzles.puzzles.set('r1', { title: 'Konter nach Ballgewinn im Mittelfeld – wer ist frei?', question: 'Wohin passt du?', media: 'image', mediaUrl: 'https://example.org/teamkompass-szene.svg', videoStart: null, answers: ['Kurz zurück zum Sechser', 'Lang auf die offene rechte Seite', 'Ball halten und auf Hilfe warten'], level: 2 });
+fake.puzzles.solutions.set('r1', { correct: 1, explanation: 'Der Gegner steht ballnah eng. Rechts ist viel Platz und unser Flügelspieler startet schon.' });
+fake.puzzles.puzzles.set('r2', { title: 'Abstoß gegen hohes Pressing', question: 'Wohin spielst du den Ball?', media: 'video', mediaUrl: 'https://www.youtube.com/watch?v=abcdefghijk', videoStart: 83, answers: ['Kurz zum Innenverteidiger', 'Hoch auf den Stürmer'], level: 3 });
+fake.puzzles.solutions.set('r2', { correct: 1, explanation: 'Alle Gegner stehen vorne – der lange Ball überspielt das Pressing.' });
+fake.puzzles.puzzles.set('r3', { title: 'Einwurf an der Mittellinie', question: 'Wer ist frei?', media: 'image', mediaUrl: 'https://example.org/teamkompass-szene.svg', videoStart: null, answers: ['Links', 'Rechts', 'Zurück'], level: 1 });
+fake.puzzles.solutions.set('r3', { correct: 2, explanation: 'Zurück ist frei, vorne wird gedoppelt.' });
+fake.puzzles.answers.set('r3_p1', { puzzleId: 'r3', playerId: 'p1', choice: 2, by: 'player', answeredAt: Date.parse('2026-11-01T17:00:00Z') });
+for (const [index, playerId] of ['p2', 'p3', 'p4'].entries()) {
+  fake.puzzles.answers.set(`r1_${playerId}`, { puzzleId: 'r1', playerId, choice: index === 0 ? 1 : 0, by: 'player', answeredAt: Date.parse('2026-11-02T17:00:00Z') + index });
+  fake.puzzles.answers.set(`r2_${playerId}`, { puzzleId: 'r2', playerId, choice: 1, by: 'player', answeredAt: Date.parse('2026-11-03T17:00:00Z') + index });
+}
 if (new URLSearchParams(location.search).get('as') === 'fresh') {
   fake.players.players.clear();
   fake.events.events.clear();
@@ -150,14 +225,14 @@ bootstrapApplication(App, {
     // Meldet nach dem Start der Anmeldeprüfung einen angemeldeten Trainer.
     provideAppInitializer(() => {
       inject(AuthApi);
-      // ?as=player | player-email | physio | scout | medical | none wählt eine andere Rolle bzw. „nicht angemeldet“ (Anmeldeseite).
+      // ?as=player | player-email | physio | scout | none wählt eine andere Rolle bzw. „nicht angemeldet“ (Anmeldeseite).
       const as = new URLSearchParams(location.search).get('as');
       const user =
         as === 'none' ? null
         : as === 'player' ? { uid: 'e2e-player', isAnonymous: true, email: null }
         : as === 'player-email' ? { uid: 'e2e-player-email', isAnonymous: false, email: 'kind@example.org' }
         : as === 'physio' ? { uid: 'e2e-physio', isAnonymous: false, email: 'physio@example.org' }
-        : as === 'scout' || as === 'medical' ? { uid: 'e2e-scout', isAnonymous: false, email: 'scout@example.org' }
+        : as === 'scout' ? { uid: 'e2e-scout', isAnonymous: false, email: 'scout@example.org' }
         : as === 'multi' ? { uid: 'e2e-multi', isAnonymous: false, email: 'multi@example.org' }
         : { uid: 'e2e-uid', isAnonymous: false, email: 'trainer@example.org' };
       setTimeout(() => fake.auth.emit(user), 0);

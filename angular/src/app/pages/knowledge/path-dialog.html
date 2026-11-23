@@ -1,0 +1,174 @@
+<tk-dialog [open]="open()" [title]="heading()" (closed)="closed.emit()">
+  <form (submit)="submit($event)" novalidate>
+    <div class="field">
+      <label class="tk-label">
+        Name des Lernpfads
+        <input
+          class="tk-input"
+          name="pathTitle"
+          autocomplete="off"
+          placeholder="z. B. Torwart: sicher fangen"
+          [attr.maxlength]="limits.title"
+          [value]="draft().title"
+          [attr.aria-invalid]="errors().title ? 'true' : null"
+          [attr.aria-describedby]="errors().title ? 'err-path-title' : null"
+          (input)="patch({ title: value($event) })"
+        />
+      </label>
+      @if (errors().title) {
+        <span class="error" id="err-path-title" role="alert">{{ errors().title }}</span>
+      }
+    </div>
+
+    <div class="pair">
+      <label class="tk-label">
+        Position
+        <select class="tk-input" name="pathPosition" (change)="patch({ position: value($event) })">
+          @for (position of positions(); track position) {
+            <option [value]="position" [selected]="draft().position === position">{{ positionLabel(position) }}</option>
+          }
+        </select>
+      </label>
+      <label class="tk-label">
+        Altersklasse
+        <select class="tk-input" name="pathAgeGroup" (change)="patch({ ageGroup: value($event) })">
+          @for (group of ageGroups(); track group) {
+            <option [value]="group" [selected]="draft().ageGroup === group">{{ ageGroupLabel(group) }}</option>
+          }
+        </select>
+      </label>
+    </div>
+    <span class="hint">Spieler mit dieser Position sehen den Pfad. Bei einer anderen Altersklasse als der des Teams sieht ihn niemand im Team.</span>
+
+    <h3 class="levels-title">Stufen</h3>
+    @if (errors().levels) {
+      <span class="error" role="alert">{{ errors().levels }}</span>
+    }
+    <ol class="levels">
+      @for (level of draft().levels; track level.id; let i = $index; let first = $first; let last = $last) {
+        <li class="level">
+          <fieldset>
+            <legend>Stufe {{ i + 1 }}</legend>
+            <div class="field">
+              <label class="tk-label">
+                Was wird gelernt?
+                <input
+                  class="tk-input"
+                  [name]="'levelTitle' + i"
+                  autocomplete="off"
+                  placeholder="z. B. Hohe Bälle fangen"
+                  [attr.maxlength]="limits.levelTitle"
+                  [value]="level.title"
+                  [attr.aria-invalid]="levelError(i, 'title') ? 'true' : null"
+                  (input)="patchLevel(i, { title: value($event) })"
+                />
+              </label>
+              @if (levelError(i, 'title')) {
+                <span class="error" role="alert">{{ levelError(i, 'title') }}</span>
+              }
+            </div>
+
+            <div class="field">
+              <label class="tk-label">
+                Kurze Einheit
+                <textarea
+                  class="tk-input"
+                  [name]="'levelUnit' + i"
+                  rows="2"
+                  placeholder="Was wird geübt? z. B. Flanken von beiden Seiten im höchsten Punkt fangen."
+                  [attr.maxlength]="limits.unit"
+                  [value]="level.unit"
+                  [attr.aria-invalid]="levelError(i, 'unit') ? 'true' : null"
+                  (input)="patchLevel(i, { unit: value($event) })"
+                ></textarea>
+              </label>
+              @if (levelError(i, 'unit')) {
+                <span class="error" role="alert">{{ levelError(i, 'unit') }}</span>
+              }
+            </div>
+
+            <div class="pair">
+              <label class="tk-label">
+                Dauer
+                <select class="tk-input" [name]="'levelMinutes' + i" (change)="setMinutes(i, $event)">
+                  @for (minutes of minutes; track minutes) {
+                    <option [value]="minutes" [selected]="level.minutes === minutes">{{ minutes }} Minuten</option>
+                  }
+                </select>
+              </label>
+              @if (links().length > 0) {
+                <label class="tk-label">
+                  Link aus „Wissen“ übernehmen
+                  <select class="tk-input" [name]="'levelKnowledge' + i" (change)="takeLink(i, $event)">
+                    <option value="" selected>Eintrag wählen …</option>
+                    @for (link of links(); track link.id) {
+                      <option [value]="link.id">{{ link.title }}</option>
+                    }
+                  </select>
+                </label>
+              }
+            </div>
+
+            <div class="field">
+              <label class="tk-label">
+                Link (optional)
+                <input
+                  class="tk-input"
+                  [name]="'levelUrl' + i"
+                  type="text"
+                  inputmode="url"
+                  autocomplete="off"
+                  autocapitalize="off"
+                  spellcheck="false"
+                  placeholder="https://…"
+                  [value]="level.url"
+                  [attr.aria-invalid]="levelError(i, 'url') ? 'true' : null"
+                  (input)="patchLevel(i, { url: value($event) })"
+                />
+              </label>
+              @if (levelError(i, 'url')) {
+                <span class="error" role="alert">{{ levelError(i, 'url') }}</span>
+              }
+            </div>
+
+            <div class="field">
+              <label class="tk-label">
+                Aufgabe für zu Hause (optional)
+                <textarea
+                  class="tk-input"
+                  [name]="'levelHomeTask' + i"
+                  rows="2"
+                  placeholder="z. B. Zehn Minuten Ball gegen die Wand werfen und fangen."
+                  [attr.maxlength]="limits.homeTask"
+                  [value]="level.homeTask"
+                  [attr.aria-invalid]="levelError(i, 'homeTask') ? 'true' : null"
+                  (input)="patchLevel(i, { homeTask: value($event) })"
+                ></textarea>
+              </label>
+              @if (levelError(i, 'homeTask')) {
+                <span class="error" role="alert">{{ levelError(i, 'homeTask') }}</span>
+              }
+            </div>
+
+            <div class="level-actions">
+              <button tkButton size="sm" type="button" [disabled]="first" (click)="move(i, -1)" [attr.aria-label]="'Stufe ' + (i + 1) + ' nach oben'">Nach oben</button>
+              <button tkButton size="sm" type="button" [disabled]="last" (click)="move(i, 1)" [attr.aria-label]="'Stufe ' + (i + 1) + ' nach unten'">Nach unten</button>
+              <button tkButton size="sm" type="button" class="remove" [disabled]="draft().levels.length === 1" (click)="removeLevel(i)" [attr.aria-label]="'Stufe ' + (i + 1) + ' entfernen'">Entfernen</button>
+            </div>
+          </fieldset>
+        </li>
+      }
+    </ol>
+    @if (draft().levels.length < limits.levels) {
+      <button tkButton size="sm" type="button" class="add" (click)="addLevel()">+ Stufe hinzufügen</button>
+    }
+
+    <menu>
+      @if (editing()) {
+        <button tkButton type="button" variant="neutral" class="delete" (click)="askDelete()">Lernpfad löschen</button>
+      }
+      <button tkButton type="button" variant="neutral" (click)="closed.emit()">Abbrechen</button>
+      <button tkButton type="submit" variant="primary">Speichern</button>
+    </menu>
+  </form>
+</tk-dialog>

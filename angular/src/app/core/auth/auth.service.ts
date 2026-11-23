@@ -5,7 +5,7 @@ import { AuthApi } from '../firebase/auth.api';
 import type { FirebaseUser, InviteRecord, MemberRecord } from '../firebase/types';
 import { clearLocalTeamData } from '../device/local-data';
 import { CurrentTeam, pickTeam, rememberTeam, rememberedTeam } from '../team/current-team.service';
-import { displayNameFor, purgeLocalCaches } from './auth-helpers';
+import { OFFLINE_VERIFY_MESSAGE, displayNameFor, isOfflineError, purgeLocalCaches } from './auth-helpers';
 import { SessionService } from './session.service';
 import { TeamAccess } from './team-access';
 
@@ -355,6 +355,8 @@ export class AuthService {
     } catch (error) {
       if (epoch !== this.epoch) return;
       console.error(error);
+      // Offline-Start (SCRUM-39): Zugang nicht gespeichert = keine Abmeldung; die Anmeldung bleibt, es gibt nur keine Daten.
+      if (isOfflineError(error)) return this.fail(OFFLINE_VERIFY_MESSAGE);
       this.reset();
       this.error.set(`Zugang konnte nicht geprüft werden. ${authErrorMessage(errorCode(error))}`);
       this.markStatus('signedOut');

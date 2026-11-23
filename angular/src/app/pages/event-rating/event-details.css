@@ -1,0 +1,177 @@
+:host {
+  display: block;
+}
+
+.details {
+  display: grid;
+  gap: var(--tk-space-3);
+  padding: var(--tk-space-4);
+  background: var(--tk-surface);
+  border: 1px solid var(--tk-line);
+  border-radius: var(--tk-radius-lg);
+}
+
+.details-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tk-space-2);
+}
+
+.details-head h2 {
+  margin: 0;
+  font-size: var(--tk-text-lg);
+}
+
+/* Felder nebeneinander, auf dem Handy zweispaltig: die Details sollen das Bewertungsformular nicht weit nach unten schieben. */
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--tk-space-3) var(--tk-space-4);
+  margin: 0;
+}
+
+.fact {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+dt,
+.label {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Zeilenumbrüche der Notiz bleiben erhalten; der Text wird nie als HTML ausgewertet. */
+.notes {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.hint {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+.error {
+  color: var(--tk-red);
+  font-size: var(--tk-text-sm);
+}
+
+.edit-pen {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  color: var(--tk-ink);
+  background: transparent;
+  border: 1px solid var(--tk-line);
+  border-radius: 50%;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.edit-pen:hover {
+  background: var(--tk-line);
+}
+
+.edit-pen:focus-visible {
+  outline: none;
+  box-shadow: var(--tk-focus-ring);
+}
+
+.opponent-plan {
+  padding-top: var(--tk-space-3);
+  border-top: 1px solid var(--tk-line);
+}
+
+.opponent-plan h3 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+}
+
+.opponent-plan dl {
+  display: grid;
+  gap: var(--tk-space-3);
+  margin: 0;
+}
+
+.plan-meta {
+  margin: 0 0 8px;
+  opacity: 0.8;
+  font-size: 0.9rem;
+}
+
+/* Aufwärmprogramm (SCRUM-178) */
+.warmup {
+  display: grid;
+  gap: var(--tk-space-3);
+  padding: var(--tk-space-3);
+  border: 1px solid var(--tk-line);
+  border-radius: var(--tk-radius-md);
+}
+
+.warmup p {
+  margin: 0;
+}
+
+.warmup-check {
+  display: flex;
+  align-items: center;
+  gap: var(--tk-space-3);
+  min-height: 44px;
+  font-weight: 600;
+}
+
+.warmup-check input {
+  width: 22px;
+  height: 22px;
+}
+
+.warmup-program {
+  max-width: 320px;
+}
+
+.warmup a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.warmup a:focus-visible {
+  outline: 2px solid var(--tk-red);
+  outline-offset: 2px;
+}
+
+.bio-banding {
+  display: grid;
+  gap: var(--tk-space-2);
+}
+
+.bio-banding h3,
+.bio-banding p {
+  margin: 0;
+}
+
+.bio-group {
+  display: grid;
+  gap: 2px;
+}
+
+.bio-group ul {
+  margin: 0;
+  padding-left: var(--tk-space-4);
+}
+
+button,
+input,
+select {
+  touch-action: manipulation;
+}

@@ -34,6 +34,7 @@ import { Chip, type Tone } from '../../ui/chip/chip';
                 <tk-chip [tone]="tone(event)">{{ pill(event) }}</tk-chip>
               </div>
               <form class="rsvp-form" (submit)="submit($event, event)">
+                @if (rsvp.reasonAllowed()) {
                 <label class="tk-label">
                   <span class="rsvp-label">Grund bei Absage (freiwillig, sieht nur das Trainerteam)</span>
                   <input
@@ -46,6 +47,7 @@ import { Chip, type Tone } from '../../ui/chip/chip';
                     [attr.aria-label]="'Grund bei Absage: ' + (event.title || event.type)"
                   />
                 </label>
+                }
                 <div class="rsvp-actions">
                   <button
                     tkButton

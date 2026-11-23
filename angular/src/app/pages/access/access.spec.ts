@@ -16,8 +16,7 @@ describe('Access (Zugänge: Spieler, Scouts und Medizin)', () => {
     firebase.players.players.set('p1', { name: 'Anna Beispiel', positions: ['ZM'], number: 8, birthdate: '2012-03-12', status: 'Fit' });
     firebase.players.players.set('p2', { name: 'Ben Widerruf', positions: ['ST'], number: 9, birthdate: '2012-05-01', status: 'Fit', consentStatus: 'revoked' });
     firebase.access.memberDocs.set('u1', { role: 'player', playerId: 'p1', expiresAt: { toDate: () => new Date('2020-01-01T00:00:00Z') } });
-    // Bisheriger Scout-Zugang mit der alten Kennung „medical“ (wird seit SCRUM-170 als Scout geführt).
-    firebase.access.memberDocs.set('u2', { role: 'medical', email: 'scout@verein.de' });
+    firebase.access.memberDocs.set('u2', { role: 'scout', email: 'scout@verein.de' });
     firebase.access.memberDocs.set('u4', { role: 'physio', email: 'arzt@verein.de' });
     firebase.access.memberDocs.set('u3', { role: 'trainer', email: 'coach@verein.de' });
     firebase.access.inviteDocs.set('abcdef0123456789abcdef0123456789abcdef0123456789', { role: 'parent', playerId: 'p2', expiresAt: null });

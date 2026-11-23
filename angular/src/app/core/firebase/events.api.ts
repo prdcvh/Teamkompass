@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { CurrentTeam } from '../team/current-team.service';
 import { PLAYER_STATS_VERSION } from '../team/player-stats';
 import { PlayerStatsMode } from '../team/player-stats-mode';
+import { PlayerViewMode } from '../ratings/player-view-mode';
 import { FirebaseConnection } from './firebase-connection';
 import type { RawDoc, SnapshotMeta } from './types';
 
@@ -11,6 +12,7 @@ export class EventsApi {
   private readonly connection = inject(FirebaseConnection);
   private readonly team = inject(CurrentTeam);
   private readonly statsMode = inject(PlayerStatsMode);
+  private readonly viewMode = inject(PlayerViewMode);
 
   /**
    * Echtzeit-Abo auf die Events des Teams (nur Metadaten: Bewertungen und interne Notizen liegen in
@@ -92,19 +94,23 @@ export class EventsApi {
   }
 
   /**
-   * Löscht das Event samt Bewertungen, internen Notizen und Zu-/Absagen (in Blöcken, Limit 500 je Schreibvorgang). Der Eintrag des
+   * Löscht das Event samt Bewertungen (und ihren Kopien für die Spieleransicht), internen Notizen und Zu-/Absagen (in Blöcken, Limit 500 je Schreibvorgang). Der Eintrag des
    * Events in der Zusammenfassung jedes bewerteten Spielers geht im selben Block wie seine Bewertung mit (SCRUM-201).
    */
   async deleteEvent(id: string): Promise<void> {
     const { db } = await this.connection.get();
     const { collection, deleteField, doc, getDocs, writeBatch } = await import('firebase/firestore');
     const base = ['teams', this.team.id(), 'events', id] as const;
-    const [ratings, privateNotes, responses, withSummary] = await Promise.all([
+    const withCopies = await this.viewMode.writesCopies();
+    const [ratings, privateNotes, responses, withSummary, values, grades] = await Promise.all([
       getDocs(collection(db, ...base, 'ratings')),
       getDocs(collection(db, ...base, 'privateNotes')),
       // Zu-/Absagen (SCRUM-205): der Grund kann ein Gesundheitsdatum sein und darf nicht verwaist liegen bleiben.
       getDocs(collection(db, ...base, 'responses')),
       this.statsMode.writesSummary(),
+      // Kopien für die Spieleransicht (SCRUM-115) – nur, wenn die Regeln sie kennen.
+      withCopies ? getDocs(collection(db, ...base, 'ratingValues')) : null,
+      withCopies ? getDocs(collection(db, ...base, 'ratingGrades')) : null,
     ]);
     type Op = (batch: ReturnType<typeof writeBatch>) => void;
     const remove = (ref: Parameters<ReturnType<typeof writeBatch>['delete']>[0]): Op => (batch) => batch.delete(ref);
@@ -124,6 +130,8 @@ export class EventsApi {
       ]),
       ...privateNotes.docs.map((entry) => remove(entry.ref)),
       ...responses.docs.map((entry) => remove(entry.ref)),
+      ...(values?.docs ?? []).map((entry) => remove(entry.ref)),
+      ...(grades?.docs ?? []).map((entry) => remove(entry.ref)),
       remove(doc(db, ...base)), // zuletzt: bricht ein Block ab, bleibt das Event sichtbar und der Löschversuch wiederholbar
     ];
     for (let offset = 0; offset < ops.length; offset += 450) {

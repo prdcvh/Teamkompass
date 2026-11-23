@@ -12,6 +12,7 @@
 | [`avv.md`](avv.md) | Vorlage Auftragsverarbeitungsvertrag (Art. 28 DSGVO) mit Anlagen (Verarbeitung, TOM, Unterauftragsverarbeiter) | Vereine als Verantwortliche |
 | [`einwilligung-eltern.md`](einwilligung-eltern.md) | Einwilligungsvorlage für Eltern/Sorgeberechtigte (Minderjährige, Gesundheitsdaten, Art. 6/7/8/9 DSGVO) | Vereine/Trainer, die sie von Eltern einholen |
 | [`impressum.md`](impressum.md) | Impressum (§ 5 DDG) | Website/App |
+| [`reife-kompass.md`](reife-kompass.md) | Datenblatt Reife-Kompass: Daten, Zweck, Zugriff, Widerruf, Löschen, Offline-Grenzen, offene Freigaben (SCRUM-252) | PO, Verein, Datenschutzbeauftragter |
 
 ## Rollenmodell (Grundannahme der Entwürfe)
 
@@ -27,6 +28,7 @@ Quellen: `angular/src/app/core/**`, `outputs/team-manager/app.js` (Alt-App, seit
 
 - **Spielerdaten** (`teams/{teamId}/players`): Name, Positionen, Rückennummer, Geburtsdatum, Status (Fit/Angeschlagen/Verletzt/Pause), "verletzt bis"/"verletzt seit", Einwilligungsstatus und Datum (nur Vermerk, nicht der Einwilligungstext).
 - **Gesundheitsdaten (Art. 9)**: Status "Verletzt/Angeschlagen", Verletzungen mit Verletzungsart (Freitext), Abwesenheiten mit Grund (Freitext möglich), Körpergröße und Gewicht (`measurements`), Belastungswerte je Termin.
+- **Reife-Kompass** (`players/{id}/maturity/parents`): optional Größe von Mutter und Vater (Daten Dritter), Einverständnis-Vermerk der Eltern mit Tag und Trainer-Konto, Geschlecht für die Formel. Der Reifestand wird nicht gespeichert. Details: [`reife-kompass.md`](reife-kompass.md).
 - **Leistungsdaten**: Bewertungen je Spieler und Termin (Einsatz, Technik, Taktik, Auffassungsgabe, Minuten, Tore, Vorlagen, Freitext-Notiz), Entwicklungspläne, Scout-Profile, Spielerstatistiken, interne Trainernotizen (`privateNotes`).
 - **Team- und Termindaten**: Termine (Titel, Datum, Ort, Ergebnis, Notizen), Gegneranalysen, Aufstellungen, Planung.
 - **Konten/Login**: Firebase Authentication. Trainer: E-Mail und Passwort. Spieler/Eltern: Einladungscode (6-stellig) mit anonymer Firebase-Anmeldung, an das Gerät gebunden, optional befristet. Rollen: `trainer`, `player`, `parent`, `physio` (UI: Medizin-Zugang), `scout`. Gespeichert: UID, Rolle, ggf. Spieler-Zuordnung, Ablaufdatum.

@@ -1,0 +1,39 @@
+/* Eigene Serien (SCRUM-194). */
+.streak {
+  display: grid;
+  gap: var(--tk-space-3);
+  min-width: 0;
+}
+h2,
+p {
+  margin: 0;
+}
+h2 {
+  font-size: var(--tk-text-lg, 18px);
+}
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--tk-space-3);
+  min-width: 0;
+}
+.count {
+  font-size: 2rem;
+  line-height: 1;
+  min-width: 2.5rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.text {
+  display: grid;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.label {
+  font-weight: 600;
+}
+.pause {
+  padding: var(--tk-space-2) var(--tk-space-3);
+  border-radius: 8px;
+  background: rgba(128, 128, 128, 0.12);
+}

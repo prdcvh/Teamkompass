@@ -27,11 +27,16 @@ after(async () => { await env.cleanup(); });
 // (siehe Test 1). Thema fuer SCRUM-181, Architektur-Notiz Abschnitt 6/8.
 const teamPaths = (prefix) => [
   "players/p1", "players/p1/developmentPlans/f1", "players/p1/absences/a1", "players/p1/measurements/m1",
-  "events/e1", "events/e1/ratings/p1", "events/e1/privateNotes/p1", "events/e1/responses/p1",
+  "events/e1", "events/e1/ratings/p1", "events/e1/ratingValues/p1", "events/e1/ratingGrades/p1", "gradeReleases/p1",
+  "events/e1/privateNotes/p1", "events/e1/responses/p1",
   "scoutProfiles/p1", "playerStats/p1", "opponents/o1",
-  "meta/lineup", "meta/settings", "meta/planning", "meta/breaks", "meta/operations", "meta/playerStats",
+  "meta/lineup", "meta/settings", "meta/planning", "meta/breaks", "meta/operations", "meta/playerStats", "meta/playerView",
   `notifications/${prefix}coach`
 ];
+// Was der Vereinsadmin davon im eigenen Verein mitlesen darf (SCRUM-183) - alles andere (Spielerdokument, Gesundheitsdaten,
+// Rueckmeldung mit Grund, Bewertungsdokument, Notizen, technische Kennzeichen, fremde Einstellungen) bleibt gesperrt.
+const ADMIN_READABLE = ["players/p1/developmentPlans/f1", "events/e1", "scoutProfiles/p1", "playerStats/p1", "opponents/o1",
+  "meta/lineup", "meta/settings", "meta/planning", "meta/breaks", "events/e1/ratingValues/p1", "events/e1/ratingGrades/p1", "gradeReleases/p1"];
 const withInvite = (prefix) => [...teamPaths(prefix), "invites/c1"];
 
 async function seedTeam(db, teamId, prefix, { withUid = true } = {}) {
@@ -119,13 +124,22 @@ test("2. Vereinsadmin A erreicht in Verein B nichts", async () => {
   for (const path of teamPaths("b")) await assertFails(getDoc(doc(db, `teams/B1/${path}`)));
 });
 
-test("3. Vereinsadmin ohne Teammitgliedschaft sieht keine Spieler-, Noten- oder Gesundheitsdaten des eigenen Vereins", async () => {
+// SCRUM-183 (PO-Entscheidung B): Der Vereinsadmin liest im eigenen Verein wie ein Trainer mit - ohne Gesundheitsdaten,
+// ohne Rueckmeldungen/Notizen, ohne Spieler-Einladungscodes - und schreibt keine Teamdaten. Ausfuehrlich:
+// tests/rules/club-admin.test.mjs.
+test("3. Vereinsadmin ohne Teammitgliedschaft: liest mit, aber keine Gesundheitsdaten und schreibt nichts", async () => {
   const db = as("adminA");
-  for (const path of [...teamPaths("a"), "members/acoach", "members/aplayer"]) await assertFails(getDoc(doc(db, `teams/A1/${path}`)));
-  for (const name of ["members", "invites", "players", "events", "players/p1/absences", "players/p1/measurements", "events/e1/ratings", "scoutProfiles", "playerStats"]) {
+  const readable = [...ADMIN_READABLE, "members/acoach", "members/aplayer"];
+  for (const path of readable) await assertSucceeds(getDoc(doc(db, `teams/A1/${path}`)));
+  for (const path of teamPaths("a").filter((path) => !readable.includes(path))) {
+    await assertFails(getDoc(doc(db, `teams/A1/${path}`)));
+  }
+  for (const name of ["invites", "players", "players/p1/absences", "players/p1/measurements", "events/e1/ratings", "events/e1/privateNotes"]) {
     await assertFails(getDocs(collection(db, `teams/A1/${name}`)));
   }
+  for (const name of ["members", "events", "scoutProfiles", "playerStats"]) await assertSucceeds(getDocs(collection(db, `teams/A1/${name}`)));
   await assertFails(getDocs(query(collection(db, "teams/A1/events/e1/ratings"), where("playerId", "==", "p1"))));
+  for (const path of ["events/e9", "opponents/o9", "meta/settings", "playerStats/p1"]) await assertFails(setDoc(doc(db, `teams/A1/${path}`), { playerId: "p1", name: "x" }));
   await assertFails(setDoc(doc(db, "teams/A1/players/p9"), { name: "x" }));
   await assertFails(setDoc(doc(db, "teams/A1/invites/c9"), { role: "player", playerId: "p1", expiresAt: null }));
   // Weitere Trainer/Scouts im besetzten Team anlegen geht nur fuer Trainer, nicht fuer den Vereinsadmin.
@@ -339,7 +353,9 @@ test("9. Rueckwaertskompatibel: Altteam ohne Team-Dokument, ohne clubId und ohne
   await assertSucceeds(setDoc(doc(as("lcoach"), t("players/p2")), { name: "neu" }));
   await assertSucceeds(setDoc(doc(as("lcoach"), t("members/neuScout")), { role: "scout", email: "s@example.test", createdAt: serverTimestamp() }));
   await assertSucceeds(getDoc(doc(as("lplayer"), t("players/p1"))));
-  await assertSucceeds(getDocs(query(collection(as("lplayer"), t("events/e1/ratings")), where("playerId", "==", "p1"))));
+  // SCRUM-115: Spieler lesen die Werte-Kopie per gezieltem Abruf, das Bewertungsdokument nicht mehr.
+  await assertSucceeds(getDoc(doc(as("lplayer"), t("events/e1/ratingValues/p1"))));
+  await assertFails(getDocs(query(collection(as("lplayer"), t("events/e1/ratings")), where("playerId", "==", "p1"))));
   await assertFails(getDoc(doc(as("lplayer"), t("events/e1/privateNotes/p1"))));
   await assertSucceeds(getDoc(doc(as("lphysio"), t("players/p1/absences/a1"))));
   await assertFails(getDoc(doc(as("lscout"), t("players/p1/absences/a1"))));
@@ -388,7 +404,9 @@ test("10. Einmal-Skript: Zuordnung schreibt nur Ergaenzungen, danach findet die 
   assert.equal(teamDoc.data().hasTrainer, true);
   for (const path of teamPaths("l")) {
     await assertSucceeds(getDoc(doc(as("lcoach"), `teams/${LEGACY}/${path}`)));
-    await assertFails(getDoc(doc(as("adminA"), `teams/${LEGACY}/${path}`)));
+    // SCRUM-183: Mit der Zuordnung zum Verein liest der Vereinsadmin mit - nur ohne Gesundheitsdaten.
+    if (ADMIN_READABLE.includes(path)) await assertSucceeds(getDoc(doc(as("adminA"), `teams/${LEGACY}/${path}`)));
+    else await assertFails(getDoc(doc(as("adminA"), `teams/${LEGACY}/${path}`)));
   }
   await assertSucceeds(getDoc(doc(as("lplayer"), `teams/${LEGACY}/players/p1`)));
   // Bestehendes Team ist "besetzt": kein erster Trainer durch den Admin.

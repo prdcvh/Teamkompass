@@ -1,0 +1,33 @@
+@if (checkIn() || lernen()) {
+  <tk-card>
+    <section class="streak" aria-labelledby="streak-title" data-testid="streaks">
+      <h2 id="streak-title">{{ parent() ? 'Serien von ' + player().name : 'Deine Serien' }}</h2>
+      @if (checkIn(); as c) {
+        <article class="item" data-testid="check-in-streak">
+          <strong class="count">{{ c.current }}</strong>
+          <div class="text">
+            <span class="label">Check-ins in Folge</span>
+            @if (c.current === 0) {
+              <small class="muted">{{ parent() ? 'Die Serie startet mit dem nächsten Check-in nach einem Termin.' : 'Starte deine Serie mit dem nächsten Check-in nach einem Termin.' }}</small>
+            } @else {
+              <small class="muted">Termine in Folge, bei denen die Anstrengung angegeben wurde.</small>
+            }
+          </div>
+        </article>
+      }
+      @if (lernen(); as l) {
+        <article class="item" data-testid="learning-streak">
+          <strong class="count">{{ l.current }}</strong>
+          <div class="text">
+            <span class="label">{{ l.current === 1 ? 'Woche' : 'Wochen' }} mit Lernfortschritt in Folge</span>
+            <small class="muted">Wochen, in denen der Trainer mindestens eine Stufe im Lernpfad bestätigt hat.</small>
+          </div>
+        </article>
+      }
+      @if (checkIn()?.pausedToday || lernen()?.pausedToday) {
+        <p class="pause" data-testid="streak-pause" role="status">Pause: Deine Serie ruht gerade (Ferien, Pause oder Abwesenheit). Sie reißt nicht und geht danach einfach weiter.</p>
+      }
+      <small class="muted">Nur für dich sichtbar. Es gibt keine Rangliste.</small>
+    </section>
+  </tk-card>
+}

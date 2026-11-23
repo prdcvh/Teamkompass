@@ -147,6 +147,16 @@ td {
   list-style: none;
 }
 
+.cards li {
+  display: flex;
+  align-items: center;
+  gap: var(--tk-space-2);
+}
+
+.cards .edit-btn {
+  flex: none;
+}
+
 .cards li + li {
   border-top: 1px solid var(--tk-line);
 }
@@ -156,14 +166,30 @@ td {
   grid-template-columns: auto 1fr auto;
   gap: var(--tk-space-3);
   align-items: center;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   min-height: 64px;
   padding: var(--tk-space-3) var(--tk-space-1);
   color: var(--tk-ink);
   background: transparent;
   border: 0;
+  border-radius: var(--tk-radius-lg);
   text-align: left;
+  text-decoration: none;
   cursor: pointer;
+}
+
+.player-card:hover {
+  background: var(--tk-soft-red);
+}
+
+.name-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.name-link:hover strong {
+  text-decoration: underline;
 }
 
 .number {

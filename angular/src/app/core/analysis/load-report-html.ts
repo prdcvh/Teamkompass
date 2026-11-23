@@ -76,8 +76,14 @@ export function loadReportHtml(report: LoadReport, logoUrl = ''): string {
   const growth = report.markers.growth.length
     ? report.markers.growth
         .map(
-          (item) =>
-            `<li>${formatDate(item.from)} → ${formatDate(item.to)}: ${comma(item.fromHeight, 1)} → ${comma(item.toHeight, 1)} cm (${comma(item.perMonth, 1)} cm/Monat)${item.perMonth >= 1.2 ? ' – starker Wachstumsschub' : item.perMonth >= 0.6 ? ' – Wachstumsschub' : ''}</li>`,
+          (item) => {
+            const span = item.from !== null && item.fromHeight !== null
+              ? `${formatDate(item.from)} → ${formatDate(item.to)}: ${comma(item.fromHeight, 1)} → ${comma(item.toHeight, 1)} cm`
+              : `${formatDate(item.to)}: ${comma(item.toHeight, 1)} cm`;
+            if (item.perMonth === null) return `<li>${span} – keine Rate: ${e(item.note)}</li>`;
+            const level = item.level === 'strong' ? ' – starker Wachstumsschub' : item.level === 'hint' ? ' – Wachstumsschub' : '';
+            return `<li>${span} (${comma(item.perMonth, 1)} cm/Monat)${level}</li>`;
+          },
         )
         .join('')
     : '<li>Keine Messungen im Zeitraum.</li>';
@@ -123,10 +129,12 @@ export function loadReportHtml(report: LoadReport, logoUrl = ''): string {
   <div class="card"><span>Stufe</span><strong>${e(a.level)}</strong><small>${e(a.action)}</small></div>
   ${availability}
   <div class="card"><span>Belastung letzte 7 Tage</span><strong>${a.load}</strong><small>Schnitt der 3 Wochen davor: ${a.baseline}</small></div>
+  <div class="card"><span>Müdigkeit / Fitness</span><strong>${a.fatigue} / ${a.fitness}</strong><small>Abklingende Mittel über 7 bzw. 28 Tage (pro Woche), Form ${a.form > 0 ? '+' : ''}${a.form}</small></div>
   <div class="card"><span>Im Zeitraum</span><strong>${report.totals.sessions} Einheiten</strong><small>${report.totals.minutes} Minuten · Belastung ${report.totals.load}${report.totals.missed ? ` · ${report.totals.missed}× gefehlt` : ''}</small></div>
 </section>
 <h3>Gründe für die Stufe</h3>
 <ul>${reasons}</ul>
+<p class="muted">Die Stufe ist keine Verletzungswahrscheinlichkeit. Sie zeigt nur, ob die Belastung deutlich über dem Gewohnten liegt.</p>
 ${report.includeHealth ? '' : '<p class="muted">Ohne Verletzungs- und Befindensdaten erstellt: Stufe ohne Verletzungen und Abwesenheiten gerechnet, Verfügbarkeit nicht angegeben.</p>'}
 <h2>Wochenverlauf</h2>
 <div class="chart">${report.weeks.some((week) => week.load > 0) ? chartSvg(report.weeks) : '<p class="muted">Keine Belastung im Zeitraum eingetragen.</p>'}</div>

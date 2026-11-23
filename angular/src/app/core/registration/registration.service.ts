@@ -176,7 +176,7 @@ export class RegistrationService {
       return;
     }
     this.invite.set(invite);
-    this.clubName.set(invite.kind === 'team' ? await this.api.readClubName(invite.clubId).catch(() => '') : '');
+    this.clubName.set(invite.kind !== 'club' ? await this.api.readClubName(invite.clubId).catch(() => '') : '');
     this.step.set('team');
   }
 
@@ -184,7 +184,8 @@ export class RegistrationService {
   async createTeam(draft: TeamDraft): Promise<boolean> {
     const invite = this.invite();
     if (this.busy() || !invite || !this.user) return false;
-    const errors = validateTeamDraft(draft, invite.kind);
+    // Trainercode (SCRUM-183): es wird kein Team angelegt, nur beigetreten – nichts einzugeben.
+    const errors = invite.kind === 'trainer' ? {} : validateTeamDraft(draft, invite.kind);
     this.teamErrors.set(errors);
     this.error.set('');
     if (Object.keys(errors).length) return false;
@@ -196,7 +197,9 @@ export class RegistrationService {
       this.error.set(
         code.includes('permission-denied')
           ? 'Das hat nicht geklappt: Der Code ist inzwischen benutzt, abgelaufen oder gilt nicht für dieses Konto. Bitte frage nach einem neuen Code.'
-          : `Verein/Team konnte nicht angelegt werden. ${authErrorMessage(code)}`,
+          : invite.kind === 'trainer'
+            ? `Beitritt hat nicht geklappt. ${authErrorMessage(code)}`
+            : `Verein/Team konnte nicht angelegt werden. ${authErrorMessage(code)}`,
       );
       this.busy.set(false);
       return false;

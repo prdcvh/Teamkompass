@@ -2,7 +2,7 @@
   <header class="head">
     <p class="tk-eyebrow">TeamKompass</p>
     <h1>Daten exportieren</h1>
-    <p class="muted">Sicherung als Datei und Spielerprofil als PDF. Nur für Trainer.</p>
+    <p class="muted">Sicherung als Datei, Spielerprofil und Saisonbericht als PDF. Nur für Trainer.</p>
   </header>
 
   @if (!isTrainer()) {
@@ -66,6 +66,12 @@
           <div>
             <button tkButton type="button" [disabled]="busy() || !selected()" (click)="request('pdf')">Bericht erstellen</button>
           </div>
+        </div>
+      </tk-card>
+
+      <tk-card>
+        <div class="panel">
+          <tk-season-report-panel />
         </div>
       </tk-card>
 

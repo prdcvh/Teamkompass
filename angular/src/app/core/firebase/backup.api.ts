@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { CurrentTeam } from '../team/current-team.service';
 import { FirebaseConnection } from './firebase-connection';
+import { SERVER_TIME } from '../ratings/player-view';
 
 export interface WriteOperation {
   readonly path: readonly string[];
@@ -17,13 +18,15 @@ export class BackupApi {
   /** Schreibt in Blöcken (Limit 500 je Schreibvorgang). Bricht ein Block ab, bleiben bereits geschriebene Blöcke bestehen. */
   async writeAll(operations: readonly WriteOperation[]): Promise<void> {
     const { db } = await this.connection.get();
-    const { doc, writeBatch } = await import('firebase/firestore');
+    const { doc, serverTimestamp, writeBatch } = await import('firebase/firestore');
+    const resolve = (data: Readonly<Record<string, unknown>>) =>
+      Object.fromEntries(Object.entries(data).map(([key, value]) => [key, value === SERVER_TIME ? serverTimestamp() : value]));
     for (let offset = 0; offset < operations.length; offset += 450) {
       const batch = writeBatch(db);
       for (const op of operations.slice(offset, offset + 450)) {
         const ref = doc(db, 'teams', this.team.id(), ...op.path);
-        if (op.merge) batch.set(ref, op.data, { merge: true });
-        else batch.set(ref, op.data);
+        if (op.merge) batch.set(ref, resolve(op.data), { merge: true });
+        else batch.set(ref, resolve(op.data));
       }
       await batch.commit();
     }

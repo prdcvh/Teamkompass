@@ -1,0 +1,142 @@
+/* Ohne Rolle mit Hinweisen darf kein leerer Platz entstehen. */
+:host {
+  display: contents;
+}
+
+.panel {
+  display: grid;
+  gap: var(--tk-space-3);
+  padding: var(--tk-space-4);
+  min-width: 0;
+}
+
+.panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--tk-space-2) var(--tk-space-3);
+}
+
+h2 {
+  margin: 0;
+}
+
+.more {
+  color: var(--tk-red);
+  font-size: var(--tk-text-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.more:hover,
+.subject:hover {
+  text-decoration: underline;
+}
+
+a:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--tk-red);
+  outline-offset: 2px;
+}
+
+.muted {
+  margin: 0;
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+.small {
+  font-size: var(--tk-text-xs);
+}
+
+.hints,
+.log-list {
+  display: grid;
+  gap: var(--tk-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--tk-space-1) var(--tk-space-3);
+  padding: var(--tk-space-3);
+  background: var(--tk-soft-amber);
+  border-left: 4px solid var(--tk-amber);
+  border-radius: var(--tk-radius-sm);
+}
+
+.hint[data-rule='pain'],
+.hint[data-rule='loadSpike'] {
+  background: var(--tk-soft-red);
+  border-left-color: var(--tk-red);
+}
+
+.hint[data-rule='openRatings'],
+.hint[data-rule='consentRevoked'] {
+  background: var(--tk-soft-blue);
+  border-left-color: var(--tk-blue);
+}
+
+.hint-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rule {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-xs);
+  font-weight: 700;
+  letter-spacing: var(--tk-track-eyebrow);
+  text-transform: uppercase;
+}
+
+.subject {
+  color: var(--tk-ink);
+  font-weight: 700;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.detail {
+  font-size: var(--tk-text-sm);
+  overflow-wrap: anywhere;
+}
+
+.since,
+.when {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+  white-space: nowrap;
+}
+
+.log summary {
+  min-height: var(--tk-touch);
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.log[open] summary {
+  margin-bottom: var(--tk-space-2);
+}
+
+.log-list li {
+  display: grid;
+  gap: 2px;
+  padding-bottom: var(--tk-space-2);
+  border-bottom: 1px solid var(--tk-line);
+  font-size: var(--tk-text-sm);
+  overflow-wrap: anywhere;
+}
+
+.log .muted.small {
+  margin-top: var(--tk-space-2);
+}

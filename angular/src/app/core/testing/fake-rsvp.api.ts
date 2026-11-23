@@ -34,6 +34,19 @@ export class FakeRsvpApi implements Pick<RsvpApi, keyof RsvpApi> {
     this.set(eventId, playerId, { ...data, updatedAt: 'server-time' });
   }
 
+  async readResponse(eventId: string, playerId: string): Promise<Readonly<Record<string, unknown>> | null> {
+    this.calls.push(`readResponse:${eventId}:${playerId}`);
+    return this.responses.get(eventId)?.get(playerId) ?? null;
+  }
+
+  async clearReason(eventId: string, playerId: string): Promise<void> {
+    this.calls.push(`clearReason:${eventId}:${playerId}`);
+    if (this.saveError) throw this.saveError;
+    const current = this.responses.get(eventId)?.get(playerId);
+    if (!current) throw new Error('not-found');
+    this.set(eventId, playerId, { ...current, reason: '' });
+  }
+
   /** Test-Hilfe: setzt (oder löscht mit null) eine Rückmeldung und benachrichtigt die Abos – wie ein anderes Gerät. */
   set(eventId: string, playerId: string, data: Record<string, unknown> | null): void {
     const store = this.responses.get(eventId) ?? new Map<string, Record<string, unknown>>();

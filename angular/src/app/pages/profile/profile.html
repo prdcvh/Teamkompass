@@ -7,7 +7,7 @@
     @if (players().length > 0) {
       <label class="picker">
         <span class="tk-sr-only">Spieler wählen</span>
-        <select class="tk-input" [value]="$safeNavigationMigration(player()?.id)" (change)="choose(valueOf($event))">
+        <select class="tk-input" [value]="player()?.id ?? ''" (change)="choose(valueOf($event))">
           @for (entry of players(); track entry.id) {
             <option [value]="entry.id" [selected]="entry.id === player()?.id">{{ entry.number }} · {{ entry.name }}</option>
           }
@@ -49,7 +49,7 @@
             }
           </div>
           <div class="grade">
-            <span>Ø Note</span>
+            <span>{{ scale() === 'levels' ? 'Ø Stufe' : 'Ø Note' }}</span>
             <strong>{{ gradeLabel(figures().average) }}</strong>
           </div>
         </div>
@@ -65,6 +65,7 @@
               <div><span>Schnitt der 3 Wochen davor</span><strong>{{ numberLabel(r.baseline) }}</strong></div>
             </div>
             <small>Belastung je Termin = Minuten × Anstrengung (0–10). {{ r.action }}</small>
+            <small class="risk-disclaimer">Die Ampel ist keine Verletzungswahrscheinlichkeit. Sie zeigt nur, ob die Belastung gerade deutlich über dem Gewohnten liegt (Müdigkeit im Verhältnis zur Fitness, siehe Belastungskurve).</small>
             <small class="risk-availability" [attr.data-availability]="r.availability.key">Verfügbarkeit: <b>{{ r.availability.label }}</b>@if (r.availability.action) { – {{ r.availability.action }}}</small>
           </div>
         }
@@ -75,13 +76,19 @@
         }
       </tk-card>
 
+      @if (trainer()) {
+        <tk-consent-panel [player]="p" />
+        <!-- Noten für Spieler/Eltern veröffentlichen (SCRUM-115). -->
+        <tk-grade-release-panel [player]="p" />
+      }
+
       <section class="columns">
         <tk-card>
           <h2>Notenverlauf</h2>
-          <svg class="chart" [attr.viewBox]="'0 0 ' + chart().width + ' ' + chart().height" role="img" [attr.aria-label]="graded().length ? 'Notenverlauf (1 ist die beste Note): ' + chart().summary : 'Noch keine benoteten Events vorhanden'">
+          <svg class="chart" [attr.viewBox]="'0 0 ' + chart().width + ' ' + chart().height" role="img" [attr.aria-label]="graded().length ? (scale() === 'levels' ? 'Verlauf der Kompetenzstufen: ' : 'Notenverlauf (1 ist die beste Note): ') + chart().summary : 'Noch keine benoteten Events vorhanden'">
             @for (line of chart().grid; track line.grade) {
               <line x1="54" [attr.y1]="line.y" [attr.x2]="chart().width - 24" [attr.y2]="line.y" class="grid" />
-              <text x="24" [attr.y]="line.y + 4" class="axis">{{ line.grade }}</text>
+              <text [attr.x]="line.x" [attr.y]="line.y + 4" class="axis">{{ line.label }}</text>
             }
             @if (chart().points.length > 0) {
                 @if (chart().area) {
@@ -111,6 +118,8 @@
               </li>
             }
           </ul>
+          <!-- Bestätigte Lernpfad-Stufen (SCRUM-192). -->
+          <tk-learning-summary [player]="p" />
           <h2>Verfügbarkeit</h2>
           <ul class="bars">
             @for (row of attendance(); track row.label) {
@@ -122,6 +131,14 @@
           </ul>
         </tk-card>
       </section>
+
+      <!-- Jahrgang im Verein (SCRUM-197): nur Trainer, nur wenn der Vereinsadmin den Vergleich eingeschaltet hat. -->
+      <tk-cohort-card [player]="p" />
+
+      <tk-load-curve-card [curve]="loadCurve()" [compact]="mobile()" />
+
+      <!-- Wachstum, Belastung und Befinden auf einer Zeitachse (SCRUM-257): nur Trainer-Profil, keine Bewertung; Hinweis und Trainerprüfung. -->
+      <tk-growth-load-card [curve]="loadCurve()" [compact]="mobile()" [player]="p" [items]="profile.items()" />
 
       <h2 class="section-title">Statistik</h2>
       <section class="cards" aria-label="Statistik">
@@ -156,6 +173,9 @@
         </details>
       }
 
+      <!-- Anstrengung (Trainer/Spieler je Termin) und Befinden des Spielers (SCRUM-138). -->
+      <tk-self-report-history [compare]="true" heading="Anstrengung und Befinden" />
+
       <details class="fold history-fold">
       <summary><h2 class="section-title">Eventhistorie · {{ history().length }}</h2></summary>
       <tk-card>
@@ -168,11 +188,11 @@
                 <div>
                   <strong>{{ entry.event.title }}</strong>
                   <small>
-                    {{ formatDate(entry.event.date) }} · {{ entry.event.type }}@if (entry.event.goalsFor !== null && entry.event.goalsAgainst !== null) { · {{ entry.event.goalsFor }}:{{ entry.event.goalsAgainst }}} · Note {{ gradeLabel(entry.grade) }}
+                    {{ formatDate(entry.event.date) }} · {{ entry.event.type }}@if (entry.event.goalsFor !== null && entry.event.goalsAgainst !== null) { · {{ entry.event.goalsFor }}:{{ entry.event.goalsAgainst }}} · {{ noteWord(entryScale(entry)) }} {{ entryLabel(entry) }}
                   </small>
                   <p class="muted">{{ entry.rating.note || entry.event.notes || 'Keine Notiz' }}</p>
                 </div>
-                <span class="badge">{{ gradeLabel(entry.grade) }}</span>
+                <span class="badge">{{ entryLabel(entry) }}</span>
               </li>
             }
           </ul>
@@ -180,7 +200,7 @@
       </tk-card>
       </details>
 
-      <tk-profile-extras [editable]="true" [consentWarning]="consentWarning()" />
+      <tk-profile-extras [editable]="true" [consentWarning]="consentWarning()" [healthLocked]="healthLocked()" />
     }
   }
 </section>

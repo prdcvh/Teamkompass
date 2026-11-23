@@ -5,7 +5,8 @@
  */
 import { type Player, parsePositions } from '../player/player';
 import { roundGrade } from '../ratings/rating';
-import { FORMATION_PRESETS, type Preset, UNAVAILABLE_STATUSES, ZONES, type Zone, presetName } from './pitch';
+import { type Preset, UNAVAILABLE_STATUSES, ZONES, type Zone, presetName } from './pitch';
+import { DEFAULT_GAME_FORMAT, type GameFormat, gameFormatInfo } from './game-format';
 import { type Assignments, emptyAssignments } from './lineup';
 
 /** Ein Spieler samt Durchschnittsnote (null = noch keine) und aktuellem Status. */
@@ -21,6 +22,9 @@ export function eligibleCandidates(entries: readonly Candidate[]): Candidate[] {
     .filter((entry) => !UNAVAILABLE_STATUSES.includes(entry.status))
     .sort((a, b) => (a.grade ?? 9) - (b.grade ?? 9) || a.player.number - b.player.number);
 }
+
+/** Aufschlag auf die Note, wenn ein Spieler in einer kleinen Spielform nicht auf einer seiner Positionen steht. */
+const OFF_POSITION_PENALTY = 5;
 
 interface Slot {
   readonly zone: Zone;
@@ -45,13 +49,16 @@ export interface SlotAssignment {
  * Wählt aus den verfügbaren Spielern die beste Gesamtelf für die Plätze: jeder Spieler besetzt höchstens einen Platz,
  * und nur in einer Zone, die exakt in seinen Positionen steht. Optimiert (Bitmasken-DP) zuerst auf möglichst wenige
  * offene Plätze, danach auf den besten Notendurchschnitt.
+ * `lenient` (kleine Spielformen, SCRUM-187): Kinder spielen dort nicht auf festen Positionen – jeder Spieler darf auf
+ * jeden Platz, wer die Zone in seinen Positionen hat, wird aber bevorzugt (Aufschlag OFF_POSITION_PENALTY).
  */
-export function assignFormationSlots(slots: readonly Slot[], candidates: readonly Candidate[]): SlotAssignment[] {
+export function assignFormationSlots(slots: readonly Slot[], candidates: readonly Candidate[], lenient = false): SlotAssignment[] {
   const fullMask = (1 << slots.length) - 1;
   const eligibility = candidates.map((entry) => {
     const positions = parsePositions(entry.player.positions);
-    return slots.reduce((bits, slot, index) => (positions.includes(slot.zone) ? bits | (1 << index) : bits), 0);
+    return slots.reduce((bits, slot, index) => (lenient || positions.includes(slot.zone) ? bits | (1 << index) : bits), 0);
   });
+  const fits = candidates.map((entry) => parsePositions(entry.player.positions));
 
   let dp: number[] = new Array<number>(fullMask + 1).fill(Infinity);
   let parent: ({ prevMask: number; playerIndex: number; slotIndex: number } | null)[] = new Array(fullMask + 1).fill(null);
@@ -69,8 +76,9 @@ export function assignFormationSlots(slots: readonly Slot[], candidates: readonl
         const bit = 1 << slotIndex;
         if (!(bits & bit) || mask & bit) continue;
         const newMask = mask | bit;
-        if (dp[mask] + grade < nextDp[newMask]) {
-          nextDp[newMask] = dp[mask] + grade;
+        const cost = grade + (lenient && !fits[playerIndex].includes(slots[slotIndex].zone) ? OFF_POSITION_PENALTY : 0);
+        if (dp[mask] + cost < nextDp[newMask]) {
+          nextDp[newMask] = dp[mask] + cost;
           nextParent[newMask] = { prevMask: mask, playerIndex, slotIndex };
         }
       }
@@ -103,8 +111,8 @@ export interface FormationPreview {
   readonly total: number;
 }
 
-export function formationPreview(preset: Preset, candidates: readonly Candidate[]): FormationPreview {
-  const assigned = assignFormationSlots(expandPreset(preset), candidates);
+export function formationPreview(preset: Preset, candidates: readonly Candidate[], format: GameFormat = DEFAULT_GAME_FORMAT): FormationPreview {
+  const assigned = assignFormationSlots(expandPreset(preset), candidates, format !== DEFAULT_GAME_FORMAT);
   const grades = assigned.map(({ candidate }) => candidate?.grade ?? null).filter((grade): grade is number => grade !== null && grade > 0);
   return {
     assigned,
@@ -121,8 +129,12 @@ export function assignmentsFromPreview(assigned: readonly SlotAssignment[]): Ass
 }
 
 /** Vorschläge für alle Formationen; „empfohlen“ ist die beste vollständig besetzbare (sonst die am besten besetzte). */
-export function formationOptions(candidates: readonly Candidate[]): { name: string; preview: FormationPreview; recommended: boolean }[] {
-  const previews = FORMATION_PRESETS.map((preset) => formationPreview(preset, candidates));
+export function formationOptions(
+  candidates: readonly Candidate[],
+  format: GameFormat = DEFAULT_GAME_FORMAT,
+): { name: string; preview: FormationPreview; recommended: boolean }[] {
+  const presets = gameFormatInfo(format).presets;
+  const previews = presets.map((preset) => formationPreview(preset, candidates, format));
   const complete = previews.filter((preview) => preview.filled === preview.total);
   const pool = complete.length ? complete : previews;
   const bestFilled = Math.max(...pool.map((preview) => preview.filled));
@@ -131,7 +143,7 @@ export function formationOptions(candidates: readonly Candidate[]): { name: stri
     null,
   );
   const recommended = previews.findIndex((preview) => preview.filled === bestFilled && preview.grade === bestGrade);
-  return previews.map((preview, index) => ({ name: presetName(FORMATION_PRESETS[index]), preview, recommended: index === recommended }));
+  return previews.map((preview, index) => ({ name: presetName(presets[index]), preview, recommended: index === recommended }));
 }
 
 /**
@@ -139,8 +151,8 @@ export function formationOptions(candidates: readonly Candidate[]): { name: stri
  * sonst die am besten besetzte). Ohne bewertete Spieler bleibt das Board leer. Die bisherige App wählte hier nur nach
  * dem Notenschnitt und zeigte dadurch teils kaum besetzte Formationen; die Empfehlung der Formationsauswahl ist stimmiger.
  */
-export function suggestedLineup(candidates: readonly Candidate[]): Assignments {
-  const recommended = formationOptions(candidates).find((option) => option.recommended);
+export function suggestedLineup(candidates: readonly Candidate[], format: GameFormat = DEFAULT_GAME_FORMAT): Assignments {
+  const recommended = formationOptions(candidates, format).find((option) => option.recommended);
   return recommended && recommended.preview.filled > 0 && recommended.preview.grade !== null
     ? assignmentsFromPreview(recommended.preview.assigned)
     : emptyAssignments();

@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { LayoutService } from '../../core/shell/layout.service';
 import { todayIso } from '../../core/shared/dates';
 import { CONSENT_LABELS, type ConsentStatus, PLAYER_STATUSES, type Player, type PlayerDraft, type PlayerErrors, type PlayerStatus, STANDARD_POSITIONS, draftFromPlayer, emptyDraft } from '../../core/player/player';
@@ -9,7 +10,7 @@ import { Dialog } from '../../ui/dialog/dialog';
 /** Spieler anlegen/bearbeiten (Figma: „Spieler anlegen“ Desktop 14 / Handy 03b). */
 @Component({
   selector: 'tk-player-dialog',
-  imports: [Dialog, Button],
+  imports: [Dialog, Button, RouterLink],
   templateUrl: './player-dialog.html',
   styleUrl: './player-dialog.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

@@ -88,8 +88,10 @@ export class Register implements OnDestroy {
   }
 
   protected async submitTeam(): Promise<void> {
+    // Trainercode (SCRUM-183): das Team besteht schon – direkt zur Übersicht statt zum Einstieg für neue Teams.
+    const joining = this.reg.invite()?.kind === 'trainer';
     const done = await this.reg.createTeam({ clubName: this.clubName, ageGroup: this.ageGroup(), teamName: this.teamName });
-    if (done) await this.router.navigateByUrl('/willkommen');
+    if (done) await this.router.navigateByUrl(joining ? '/start' : '/willkommen');
   }
 
   protected value(event: Event): string {

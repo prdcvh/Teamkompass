@@ -1,0 +1,57 @@
+@if (views().length > 0) {
+  <section class="learning" aria-labelledby="learning-title">
+    <h2 id="learning-title" class="title">{{ parent() ? 'Lernpfad von ' + player().name : 'Dein Lernpfad' }}</h2>
+    @for (view of views(); track view.path.id) {
+      <tk-card>
+        <div class="path" data-testid="learning-path">
+          <div class="head">
+            <div class="chips">
+              <tk-chip tone="blue">{{ positionLabel(view.path.position) }}</tk-chip>
+              <tk-chip>{{ ageGroupLabel(view.path.ageGroup) }}</tk-chip>
+            </div>
+            <strong class="path-title">{{ view.path.title }}</strong>
+            <small class="muted">{{ progressText(view) }}</small>
+            <progress [max]="view.total" [value]="view.done" [attr.aria-label]="view.path.title + ': ' + progressText(view)"></progress>
+          </div>
+
+          @if (view.next; as next) {
+            <div class="next" data-testid="next-step">
+              <p class="eyebrow">{{ parent() ? 'Nächster Schritt' : 'Dein nächster Schritt' }}</p>
+              <strong>Stufe {{ next.number }}: {{ next.level.title }}</strong>
+              @if (next.level.unit) {
+                <p><span class="label">Kurze Einheit ({{ next.level.minutes }} Min.):</span> {{ next.level.unit }}</p>
+              }
+              @if (next.level.url) {
+                <a class="link" [href]="next.level.url" target="_blank" rel="noopener noreferrer">Video oder Material öffnen (neuer Tab)</a>
+              }
+              @if (next.level.homeTask) {
+                <p><span class="label">Aufgabe für zu Hause:</span> {{ next.level.homeTask }}</p>
+              }
+              <small class="muted">Der Trainer bestätigt im Training, wenn die Stufe sitzt.</small>
+            </div>
+          } @else {
+            <p class="all-done">Alle Stufen geschafft – stark!</p>
+          }
+
+          <ol class="steps">
+            @for (entry of view.levels; track entry.level.id) {
+              <li [attr.data-state]="entry.state">
+                <span class="mark" aria-hidden="true">{{ entry.state === 'done' ? '✓' : entry.number }}</span>
+                <span class="text">
+                  Stufe {{ entry.number }}: {{ entry.level.title }}
+                  <small class="muted">
+                    @switch (entry.state) {
+                      @case ('done') { bestätigt am {{ formatDate(entry.confirmedAt) }} }
+                      @case ('next') { als Nächstes }
+                      @default { später }
+                    }
+                  </small>
+                </span>
+              </li>
+            }
+          </ol>
+        </div>
+      </tk-card>
+    }
+  </section>
+}

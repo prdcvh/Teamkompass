@@ -41,6 +41,16 @@ h2 {
   justify-content: space-between;
 }
 
+.rule-row > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rule-row small {
+  font-size: var(--tk-text-sm);
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;

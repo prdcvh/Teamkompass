@@ -1,0 +1,115 @@
+/* Einwilligung im Spielerprofil (SCRUM-245). */
+:host {
+  display: block;
+}
+.consent {
+  display: grid;
+  gap: var(--tk-space-3);
+  justify-items: start;
+  min-width: 0;
+}
+/* Lange Beschriftungen umbrechen statt über den Rand zu ragen (Handy, 360 px). */
+.consent button {
+  max-width: 100%;
+  white-space: normal;
+  line-height: 1.25;
+  text-align: left;
+  padding-block: 8px;
+}
+.consent > *,
+.task li > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tk-space-2);
+}
+h2,
+h3,
+p {
+  margin: 0;
+}
+h2 {
+  font-size: var(--tk-text-lg, 18px);
+}
+h3 {
+  font-size: var(--tk-text-md, 16px);
+}
+.pill {
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: var(--tk-text-sm);
+  font-weight: 600;
+  background: var(--tk-soft-amber, #fff4d6);
+  color: var(--tk-ink, inherit);
+}
+.pill[data-state='granted'] {
+  background: var(--tk-soft-green, #e3f5e8);
+}
+.pill[data-state='revoked'] {
+  background: var(--tk-soft-red);
+  color: var(--tk-red-dark);
+}
+.lock,
+.task {
+  padding: var(--tk-space-3);
+  border-radius: var(--tk-radius-md);
+  background: var(--tk-soft-red);
+  color: var(--tk-red-dark);
+  font-size: var(--tk-text-sm);
+}
+.task {
+  display: grid;
+  gap: var(--tk-space-2);
+  width: 100%;
+  box-sizing: border-box;
+}
+.task ul {
+  display: grid;
+  gap: var(--tk-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.task li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tk-space-2);
+}
+.done {
+  font-weight: 600;
+}
+.muted {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+.task .muted {
+  color: inherit;
+}
+.text {
+  display: grid;
+  gap: var(--tk-space-2);
+  max-width: 70ch;
+}
+.text summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.text p {
+  margin-top: var(--tk-space-2);
+}
+.error {
+  color: var(--tk-red-dark);
+}
+.confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--tk-space-2);
+  margin-top: var(--tk-space-3);
+}

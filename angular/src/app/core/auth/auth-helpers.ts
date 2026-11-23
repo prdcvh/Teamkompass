@@ -39,6 +39,16 @@ export async function flushTeardown(injector: Injector): Promise<void> {
   }
 }
 
+/** Firestore meldet `unavailable`, wenn keine Verbindung besteht und die Daten nicht im lokalen Speicher liegen (SCRUM-39). */
+export function isOfflineError(error: unknown): boolean {
+  const code = typeof error === 'object' && error !== null && 'code' in error ? String((error as { code: unknown }).code) : '';
+  return code.includes('unavailable') || code.includes('network-request-failed');
+}
+
+export const OFFLINE_VERIFY_MESSAGE =
+  'Ohne Internet kann dein Zugang auf diesem Gerät noch nicht geprüft werden (die App wurde hier noch nicht online geöffnet). ' +
+  'Es werden keine Teamdaten angezeigt. Bitte mit Internet verbinden und die Seite neu laden.';
+
 export function displayNameFor(role: Role, email: string | null): string {
   if (role === 'player') return 'Spieler';
   if (role === 'parent') return 'Eltern';

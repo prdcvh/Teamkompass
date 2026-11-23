@@ -1,0 +1,55 @@
+.pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--tk-space-3);
+  align-items: end;
+}
+
+.levels-title {
+  margin: 0;
+  font-size: var(--tk-text-lg);
+}
+
+.levels {
+  display: grid;
+  gap: var(--tk-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+fieldset {
+  display: grid;
+  gap: var(--tk-space-3);
+  min-width: 0;
+  margin: 0;
+  padding: var(--tk-space-3);
+  border: 1px solid var(--tk-line);
+  border-radius: var(--tk-radius-md);
+}
+
+legend {
+  padding: 0 var(--tk-space-1);
+  font-weight: 700;
+}
+
+.level-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tk-space-2);
+}
+
+.remove {
+  margin-left: auto;
+  color: var(--tk-red);
+}
+
+.add {
+  justify-self: start;
+}
+
+@media (max-width: 720px) {
+  .pair {
+    grid-template-columns: 1fr;
+  }
+}

@@ -92,6 +92,19 @@ describe('RegistrationService', () => {
     expect(firebase.registration.committed[0].map((write) => write.path[0])).toEqual(['clubInvites', 'teams', 'teams']);
   });
 
+  it('Trainercode (SCRUM-183): ohne Eingaben dem bestehenden Team beitreten', async () => {
+    firebase.registration.invites.set(CODE, invite({ kind: 'trainer', clubId: 'fc-x', teamId: 'U14', teamName: 'FC X U14' }));
+    firebase.registration.clubNames.set('fc-x', 'FC X');
+    firebase.registration.verified = true;
+    await reg.createAccount(account);
+    await reg.checkVerified();
+    expect(reg.step()).toBe('team');
+    expect(reg.clubName()).toBe('FC X');
+    expect(reg.invite()?.teamName).toBe('FC X U14');
+    expect(await reg.createTeam({ clubName: '', ageGroup: '', teamName: '' })).toBe(true);
+    expect(firebase.registration.committed[0].map((write) => write.path.join('/'))).toEqual([`clubInvites/${CODE}`, 'teams/U14/members/new-coach']);
+  });
+
   it('meldet benutzte, abgelaufene oder fremd gebundene Codes verständlich und bleibt im ersten Schritt', async () => {
     firebase.registration.verified = true;
     await reg.createAccount(account);

@@ -1,6 +1,6 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { Router, type UrlTree, provideRouter } from '@angular/router';
 import { LayoutService } from '../../core/shell/layout.service';
 import { SessionService } from '../../core/auth/session.service';
 import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
@@ -166,22 +166,14 @@ describe('Events (Events-Seite)', () => {
       expect(firebase.calls.some((call) => call.startsWith('saveEvent'))).toBe(false);
     });
 
-    it('bearbeitet ein Event nachträglich (Titel, Datum, Ort, Notiz)', async () => {
+    it('der Titel in der Tabelle öffnet die Bewertungsseite; „Anschauen“ gibt es nicht mehr (SCRUM-285)', async () => {
       const fixture = await render();
-      qa<HTMLButtonElement>(fixture, 'tbody tr button').find((button) => text(button) === 'Anschauen' && button.getAttribute('aria-label') === 'Anschauen: Training Montag')!.click();
-      await flush(fixture);
-      const dialog = q<HTMLElement>(fixture, 'tk-event-dialog')!;
-      dialog.querySelector<HTMLButtonElement>('.edit-pen')!.click();
-      await flush(fixture);
-      expect(text(dialog.querySelector('h2'))).toBe('Event bearbeiten');
-      expect(dialog.querySelector<HTMLInputElement>('input[name="title"]')!.value).toBe('Training Montag');
-      type(dialog.querySelector<HTMLInputElement>('input[name="title"]')!, 'Training Dienstag');
-      type(dialog.querySelector<HTMLInputElement>('input[name="date"]')!, '2026-10-06');
-      type(dialog.querySelector<HTMLInputElement>('input[name="location"]')!, 'Halle');
-      type(dialog.querySelector<HTMLTextAreaElement>('textarea[name="notes"]')!, 'Passspiel');
-      (dialog.querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit'));
-      await vi.waitFor(() => expect(firebase.events.events.get('e1')).toMatchObject({ title: 'Training Dienstag', date: '2026-10-06', location: 'Halle', notes: 'Passspiel' }));
-      expect(firebase.events.events.size).toBe(3);
+      openAll(fixture);
+      const titles = qa<HTMLAnchorElement>(fixture, 'tbody tr a.title-link');
+      expect(titles.map((link) => [text(link), link.getAttribute('href')])).toContainEqual(['Training Montag', '/events/e1']);
+      expect(qa(fixture, 'button').some((button) => /Anschauen/.test(text(button) + (button.getAttribute('aria-label') ?? '')))).toBe(false);
+      // Bearbeiten passiert auf der Bewertungsseite: die Liste öffnet keinen Event-Dialog mit Event mehr.
+      expect(text(q(fixture, 'tk-event-dialog h2'))).toBe('Event anlegen');
     });
 
     it('löscht erst nach Bestätigung', async () => {
@@ -299,29 +291,39 @@ describe('Events (Events-Seite)', () => {
       openAll(fixture);
       expect(qa(fixture, 'tbody tr')).toHaveLength(3);
       expect(q(fixture, '.head button')).toBeNull();
-      expect(qa(fixture, 'tbody tr button').map(text)).toEqual(['Anschauen', 'Anschauen', 'Anschauen']);
-      expect(qa(fixture, 'tbody tr a')).toHaveLength(0);
+      expect(qa(fixture, 'tbody tr button')).toHaveLength(0);
+      // Nur der Titel als Link (zu den Eventdetails), kein „Bewerten“.
+      expect(qa(fixture, 'tbody tr a').map(text)).toEqual(['Training September', 'Training Montag', 'Heimspiel']);
     });
   });
 
   describe('Handy', () => {
-    it('gruppiert nach Monat, öffnet das Bewerten per Tipp und das Bearbeiten über die Schaltfläche', async () => {
+    it('gruppiert nach Monat; ein Tipp auf die Kachel öffnet die Bewertungsseite, ohne „Anschauen“-Knopf (SCRUM-285)', async () => {
       const fixture = await render('trainer', true);
       openAll(fixture);
       expect(qa(fixture, '.group').map(text)).toEqual(['September 2026 · 1']);
       expect(q(fixture, 'table')).toBeNull();
       expect(q(fixture, '.fab')).not.toBeNull();
-      expect(qa<HTMLAnchorElement>(fixture, 'a.event-card')[1].getAttribute('href')).toBe('/events/e1');
-      qa<HTMLButtonElement>(fixture, '.row button')[0].click();
-      await flush(fixture);
-      expect(text(q(fixture, 'tk-event-dialog h2'))).toBe('Event ansehen');
-      expect(q(fixture, 'tk-event-dialog .edit-pen')).not.toBeNull();
+      const card = qa<HTMLAnchorElement>(fixture, 'a.event-card')[1];
+      expect(card.getAttribute('href')).toBe('/events/e1');
+      expect(card.getAttribute('aria-label')).toBe('Event öffnen: Training Montag');
+      expect(qa(fixture, '.row button')).toHaveLength(0);
+    });
+
+    it('Klick auf die Kachel navigiert zur Bewertungsseite des Events (SCRUM-285)', async () => {
+      const fixture = await render('trainer', true);
+      const router = TestBed.inject(Router);
+      const navigate = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+      q<HTMLAnchorElement>(fixture, 'a.event-card[href="/events/e1"]')!.click();
+      expect(navigate).toHaveBeenCalled();
+      expect(router.serializeUrl(navigate.mock.calls[0][0] as UrlTree)).toBe('/events/e1');
     });
 
     it('zeigt für Medizin weder Anlegen noch Bearbeiten', async () => {
       const fixture = await render('physio', true);
       expect(q(fixture, '.fab')).toBeNull();
-      expect(qa(fixture, '.row button').map(text)).toEqual(['Anschauen', 'Anschauen']); // nur „Diese Woche“ ist offen
+      expect(qa(fixture, '.row button')).toHaveLength(0);
+      expect(qa(fixture, 'a.event-card')).toHaveLength(2); // nur „Diese Woche“ ist offen
     });
   });
 });

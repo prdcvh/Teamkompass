@@ -1,26 +1,28 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { LayoutService } from '../../core/shell/layout.service';
 import { SessionService } from '../../core/auth/session.service';
 import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
 import { SquadService } from '../../core/player/squad.service';
 import { SquadAbsencesService } from '../../core/records/squad-absences.service';
 import { Squad } from './squad';
+import { CurrentTeam } from '../../core/team/current-team.service';
 
 describe('Squad (Kader-Seite)', () => {
   let firebase: FakeFirebase;
   const isMobile = signal(false);
 
-  async function render(role: 'trainer' | 'physio' = 'trainer', mobile = false) {
+  async function render(role: 'trainer' | 'physio' = 'trainer', mobile = false, team = 'U14') {
     isMobile.set(mobile);
     firebase = new FakeFirebase();
-    firebase.players.players.set('p1', { name: 'Jonas Keller', positions: ['TW'], number: 1, birthdate: '2012-05-05', status: 'Fit' });
-    firebase.players.players.set('p2', { name: 'Elias Wagner', positions: ['RV'], number: 2, birthdate: '2012-06-06', status: 'Fit' });
-    firebase.players.players.set('p3', { name: 'Jan Braun', positions: ['RA'], number: 17, birthdate: '2013-01-01', status: 'Verletzt' });
+    firebase.players.players.set('p1', { name: 'Jonas Keller', positions: ['TW'], number: 1, birthdate: '2012-05-05', status: 'Fit', consentStatus: 'pending' });
+    firebase.players.players.set('p2', { name: 'Elias Wagner', positions: ['RV'], number: 2, birthdate: '2012-06-06', status: 'Fit', consentStatus: 'pending' });
+    firebase.players.players.set('p3', { name: 'Jan Braun', positions: ['RA'], number: 17, birthdate: '2013-01-01', status: 'Verletzt', consentStatus: 'pending' });
     TestBed.configureTestingModule({
       providers: [provideRouter([]), ...provideFakeFirebase(firebase), { provide: LayoutService, useValue: { isMobile } }],
     });
+    TestBed.inject(CurrentTeam).id.set(team);
     TestBed.inject(SessionService).role.set(role);
     const fixture = TestBed.createComponent(Squad);
     await fixture.whenStable();
@@ -48,6 +50,7 @@ describe('Squad (Kader-Seite)', () => {
       expect(text(qa(fixture, 'tbody tr')[0])).toContain('TW');
       const counts = qa(fixture, '.metrics .count').map(text);
       expect(counts).toEqual(['2', '0', '1', '0']);
+      expect(qa<HTMLAnchorElement>(fixture, 'tbody a.name-link').map((a) => a.getAttribute('href'))).toEqual(['/profile/p1', '/profile/p2', '/profile/p3']);
       expect(text(q(fixture, '.meta'))).toBe('3 Spieler');
       expect(q(fixture, '.sync')?.getAttribute('data-state')).toBe('saved');
     });
@@ -121,6 +124,20 @@ describe('Squad (Kader-Seite)', () => {
       q<HTMLFormElement>(fixture, 'form')!.dispatchEvent(new Event('submit'));
       fixture.detectChanges();
       expect(text(q(fixture, '#err-number'))).toContain('bereits vergeben');
+      expect(firebase.calls.some((c) => c.startsWith('savePlayer'))).toBe(false);
+    });
+
+    it('fremder Verein ohne dokumentierte Einwilligung: Status „Verletzt“ gesperrt, Hinweis mit Link zum Profil (SCRUM-245)', async () => {
+      const fixture = await render('trainer', false, 'Xy7Fremd0000Verein01');
+      qa<HTMLButtonElement>(fixture, 'tbody tr')[0].querySelector<HTMLButtonElement>('button')!.click();
+      fixture.detectChanges();
+      type(q<HTMLSelectElement>(fixture, 'select[name="status"]')!, 'Verletzt', 'change');
+      fixture.detectChanges();
+      q<HTMLFormElement>(fixture, 'form')!.dispatchEvent(new Event('submit'));
+      fixture.detectChanges();
+      expect(text(q(fixture, '#err-status'))).toContain('fehlt die dokumentierte Einwilligung');
+      const link = q<HTMLAnchorElement>(fixture, '#err-status a')!;
+      expect(link.getAttribute('href')).toBe('/profile/p1#einwilligung');
       expect(firebase.calls.some((c) => c.startsWith('savePlayer'))).toBe(false);
     });
 
@@ -204,10 +221,21 @@ describe('Squad (Kader-Seite)', () => {
       expect(q(fixture, 'button.fab')?.getAttribute('aria-label')).toBe('Spieler anlegen');
     });
 
-    it('öffnet per Tipp auf die Karte den Dialog mit Status als Auswahlleiste', async () => {
+    it('öffnet per Tipp auf die Karte das Spielerprofil, ohne den Bearbeiten-Dialog', async () => {
       const fixture = await render('trainer', true);
-      qa<HTMLButtonElement>(fixture, '.player-card')[2].click();
+      const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+      const card = qa<HTMLAnchorElement>(fixture, 'a.player-card')[2];
+      card.click();
+      expect(card.getAttribute('href')).toBe('/profile/p3');
+      expect(navigate.mock.calls.map((call) => String(call[0]))).toEqual(['/profile/p3']);
+    });
+
+    it('Bearbeiten-Knopf öffnet den Dialog mit Status als Auswahlleiste und navigiert nicht', async () => {
+      const fixture = await render('trainer', true);
+      const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+      qa<HTMLButtonElement>(fixture, '.cards .edit-btn')[2].click();
       fixture.detectChanges();
+      expect(navigate).not.toHaveBeenCalled();
       expect(q<HTMLInputElement>(fixture, 'input[name="name"]')!.value).toBe('Jan Braun');
       const radios = qa<HTMLButtonElement>(fixture, '[role="radio"]');
       expect(radios.map(text)).toEqual(['Fit', 'Angeschlagen', 'Verletzt', 'Pause']);
@@ -220,7 +248,7 @@ describe('Squad (Kader-Seite)', () => {
 
     it('bedient die Status-Auswahl per Pfeiltasten (nur der gewählte Eintrag ist per Tab erreichbar)', async () => {
       const fixture = await render('trainer', true);
-      qa<HTMLButtonElement>(fixture, '.player-card')[0].click();
+      qa<HTMLButtonElement>(fixture, '.cards .edit-btn')[0].click();
       fixture.detectChanges();
       const radios = () => qa<HTMLButtonElement>(fixture, '[role="radio"]');
       expect(radios().map((r) => r.getAttribute('tabindex'))).toEqual(['0', '-1', '-1', '-1']);
@@ -295,7 +323,7 @@ describe('Squad (Kader-Seite)', () => {
       for (const selector of ['button.fab', '.access-card', 'tk-player-dialog', 'tbody tr button', '.head button']) {
         expect(q(fixture, selector), selector).toBeNull();
       }
-      if (mobile) expect(qa<HTMLButtonElement>(fixture, '.player-card').every((card) => card.disabled)).toBe(true);
+      if (mobile) expect(q(fixture, '.cards .edit-btn')).toBeNull(); // Profil-Link bleibt, Bearbeiten fehlt
       expect(qa(fixture, 'a').filter((a) => a.getAttribute('href') === '/zugaenge')).toHaveLength(0);
     });
   });

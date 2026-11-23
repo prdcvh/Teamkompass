@@ -7,7 +7,7 @@
 import { formatDate } from '../events/event';
 import { type Player, positionText } from '../player/player';
 import { type EventRating, availability, gameStats, gradedEvents, numberLabel, profileFigures, skillAverages } from './profile';
-import { gradeLabel } from '../ratings/rating';
+import { type RatingScale, scoreLabel } from '../ratings/rating-scale';
 import type { Absence } from '../records/absence';
 import { effectiveStatus } from '../records/availability';
 import type { Measurement } from '../records/measurement';
@@ -26,6 +26,8 @@ export interface ProfileReportInput {
   /** Körpermessungen (für den Hinweis „Wachstumsschub“); fehlen sie, entfällt dieser Hinweis. */
   readonly measurements?: readonly Measurement[];
   readonly today: string;
+  /** Bewertungsskala des Teams (SCRUM-188); fehlt sie, Schulnoten. */
+  readonly scale?: RatingScale;
 }
 
 /**
@@ -52,6 +54,10 @@ export const PROFILE_REPORT_CSS = `
 
 export function profileReportHtml(input: ProfileReportInput): string {
   const { player, items, today } = input;
+  // Skala des Teams (SCRUM-188); ohne Angabe Schulnoten wie bisher.
+  const scale: RatingScale = input.scale ?? 'grades';
+  const gradeLabel = (value: number | null) => scoreLabel(value, scale);
+  const heading = scale === 'levels' ? 'Ø Stufe' : 'Ø Note';
   const figures = profileFigures(items, today);
   const games = gameStats(items, today);
   const graded = gradedEvents(items);
@@ -85,7 +91,7 @@ export function profileReportHtml(input: ProfileReportInput): string {
   <div class="muted">Nr. ${escapeHtml(player.number)} · ${escapeHtml(positionText(player))} · ${escapeHtml(formatDate(player.birthdate))} · ${escapeHtml(status)}</div>
 </header>
 <section class="cards">
-  ${card('Ø Note', gradeLabel(figures.average))}
+  ${card(heading, gradeLabel(figures.average))}
   ${card('Bewertete Events', String(figures.ratedEvents))}
   ${card('Teilnahmen', String(figures.attendances))}
   ${card('Einsatzquote', `${games.appearanceRate}%`)}
@@ -98,12 +104,12 @@ export function profileReportHtml(input: ProfileReportInput): string {
   <h2>Belastung</h2>
   <p><strong>${escapeHtml(risk.level)}</strong> · ${escapeHtml(risk.reason)}</p>
   <table><thead><tr><th>Belastung letzte 7 Tage</th><th>Schnitt der 3 Wochen davor</th><th>Verfügbarkeit</th></tr></thead><tbody><tr><td>${escapeHtml(numberLabel(risk.load))}</td><td>${escapeHtml(numberLabel(risk.baseline))}</td><td>${escapeHtml(risk.availability.label)}${risk.availability.action ? ` – ${escapeHtml(risk.availability.action)}` : ''}</td></tr></tbody></table>
-  <p class="muted">Belastung je Termin = Minuten × Anstrengung (0–10).</p>
+  <p class="muted">Belastung je Termin = Minuten × Anstrengung (0–10). Müdigkeit ${escapeHtml(numberLabel(risk.fatigue))} · Fitness ${escapeHtml(numberLabel(risk.fitness))} · Form ${escapeHtml(numberLabel(risk.form, { signed: true }))} (abklingende Mittel über 7 bzw. 28 Tage, pro Woche). Die Ampel ist keine Verletzungswahrscheinlichkeit.</p>
 </section>
 <section class="section-grid">
   <div>
     <h2>Kompetenzprofil</h2>
-    <table><thead><tr><th>Kriterium</th><th>Ø Note</th></tr></thead><tbody>${skills || '<tr><td colspan="2">Keine Bewertungen vorhanden.</td></tr>'}</tbody></table>
+    <table><thead><tr><th>Kriterium</th><th>${heading}</th></tr></thead><tbody>${skills || '<tr><td colspan="2">Keine Bewertungen vorhanden.</td></tr>'}</tbody></table>
   </div>
   <div>
     <h2>Verfügbarkeit</h2>

@@ -1,5 +1,6 @@
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { authErrorMessage, errorCode } from '../auth/auth-errors';
+import type { GameFormat } from './game-format';
 import { LineupApi } from '../firebase/lineup.api';
 import { type Assignments, type EventLineups, docFromEventLineup, docFromLineup, emptyAssignments, normalizeEventLineups, normalizeLineup } from './lineup';
 import { SessionService } from '../auth/session.service';
@@ -102,9 +103,9 @@ export class LineupService {
    * Speichert die Aufstellung für ein Spiel am Eintrag `byEvent.<eventId>` (Format der Live-App); die allgemeine Startelf
    * und die anderen Spiele bleiben unberührt. Rückgabe: false, wenn nicht erlaubt oder noch nicht geladen.
    */
-  saveForEvent(eventId: string, assignments: Assignments, now: Date = new Date()): boolean {
+  saveForEvent(eventId: string, assignments: Assignments, now: Date = new Date(), gameFormat?: GameFormat): boolean {
     if (!this.canEdit() || !eventId) return false;
-    const entry = docFromEventLineup(assignments, now.toISOString());
+    const entry = docFromEventLineup(assignments, now.toISOString(), gameFormat);
     const current = this.stored();
     const byEvent = { ...((current?.['byEvent'] as Record<string, unknown> | undefined) ?? {}), [eventId]: entry };
     this.stored.set({ ...current, byEvent }); // sofort sichtbar, auch offline; das Abo bestätigt es

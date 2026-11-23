@@ -1,0 +1,175 @@
+<tk-dialog [open]="open()" [title]="heading()" (closed)="closed.emit()">
+  <form (submit)="submit($event)" novalidate>
+    @if (answered() > 0) {
+      <p class="hint warn" role="note">Schon {{ answered() }} {{ answered() === 1 ? 'Antwort' : 'Antworten' }} auf dieses Rätsel. Änderst du Antworten oder die richtige Lösung, rechnet die App die Wertungen der Spieler neu.</p>
+    }
+
+    <div class="field">
+      <label class="tk-label">
+        Name der Szene
+        <input
+          class="tk-input"
+          name="puzzleTitle"
+          autocomplete="off"
+          placeholder="z. B. Konter nach Ballgewinn im Mittelfeld"
+          [attr.maxlength]="limits.title"
+          [value]="draft().title"
+          [attr.aria-invalid]="errors().title ? 'true' : null"
+          [attr.aria-describedby]="errors().title ? 'err-puzzle-title' : null"
+          (input)="patch({ title: value($event) })"
+        />
+      </label>
+      @if (errors().title) {
+        <span class="error" id="err-puzzle-title" role="alert">{{ errors().title }}</span>
+      }
+    </div>
+
+    <fieldset class="media">
+      <legend>Spielszene</legend>
+      <div class="choice" role="radiogroup" aria-label="Art der Szene">
+        <label><input type="radio" name="puzzleMedia" value="image" [checked]="draft().media === 'image'" (change)="setMedia('image')" /> Bild</label>
+        <label><input type="radio" name="puzzleMedia" value="video" [checked]="draft().media === 'video'" (change)="setMedia('video')" /> Video-Link mit Zeitmarke</label>
+      </div>
+      <div class="field">
+        <label class="tk-label">
+          {{ draft().media === 'image' ? 'Adresse des Bildes' : 'Video-Link' }}
+          <input
+            class="tk-input"
+            name="puzzleUrl"
+            type="text"
+            inputmode="url"
+            autocomplete="off"
+            autocapitalize="off"
+            spellcheck="false"
+            placeholder="https://…"
+            [value]="draft().mediaUrl"
+            [attr.aria-invalid]="errors().mediaUrl ? 'true' : null"
+            (input)="patch({ mediaUrl: value($event) })"
+          />
+        </label>
+        @if (errors().mediaUrl) {
+          <span class="error" role="alert">{{ errors().mediaUrl }}</span>
+        }
+        <span class="hint">Es wird nur verlinkt, nichts hochgeladen. {{ draft().media === 'image' ? 'Spieler öffnen das Bild in einem neuen Tab (z. B. ein Standbild aus Google Drive, freigegeben für „Jeder mit dem Link“).' : 'Spieler öffnen das Video in einem neuen Tab an der Zeitmarke.' }}</span>
+      </div>
+      @if (draft().media === 'video') {
+        <div class="field">
+          <label class="tk-label">
+            Zeitmarke (Minuten:Sekunden)
+            <input
+              class="tk-input short"
+              name="puzzleStart"
+              autocomplete="off"
+              inputmode="numeric"
+              placeholder="z. B. 1:23"
+              [value]="draft().videoStart"
+              [attr.aria-invalid]="errors().videoStart ? 'true' : null"
+              (input)="patch({ videoStart: value($event) })"
+            />
+          </label>
+          @if (errors().videoStart) {
+            <span class="error" role="alert">{{ errors().videoStart }}</span>
+          }
+          <span class="hint">Leer lassen, wenn der Link die Zeit schon enthält (z. B. YouTube mit „t=83“).</span>
+        </div>
+      }
+    </fieldset>
+
+    <div class="field">
+      <label class="tk-label">
+        Frage
+        <input
+          class="tk-input"
+          name="puzzleQuestion"
+          autocomplete="off"
+          [attr.maxlength]="limits.question"
+          [value]="draft().question"
+          [attr.aria-invalid]="errors().question ? 'true' : null"
+          (input)="patch({ question: value($event) })"
+        />
+      </label>
+      @if (errors().question) {
+        <span class="error" role="alert">{{ errors().question }}</span>
+      }
+    </div>
+
+    <fieldset>
+      <legend>Antworten ({{ limits.min }}–{{ limits.max }}) – richtige markieren</legend>
+      @if (errors().answers) {
+        <span class="error" role="alert">{{ errors().answers }}</span>
+      }
+      @if (errors().correct) {
+        <span class="error" role="alert">{{ errors().correct }}</span>
+      }
+      <ol class="answers">
+        @for (answer of draft().answers; track $index; let i = $index) {
+          <li class="answer">
+            <label class="correct" [attr.title]="'Antwort ' + (i + 1) + ' ist richtig'">
+              <input type="radio" name="puzzleCorrect" [checked]="draft().correct === i" (change)="patch({ correct: i })" [attr.aria-label]="'Antwort ' + (i + 1) + ' ist richtig'" />
+              <span aria-hidden="true">richtig</span>
+            </label>
+            <div class="field grow">
+              <input
+                class="tk-input"
+                [name]="'puzzleAnswer' + i"
+                autocomplete="off"
+                [placeholder]="'Antwort ' + (i + 1)"
+                [attr.aria-label]="'Antwort ' + (i + 1)"
+                [attr.maxlength]="limits.answer"
+                [value]="answer"
+                [attr.aria-invalid]="answerError(i) ? 'true' : null"
+                (input)="setAnswer(i, value($event))"
+              />
+              @if (answerError(i)) {
+                <span class="error" role="alert">{{ answerError(i) }}</span>
+              }
+            </div>
+            <button tkButton size="sm" type="button" class="remove" [disabled]="draft().answers.length <= limits.min" (click)="removeAnswer(i)" [attr.aria-label]="'Antwort ' + (i + 1) + ' entfernen'">Entfernen</button>
+          </li>
+        }
+      </ol>
+      @if (draft().answers.length < limits.max) {
+        <button tkButton size="sm" type="button" class="add" (click)="addAnswer()">+ Antwort hinzufügen</button>
+      }
+    </fieldset>
+
+    <div class="field">
+      <label class="tk-label">
+        Erklärung (sehen Spieler direkt nach ihrer Antwort)
+        <textarea
+          class="tk-input"
+          name="puzzleExplanation"
+          rows="3"
+          placeholder="z. B. Der Gegner steht ballnah eng – auf der anderen Seite ist viel Platz."
+          [attr.maxlength]="limits.explanation"
+          [value]="draft().explanation"
+          [attr.aria-invalid]="errors().explanation ? 'true' : null"
+          (input)="patch({ explanation: value($event) })"
+        ></textarea>
+      </label>
+      @if (errors().explanation) {
+        <span class="error" role="alert">{{ errors().explanation }}</span>
+      }
+    </div>
+
+    <div class="field">
+      <label class="tk-label">
+        Schwierigkeit
+        <select class="tk-input" name="puzzleLevel" (change)="setLevel($event)">
+          @for (level of levels; track level.value) {
+            <option [value]="level.value" [selected]="draft().level === level.value">{{ level.label }} (zählt wie Wertung {{ level.rating }})</option>
+          }
+        </select>
+      </label>
+      <span class="hint">Richtig bei „Schwer“ bringt mehr Punkte, falsch bei „Leicht“ kostet mehr.</span>
+    </div>
+
+    <menu>
+      @if (editing()) {
+        <button tkButton type="button" variant="neutral" class="delete" (click)="askDelete()">Rätsel löschen</button>
+      }
+      <button tkButton type="button" variant="neutral" (click)="closed.emit()">Abbrechen</button>
+      <button tkButton type="submit" variant="primary">Speichern</button>
+    </menu>
+  </form>
+</tk-dialog>

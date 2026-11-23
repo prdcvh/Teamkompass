@@ -18,7 +18,8 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
  * Vereinsadmin (SCRUM-181): Beitrittscodes für neue Trainer im eigenen Verein. Wer den Code einlöst, legt ein neues
- * Team im Verein an und wird dessen Trainer – aber nicht Vereinsadmin. Der Vereinsadmin sieht dadurch keine Teamdaten.
+ * Team im Verein an und wird dessen Trainer – aber nicht Vereinsadmin. Teams ansehen und weitere Trainer für bestehende
+ * Teams: Vereinsübersicht (SCRUM-183, club-admin-overview.service.ts).
  */
 @Injectable({ providedIn: 'root' })
 export class ClubAdminService {

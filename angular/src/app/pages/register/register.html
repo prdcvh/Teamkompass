@@ -11,7 +11,7 @@
             E-Mail bestätigen
           }
           @default {
-            {{ reg.invite()?.kind === 'club' ? 'Verein und Team anlegen' : 'Team anlegen' }}
+            {{ reg.invite()?.kind === 'club' ? 'Verein und Team anlegen' : reg.invite()?.kind === 'trainer' ? 'Team beitreten' : 'Team anlegen' }}
           }
         }
       </h1>
@@ -97,6 +97,19 @@
           </div>
         }
         @case ('team') {
+          @if (reg.invite()?.kind === 'trainer') {
+            <!-- SCRUM-183: Trainercode des Vereinsadmins – Beitritt zu einem bestehenden Team, nichts anzulegen. -->
+            <form (ngSubmit)="submitTeam()" novalidate>
+              <p class="hint">
+                Du wirst Trainer im Team <strong>{{ reg.invite()?.teamName || 'deines Vereins' }}</strong>
+                @if (reg.clubName()) {
+                  (Verein <strong>{{ reg.clubName() }}</strong>)
+                }
+                und siehst dort alle Daten wie die anderen Trainer.
+              </p>
+              <button tkButton variant="primary" type="submit" [disabled]="reg.busy()" [attr.aria-busy]="reg.busy()">Team beitreten</button>
+            </form>
+          } @else {
           <form (ngSubmit)="submitTeam()" novalidate>
             @if (reg.invite()?.kind === 'club') {
               <p class="hint">Dein Code <strong>{{ formattedCode() }}</strong> legt einen neuen Verein an. Du wirst Vereinsadmin und Trainer des ersten Teams.</p>
@@ -149,6 +162,7 @@
               {{ reg.invite()?.kind === 'club' ? 'Verein und Team anlegen' : 'Team anlegen' }}
             </button>
           </form>
+          }
         }
         @default {
           <p role="status">Fertig! Dein Team wird geöffnet …</p>

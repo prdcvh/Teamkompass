@@ -129,6 +129,11 @@ table.game .col-attendance { width: 13%; }
 table.game .col-grade { width: 6%; }
 table.game .col-note { width: 10%; }
 
+.scale-legend {
+  margin: 0 0 var(--tk-space-2);
+  font-size: 0.85rem;
+}
+
 .matrix {
   padding: var(--tk-space-2);
 }
@@ -272,6 +277,16 @@ tr[data-tone='grey'] td,
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 4px;
+}
+
+.chips.levels {
+  grid-template-columns: minmax(44px, 0.6fr) repeat(3, 1fr);
+}
+
+.chips.levels .chip {
+  padding: 2px 4px;
+  font-size: 0.85rem;
+  line-height: 1.15;
 }
 
 .chip {

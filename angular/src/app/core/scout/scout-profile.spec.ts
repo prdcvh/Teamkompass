@@ -85,8 +85,8 @@ describe('Scout-Sicht (SCRUM-170)', () => {
     expect(JSON.stringify(view.items.get('x'))).not.toContain('Verletzt');
   });
 
-  it('bisherige Scout-Konten („medical“) werden Scouts, nicht Medizin', () => {
-    expect(normalizeRole('medical')).toBe('scout');
+  it('SCRUM-202: die alte Kennung „medical“ ergibt keine Rolle mehr (kein Zugang, kein Fallback)', () => {
+    expect(normalizeRole('medical')).toBeNull();
     expect(normalizeRole('scout')).toBe('scout');
     expect(normalizeRole('physio')).toBe('physio');
     expect(normalizeRole('irgendwas')).toBeNull();

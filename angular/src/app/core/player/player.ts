@@ -13,8 +13,9 @@ export type PlayerStatus = (typeof PLAYER_STATUSES)[number];
 export type ConsentStatus = 'pending' | 'granted' | 'revoked';
 
 /**
- * Einwilligung (SCRUM-51): Nur „widerrufen“ löst eine Warnung aus. „Noch offen“ und „dokumentiert“ verhalten sich
- * gleich. Die Warnung blockiert nichts (keine serverseitige Sperre).
+ * Einwilligung (SCRUM-51): „widerrufen“ löst eine Warnung aus. Seit SCRUM-245 blenden die Regeln bei „widerrufen“
+ * die Gesundheitsdaten für Spieler, Eltern und Medizin aus, und fremde Vereine speichern Gesundheitsdaten nur mit
+ * „dokumentiert“ (siehe consent.ts).
  */
 export function isConsentRevoked(player: { readonly consentStatus: ConsentStatus } | null | undefined): boolean {
   return player?.consentStatus === 'revoked';
@@ -50,6 +51,14 @@ export interface Player {
   readonly consentStatus: ConsentStatus;
   /** „Dokumentiert am“ (ISO-Datum) oder leer. */
   readonly consentDate: string;
+  /** Wer die Einwilligung als „dokumentiert“ eingetragen hat (E-Mail des Trainer-Kontos) und dessen UID (SCRUM-245); sonst leer. */
+  readonly consentBy?: string;
+  readonly consentByUid?: string;
+  /**
+   * Nur für Spieler/Eltern bei widerrufener Einwilligung (SCRUM-245): Der Spieler stammt aus der bereinigten Karte
+   * (playerCards), Status und „verletzt bis/seit“ sind unbekannt und werden nicht angezeigt.
+   */
+  readonly healthHidden?: boolean;
 }
 
 /** Eingaben aus dem Formular; alles als Text, wie es der Nutzer eingibt. */
@@ -66,7 +75,7 @@ export interface PlayerDraft {
   readonly consentDate: string;
 }
 
-export type PlayerErrors = Partial<Record<'name' | 'positions' | 'number' | 'birthdate' | 'injuryUntil' | 'consentDate', string>>;
+export type PlayerErrors = Partial<Record<'name' | 'positions' | 'number' | 'birthdate' | 'status' | 'injuryUntil' | 'consentDate', string>>;
 
 /** „ZM, OM“ / ['ZM','OM'] → ['ZM','OM'] (ohne Duplikate und Leerstellen). */
 export function parsePositions(value: unknown): string[] {
@@ -170,6 +179,8 @@ export function playerFromDraft(draft: PlayerDraft, id: string, previous: Player
     injuredSince: injuredSinceFor(draft.status, previous, todayIso(now)),
     consentStatus: draft.consentStatus,
     consentDate: draft.consentDate,
+    ...(previous?.consentBy ? { consentBy: previous.consentBy } : {}),
+    ...(previous?.consentByUid ? { consentByUid: previous.consentByUid } : {}),
   };
 }
 
@@ -195,6 +206,28 @@ export function playerFromDoc(id: string, data: Readonly<Record<string, unknown>
     injuredSince: status === 'Verletzt' && isIsoDate(text(data['injuredSince'])) ? text(data['injuredSince']) : '',
     consentStatus: consent,
     consentDate: text(data['consentDate']),
+    ...(text(data['consentBy']) ? { consentBy: text(data['consentBy']) } : {}),
+    ...(text(data['consentByUid']) ? { consentByUid: text(data['consentByUid']) } : {}),
+  };
+}
+
+/**
+ * Bereinigte Karte (playerCards, SCRUM-245) → Spieler für die Ansicht von Spielern/Eltern bei widerrufener
+ * Einwilligung: ohne Gesundheitsangaben (Status neutral „Fit“, aber `healthHidden`, damit nichts davon angezeigt wird).
+ */
+export function playerFromCard(id: string, data: Readonly<Record<string, unknown>>, now: Date = new Date()): Player {
+  return { ...playerFromDoc(id, { ...data, status: 'Fit', injuryUntil: '', injuredSince: '' }, now), consentStatus: 'revoked', healthHidden: true };
+}
+
+/** Spieler → bereinigte Karte (nur Felder ohne Gesundheitsbezug; so verlangen es die Regeln). */
+export function cardFromPlayer(player: Player): Record<string, unknown> {
+  return {
+    playerId: player.id,
+    name: player.name,
+    number: player.number,
+    positions: [...player.positions],
+    birthdate: player.birthdate,
+    consentStatus: 'revoked',
   };
 }
 
@@ -211,6 +244,9 @@ export function docFromPlayer(player: Player): Record<string, unknown> {
     injuredSince: player.injuredSince,
     consentStatus: player.consentStatus,
     consentDate: player.consentDate,
+    // Wer dokumentiert hat (SCRUM-245): nur wenn bekannt; ältere Dokumente behalten ihr Format.
+    ...(player.consentBy ? { consentBy: player.consentBy } : {}),
+    ...(player.consentByUid ? { consentByUid: player.consentByUid } : {}),
   };
 }
 

@@ -1,24 +1,28 @@
 rules_version = '2';
 
 // Datenmodell:
-// - teams/{teamId}/{meta,members,invites,players,events,opponents,scoutProfiles,playerStats,notifications}
+// - teams/{teamId}/{meta,members,invites,players,events,opponents,scoutProfiles,playerStats,gradeReleases,notifications}
 // - clubs/{clubId}/admins und clubInvites/{code} fuer Vereine und Registrierung (siehe unten)
+// - clubs/{clubId}/comparison und comparisonReaders fuer den Vereinsvergleich (SCRUM-197, siehe unten)
 // Siehe README/FIREBASE_SETUP.md fuer den Hintergrund. Kernidee:
 // - "teams/{teamId}/members/{uid}" verknuepft eine angemeldete Firebase-Auth-Identitaet mit einer
 //   Rolle und - fuer Spieler und Eltern - der eigenen playerId. Es gibt diese Team-Rollen:
 //   - "trainer": darf im Team alles lesen/schreiben (Spieler, Termine, Bewertungen, Gegner, Aufstellung,
 //     Planung, Zugaenge und Einladungen). Mehrere Trainer-Konten (auch Co-Trainer) haben dieselbe Rolle.
 //   - "player" (Spieler) und "parent" (Eltern): sehen nur den eigenen Spieler (Profil, Foerderplan,
-//     Bewertungen, Abwesenheiten, Messwerte, eigene Zu-/Absagen), nie die Daten anderer Spieler. Dazu
-//     lesen sie Termine und die Pausen/die MVP-Rangliste des Teams. Nur der Spieler (nicht die Eltern)
-//     darf seine Selbsteinschaetzung im Foerderplan schreiben.
+//     Werte der Bewertungen, Abwesenheiten, Messwerte, eigene Zu-/Absagen), nie die Daten anderer Spieler. Dazu
+//     lesen sie Termine und die Pausen/die MVP-Rangliste des Teams. Noten nur nach "Bewertung veroeffentlichen",
+//     Kommentare der Bewertung nie (SCRUM-115, siehe events/*/ratingValues und ratingGrades). Nur der Spieler
+//     (nicht die Eltern) darf seine Selbsteinschaetzung im Foerderplan schreiben.
 //   - "physio" (Medizin-Zugang): liest Spielerliste, Status, Abwesenheiten/Verletzungen, Messwerte und
 //     Termine, keine Noten.
 //   - "scout" (Scout-Zugang): liest nur die bereinigte Scout-Sicht (scoutProfiles), keine
-//     Gesundheitsdaten. "medical" ist die alte Kennung dafuer und gilt weiter als "scout".
+//     Gesundheitsdaten. Die alte Kennung "medical" gilt nicht mehr (SCRUM-202).
 //   Zugaenge koennen ein Ablaufdatum (expiresAt) haben; danach gilt das Mitglied als nicht vorhanden.
-// - Ausserhalb der Teams: Vereinsadmins ("clubs/{clubId}/admins/{uid}") verwalten nur Verein, Teams und
-//   Beitrittscodes und sehen keine Spielerdaten. Wer sich neu registriert, braucht einen Einladungscode
+// - Ausserhalb der Teams: Vereinsadmins ("clubs/{clubId}/admins/{uid}") verwalten Verein, Teams, Beitritts- und
+//   Trainercodes und die Trainer der Teams. Seit SCRUM-183 (PO-Entscheidung B, 02.11.2026) lesen sie in den Teams des
+//   eigenen Vereins wie ein Trainer mit - nur lesen, nie aendern - aber OHNE Gesundheitsdaten (siehe
+//   isClubAdminOfTeam() unten). Wer sich neu registriert, braucht einen Einladungscode
 //   in "clubInvites" (Vereins- oder Beitrittscode); Spieler und Eltern treten mit einem Code aus
 //   "teams/{teamId}/invites" bei. Details in den Abschnitten unten.
 service cloud.firestore {
@@ -29,9 +33,9 @@ service cloud.firestore {
     // clubs/{clubId}               name, logoUrl, createdAt   - nur oeffentliche Angaben
     // clubs/{clubId}/admins/{uid}  uid (= Dokument-ID), role "admin", createdAt
     // teams/{teamId}               clubId, name, label, hasTrainer, firstTrainerUid, createdAt
-    // Wer was in einem Team sehen darf, entscheidet weiter allein teams/{teamId}/members/{uid}. Ein
-    // Vereinsadmin verwaltet nur (Name/Logo, Teams anlegen, ersten Trainer einsetzen) und sieht KEINE
-    // Spielerdaten, Noten oder Gesundheitsdaten - dafuer muesste er selbst Mitglied des Teams sein.
+    // Wer was in einem Team sehen darf, entscheidet teams/{teamId}/members/{uid} - und seit SCRUM-183 zusaetzlich
+    // der Vereinsadmin des Vereins, dem das Team gehoert (teams/{teamId}.clubId): er liest wie ein Trainer mit, aber
+    // nur lesend und ohne Gesundheitsdaten (Einzelheiten bei isClubAdminOfTeam()). Teams fremder Vereine sieht er nie.
     // Teams ohne Team-Dokument bzw. ohne clubId (Uebergang bis zum Lauf von scripts/assign-clubs.mjs)
     // funktionieren unveraendert; alle Admin-Wege sind fuer sie gesperrt.
     // ---------------------------------------------------------------------------------------------
@@ -106,16 +110,27 @@ service cloud.firestore {
       // Der Vereinsadmin sieht die Beitrittscodes seines Vereins (Liste nur mit Filter clubId == eigener Verein).
       allow get: if verifiedEmail() || (resource != null && isClubAdmin(resource.data.get('clubId', null)));
       allow list: if isClubAdmin(resource.data.clubId);
-      // In der App legt nur ein Vereinsadmin Codes an - und nur Beitrittscodes fuer den eigenen Verein (neue Vereine
-      // nur per Skript des PO). Der Code ist 16 Zeichen lang (Alphabet ohne 0/O/1/I), hoechstens 30 Tage gueltig, und
-      // das kuenftige Team hat eine noch freie Zufalls-ID.
+      // In der App legt nur ein Vereinsadmin Codes an - und nur fuer den eigenen Verein (neue Vereine nur per Skript des
+      // PO). Der Code ist 16 Zeichen lang (Alphabet ohne 0/O/1/I), hoechstens 30 Tage gueltig. Zwei Arten:
+      // - "team" (SCRUM-181): das kuenftige Team hat eine noch freie Zufalls-ID;
+      // - "trainer" (SCRUM-183): weiterer Trainer fuer ein BESTEHENDES Team des eigenen Vereins (teamName = Anzeigename
+      //   fuer die Einladung - der Eingeladene darf das Team-Dokument vor dem Beitritt nicht lesen).
       allow create: if code.matches('^[A-HJ-NP-Z2-9]{16}$')
         && isClubAdmin(request.resource.data.get('clubId', null))
-        && request.resource.data.keys().hasOnly(['kind', 'clubId', 'teamId', 'expiresAt', 'createdAt', 'email', 'createdBy'])
-        && request.resource.data.kind == "team"
+        && request.resource.data.keys().hasOnly(['kind', 'clubId', 'teamId', 'teamName', 'expiresAt', 'createdAt', 'email', 'createdBy'])
         && request.resource.data.teamId is string
-        && request.resource.data.teamId.matches('^[A-Za-z0-9]{20}$')
-        && !exists(/databases/$(database)/documents/teams/$(request.resource.data.teamId))
+        && (
+          (request.resource.data.kind == "team"
+            && request.resource.data.get('teamName', null) == null
+            && request.resource.data.teamId.matches('^[A-Za-z0-9]{20}$')
+            && !exists(/databases/$(database)/documents/teams/$(request.resource.data.teamId)))
+          || (request.resource.data.kind == "trainer"
+            && request.resource.data.get('teamName', '') is string
+            && request.resource.data.get('teamName', '').size() <= 100
+            && request.resource.data.teamId.size() > 0 && request.resource.data.teamId.size() <= 64
+            && exists(/databases/$(database)/documents/teams/$(request.resource.data.teamId))
+            && get(/databases/$(database)/documents/teams/$(request.resource.data.teamId)).data.get('clubId', null) == request.resource.data.clubId)
+        )
         && request.resource.data.expiresAt is timestamp
         && request.resource.data.expiresAt > request.time
         && request.resource.data.expiresAt <= request.time + duration.value(30, 'd')
@@ -125,9 +140,15 @@ service cloud.firestore {
           || (request.resource.data.email is string && request.resource.data.email.size() <= 254
             && request.resource.data.email == request.resource.data.email.lower()));
       allow update: if false;
-      // Loeschen: der Vereinsadmin zieht einen Beitrittscode zurueck - oder der Code wird beim Einloesen verbraucht
-      // (im selben Schreibvorgang entstehen das Team mit dem eigenen Konto als erstem Trainer und dessen Zugang).
-      allow delete: if (resource.data.kind == "team" && isClubAdmin(resource.data.clubId))
+      // Loeschen: der Vereinsadmin zieht einen Beitritts- oder Trainercode zurueck - oder der Code wird beim Einloesen
+      // verbraucht (Beitrittscode: im selben Schreibvorgang entstehen das Team mit dem eigenen Konto als erstem Trainer
+      // und dessen Zugang; Trainercode: im selben Schreibvorgang entsteht der eigene Trainer-Zugang, der den Code traegt).
+      allow delete: if (resource.data.kind in ["team", "trainer"] && isClubAdmin(resource.data.clubId))
+        || (signedIn()
+          && resource.data.kind == "trainer"
+          && resource.data.teamId is string
+          && !exists(/databases/$(database)/documents/teams/$(resource.data.teamId)/members/$(request.auth.uid))
+          && getAfter(/databases/$(database)/documents/teams/$(resource.data.teamId)/members/$(request.auth.uid)).data.get('claimedInviteCode', null) == code)
         || (signedIn()
           && resource.data.teamId is string
           && !exists(/databases/$(database)/documents/teams/$(resource.data.teamId))
@@ -157,8 +178,11 @@ service cloud.firestore {
       // erlaubt Bilder nur als data:-URL - deshalb liegt das (im Browser auf 256 px verkleinerte) Logo direkt hier, nur
       // als PNG/JPEG/WebP in base64 und hoechstens 100000 Zeichen (~75 KB). Gleiche Grenze in der App
       // (angular/src/app/core/registration/club-logo.ts). Keine fremden Adressen (http...) mehr.
+      // SCRUM-197: Zusaetzlich schaltet der Vereinsadmin hier den Vereinsvergleich ein/aus (comparisonEnabled, bool;
+      // fehlt das Feld, ist der Vergleich aus).
       allow update: if isClubAdmin(clubId)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'logoUrl'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'logoUrl', 'comparisonEnabled'])
+        && request.resource.data.get('comparisonEnabled', false) is bool
         && request.resource.data.name is string
         && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 100
         && (request.resource.data.get('logoUrl', null) == null
@@ -189,6 +213,69 @@ service cloud.firestore {
         allow update: if false;
         // Niemand entfernt sich selbst (der Verein bliebe sonst ggf. ohne Admin).
         allow delete: if isClubAdmin(clubId) && request.auth.uid != uid;
+      }
+
+      // -------------------------------------------------------------------------------------------
+      // Vereinsvergleich (SCRUM-197, PO-Entscheidung vom 06.11.2026: nur innerhalb des eigenen Vereins, ohne Cloud
+      // Function). Bewusst KEIN Zugriff von Trainern auf die Teamdaten anderer Teams: jeder Trainer-Client schreibt eine
+      // Kurzfassung seines Teams (club-comparison.ts) nach comparison/{teamId}; nur Trainer von Teams DESSELBEN Vereins
+      // (und der Vereinsadmin) lesen sie, und nur, solange der Vereinsadmin den Vergleich eingeschaltet hat
+      // (clubs/{clubId}.comparisonEnabled == true, Standard aus). Spieler, Eltern, Medizin, Scouts, Trainer fremder
+      // Vereine und Teams ohne Verein lesen nichts. Inhalt: je Team Kennzahlen der Teamanalyse, je Spieler nur id, Name,
+      // Jahrgang, Notenschnitt, Zahl der Bewertungen und Teilnahmequote (Name nur bei den 3 Schluesselspielern, sonst
+      // leer) - keine Gesundheitsdaten, Notizen, Rueckmeldungen
+      // oder Elterndaten (hasOnly/Typen sichern die Felder oben und im Teamteil ab).
+      // comparisonReaders/{uid} (teamId): Regeln koennen nicht suchen, in welchem Team ein Konto Trainer ist - deshalb
+      // traegt der Trainer hier sein Team ein. Der Verweis allein gibt nichts frei: Jeder Lesezugriff prueft live, dass
+      // das Konto in genau diesem Team (noch) Trainer ist und das Team zu diesem Verein gehoert.
+      // -------------------------------------------------------------------------------------------
+      function comparisonEnabled() {
+        return get(/databases/$(database)/documents/clubs/$(clubId)).data.get('comparisonEnabled', false) == true;
+      }
+
+      // Konto ist (nicht abgelaufener) Trainer des Teams teamId, und das Team gehoert zu diesem Verein.
+      function isTrainerOfClubTeam(teamId) {
+        return signedIn() && teamId is string && teamId.size() > 0
+          && exists(/databases/$(database)/documents/teams/$(teamId))
+          && get(/databases/$(database)/documents/teams/$(teamId)).data.get('clubId', null) == clubId
+          && exists(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid))
+          && get(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid)).data.get('role', null) == "trainer"
+          && (get(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid)).data.get('expiresAt', null) == null
+            || get(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid)).data.get('expiresAt', null) > request.time);
+      }
+
+      function readerPath() {
+        return /databases/$(database)/documents/clubs/$(clubId)/comparisonReaders/$(request.auth.uid);
+      }
+
+      // Trainer eines Teams dieses Vereins (ueber den eigenen Verweis, live geprueft).
+      function isClubTrainer() {
+        return signedIn() && exists(readerPath()) && isTrainerOfClubTeam(get(readerPath()).data.get('teamId', null));
+      }
+
+      match /comparison/{teamId} {
+        // Der Vereinsadmin darf auch bei ausgeschaltetem Vergleich auflisten - nur um beim Ausschalten alles zu loeschen.
+        allow read: if isClubAdmin(clubId) || (comparisonEnabled() && isClubTrainer());
+        allow create, update: if comparisonEnabled() && isTrainerOfClubTeam(teamId)
+          && request.resource.data.keys().hasOnly(['version', 'teamName', 'team', 'players', 'updatedAt'])
+          && request.resource.data.version is int
+          && request.resource.data.teamName is string && request.resource.data.teamName.size() <= 100
+          && request.resource.data.team is map
+          && request.resource.data.team.keys().hasOnly(['playerCount', 'attendanceRate', 'avgExertion', 'avgGrade', 'trainings', 'games', 'focus'])
+          && request.resource.data.team.get('focus', {}) is map
+          && request.resource.data.players is list
+          && request.resource.data.players.size() <= 200
+          && request.resource.data.updatedAt == request.time;
+        allow delete: if isClubAdmin(clubId) || isTrainerOfClubTeam(teamId);
+      }
+
+      match /comparisonReaders/{uid} {
+        allow get: if (signedIn() && request.auth.uid == uid) || isClubAdmin(clubId);
+        allow list: if isClubAdmin(clubId);
+        allow create, update: if signedIn() && request.auth.uid == uid
+          && request.resource.data.keys().hasOnly(['teamId'])
+          && isTrainerOfClubTeam(request.resource.data.teamId);
+        allow delete: if (signedIn() && request.auth.uid == uid) || isClubAdmin(clubId);
       }
     }
 
@@ -246,13 +333,13 @@ service cloud.firestore {
       //   (scoutProfiles: Kompetenzprofil, Notenverlauf, Statistik). KEINE Gesundheitsdaten: weder
       //   Spielerdokumente (Status, Verletzt bis ...), Abwesenheiten, Messwerte, Bewertungsdokumente (deren
       //   Rueckmeldung kann einen Abwesenheitsgrund enthalten), interne Notizen noch Event-Notizen.
-      // "medical" ist die alte Kennung des bisherigen "Scout-Zugangs" (SCRUM-91). Entscheidung des PO
-      // (20.10.2026): bestehende Konten werden Scout-Konten. Deshalb gilt "medical" ab sofort als Scout -
-      // die Konten verlieren den Zugriff auf Gesundheitsdaten mit dem Deploy dieser Regeln, ohne dass ein
-      // Dokument umgeschrieben werden muss. Neue "medical"-Konten koennen nicht mehr angelegt werden; der
-      // Medizin-Zugang nutzt die neue, vorher nie vergebene Kennung "physio".
+      // "medical" war die alte Kennung des bisherigen "Scout-Zugangs" (SCRUM-91) und galt seit SCRUM-170 als
+      // Alias fuer "scout". Seit SCRUM-202 ist der Alias entfernt: ein Konto, das noch "medical" traegt, hat
+      // KEINE Rolle mehr und darf ausser dem eigenen Mitglieds-Dokument (und dem Team-Dokument sowie
+      // meta/breaks, die jedes Teammitglied lesen darf) nichts. Vorher scripts/migrate-medical-role.mjs
+      // laufen lassen (FIREBASE_SETUP.md), sonst verlieren alte Scout-Konten den Zugang.
       function isScout() {
-        return isTeamMember() && memberDoc().data.role in ["scout", "medical"];
+        return isTeamMember() && memberDoc().data.role == "scout";
       }
 
       function isPhysio() {
@@ -272,6 +359,71 @@ service cloud.firestore {
 
       function teamPath() {
         return /databases/$(database)/documents/teams/$(teamId);
+      }
+
+      // ---------------------------------------------------------------------------------------------
+      // Vereinsadmin liest mit (SCRUM-183, PO-Entscheidung B vom 02.11.2026): Der Admin des Vereins, dem das Team gehoert
+      // (teams/{teamId}.clubId), liest im Team wie ein Trainer - aber nur lesen, nie schreiben: kein Zweig unten gibt ihm
+      // ein create/update/delete auf Teamdaten. Ausnahmen sind nur Verwaltung: Team-Name, erster Trainer (SCRUM-180),
+      // Trainer entfernen (members). Teams ohne Team-Dokument oder ohne clubId (Altteams) und fremde Vereine nie.
+      // NICHT enthalten sind Gesundheitsdaten (Ticket: "keine Gesundheitsdaten"; laut Einwilligungstext sehen sie nur
+      // Trainerteam, Medizin und der Spieler selbst bzw. seine Eltern):
+      // - das Spielerdokument players/{playerId} (Status, "verletzt bis/seit" stehen darin; einzelne Felder ausblenden
+      //   koennen Regeln nicht) - Name, Nummer und Positionen liest er stattdessen aus meta/clubOverview;
+      // - absences, measurements, maturity, wellness und Absagen MIT Grund (responses mit reason != '');
+      // - die vollstaendigen Bewertungsdokumente events/*/ratings (die Rueckmeldung kann einen Abwesenheitsgrund
+      //   enthalten) und die internen Notizen privateNotes - Noten und Werte liest er aus ratingGrades, ratingValues
+      //   und playerStats.
+      // Ebenfalls nicht: Einladungscodes fuer Spieler (invites - damit koennte er sich als Spieler/Eltern anmelden),
+      // Spielerkarten (playerCards), persoenliche Einstellungen anderer Konten (notifications) und technische
+      // Kennzeichen (meta/playerView, meta/playerStats, meta/operations, appState).
+      // ---------------------------------------------------------------------------------------------
+      function isClubAdminOfTeam() {
+        return isSignedIn() && exists(teamPath()) && isClubAdmin(get(teamPath()).data.get('clubId', null));
+      }
+
+      // ---------------------------------------------------------------------------------------------
+      // Einwilligung fuer Gesundheitsdaten (SCRUM-245, PO-Entscheidung zu SCRUM-173 vom 02.11.2026).
+      // Gesundheitsdaten: im Spielerdokument status (alles ausser "Fit"), injuryUntil, injuredSince; die
+      // Unter-Sammlungen absences und measurements; der Absagegrund in events/*/responses (reason).
+      // - Einwilligung "widerrufen" (consentStatus "revoked"): Spieler, Eltern und Medizin lesen diese Daten
+      //   nicht mehr (das Spielerdokument gar nicht - dafuer gibt es playerCards, siehe unten). Der Trainer
+      //   liest weiter alles und loescht von Hand; geloescht wird nie automatisch.
+      // - Einwilligung "offen" in den eigenen Teams: alles wie bisher.
+      // - Fremde Vereine (jedes Team ausser den eigenen Teams unten): Gesundheitsdaten werden nur mit
+      //   dokumentierter Einwilligung (consentStatus "granted") gespeichert - volle Sperre beim Schreiben.
+      // Eigene Teams = die vier Team-IDs des 1. FC Koenigstein (U14-Test, Hauptteam, U15, U17). Bewusst eine
+      // feste Liste in den Regeln: kein Client kann ein Team "zum eigenen" machen, und jedes neue Team (auch im
+      // eigenen Verein) ist ab Werk streng. Gleiche Liste in der App: angular/src/app/core/player/consent.ts
+      // (tests/consent.test.mjs prueft, dass beide gleich sind).
+      // ---------------------------------------------------------------------------------------------
+      function isOwnTeam() {
+        return teamId in ['mein-team', 'U14', 'U15', 'U17'];
+      }
+
+      function playerPath(playerId) {
+        return /databases/$(database)/documents/teams/$(teamId)/players/$(playerId);
+      }
+
+      // Einwilligung des Spielers widerrufen? Fehlt das Spielerdokument oder das Feld, gilt "offen".
+      function consentRevoked(playerId) {
+        return exists(playerPath(playerId))
+          && get(playerPath(playerId)).data.get('consentStatus', 'pending') == 'revoked';
+      }
+
+      // Duerfen (nach diesem Schreibvorgang) Gesundheitsdaten des Spielers gespeichert werden? Eigene Teams immer,
+      // fremde nur mit dokumentierter Einwilligung. getAfter: Einwilligung und Eintrag duerfen im selben Schreibvorgang
+      // kommen; ohne Spielerdokument nach dem Schreiben wird nichts gespeichert.
+      function mayStoreHealth(playerId) {
+        return isOwnTeam()
+          || getAfter(playerPath(playerId)).data.get('consentStatus', 'pending') == 'granted';
+      }
+
+      // Spielerdokument ohne Gesundheitsangaben (Status "Fit", kein "verletzt bis/seit").
+      function withoutHealthFields(data) {
+        return data.get('status', 'Fit') == 'Fit'
+          && data.get('injuryUntil', '') in ['', null]
+          && data.get('injuredSince', '') in ['', null];
       }
 
       // Das Team-Dokument selbst (SCRUM-180). Lesen: Teammitglieder und die Admins des eigenen Vereins.
@@ -323,7 +475,8 @@ service cloud.firestore {
       match /members/{uid} {
         // Trainer duerfen die ganze Liste sehen (Zugaenge verwalten); diese Regel
         // haengt nicht von resource-Daten ab und ist daher fuer Listenabfragen sicher.
-        allow read: if isTrainer() || (isSignedIn() && request.auth.uid == uid);
+        // SCRUM-183: Der Vereinsadmin sieht die Zugaenge (Trainer der Teams in der Vereinsuebersicht).
+        allow read: if isTrainer() || (isSignedIn() && request.auth.uid == uid) || isClubAdminOfTeam();
         // Zwei erlaubte Wege, ein members/{uid}-Dokument anzulegen:
         // 1. Ein bereits bestehender Trainer legt (in der App, ueber eine zweite,
         //    temporaere Firebase-App-Instanz fuer den neuen Auth-User - siehe
@@ -397,11 +550,29 @@ service cloud.firestore {
             && getAfter(teamPath()).data.get('firstTrainerUid', null) == uid
             && registersWith(request.resource.data.claimedInviteCode, getAfter(teamPath()).data.get('clubId', null), teamId)
           )
+          // 5. SCRUM-183: Trainercode des Vereinsadmins fuer ein bestehendes Team einloesen - das eigene Konto wird
+          //    (weiterer) Trainer genau dieses Teams. Der Code gehoert zum Verein des Teams, wird im selben Schreibvorgang
+          //    verbraucht und ist an die bestaetigte E-Mail gebunden (falls gesetzt). Wer den Code erstellt hat, kann ihn
+          //    nicht selbst einloesen (ein Vereinsadmin macht sich so nicht selbst zum Trainer mit Schreib- und
+          //    Gesundheitsrechten).
+          || (
+            isSignedIn() && request.auth.uid == uid
+            && request.resource.data.keys().hasOnly(['role', 'email', 'uid', 'createdAt', 'claimedInviteCode'])
+            && request.resource.data.role == "trainer"
+            && request.resource.data.uid == uid
+            && request.resource.data.email == request.auth.token.get('email', null)
+            && request.resource.data.createdAt == request.time
+            && exists(teamPath())
+            && claimsClubInvite(request.resource.data.claimedInviteCode, "trainer", get(teamPath()).data.get('clubId', null), teamId)
+            && get(clubInvitePath(request.resource.data.claimedInviteCode)).data.get('createdBy', null) != request.auth.uid
+          )
         );
         // Kein Update: eine bestehende Mitgliedschaft wird nicht bearbeitet, sondern
         // vom Trainer geloescht (Zugang sperren) und bei Bedarf neu eingeladen.
         allow update: if false;
-        allow delete: if isTrainer();
+        // SCRUM-183: Der Vereinsadmin entfernt Trainer aus den Teams seines Vereins - nur Trainer-Zugaenge, keine
+        // Spieler, Eltern, Medizin oder Scouts (die verwaltet weiter das Trainerteam).
+        allow delete: if isTrainer() || (isClubAdminOfTeam() && resource.data.role == "trainer");
       }
 
       match /invites/{code} {
@@ -437,15 +608,33 @@ service cloud.firestore {
       // Datenfeld (nicht auf das Pfadsegment) prueft, das exakt zum Abfragefilter passt.
       // Deshalb tragen diese beiden Dokumenttypen zusaetzlich ein eigenes "playerId"-Feld.
       match /players/{playerId} {
-        allow read: if isTrainer() || isPhysio() || isPlayerFor(playerId);
-        allow write: if isTrainer();
+        // SCRUM-245: Bei widerrufener Einwilligung lesen Spieler, Eltern und Medizin das Spielerdokument nicht mehr
+        // (Status und "verletzt bis/seit" stehen darin; Felder einzeln ausblenden koennen Regeln nicht). Spieler und
+        // Eltern lesen dann die bereinigte Karte playerCards/{playerId}. Medizin listet nur mit dem Filter
+        // where('consentStatus', '!=', 'revoked') - eine Listenregel muss am Datenfeld pruefen (ohne get-Standardwert,
+        // den der Emulator bei Listen nicht absichert); Dokumente ohne das Feld fehlen in dieser Liste (die App des
+        // Trainers traegt es nach).
+        allow get: if isTrainer()
+          || ((isPhysio() || isPlayerFor(playerId))
+            && (resource == null || resource.data.get('consentStatus', 'pending') != 'revoked'));
+        allow list: if isTrainer() || (isPhysio() && resource.data.consentStatus != 'revoked');
+        // Fremde Vereine: Gesundheitsangaben (Status ausser "Fit", verletzt bis/seit) nur mit dokumentierter
+        // Einwilligung. Wer die Einwilligung auf "dokumentiert" setzt, traegt sich selbst ein (consentByUid).
+        allow create, update: if isTrainer()
+          && (isOwnTeam()
+            || request.resource.data.get('consentStatus', 'pending') == 'granted'
+            || withoutHealthFields(request.resource.data))
+          && (request.resource.data.get('consentStatus', 'pending') != 'granted'
+            || (resource != null && resource.data.get('consentStatus', 'pending') == 'granted')
+            || request.resource.data.get('consentByUid', null) == request.auth.uid);
+        allow delete: if isTrainer();
 
         match /developmentPlans/{planId} {
           // ".get('playerId', null)" statt direktem Feldzugriff - gleiche Absicherung wie
           // bei isExpired(): ein Trainer-Dokument hat kein "playerId"-Feld, direkter
           // Zugriff wuerde die Regelauswertung in diesem (eigentlich schon durch
           // isTrainer() abgedeckten) Fall unnoetig riskant machen.
-          allow read: if isTrainer() || (isTeamMember() && memberDoc().data.role in ["player", "parent"] && resource.data.playerId == memberDoc().data.get('playerId', null));
+          allow read: if isTrainer() || isClubAdminOfTeam() || (isTeamMember() && memberDoc().data.role in ["player", "parent"] && resource.data.playerId == memberDoc().data.get('playerId', null));
           allow create, delete: if isTrainer();
           allow update: if isTrainer() || (
             isTeamMember()
@@ -458,47 +647,233 @@ service cloud.firestore {
           );
         }
 
+        // Abwesenheiten/Verletzungen und Messwerte sind Gesundheitsdaten (SCRUM-245): bei widerrufener Einwilligung
+        // nur noch fuer den Trainer lesbar; in fremden Vereinen nur mit dokumentierter Einwilligung speicherbar.
+        // Loeschen darf der Trainer immer (Aufgabe "Daten pruefen und loeschen").
         match /absences/{absenceId} {
-          allow read: if isTrainer() || isPhysio() || (isTeamMember() && memberDoc().data.role in ["player", "parent"] && resource.data.playerId == memberDoc().data.get('playerId', null));
-          allow write: if isTrainer();
+          allow read: if isTrainer()
+            || ((isPhysio() || (isTeamMember() && memberDoc().data.role in ["player", "parent"] && resource.data.playerId == memberDoc().data.get('playerId', null)))
+              && !consentRevoked(playerId));
+          allow create, update: if isTrainer() && mayStoreHealth(playerId);
+          allow delete: if isTrainer();
         }
 
         match /measurements/{measurementId} {
-          allow read: if isTrainer() || isPhysio() || (isTeamMember() && memberDoc().data.role in ["player", "parent"] && resource.data.playerId == memberDoc().data.get('playerId', null));
-          allow write: if isTrainer();
+          allow read: if isTrainer()
+            || ((isPhysio() || (isTeamMember() && memberDoc().data.role in ["player", "parent"] && resource.data.playerId == memberDoc().data.get('playerId', null)))
+              && !consentRevoked(playerId));
+          allow create, update: if isTrainer() && mayStoreHealth(playerId);
+          allow delete: if isTrainer();
         }
+
+        // Trainerpruefung "Wachstum und Belastung gemeinsam ansehen" (SCRUM-257, docs/reife-kompass-wachstum-belastung-
+        // hinweis.md): kurze, datierte Notiz am Foerderplan mit der Massnahme. Eigenes Dokument statt Feld im
+        // Foerderplan, weil Foerderplaene auch Spieler, Eltern (auch nach Widerruf) und der Vereinsadmin lesen, die
+        // Pruefung aber auf Gesundheitsdaten beruht. Lesen nur Trainer. Anlegen nur Trainer, nur diese Felder, nur zu
+        // einem bestehenden Foerderplan, mit dem eigenen Konto, nicht bei widerrufener Einwilligung, fremde Vereine
+        // nur mit dokumentierter Einwilligung. Aendern nie (die Notiz bleibt, wie sie ist), loeschen Trainer.
+        match /growthReviews/{reviewId} {
+          allow read: if isTrainer();
+          allow create: if isTrainer()
+            && mayStoreHealth(playerId)
+            && !consentRevoked(playerId)
+            && request.resource.data.keys().hasOnly(['playerId', 'planId', 'hintKey', 'date', 'by', 'byUid', 'action', 'createdAt'])
+            && request.resource.data.playerId == playerId
+            && request.resource.data.byUid == request.auth.uid
+            && request.resource.data.planId is string
+            && exists(/databases/$(database)/documents/teams/$(teamId)/players/$(playerId)/developmentPlans/$(request.resource.data.planId))
+            && request.resource.data.hintKey is string && request.resource.data.hintKey.size() > 0 && request.resource.data.hintKey.size() <= 300
+            && request.resource.data.date is string && request.resource.data.date.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
+            && request.resource.data.by is string && request.resource.data.by.size() <= 80
+            && request.resource.data.action is string && request.resource.data.action.size() > 0 && request.resource.data.action.size() <= 400
+            && request.resource.data.createdAt is string && request.resource.data.createdAt.size() <= 40;
+          allow delete: if isTrainer();
+        }
+
+        // -----------------------------------------------------------------------------------------
+        // Reife-Kompass (SCRUM-190, PO-Entscheidung 02.11.2026; Einwilligung/Widerruf SCRUM-252). Ein Dokument "parents"
+        // mit Geschlecht fuer die Formel, Einverstaendnis der Eltern und Groesse von Mutter und Vater (Angaben ueber
+        // Dritte). Der Reifestand selbst (und jede andere Ableitung) wird nie gespeichert, die App rechnet ihn aus
+        // Messwerten und diesem Dokument. Datenblatt: docs/legal/reife-kompass.md.
+        // - Lesen: nur Trainer und Medizin (Medizin nicht bei widerrufener Einwilligung, wie Messwerte). Spieler,
+        //   Eltern, Scouts, Vereinsadmin und andere Teams nie - ohne die Groesse der Eltern laesst sich der Reifestand
+        //   nicht berechnen. Kein collectionGroup-Zugriff (es gibt keine Regel dafuer).
+        // - Schreiben: nur Trainer, nur genau diese Felder, Groessen 100-250 cm. Ohne Haekchen "Eltern sind
+        //   einverstanden" (parentsConsent) duerfen keine Groessen und kein Nachweis gespeichert sein. Fremde Vereine
+        //   wie bei Gesundheitsdaten nur mit dokumentierter Einwilligung (mayStoreHealth). Loeschen: Trainer.
+        // - Nachweis (SCRUM-252): Wer das Haekchen neu setzt, traegt sich mit Konto (parentsConsentByUid), Anzeige
+        //   (parentsConsentBy) und Tag (parentsConsentDate) ein; bleibt das Haekchen gesetzt, bleibt der Nachweis
+        //   unveraendert. Eintraege von vor SCRUM-252 ohne Nachweis bleiben gueltig.
+        // - Widerruf (SCRUM-252, wie SCRUM-245): Ist die Einwilligung des Spielers nach dem Schreiben "widerrufen",
+        //   duerfen keine Groessen der Eltern mehr gespeichert werden (keine neue Berechnung). Was schon gespeichert
+        //   ist, bleibt bis der Trainer es loescht - geloescht wird nie automatisch.
+        // Neue Felder (z. B. SCRUM-253): Rohmesswerte wie Sitzhoehe gehoeren in measurements (dort gelten Lesen/
+        // Schreiben/Widerruf schon fuer jedes Feld). Weitere Reife-Angaben in DIESEM Dokument muessen unten in hasOnly
+        // aufgenommen werden; gespeicherte Ableitungen sind nicht vorgesehen.
+        // -----------------------------------------------------------------------------------------
+        match /maturity/{docId} {
+          function parentHeightOk(value) {
+            return value == null || ((value is int || value is float) && value >= 100 && value <= 250);
+          }
+          function noParentHeights(data) {
+            return data.get('motherHeight', null) == null && data.get('fatherHeight', null) == null;
+          }
+          function revokedAfterWrite() {
+            return existsAfter(playerPath(playerId))
+              && getAfter(playerPath(playerId)).data.get('consentStatus', 'pending') == 'revoked';
+          }
+          function parentsConsentRecordOk(data) {
+            return data.parentsConsent == false
+              ? (data.get('parentsConsentDate', null) == null
+                && data.get('parentsConsentBy', null) == null
+                && data.get('parentsConsentByUid', null) == null)
+              : ((resource != null && resource.data.get('parentsConsent', false) == true
+                  && data.get('parentsConsentDate', null) == resource.data.get('parentsConsentDate', null)
+                  && data.get('parentsConsentBy', null) == resource.data.get('parentsConsentBy', null)
+                  && data.get('parentsConsentByUid', null) == resource.data.get('parentsConsentByUid', null))
+                || ((resource == null || resource.data.get('parentsConsent', false) != true)
+                  && data.get('parentsConsentByUid', null) == request.auth.uid
+                  && data.get('parentsConsentDate', null) is string
+                  && data.get('parentsConsentDate', '').matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+                  && data.get('parentsConsentBy', '') is string
+                  && data.get('parentsConsentBy', '').size() <= 200));
+          }
+          allow read: if isTrainer() || (isPhysio() && !consentRevoked(playerId));
+          allow create, update: if isTrainer()
+            && docId == 'parents'
+            && mayStoreHealth(playerId)
+            && request.resource.data.keys().hasOnly(['playerId', 'sex', 'parentsConsent', 'motherHeight', 'fatherHeight', 'parentsConsentDate', 'parentsConsentBy', 'parentsConsentByUid', 'updatedAt'])
+            && request.resource.data.playerId == playerId
+            && request.resource.data.get('sex', '') in ['', 'm', 'f']
+            && request.resource.data.parentsConsent is bool
+            && request.resource.data.get('updatedAt', '') is string
+            && parentHeightOk(request.resource.data.get('motherHeight', null))
+            && parentHeightOk(request.resource.data.get('fatherHeight', null))
+            && (request.resource.data.parentsConsent == true || noParentHeights(request.resource.data))
+            && parentsConsentRecordOk(request.resource.data)
+            && (!revokedAfterWrite() || noParentHeights(request.resource.data));
+          allow delete: if isTrainer();
+        }
+
+        // -----------------------------------------------------------------------------------------
+        // Angaben des Spielers nach einem Termin (SCRUM-138, PO-Entscheidung 02.11.2026). Dokument-ID = Event-ID.
+        // - selfReports: Anstrengung 0-10 (kein Gesundheitsdatum, wird ohne Einwilligung abgefragt).
+        // - wellness: Befinden (Muedigkeit, Schlaf, Muskelkater, Stress, je 1-7 oder leer) - ein Gesundheitsdatum.
+        //   Speichern nur bei dokumentierter Einwilligung (consentStatus "granted", SCRUM-173 (a) Option 2). Bei
+        //   widerrufener Einwilligung lesen es Medizin, Spieler und Eltern nicht mehr; der Trainer sieht es weiter
+        //   und loescht von Hand (geloescht wird nie automatisch).
+        // Lesen: Trainer (alle Trainer-Konten = Trainerteam), Medizin und der eigene Spieler bzw. die eigenen Eltern.
+        // Der Spieler steht im Pfad, deshalb sind auch Listen des eigenen Spielers ohne Filter erlaubt; fremde nie.
+        // Schreiben: nur der eigene Spieler bzw. die eigenen Eltern, nur fuer ein bestehendes Event, bei dem der
+        // Trainer ihn als "anwesend" oder "eingeschraenkt" eingetragen hat, nur bis zum Ende des Folgetags und nur
+        // mit genau diesen Feldern (Datum = Datum des Events, Rolle = eigene Rolle, Zeitpunkt vom Server).
+        // Die Frist prueft der Server grob in UTC (Termintag 00:00 Berliner Zeit bis Ende des Folgetags, bis zu einer
+        // Stunde Spielraum durch die Sommerzeit); genau (ab Ende des Termins) prueft es die App.
+        // Loeschen: nur der Trainer (Spieler loeschen, Daten pruefen und loeschen). Scouts haben keinen Zugriff.
+        // -----------------------------------------------------------------------------------------
+        match /selfReports/{eventId} {
+          // SCRUM-183: Anstrengung ist kein Gesundheitsdatum (siehe oben) - der Vereinsadmin liest sie wie ein Trainer.
+          allow read: if isTrainer() || isPhysio() || isPlayerFor(playerId) || isClubAdminOfTeam();
+          allow create, update: if isPlayerFor(playerId)
+            && selfReportAllowed(playerId, eventId)
+            && request.resource.data.keys().hasOnly(['playerId', 'eventId', 'date', 'exertion', 'by', 'updatedAt'])
+            && request.resource.data.exertion is int
+            && request.resource.data.exertion >= 0
+            && request.resource.data.exertion <= 10;
+          allow delete: if isTrainer();
+        }
+
+        match /wellness/{eventId} {
+          allow read: if isTrainer()
+            || ((isPhysio() || isPlayerFor(playerId))
+              && get(/databases/$(database)/documents/teams/$(teamId)/players/$(playerId)).data.get('consentStatus', 'pending') != 'revoked');
+          allow create, update: if isPlayerFor(playerId)
+            && get(/databases/$(database)/documents/teams/$(teamId)/players/$(playerId)).data.get('consentStatus', 'pending') == 'granted'
+            && selfReportAllowed(playerId, eventId)
+            && request.resource.data.keys().hasOnly(['playerId', 'eventId', 'date', 'fatigue', 'sleep', 'soreness', 'stress', 'by', 'updatedAt'])
+            && wellnessValue(request.resource.data.get('fatigue', null))
+            && wellnessValue(request.resource.data.get('sleep', null))
+            && wellnessValue(request.resource.data.get('soreness', null))
+            && wellnessValue(request.resource.data.get('stress', null));
+          allow delete: if isTrainer();
+        }
+      }
+
+      // Gemeinsame Pruefungen fuer selfReports und wellness (SCRUM-138, siehe oben).
+      function selfReportAllowed(playerId, eventId) {
+        return exists(/databases/$(database)/documents/teams/$(teamId)/events/$(eventId))
+          && exists(/databases/$(database)/documents/teams/$(teamId)/events/$(eventId)/ratings/$(playerId))
+          && get(/databases/$(database)/documents/teams/$(teamId)/events/$(eventId)/ratings/$(playerId)).data.get('attendance', '') in ['present', 'limited']
+          && request.resource.data.playerId == playerId
+          && request.resource.data.eventId == eventId
+          && request.resource.data.by == memberDoc().data.role
+          && request.resource.data.updatedAt == request.time
+          && request.resource.data.date == get(/databases/$(database)/documents/teams/$(teamId)/events/$(eventId)).data.get('date', null)
+          && reportWindowOpen(request.resource.data.date);
+      }
+
+      // Termintag "JJJJ-MM-TT": offen ab 00:00 Berliner Zeit (= Vortag 22:00 UTC im Sommer) bis Ende des Folgetags
+      // (spaetestens 23:00 UTC des Folgetags = 00:00 bzw. 01:00 Berliner Zeit).
+      function reportWindowOpen(date) {
+        return date is string
+          && date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+          && request.time >= timestamp.date(int(date.split('-')[0]), int(date.split('-')[1]), int(date.split('-')[2])) - duration.value(2, 'h')
+          && request.time < timestamp.date(int(date.split('-')[0]), int(date.split('-')[1]), int(date.split('-')[2])) + duration.value(47, 'h');
+      }
+
+      function wellnessValue(value) {
+        return value == null || (value is int && value >= 1 && value <= 7);
       }
 
       match /events/{eventId} {
         // Scouts lesen keine Event-Dokumente (Event-Notizen sind Freitext des Trainers); was sie von einem
         // Termin brauchen (Datum, Art, Titel, Gegner, Ergebnis), steht in scoutProfiles.
-        allow read: if readsEvents();
+        allow read: if readsEvents() || isClubAdminOfTeam();
         allow write: if isTrainer();
 
+        // Bewertung (SCRUM-115): Das vollstaendige Dokument (Anwesenheit, Teilnoten, Minuten, Tore, Vorlagen und der
+        // Kommentar "note") liest und schreibt nur noch der Trainer. Spieler und Eltern lesen stattdessen zwei Kopien,
+        // die der Trainer-Client im selben Schreibvorgang mitschreibt (Firestore sperrt nur ganze Dokumente):
+        // - ratingValues/{playerId}: nur die Werte (Anwesenheit, Minuten, Tore, Vorlagen) - immer lesbar;
+        // - ratingGrades/{playerId}: nur die Noten (Teilnoten, Gesamtnote, Skala) mit dem Zeitpunkt ratedAt - lesbar nur,
+        //   solange eine Freigabe gradeReleases/{playerId} gilt und die Note vor dem Klick auf "Bewertung
+        //   veroeffentlichen" vergeben wurde (ratedAt <= publishedUntil).
+        // Der Kommentar steht in keiner Kopie: Spieler und Eltern sehen ihn nie. selfReportAllowed() (unten) liest die
+        // Anwesenheit weiter per get() aus ratings/{playerId}; das ist von diesen Leseregeln unabhaengig.
         match /ratings/{playerId} {
-          // ".get('playerId', null)" statt direktem Feldzugriff - gleiche Absicherung wie
-          // bei isExpired(): ein Trainer-Dokument hat kein "playerId"-Feld, direkter
-          // Zugriff wuerde die Regelauswertung in diesem (eigentlich schon durch
-          // isTrainer() abgedeckten) Fall unnoetig riskant machen.
-          //
-          // SCRUM-234: Einzelabruf (get) und Liste (list) getrennt. "Mein Profil" holt fuer JEDEN Termin gezielt
-          // ratings/{eigene playerId} - auch fuer Termine ohne Bewertung (z. B. zukuenftige). Dann gibt es das
-          // Dokument nicht, "resource" ist null und eine Pruefung auf resource.data schlaegt fehl
-          // (permission-denied, das ganze Profil lud nicht). Beim get entscheidet deshalb das Pfadsegment
-          // (Dokument-ID = playerId, so schreibt der Trainer-Client jede Bewertung): Spieler/Eltern lesen nur
-          // ratings/{eigene playerId}, vorhanden oder nicht. Zusaetzlich muss ein vorhandenes Dokument zur
-          // eigenen playerId passen (bzw. kein playerId-Feld haben), damit ein abweichendes Feld nie etwas
-          // Fremdes freigibt. Listen (where("playerId", "==", ...)) pruefen weiter das Datenfeld, weil Firestore
-          // Listenabfragen nur ueber Datenfelder zulassen kann. Scout, Medizin und abgelaufene Zugaenge sind
-          // ueber isPlayerFor()/isTeamMember() weiter ausgeschlossen.
-          allow get: if isTrainer() || (isPlayerFor(playerId) && (resource == null || resource.data.get('playerId', playerId) == playerId));
-          allow list: if isTrainer() || (isTeamMember() && memberDoc().data.role in ["player", "parent"] && resource.data.playerId == memberDoc().data.get('playerId', null));
-          allow write: if isTrainer();
+          allow read, write: if isTrainer();
         }
 
-        // Interne Trainer-Notizen zu einer Bewertung. Bewusst ein eigener Pfad: das
-        // Bewertungsdokument darf der Spieler/das Elternteil komplett lesen, dieser Pfad
-        // nie (kein Eintrag fuer player/parent/physio/scout).
+        // Werte-Kopie. Gezielter Abruf durch Spieler/Eltern wie bisher bei ratings (SCRUM-234): auch fuer Termine ohne
+        // Bewertung (resource == null), ein vorhandenes Dokument muss zur eigenen playerId passen. Keine Listen.
+        match /ratingValues/{playerId} {
+          allow get: if isTrainer() || isClubAdminOfTeam() || (isPlayerFor(playerId) && (resource == null || resource.data.get('playerId', null) == playerId));
+          allow list: if isTrainer() || isClubAdminOfTeam();
+          allow create, update: if isTrainer()
+            && request.resource.data.keys().hasOnly(['playerId', 'attendance', 'minutes', 'goals', 'assists'])
+            && request.resource.data.playerId == playerId;
+          allow delete: if isTrainer();
+        }
+
+        // Noten-Kopie. ratedAt ist der Server-Zeitpunkt des Schreibens - der Client schreibt die Kopie nur, wenn sich
+        // die Noten aendern, damit eine spaetere Aenderung von Minuten/Toren veroeffentlichte Noten nicht verbirgt.
+        match /ratingGrades/{playerId} {
+          allow get: if isTrainer() || isClubAdminOfTeam()
+            || (isPlayerFor(playerId) && gradesReleased(playerId)
+              && (resource == null
+                || (resource.data.get('playerId', null) == playerId
+                  && resource.data.get('ratedAt', null) is timestamp
+                  && resource.data.ratedAt <= get(gradeReleasePath(playerId)).data.publishedUntil)));
+          allow list: if isTrainer() || isClubAdminOfTeam();
+          allow create, update: if isTrainer()
+            && request.resource.data.keys().hasOnly(['playerId', 'grade', 'effort', 'technique', 'tactics', 'comprehension', 'scale', 'ratedAt'])
+            && request.resource.data.playerId == playerId
+            && request.resource.data.ratedAt == request.time;
+          allow delete: if isTrainer();
+        }
+
+        // Interne Trainer-Notizen zu einer Bewertung. Bewusst ein eigener Pfad, den Spieler, Eltern, Medizin und
+        // Scouts nie lesen (kein Eintrag fuer player/parent/physio/scout).
         match /privateNotes/{playerId} {
           allow read, write: if isTrainer();
         }
@@ -510,9 +885,21 @@ service cloud.firestore {
         // der eigene Spieler bzw. die eigenen Eltern, nicht Medizin oder Scouts. Spieler lesen per gezieltem Get
         // (nie als Liste), deshalb reicht der Pfadvergleich. Die Anwesenheit ("Fehlt") setzt weiterhin nur der
         // Trainer-Client in der Bewertung; Loeschen nur der Trainer (Spieler/Event loeschen).
+        // SCRUM-245: Der Grund ist ein Gesundheitsdatum. Bei widerrufener Einwilligung lesen Spieler/Eltern nur noch
+        // Rueckmeldungen ohne Grund und speichern keinen Grund mehr; in fremden Vereinen gibt es einen Grund nur mit
+        // dokumentierter Einwilligung. Zu-/Absagen selbst gehen immer.
+        // SCRUM-248: Der Trainer darf (nach Rueckfrage in der App) nur den Grund leeren - kein anderes Feld,
+        // keine neue Rueckmeldung. Die Absage selbst, wer sie gegeben hat und der Zeitstempel bleiben.
         match /responses/{playerId} {
-          allow read: if isTrainer() || isPlayerFor(playerId);
+          // SCRUM-183: Der Vereinsadmin liest nur Rueckmeldungen OHNE Grund (Listen nur mit Filter where('reason', '==', '')).
+          allow read: if isTrainer()
+            || (isClubAdminOfTeam() && resource.data.reason == '')
+            || (isPlayerFor(playerId)
+              && (resource == null || resource.data.get('reason', '') == '' || !consentRevoked(playerId)));
           allow create, update: if isPlayerFor(playerId)
+            && (request.resource.data.get('reason', '') == ''
+              || (!consentRevoked(playerId)
+                && (isOwnTeam() || get(playerPath(playerId)).data.get('consentStatus', 'pending') == 'granted')))
             && exists(/databases/$(database)/documents/teams/$(teamId)/events/$(eventId))
             && request.resource.data.keys().hasOnly(['playerId', 'status', 'reason', 'by', 'updatedAt'])
             && request.resource.data.playerId == playerId
@@ -522,8 +909,48 @@ service cloud.firestore {
             && (request.resource.data.status == "no" || request.resource.data.reason == "")
             && request.resource.data.by == memberDoc().data.role
             && request.resource.data.updatedAt == request.time;
+          allow update: if isTrainer()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reason'])
+            && request.resource.data.reason == '';
           allow delete: if isTrainer();
         }
+      }
+
+      // ---------------------------------------------------------------------------------------------
+      // Freigabe der Noten je Spieler (SCRUM-115): "Bewertung veroeffentlichen" im Spielerprofil. Dokument-ID = playerId.
+      // publishedUntil = Zeitpunkt des Klicks (Server-Zeit): freigegeben sind nur Noten, die bis dahin vergeben wurden.
+      // expiresAt = Ende der Freigabe (null = unbefristet), Dauer waehlt der Trainer wie bei Einladungscodes.
+      // Zuruecknehmen = Dokument loeschen. Spieler und Eltern lesen die eigene Freigabe (gezielter Abruf); Schreiben
+      // nur der Trainer. Ohne Freigabe (auch: nach dem Ablauf) sieht der Spieler keine Noten - es gibt keine
+      // automatische Freigabe (PO, 02.11.2026).
+      // ---------------------------------------------------------------------------------------------
+      function gradeReleasePath(playerId) {
+        return /databases/$(database)/documents/teams/$(teamId)/gradeReleases/$(playerId);
+      }
+
+      function gradesReleased(playerId) {
+        return exists(gradeReleasePath(playerId))
+          && get(gradeReleasePath(playerId)).data.get('publishedUntil', null) is timestamp
+          && (get(gradeReleasePath(playerId)).data.get('expiresAt', null) == null
+            || get(gradeReleasePath(playerId)).data.get('expiresAt', null) > request.time);
+      }
+
+      match /gradeReleases/{playerId} {
+        allow get: if isTrainer() || isClubAdminOfTeam() || isPlayerFor(playerId);
+        allow list: if isTrainer() || isClubAdminOfTeam();
+        allow create, update: if isTrainer()
+          && request.resource.data.keys().hasOnly(['playerId', 'publishedUntil', 'expiresAt', 'createdBy'])
+          && request.resource.data.playerId == playerId
+          && request.resource.data.publishedUntil == request.time
+          && request.resource.data.createdBy == request.auth.uid
+          && (request.resource.data.expiresAt == null
+            || (request.resource.data.expiresAt is timestamp && request.resource.data.expiresAt > request.time));
+        allow delete: if isTrainer();
+      }
+
+      // Kennzeichen "Kopien fuer die Spieleransicht sind eingerichtet" (SCRUM-115, Version und Zeitpunkt) - nur Trainer.
+      match /meta/playerView {
+        allow read, write: if isTrainer();
       }
 
       // Scout-Sicht (SCRUM-170): je Spieler ein Dokument, das ausschliesslich der Trainer-Client schreibt
@@ -532,7 +959,7 @@ service cloud.firestore {
       // Teilnoten, Minuten, Tore und Vorlagen - keine Rueckmeldungen, Notizen, Status oder Gesundheitsdaten.
       // hasOnly sichert ab, dass kein weiteres Feld (z.B. "status" oder "injuryUntil") hineinrutscht.
       match /scoutProfiles/{playerId} {
-        allow read: if isTrainer() || isScout();
+        allow read: if isTrainer() || isScout() || isClubAdminOfTeam();
         allow create, update: if isTrainer()
           && request.resource.data.keys().hasOnly(['playerId', 'name', 'number', 'positions', 'birthdate', 'entries', 'version'])
           && request.resource.data.playerId == playerId
@@ -540,13 +967,27 @@ service cloud.firestore {
         allow delete: if isTrainer();
       }
 
+      // Bereinigte Spielerkarte (SCRUM-245): nur fuer Spieler mit widerrufener Einwilligung, die ihr Spielerdokument
+      // dann nicht mehr lesen. Enthaelt Name, Nummer, Positionen, Geburtsdatum - keine Gesundheitsdaten. Schreibt
+      // nur der Trainer-Client (consent-card.service.ts); hasOnly verhindert, dass Status oder "verletzt bis"
+      // hineinrutschen. Lesen: Trainer und der eigene Spieler bzw. die eigenen Eltern (gezielter Abruf).
+      match /playerCards/{playerId} {
+        allow get: if isTrainer() || isPlayerFor(playerId);
+        allow list: if isTrainer();
+        allow create, update: if isTrainer()
+          && request.resource.data.keys().hasOnly(['playerId', 'name', 'number', 'positions', 'birthdate', 'consentStatus'])
+          && request.resource.data.playerId == playerId
+          && request.resource.data.consentStatus == 'revoked';
+        allow delete: if isTrainer();
+      }
+
       // Zusammenfassung je Spieler (SCRUM-201, nur Angular): je Event Anwesenheit, Teilnoten, Minuten, Tore und
       // Vorlagen - dieselben Werte wie in den Bewertungen, ohne Rueckmeldung und interne Notizen. Der Trainer-Client
       // schreibt sie im selben Schreibvorgang wie jede Bewertung mit. Nur Trainer lesen und schreiben; Spieler, Eltern,
-      // Medizin und Scouts haben keinen Zugriff (Spieler lesen ihre eigenen Bewertungen weiter direkt).
+      // Medizin und Scouts haben keinen Zugriff (Spieler lesen ratingValues/ratingGrades, SCRUM-115).
       // hasOnly/Typen sichern das Format ab, damit kein weiteres Feld (z.B. Notizen) hineinrutscht.
       match /playerStats/{playerId} {
-        allow read: if isTrainer();
+        allow read: if isTrainer() || isClubAdminOfTeam();
         allow create, update: if isTrainer()
           && request.resource.data.keys().hasOnly(['playerId', 'version', 'events'])
           && request.resource.data.playerId == playerId
@@ -561,30 +1002,34 @@ service cloud.firestore {
       }
 
       match /opponents/{opponentId} {
-        allow read, write: if isTrainer();
+        allow read: if isTrainer() || isClubAdminOfTeam();
+        allow write: if isTrainer();
       }
 
       // Startelf/Taktikboard - wie das gesamte Dashboard nur fuer Trainer sichtbar,
       // deshalb ein einzelnes Dokument statt einer Unter-Collection.
       match /meta/lineup {
-        allow read, write: if isTrainer();
+        allow read: if isTrainer() || isClubAdminOfTeam();
+        allow write: if isTrainer();
       }
 
       // Teameinstellungen (Standardort/Heimplatz fuer neue Events), SCRUM-97 - nur Trainer.
       match /meta/settings {
-        allow read, write: if isTrainer();
+        allow read: if isTrainer() || isClubAdminOfTeam();
+        allow write: if isTrainer();
       }
 
       // Planung (Trainingsserien, SCRUM-145) - nur Trainer.
       match /meta/planning {
-        allow read, write: if isTrainer();
+        allow read: if isTrainer() || isClubAdminOfTeam();
+        allow write: if isTrainer();
       }
 
       // Pausen (Ferien, Winterpause; SCRUM-148/150) - bewusst ein eigenes Dokument neben meta/planning: jedes
       // Teammitglied darf es lesen (Hinweis "Winterpause bis 10.01." fuer Spieler), enthaelt aber nur Name und
       // Zeitraum. Die Serien in meta/planning bleiben Trainern vorbehalten. Schreiben darf nur der Trainer.
       match /meta/breaks {
-        allow read: if isTeamMember();
+        allow read: if isTeamMember() || isClubAdminOfTeam();
         allow write: if isTrainer();
       }
 
@@ -592,7 +1037,7 @@ service cloud.firestore {
       // Einzelpunkte liegen im Trainer-Pfad events/*/privateNotes, den Spieler nie lesen; dieses Dokument enthaelt nur die
       // Auswertung. Lesen: Trainer sowie Spieler und Eltern des Teams. Schreiben nur der Trainer, nur diese drei Felder.
       match /meta/ranking {
-        allow read: if isTrainer() || (isTeamMember() && memberDoc().data.role in ["player", "parent"]);
+        allow read: if isTrainer() || isClubAdminOfTeam() || (isTeamMember() && memberDoc().data.role in ["player", "parent"]);
         allow create, update: if isTrainer()
           && request.resource.data.keys().hasOnly(['week', 'month', 'updatedAt']);
         allow delete: if isTrainer();
@@ -600,6 +1045,28 @@ service cloud.firestore {
 
       match /meta/operations {
         allow read, write: if isTrainer();
+      }
+
+      // ---------------------------------------------------------------------------------------------
+      // Vereinsuebersicht (SCRUM-183): Kurzfassung des Kaders fuer den Vereinsadmin, der das Spielerdokument (mit
+      // Gesundheitsangaben) nicht liest. Schreibt nur der Trainer-Client (club-overview.service.ts), sobald sich der
+      // Kader aendert: Spielerzahl, Zahl offener/widerrufener Einwilligungen und je Spieler nur id, Name, Nummer,
+      // Positionen (players). hasOnly/Typen sichern das Format ab.
+      // Lesen: Trainer und der Vereinsadmin des Teams. Spieler, Eltern, Medizin und Scouts nicht.
+      // ---------------------------------------------------------------------------------------------
+      match /meta/clubOverview {
+        allow read: if isTrainer() || isClubAdminOfTeam();
+        allow create, update: if isTrainer()
+          && request.resource.data.keys().hasOnly(['version', 'playerCount', 'consentPending', 'consentRevoked', 'players', 'updatedAt'])
+          && request.resource.data.version is int
+          && request.resource.data.playerCount is int
+          && request.resource.data.consentPending is int
+          && request.resource.data.consentRevoked is int
+          && request.resource.data.players is list
+          && request.resource.data.players.size() <= 200
+          && request.resource.data.players.size() == request.resource.data.playerCount
+          && request.resource.data.updatedAt == request.time;
+        allow delete: if isTrainer();
       }
 
       // Benachrichtigungs-Einstellungen je Konto (SCRUM-100): E-Mail-Erinnerung an offene Bewertungen (Opt-in).
@@ -613,6 +1080,111 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly(['emailReminders'])
           && request.resource.data.emailReminders is bool;
         allow delete: if isTrainer() && request.auth.uid == uid;
+      }
+
+      // ---------------------------------------------------------------------------------------------
+      // Lernpfade mit Kompetenzstufen (SCRUM-192, PO-Entscheidung A vom 02.11.2026: der Trainer legt alles selbst an).
+      // - learningPaths/{pathId}: Inhalt eines Pfads (Name, Position, Altersklasse, Stufen mit kurzer Einheit, Link und
+      //   Aufgabe fuer zu Hause). Keine Spielerdaten, fuer die ganze Mannschaft gleich: lesen Trainer sowie Spieler und
+      //   Eltern des Teams (die App zeigt nur die Pfade fuer Position und Altersklasse des Spielers). Schreiben nur der
+      //   Trainer, nur diese Felder, hoechstens 12 Stufen, Zeitpunkt vom Server.
+      // - learningProgress/{playerId}: bestaetigte Stufen EINES Spielers (paths.{pathId}.{levelId} = Datum). Keine Noten
+      //   und kein Gesundheitsdatum, deshalb unabhaengig von der Einwilligung (SCRUM-245). Lesen: Trainer und der eigene
+      //   Spieler bzw. die eigenen Eltern per gezieltem Abruf (Pfadvergleich wie bei playerCards) - nie fremde Spieler,
+      //   nie als Liste. Medizin und Scouts haben keinen Zugriff. Schreiben (bestaetigen/zuruecknehmen) nur der Trainer.
+      // ---------------------------------------------------------------------------------------------
+      match /learningPaths/{pathId} {
+        allow read: if isTrainer() || isClubAdminOfTeam() || (isTeamMember() && memberDoc().data.role in ["player", "parent"]);
+        allow create, update: if isTrainer()
+          && request.resource.data.keys().hasOnly(['title', 'position', 'ageGroup', 'levels', 'updatedAt'])
+          && request.resource.data.title is string
+          && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 120
+          && request.resource.data.position is string && request.resource.data.position.size() <= 40
+          && request.resource.data.ageGroup is string && request.resource.data.ageGroup.size() <= 40
+          && request.resource.data.levels is list
+          && request.resource.data.levels.size() <= 12
+          && request.resource.data.updatedAt == request.time;
+        allow delete: if isTrainer();
+      }
+
+      match /learningProgress/{playerId} {
+        allow get: if isTrainer() || isClubAdminOfTeam() || isPlayerFor(playerId);
+        allow list: if isTrainer() || isClubAdminOfTeam();
+        allow create, update: if isTrainer()
+          && request.resource.data.keys().hasOnly(['playerId', 'paths', 'updatedAt'])
+          && request.resource.data.playerId == playerId
+          && request.resource.data.paths is map
+          && request.resource.data.updatedAt == request.time;
+        allow delete: if isTrainer();
+      }
+
+      // ---------------------------------------------------------------------------------------------
+      // Situationsraetsel aus Spielszenen (SCRUM-193). Keine Gesundheitsdaten, keine Noten, keine Rangliste.
+      // - puzzles/{puzzleId}: Szene (Bild- oder Video-Link mit Zeitmarke), Frage, 2-4 Antworten, Schwierigkeit 1-3 -
+      //   bewusst OHNE Loesung. Lesen Trainer sowie Spieler und Eltern des Teams; schreiben nur der Trainer.
+      // - puzzleSolutions/{puzzleId}: richtige Antwort und Erklaerung. Trainer lesen alle. Spieler und Eltern nur per
+      //   gezieltem Abruf und erst, wenn die Antwort des eigenen Spielers auf dieses Raetsel existiert - vorher steht die
+      //   Loesung nirgends, wo sie sie lesen koennten. Schreiben nur der Trainer.
+      // - puzzleAnswers/{puzzleId}_{playerId}: die eine Antwort eines Spielers. Anlegen NUR der Spieler selbst (Rolle
+      //   "player", nicht Eltern), nur fuer ein bestehendes Raetsel, nur eine vorhandene Antwortmoeglichkeit, Zeitpunkt
+      //   vom Server. Aendern nie (keine zweite Chance nach dem Blick auf die Erklaerung), loeschen nur der Trainer.
+      //   Lesen: Trainer und der eigene Spieler bzw. die eigenen Eltern (Liste nur mit playerId-Filter) - nie fremde.
+      // Die Raetsel-Wertung wird nicht gespeichert, die App berechnet sie aus den Antworten. Medizin und Scouts: nichts.
+      // ---------------------------------------------------------------------------------------------
+      function puzzlePath(puzzleId) {
+        return /databases/$(database)/documents/teams/$(teamId)/puzzles/$(puzzleId);
+      }
+
+      match /puzzles/{puzzleId} {
+        allow read: if isTrainer() || isClubAdminOfTeam() || (isTeamMember() && memberDoc().data.role in ["player", "parent"]);
+        allow create, update: if isTrainer()
+          && request.resource.data.keys().hasOnly(['title', 'question', 'media', 'mediaUrl', 'videoStart', 'answers', 'level', 'updatedAt'])
+          && request.resource.data.title is string
+          && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 120
+          && request.resource.data.question is string && request.resource.data.question.size() <= 300
+          && request.resource.data.media in ['image', 'video']
+          && request.resource.data.mediaUrl is string
+          && request.resource.data.mediaUrl.size() <= 2000
+          && request.resource.data.mediaUrl.matches('^https://.+')
+          && (request.resource.data.videoStart == null
+            || (request.resource.data.videoStart is int && request.resource.data.videoStart >= 0 && request.resource.data.videoStart <= 36000))
+          && request.resource.data.answers is list
+          && request.resource.data.answers.size() >= 2 && request.resource.data.answers.size() <= 4
+          && request.resource.data.level in [1, 2, 3]
+          && request.resource.data.updatedAt == request.time;
+        allow delete: if isTrainer();
+      }
+
+      match /puzzleSolutions/{puzzleId} {
+        allow read: if isTrainer() || isClubAdminOfTeam();
+        allow get: if isTeamMember()
+          && memberDoc().data.role in ["player", "parent"]
+          && exists(/databases/$(database)/documents/teams/$(teamId)/puzzleAnswers/$(puzzleId + '_' + memberDoc().data.playerId));
+        allow create, update: if isTrainer()
+          && request.resource.data.keys().hasOnly(['correct', 'explanation', 'updatedAt'])
+          && request.resource.data.correct is int
+          && request.resource.data.correct >= 0 && request.resource.data.correct <= 3
+          && request.resource.data.explanation is string && request.resource.data.explanation.size() <= 1000
+          && request.resource.data.updatedAt == request.time;
+        allow delete: if isTrainer();
+      }
+
+      match /puzzleAnswers/{answerId} {
+        allow read: if isTrainer() || isClubAdminOfTeam() || isPlayerFor(resource.data.playerId);
+        allow create: if isTeamMember()
+          && memberDoc().data.role == "player"
+          && request.resource.data.keys().hasOnly(['puzzleId', 'playerId', 'choice', 'by', 'answeredAt'])
+          && request.resource.data.playerId == memberDoc().data.playerId
+          && request.resource.data.puzzleId is string
+          && request.resource.data.playerId is string
+          && answerId == request.resource.data.puzzleId + '_' + request.resource.data.playerId
+          && exists(puzzlePath(request.resource.data.puzzleId))
+          && request.resource.data.choice is int
+          && request.resource.data.choice >= 0
+          && request.resource.data.choice < get(puzzlePath(request.resource.data.puzzleId)).data.answers.size()
+          && request.resource.data.by == 'player'
+          && request.resource.data.answeredAt == request.time;
+        allow delete: if isTrainer();
       }
 
       // Altes Einzeldokument aus dem frueheren Single-Blob-Modell. Die App liest oder schreibt es nicht mehr,

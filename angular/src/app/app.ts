@@ -1,8 +1,9 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, effect, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { AuthService } from './core/auth/auth.service';
 import { AppUpdateService } from './core/device/app-update.service';
 import { InstallHintService } from './core/device/install-hint.service';
+import { SplashService } from './core/device/splash.service';
 import { LiveOutboxService } from './core/live/live-outbox.service';
 import { Button } from './ui/button/button';
 
@@ -20,4 +21,13 @@ export class App {
   private readonly installHint = inject(InstallHintService);
   // Früh erzeugen: schickt beim Öffnen der App noch offene Live-Punkte erneut (Funkloch, SCRUM-216).
   private readonly liveOutbox = inject(LiveOutboxService);
+  private readonly splash = inject(SplashService);
+
+  constructor() {
+    // Start-Animation (SCRUM-283) ausblenden, sobald der Anmeldezustand feststeht (auch bei „nicht erreichbar“,
+    // dann zeigt die App ihre Fehlermeldung).
+    effect(() => {
+      if (this.auth.status() !== 'loading') this.splash.markReady();
+    });
+  }
 }

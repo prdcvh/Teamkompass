@@ -116,13 +116,19 @@ export function isUpcoming(event: TeamEvent, today: string): boolean {
  *   „Fehlt“ mit der Notiz „Abgesagt[: Grund]“ und der Markierung `rsvpAbsence`. Ein bereits so markierter Eintrag
  *   bekommt nur den neuen Grund.
  * - Zusage oder keine Rückmeldung: nur ein markierter Eintrag wird auf „Offen“ zurückgesetzt (Markierung false).
+ * - `hideReason` (widerrufene Einwilligung, SCRUM-248): neue Einträge nur „Abgesagt“ ohne Grund; ein schon markiertes
+ *   „Fehlt“ bleibt samt bisheriger Notiz stehen – einen alten Grund entfernt nur der Trainer nach Rückfrage.
  * Von Hand geänderte Bewertungen bleiben immer stehen. Rückgabe: die neue Bewertung oder null, wenn sich nichts ändert.
  */
-export function rsvpAbsenceRating(existing: Rating | null, response: RsvpResponse | null | undefined): Rating | null {
+export function rsvpAbsenceRating(
+  existing: Rating | null,
+  response: RsvpResponse | null | undefined,
+  options: { readonly hideReason?: boolean } = {},
+): Rating | null {
   if (response?.status === 'no') {
-    const note = rsvpAbsenceNote(response);
+    const note = rsvpAbsenceNote(options.hideReason ? null : response);
     if (existing?.rsvpAbsence) {
-      if (existing.attendance === 'absent' && existing.note === note) return null;
+      if (existing.attendance === 'absent' && (existing.note === note || options.hideReason)) return null;
       return { ...existing, attendance: 'absent', note };
     }
     if (existing?.autoAbsence) return null;

@@ -2,8 +2,10 @@
  * Spielerbewertung je Event: Modell, Gesamtnote und die reine Logik für Änderungen und Fortschritt.
  * Das Dokument `teams/{teamId}/events/{eventId}/ratings/{playerId}` ist mit der bisherigen App
  * identisch (siehe Alt-App app.js: normalizeRating, calculatedGrade, updateRating).
- * Noten sind Schulnoten: 1 = sehr gut … 6 = ungenügend; kleiner ist besser.
+ * Noten sind Schulnoten: 1 = sehr gut … 6 = ungenügend; kleiner ist besser. Kompetenzstufen (SCRUM-188) werden als ihr
+ * Schulnoten-Gegenwert gespeichert (4,5 / 3 / 1,5, siehe `rating-scale.ts`) und rechnen deshalb unverändert mit.
  */
+import { LEVEL_OPTIONS, type RatingScale, isScaleValue } from './rating-scale';
 
 export const ATTENDANCES = ['open', 'present', 'limited', 'absent', 'excluded'] as const;
 export type Attendance = (typeof ATTENDANCES)[number];
@@ -78,6 +80,11 @@ export interface Rating {
    * nimmt die Markierung weg (false); dann setzt eine spätere Zusage die Bewertung nicht mehr zurück. Fehlt = nie gesetzt.
    */
   readonly rsvpAbsence?: boolean;
+  /**
+   * Skala, mit der die Teilnoten vergeben wurden (SCRUM-188). Fehlt = Schulnoten (alle Bewertungen vor SCRUM-188).
+   * Wird nur geschrieben, wenn gesetzt – eine Schulnoten-Bewertung ohne Feld bleibt Feld für Feld wie bisher.
+   */
+  readonly scale?: RatingScale;
 }
 
 export const BLANK_RATING: Rating = {
@@ -114,10 +121,37 @@ export function gradeLabel(grade: number | null): string {
   return grade === null ? '–' : grade.toFixed(1).replace('.', ',');
 }
 
+/** Stufenwerte, die keine ganze Schulnote sind (1,5 und 4,5); 3 ist zugleich Schulnote. */
+const LEVEL_ONLY_VALUES: readonly number[] = LEVEL_OPTIONS.map((option) => option.value).filter((value) => !Number.isInteger(value));
+
+/**
+ * Gespeicherter Teilnotenwert → Zahl. Gültig sind die Schulnoten 1–6 und die Stufenwerte 1,5 / 3 / 4,5 – unabhängig von
+ * der Skala, damit auch Wege ohne Skalenangabe (Zusammenfassung je Spieler, Scout-Sicht) dieselben Zahlen sehen.
+ * Bis SCRUM-188 konnte keine App einen halben Wert speichern; für jede bestehende Schulnote ändert sich also nichts.
+ */
 function gradeValue(value: unknown): number | null {
   if (value === '' || value === null || value === undefined) return null;
   const number = Number(value);
+  if (LEVEL_ONLY_VALUES.includes(number)) return number;
   return Number.isInteger(number) && number >= MIN_GRADE && number <= MAX_GRADE ? number : null;
+}
+
+/** Eingabe aus dem Formular → Teilnote; nur Werte der Skala, mit der gerade bewertet wird. */
+function inputGrade(value: string, scale: RatingScale): number | null {
+  const number = gradeValue(value);
+  return number !== null && isScaleValue(number, scale) ? number : null;
+}
+
+function hasGrade(rating: Rating): boolean {
+  return GRADE_FIELDS.some((field) => rating[field] !== null);
+}
+
+/**
+ * Skala, in der eine Bewertung angezeigt und weiter bearbeitet wird: hat sie schon eine Teilnote, ihre eigene (so mischt
+ * ein Wechsel der Teamskala nie zwei Skalen in einer Bewertung); sonst die des Teams.
+ */
+export function ratingScaleOf(rating: Rating, teamScale: RatingScale): RatingScale {
+  return hasGrade(rating) ? (rating.scale ?? 'grades') : teamScale;
 }
 
 function count(value: unknown, max: number): number | null {
@@ -144,6 +178,7 @@ export function ratingFromDoc(data: Readonly<Record<string, unknown>> | undefine
     note: typeof data['note'] === 'string' ? data['note'] : '',
     autoAbsence: data['autoAbsence'] === true,
     ...(data['rsvpAbsence'] === true ? { rsvpAbsence: true } : {}),
+    ...(data['scale'] === 'levels' || data['scale'] === 'grades' ? { scale: data['scale'] } : {}),
   };
 }
 
@@ -169,6 +204,8 @@ export function docFromRating(rating: Rating, options: { clearAuto?: boolean } =
   else if (options.clearAuto) doc['autoAbsence'] = false;
   // Markierung einer Absage (SCRUM-205): nur geschrieben, wenn gesetzt (true) oder gerade zurückgenommen (false).
   if (rating.rsvpAbsence !== undefined) doc['rsvpAbsence'] = rating.rsvpAbsence;
+  // Skala (SCRUM-188): nur geschrieben, wenn gesetzt – Schulnoten-Bewertungen ohne Feld bleiben unverändert.
+  if (rating.scale !== undefined) doc['scale'] = rating.scale;
   return doc;
 }
 
@@ -184,8 +221,11 @@ export interface RatingChange {
  * - Minuten sind auf 0 bis Spieldauer begrenzt, Tore/Vorlagen auf 0 bis 20.
  * - „Fehlt“ und „Nicht im Kader“ löschen Noten, Minuten, Tore und Vorlagen.
  * - Eine Handänderung macht aus einer automatisch gesetzten Abwesenheit eine normale.
+ * - Teilnoten gelten in der Skala der Bewertung (`ratingScaleOf`, ohne Teilnote die des Teams, SCRUM-188); Stufen
+ *   markieren die Bewertung mit `scale: 'levels'`, eine Schulnote auf einer zuvor so markierten, leeren Bewertung mit
+ *   `scale: 'grades'`. Eine Bewertung ohne Markierung bekommt bei Schulnoten keine.
  */
-export function applyChange(rating: Rating, field: RatingField, value: string, matchDuration: number): RatingChange {
+export function applyChange(rating: Rating, field: RatingField, value: string, matchDuration: number, teamScale: RatingScale = 'grades'): RatingChange {
   // Auch eine von einer Absage gesetzte Abwesenheit wird durch die Handänderung zu einer normalen (SCRUM-205).
   const clearedAuto = rating.autoAbsence || rating.rsvpAbsence === true;
   let next: Rating = { ...rating, autoAbsence: false, ...(rating.rsvpAbsence ? { rsvpAbsence: false } : {}) };
@@ -202,9 +242,12 @@ export function applyChange(rating: Rating, field: RatingField, value: string, m
     case 'effort':
     case 'technique':
     case 'tactics':
-    case 'comprehension':
-      next = { ...next, [field]: gradeValue(value) };
+    case 'comprehension': {
+      const scale = ratingScaleOf(rating, teamScale);
+      next = { ...next, [field]: inputGrade(value, scale) };
+      if (scale === 'levels' || rating.scale !== undefined) next = { ...next, scale };
       break;
+    }
     case 'minutes':
       next = { ...next, minutes: count(value, Math.max(0, matchDuration)) };
       break;

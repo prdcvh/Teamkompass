@@ -6,6 +6,7 @@ import { formatDate } from '../shared/dates';
 import type { Player } from '../player/player';
 import { BLANK_RATING, type Rating } from '../ratings/rating';
 import { type Absence, absenceTitle, activeAbsenceOn, isInjuryAbsence } from './absence';
+import { NEUTRAL_ABSENCE_NOTE } from './health-reasons';
 
 /** Grund in der Bewertung, wenn der Status „Verletzt“ ohne „ca. verletzt bis“ gesetzt ist (SCRUM-164). */
 export const OPEN_INJURY_REASON = 'Verletzt (bis auf Weiteres)';
@@ -55,11 +56,13 @@ function hasRatingData(rating: Rating): boolean {
  *   Eingabe). Eine manuell gesetzte Anwesenheit sowie Teilnoten/Notizen bleiben unangetastet.
  * - Rückwärts: nur Einträge mit `autoAbsence`-Markierung. Die Markierung fällt weg, sobald jemand die Bewertung
  *   von Hand ändert; dann bleibt sie immer stehen.
+ * - Neutraler Grund ({@link NEUTRAL_ABSENCE_NOTE}, widerrufene Einwilligung, SCRUM-248): ein schon gesetztes „Fehlt“
+ *   bleibt samt bisheriger Rückmeldung stehen – einen alten Grund entfernt nur der Trainer nach Rückfrage.
  * Rückgabe: die neue Bewertung oder `null`, wenn sich nichts ändert.
  */
 export function autoAbsenceRating(existing: Rating | null, reason: string | null): Rating | null {
   if (existing?.autoAbsence) {
-    if (reason && existing.note === reason) return null;
+    if (reason && (existing.note === reason || reason === NEUTRAL_ABSENCE_NOTE)) return null;
     return reason ? { ...existing, note: reason } : { ...BLANK_RATING };
   }
   if (existing && existing.attendance !== 'open') return null;
@@ -71,9 +74,12 @@ export function autoAbsenceRating(existing: Rating | null, reason: string | null
 /**
  * Der Status „Verletzt“ ohne Datum wird zurückgenommen: Vergangene Termine bleiben „Fehlt“ (der Spieler war ja
  * verletzt). Dazu verliert der automatisch gesetzte Eintrag seine Markierung und gilt ab dann wie von Hand gesetzt.
+ * Bei widerrufener Einwilligung steht statt des Grundes nur „Fehlt“ (SCRUM-248); das gilt als Verletzung, solange an dem
+ * Tag keine Abwesenheit eingetragen ist (`coveredByAbsence`).
  * Rückgabe: die neue Bewertung oder `null`, wenn es nichts festzuhalten gibt.
  */
-export function keepPastOpenInjury(existing: Rating | null): Rating | null {
-  if (!existing?.autoAbsence || existing.note !== OPEN_INJURY_REASON) return null;
+export function keepPastOpenInjury(existing: Rating | null, coveredByAbsence = false): Rating | null {
+  if (!existing?.autoAbsence) return null;
+  if (existing.note !== OPEN_INJURY_REASON && (existing.note !== NEUTRAL_ABSENCE_NOTE || coveredByAbsence)) return null;
   return { ...existing, autoAbsence: false };
 }

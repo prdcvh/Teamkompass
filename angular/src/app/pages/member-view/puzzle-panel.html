@@ -1,0 +1,122 @@
+@if (ready()) {
+  <section class="puzzles" aria-labelledby="puzzles-title">
+    <h2 id="puzzles-title" class="title">{{ parent() ? 'Situationsrätsel von ' + player().name : 'Situationsrätsel' }}</h2>
+
+    <tk-card>
+      <div class="rating" data-testid="puzzle-rating">
+        <div>
+          <p class="eyebrow">{{ parent() ? 'Rätsel-Wertung' : 'Deine Rätsel-Wertung' }}</p>
+          <strong class="value">{{ history().rating }}</strong>
+        </div>
+        <p class="muted">
+          {{ history().steps.length }} {{ history().steps.length === 1 ? 'Rätsel' : 'Rätsel' }} beantwortet, {{ history().solved }} richtig. Start bei 1000; schwere Rätsel bringen mehr, leichte kosten mehr, wenn sie danebengehen.
+          {{ parent() ? 'Nur ihr und der Trainer seht diese Zahl' : 'Nur du, deine Eltern und dein Trainer sehen diese Zahl' }} – es gibt keine Rangliste.
+        </p>
+      </div>
+    </tk-card>
+
+    @if (parent()) {
+      @if (open().length > 0) {
+        <p class="muted" data-testid="puzzle-parent-note">{{ open().length }} {{ open().length === 1 ? 'Rätsel ist' : 'Rätsel sind' }} noch offen. {{ player().name }} beantwortet sie mit dem eigenen Spieler-Zugang.</p>
+      }
+    } @else if (current(); as shown) {
+      <tk-card>
+        <div class="puzzle" data-testid="puzzle-current">
+          <div class="chips">
+            <tk-chip tone="blue">{{ levelLabel(shown.puzzle.level) }}</tk-chip>
+            @if (!shown.answered) {
+              <tk-chip>{{ open().length }} offen</tk-chip>
+            }
+          </div>
+          <strong class="puzzle-title">{{ shown.puzzle.title }}</strong>
+          <!-- Nur verlinkt (neuer Tab): die App lädt keine Bilder fremder Seiten (Content-Security-Policy, kein Mitlesen Dritter). -->
+          @if (shown.puzzle.media === 'image') {
+            <a class="scene-link" [href]="shown.puzzle.mediaUrl" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Szene als Bild ansehen (neuer Tab)</a>
+          } @else {
+            <a class="scene-link" [href]="videoLinkAt(shown.puzzle.mediaUrl, shown.puzzle.videoStart)" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">
+              ▶ Szene ansehen{{ shown.puzzle.videoStart ? ' ab ' + formatSeconds(shown.puzzle.videoStart) : '' }} (neuer Tab) – dort anhalten
+            </a>
+          }
+          <p class="question">{{ shown.puzzle.question }}</p>
+          <ul class="answers" role="list">
+            @for (text of shown.puzzle.answers; track $index) {
+              <li>
+                <button
+                  type="button"
+                  class="answer"
+                  [attr.data-state]="shown.answered ? answerState(shown.puzzle.id, $index) : null"
+                  [attr.aria-pressed]="shown.answered ? choiceOf(shown.puzzle.id) === $index : null"
+                  [disabled]="shown.answered || puzzles.saving() !== null || !puzzles.canAnswer()"
+                  (click)="choose(shown.puzzle, $index)"
+                >
+                  <span class="letter" aria-hidden="true">{{ 'ABCD'[$index] }}</span>
+                  <span>{{ text }}</span>
+                </button>
+              </li>
+            }
+          </ul>
+
+          @if (shown.answered) {
+            <div class="result" role="status" data-testid="puzzle-result">
+              @if (solutionOf(shown.puzzle.id); as solution) {
+                @let step = stepOf(shown.puzzle.id);
+                <p class="verdict" [attr.data-solved]="choiceOf(shown.puzzle.id) === solution.correct">
+                  {{ choiceOf(shown.puzzle.id) === solution.correct ? 'Richtig!' : 'Nicht ganz. Richtig ist: ' + shown.puzzle.answers[solution.correct] }}
+                  @if (step) {
+                    <span class="delta">Wertung {{ deltaLabel(step.delta) }} → {{ step.after }}</span>
+                  }
+                </p>
+                @if (solution.explanation) {
+                  <p><span class="label">Warum:</span> {{ solution.explanation }}</p>
+                }
+              } @else if (puzzles.saving() === shown.puzzle.id) {
+                <p class="muted">Antwort wird gespeichert …</p>
+              } @else {
+                <p class="muted">Erklärung wird geladen …</p>
+              }
+              <button tkButton variant="primary" size="sm" type="button" (click)="next()">{{ open().length > 0 ? 'Nächstes Rätsel' : 'Fertig' }}</button>
+            </div>
+          }
+          @if (puzzles.answerError(); as error) {
+            <p class="error" role="alert">{{ error }}</p>
+          }
+        </div>
+      </tk-card>
+    } @else {
+      <p class="muted all-done">Alle Rätsel gelöst – der Trainer stellt bald neue.</p>
+    }
+
+    @if (done().length > 0) {
+      <tk-card>
+        <div class="done">
+          <h3 class="sub">Erledigte Rätsel</h3>
+          <ul class="done-list" data-testid="puzzle-done">
+            @for (step of done(); track step.puzzle.id) {
+              <li>
+                <button type="button" class="done-row" [attr.aria-expanded]="opened() === step.puzzle.id" (click)="toggle(step.puzzle.id)">
+                  <span class="mark" [attr.data-solved]="step.solved" aria-hidden="true">{{ step.solved ? '✓' : '✗' }}</span>
+                  <span class="done-title">{{ step.puzzle.title }} <small class="muted">· {{ levelLabel(step.puzzle.level) }}</small></span>
+                  <span class="delta">{{ deltaLabel(step.delta) }}</span>
+                  <span class="tk-sr-only">{{ step.solved ? 'richtig' : 'falsch' }}</span>
+                </button>
+                @if (opened() === step.puzzle.id) {
+                  @if (solutionOf(step.puzzle.id); as solution) {
+                    <div class="done-detail">
+                      <p>{{ step.puzzle.question }}</p>
+                      <p><span class="label">{{ parent() ? 'Gewählt' : 'Deine Antwort' }}:</span> {{ step.puzzle.answers[step.choice] }}</p>
+                      <p><span class="label">Richtig:</span> {{ step.puzzle.answers[solution.correct] }}</p>
+                      @if (solution.explanation) {
+                        <p><span class="label">Warum:</span> {{ solution.explanation }}</p>
+                      }
+                      <small class="muted">Wertung vorher {{ step.before }}, danach {{ step.after }}.</small>
+                    </div>
+                  }
+                }
+              </li>
+            }
+          </ul>
+        </div>
+      </tk-card>
+    }
+  </section>
+}

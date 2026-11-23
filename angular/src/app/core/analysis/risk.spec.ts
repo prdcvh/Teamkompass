@@ -56,16 +56,52 @@ describe('risk (Belastungsampel)', () => {
     expect(risk([entry(-1, 9), entry(-2, 9)]).reasons).toEqual([]);
   });
 
-  it('echte Spitze nach 4 normalen Wochen ergibt einen Hinweis (ab dem 1,5-fachen)', () => {
-    const calm = risk([...normalWeeks, entry(1), entry(4)]);
+  /**
+   * SCRUM-176: Spitze = Müdigkeit (Mittel über 7 Tage) / Fitness (Mittel über 28 Tage) ab 1,5 (stark ab 2,0), nur bei
+   * Belastung in 3 der 4 Wochen und wenn die letzten 7 Tage mindestens 15 % über dem Schnitt der 3 Wochen davor liegen.
+   */
+  /** `weeks` normale Wochen bis gestern vor 7 Tagen: je Woche Termine an den Wochentagen `days` (0 = 7 Tage vor heute …). */
+  const history = (weeks: number, days: readonly number[] = [0, 2], from = 7) =>
+    Array.from({ length: weeks }, (_, week) => days.map((day) => entry(from + week * 7 + day))).flat();
+
+  it('echte Spitze nach 12 normalen Wochen: 2,4-fache Woche ergibt „Beobachten“, Turnier ergibt „Anpassen“', () => {
+    const calm = risk([...history(12), entry(1), entry(4)]);
     expect(calm.baseline).toBe(900);
+    expect(calm.fitness).toBe(989);
     expect(calm.tier).toBe('unauffaellig');
-    const mild = risk([...normalWeeks, entry(1), entry(3), entry(6)]); // 1350 = 1,5-fach
-    expect(mild.tier).toBe('beobachten');
-    expect(mild.reasons[0]).toBe('Belastungsspitze (1,5-fach des Schnitts der 3 Wochen davor)');
-    const big = risk([...normalWeeks, entry(1, 6), entry(3, 6), entry(5, 6), entry(6, 6)]); // 2160 = 2,4-fach
-    expect(big.tier).toBe('anpassen');
+    // 4 Einheiten à 90 Minuten × 6 = 2160 (2,4-fach der üblichen 900): Müdigkeit 1,6-fach der Fitness.
+    const big = risk([...history(12), entry(5, 6), entry(3, 6), entry(1, 6), entry(0, 6)]);
     expect(big.load).toBe(2160);
+    expect(big.ratio).toBe(1.6);
+    expect(big.tier).toBe('beobachten');
+    expect(big.reasons[0]).toBe('Belastungsspitze (Müdigkeit 1,6-fach der Fitness)');
+    // Turnier am Wochenende: je zwei Spiele à 90 Minuten (Anstrengung 9 und 8) gestern und heute nach den zwei üblichen Trainings.
+    const tournament = risk([...history(12), entry(6), entry(4), entry(1, 9), entry(1, 8), entry(0, 9), entry(0, 8)]);
+    expect(tournament.ratio).toBe(2.2);
+    expect(tournament.reasons[0]).toBe('Belastungsspitze (Müdigkeit 2,2-fach der Fitness)');
+    expect(tournament.tier).toBe('anpassen');
+  });
+
+  it('kein Fehlalarm im normalen Wochenrhythmus, auch nicht bei zwei Einheiten an zwei Tagen hintereinander', () => {
+    // Müdigkeit springt nach jeder Einheit hoch (hier bis 1,5-fach der Fitness), die Woche ist aber nicht höher als sonst.
+    const rhythm = (days: readonly number[]) => [0, 1, 2, 3, 4, 5, 6].map((shift) => risk(history(13, days, shift)));
+    for (const days of [[0, 1], [0, 2], [0, 2, 4], [0]]) {
+      expect(rhythm(days).map((result) => result.tier)).toEqual(Array(7).fill('unauffaellig'));
+    }
+    expect(Math.max(...rhythm([0, 1]).map((result) => result.ratio ?? 0))).toBeGreaterThanOrEqual(1.5);
+  });
+
+  it('kein Fehlalarm nach 6 Wochen Pause: weder in den ersten Wochen noch beim langsamen Aufbau der Fitness danach', () => {
+    // 12 Wochen Training, 6 Wochen Pause, dann wieder 2 Einheiten pro Woche; geprüft wird jeder Tag der 6 Wochen danach.
+    const restart = (weeksBack: number, shift: number) => [...history(12, [0, 2], 7 * (6 + weeksBack) + shift), ...history(weeksBack, [0, 2], shift)];
+    for (let weeksBack = 1; weeksBack <= 6; weeksBack += 1) {
+      for (let shift = 0; shift < 7; shift += 1) {
+        const result = risk(restart(weeksBack, shift));
+        expect(result.reasons.some((reason) => reason.startsWith('Belastungsspitze'))).toBe(false);
+        expect(result.tier).toBe('unauffaellig');
+      }
+    }
+    expect(risk(restart(1, 0)).reasons).toContain('Wiedereinstieg – langsam steigern');
   });
 
   it('Wochengrenzen: letzte 7 Tage und die 3 Wochen davor überschneiden sich nicht', () => {
@@ -75,21 +111,62 @@ describe('risk (Belastungsampel)', () => {
   });
 
   it('Wachstum von 0,7 cm pro Monat ergibt einen Hinweis, ab 1,2 einen starken, 0,5 keinen', () => {
-    const growth = (height: number) => risk([], player(), [], [measurement('m1', '2026-09-01', 150), measurement('m2', '2026-10-01', height)]);
-    expect(growth(150.5).tier).toBe('unauffaellig');
-    const hint = growth(150.7);
+    // 92 Tage Abstand (Mindestabstand 90 Tage, SCRUM-305); cm/Monat = cm / Tage × 365,25 / 12.
+    const growth = (height: number) => risk([], player(), [], [measurement('m1', '2026-07-01', 150), measurement('m2', '2026-10-01', height)]);
+    expect(growth(151.5).tier).toBe('unauffaellig');
+    const hint = growth(152.1);
     expect(hint.tier).toBe('beobachten');
     expect(hint.reasons).toEqual(['Wachstumsschub (0,7 cm/Monat)']);
-    const strong = growth(151.3);
+    const strong = growth(154);
     expect(strong.tier).toBe('anpassen');
     expect(strong.reasons[0]).toBe('Starker Wachstumsschub (1,3 cm/Monat)');
   });
 
-  it('Wachstum zählt nur Messungen der letzten 90 Tage (SCRUM-157)', () => {
-    const run = (a: string, b: string) => risk([], player(), [], [measurement('m1', a, 150), measurement('m2', b, 151.5)]);
-    expect(run('2025-09-01', '2025-10-01').tier).toBe('unauffaellig');
-    expect(run('2026-06-01', '2026-10-01').tier).toBe('unauffaellig');
-    expect(run('2026-08-01', '2026-09-01').tier).toBe('anpassen');
+  it('Wachstum: jüngste Messung höchstens 90 Tage alt, Vergleichsmessung 90 bis 365 Tage davor (SCRUM-157, SCRUM-305)', () => {
+    const run = (a: string, b: string) => risk([], player(), [], [measurement('m1', a, 150), measurement('m2', b, 154)]);
+    expect(run('2025-06-01', '2025-09-01').tier).toBe('unauffaellig'); // jüngste Messung über ein Jahr alt
+    expect(run('2026-04-01', '2026-07-15').tier).toBe('unauffaellig'); // jüngste Messung 93 Tage alt
+    expect(run('2025-07-01', '2026-10-01').tier).toBe('unauffaellig'); // 457 Tage Abstand: zu lang für einen Hinweis
+    expect(run('2026-06-01', '2026-09-01').tier).toBe('anpassen'); // 92 Tage Abstand, 45 Tage alt
+  });
+
+  it('zwei Messungen kurz hintereinander lösen keinen Wachstumshinweis aus (SCRUM-305)', () => {
+    // Das Beispiel aus dem Ticket: 0,5 cm an zwei aufeinanderfolgenden Tagen waren vorher „15 cm/Monat“.
+    const consecutive = risk([], player(), [], [measurement('m1', '2026-10-14', 150), measurement('m2', '2026-10-15', 150.5)]);
+    expect(consecutive.tier).toBe('unauffaellig');
+    expect(consecutive.reasons).toEqual([]);
+    // 89 Tage: noch zu kurz; 90 Tage: zählt.
+    expect(risk([], player(), [], [measurement('m1', '2026-07-04', 150), measurement('m2', '2026-10-01', 154)]).reasons).toEqual([]);
+    expect(risk([], player(), [], [measurement('m1', '2026-07-03', 150), measurement('m2', '2026-10-01', 154)]).reasons).toEqual(['Starker Wachstumsschub (1,4 cm/Monat)']);
+    // Eine Messung kurz davor wird übersprungen: Vergleich mit der jüngsten älteren Messung mit mindestens 90 Tagen Abstand
+    // (01.07. → 03.10.: 2,5 cm in 94 Tagen), nicht 1,5 cm in 2 Tagen (vorher „22,5 cm/Monat“).
+    const skipped = risk([], player(), [], [measurement('m1', '2026-07-01', 150), measurement('m2', '2026-10-01', 151), measurement('m3', '2026-10-03', 152.5)]);
+    expect(skipped.reasons).toEqual(['Wachstumsschub (0,8 cm/Monat)']);
+    expect(skipped.tier).toBe('beobachten');
+  });
+
+  it('Wachstum: Ausreißer, markierte und spätere Messungen lösen keinen Hinweis aus (SCRUM-305)', () => {
+    // 6 cm in 92 Tagen = 23,8 cm/Jahr: über 20 cm/Jahr gilt als ungeprüfter Ausreißer (wie im Profil, SCRUM-254).
+    expect(risk([], player(), [], [measurement('m1', '2026-07-01', 150), measurement('m2', '2026-10-01', 156)]).reasons).toEqual([]);
+    // Als auffällig markierte jüngste Messung zählt nicht; dann gibt es keine frische gültige Messung mit Partner.
+    const flagged: Measurement = { ...measurement('m2', '2026-10-01', 154), quality: 'flagged' };
+    expect(risk([], player(), [], [measurement('m1', '2026-07-01', 150), flagged]).reasons).toEqual([]);
+    // Messung nach dem Auswertungstag zählt nicht (Ampel für einen früheren Tag).
+    expect(risk([], player(), [], [measurement('m1', '2026-07-20', 150), measurement('m2', '2026-10-20', 154)]).reasons).toEqual([]);
+  });
+
+  it('Messung nur mit Gewicht zählt nicht als 0 cm Größe (SCRUM-302)', () => {
+    const weightOnly = (id: string, date: string): Measurement => ({ id, date, height: null, weight: 40 });
+    // Nur Gewicht, dann Größe: keine zwei Größenmessungen → kein Wachstumshinweis (vorher „150 cm/Monat“).
+    const single = risk([], player(), [], [weightOnly('m1', '2026-07-01'), measurement('m2', '2026-10-01', 150)]);
+    expect(single.tier).toBe('unauffaellig');
+    expect(single.reasons).toEqual([]);
+    // Gewicht-only zwischen zwei Größenmessungen verdrängt die ältere Größenmessung nicht: 150 → 154 in 92 Tagen.
+    const between = risk([], player(), [], [measurement('m1', '2026-07-01', 150), weightOnly('m2', '2026-09-15'), measurement('m3', '2026-10-01', 154)]);
+    expect(between.reasons).toEqual(['Starker Wachstumsschub (1,3 cm/Monat)']);
+    // Gewicht-only als jüngste Messung: die letzten beiden Größenmessungen zählen (kein Sprung auf 0 cm).
+    const after = risk([], player(), [], [measurement('m1', '2026-07-01', 150), measurement('m2', '2026-10-01', 150.2), weightOnly('m3', '2026-10-10')]);
+    expect(after.tier).toBe('unauffaellig');
   });
 
   it('Intensität 1/2/3 wird als Anstrengung 3/5/7 gelesen und fließt so in die Belastung ein', () => {

@@ -4,7 +4,7 @@ import { FirebaseConnection } from './firebase-connection';
 import type { RawDoc, SnapshotMeta } from './types';
 
 /** Unterkollektionen eines Spielers, die das Profil verwaltet. */
-export type PlayerRecordKind = 'developmentPlans' | 'absences' | 'measurements';
+export type PlayerRecordKind = 'developmentPlans' | 'absences' | 'measurements' | 'growthReviews';
 
 /** Unterdaten eines Spielers: Förderpläne (mit Selbstreflexion), Abwesenheiten und Messwerte. */
 @Injectable({ providedIn: 'root' })
@@ -62,7 +62,7 @@ export class PlayerRecordsApi {
     );
   }
 
-  /** Echtzeit-Abo auf die Messwerte ab dem Stichtag `since` (die Belastungsampel braucht nur die letzten ca. 90 Tage). */
+  /** Echtzeit-Abo auf die Messwerte ab dem Stichtag `since` (die Belastungsampel braucht nur ein begrenztes Fenster). */
   async watchRecentMeasurements(
     playerId: string,
     since: string,

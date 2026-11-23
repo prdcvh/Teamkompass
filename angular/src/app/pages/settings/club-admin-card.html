@@ -2,6 +2,10 @@
   <tk-card>
     <div class="panel">
       <h2>Verein: {{ club.name || club.clubId }}</h2>
+      <p>
+        <a tkButton variant="primary" routerLink="/verein">Vereinsübersicht öffnen</a>
+      </p>
+      <p class="muted">Alle Teams des Vereins mit Trainern, Spielerzahl, Terminen und offenen Einwilligungen – Teams ansehen (nur lesen, ohne Gesundheitsdaten), Trainer einladen und entfernen.</p>
 
       <!-- Name und Logo (SCRUM-182): erscheinen in der App bei allen Teams des Vereins. -->
       <h3>Name und Logo</h3>
@@ -34,10 +38,11 @@
         }
       </div>
 
-      <h3>Trainer einladen</h3>
+      <h3>Neues Team: Trainer einladen</h3>
       <p class="muted">
-        Du bist Vereinsadmin. Lade einen Trainer ein: Er registriert sich mit dem Link, legt ein neues Team in diesem Verein
-        an und wird dessen Trainer. Du siehst dadurch keine Daten seines Teams. Der Link gilt 14 Tage und nur einmal.
+        Lade einen Trainer für ein neues Team ein: Er registriert sich mit dem Link, legt ein neues Team in diesem Verein
+        an und wird dessen Trainer. Der Link gilt 14 Tage und nur einmal. Einen weiteren Trainer für ein bestehendes Team
+        lädst du in der Vereinsübersicht ein.
       </p>
       <label class="field">
         <span>E-Mail des Trainers (empfohlen: dann gilt der Link nur für diese Adresse)</span>

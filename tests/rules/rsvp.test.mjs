@@ -7,7 +7,8 @@ import { readFileSync } from "node:fs";
 import { initializeTestEnvironment, assertFails, assertSucceeds } from "@firebase/rules-unit-testing";
 import { collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, Timestamp } from "firebase/firestore";
 
-const TEAM = "TESTTEAM";
+// Eigenes Team (SCRUM-245): hier gilt die Einwilligungs-Sperre fremder Vereine nicht - die Rollen-Matrix bleibt unveraendert.
+const TEAM = "U14";
 const t = (path) => `teams/${TEAM}/${path}`;
 let env;
 

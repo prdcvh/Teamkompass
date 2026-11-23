@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { type AdminClub, ClubAdminService } from '../../core/registration/club-admin.service';
 import { shrinkLogo } from '../../core/registration/club-logo';
 import { formatInviteCode } from '../../core/registration/registration';
@@ -6,12 +7,12 @@ import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 
 /**
- * Einstellungen → „Verein“ (nur für Vereinsadmins, SCRUM-181): Trainer für ein neues Team im Verein einladen. Der
- * Vereinsadmin sieht dabei keine Spieler- oder Teamdaten (Regeln: nur Verwaltung).
+ * Einstellungen → „Verein“ (nur für Vereinsadmins, SCRUM-181): Name/Logo, Trainer für ein neues Team einladen und der
+ * Weg zur Vereinsübersicht (SCRUM-183: Teams ansehen ohne Gesundheitsdaten, Trainer bestehender Teams verwalten).
  */
 @Component({
   selector: 'tk-club-admin-card',
-  imports: [Button, Card],
+  imports: [Button, Card, RouterLink],
   templateUrl: './club-admin-card.html',
   styleUrl: './settings.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

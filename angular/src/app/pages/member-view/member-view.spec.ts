@@ -17,11 +17,15 @@ describe('MemberView (Ansicht für Spieler, Eltern und Medizin)', () => {
 
   const grades = (grade: number, extra: Record<string, unknown> = {}) => ({ attendance: 'present', effort: grade, technique: grade, tactics: grade, comprehension: grade, ...extra });
 
+  /** Freigabe der Noten (SCRUM-115): veröffentlicht „jetzt“, unbefristet bzw. bis `expiresAt`. */
+  const releaseNow = (firebase: FakeFirebase, expiresAt: Date | null = null) =>
+    firebase.gradeReleases.releases.set('p1', { playerId: 'p1', publishedUntil: new Date(), expiresAt, createdBy: 'coach' });
+
   async function render(role: Role, options: { playerId?: string | null; mutate?: (firebase: FakeFirebase) => void } = {}) {
     const playerId = options.playerId === undefined ? 'p1' : options.playerId;
     firebase = new FakeFirebase();
     firebase.players.players.set('p1', { name: 'Jonas Keller', positions: ['TW'], number: 1, birthdate: '2012-05-05', status: 'Fit', consentStatus: 'granted' });
-    firebase.players.players.set('p2', { name: 'Elias Wagner', positions: ['RV'], number: 2, birthdate: '2012-06-06', status: 'Verletzt', injuryUntil: '2026-12-01' });
+    firebase.players.players.set('p2', { name: 'Elias Wagner', positions: ['RV'], number: 2, birthdate: '2012-06-06', status: 'Verletzt', injuryUntil: '2026-12-01', consentStatus: 'pending' });
     firebase.events.events.set('e1', { type: 'Training', title: 'Training Montag', date: '2026-09-01', intensity: 2, notes: 'Interne Planung' });
     firebase.events.events.set('e2', { type: 'Spiel', title: 'Heimspiel', date: '2026-09-08', goalsFor: 3, goalsAgainst: 1 });
     firebase.ratings.ratings.set('e1', new Map([['p1', grades(3, { playerId: 'p1' })], ['p2', grades(5, { playerId: 'p2', note: 'Nur für Elias' })]]));
@@ -86,34 +90,82 @@ describe('MemberView (Ansicht für Spieler, Eltern und Medizin)', () => {
       expect(firebase.calls.filter((call) => call.startsWith('readPrivateNotes'))).toEqual([]);
     });
 
-    it('zeigt nur das eigene Profil mit eigenen Bewertungen und Rückmeldungen', async () => {
-      const fixture = await render('player');
-      await settled(fixture, () => expect(text(fixture)).toContain('Starkes Spiel'));
+    it('zeigt nur das eigene Profil mit veröffentlichten Noten, nie Kommentare oder fremde Daten', async () => {
+      const fixture = await render('player', { mutate: (f) => releaseNow(f) });
+      await settled(fixture, () => expect(text(fixture, '.grade strong')).toBe('2,0'));
       expect(text(fixture, 'h1')).toBe('Mein Profil');
       expect(text(fixture, '.who strong')).toBe('Jonas Keller');
-      expect(text(fixture, '.grade strong')).toBe('2,0');
       expect(root(fixture).querySelector('select')).toBeNull();
+      expect(text(fixture)).toContain('Notenverlauf');
+      expect(text(fixture, '.release-note')).toContain('veröffentlicht');
+      // SCRUM-115: Kommentare der Bewertung sieht der Spieler nie.
+      expect(text(fixture)).not.toContain('Starkes Spiel');
       // Nichts von anderen Spielern oder internen Notizen.
       expect(text(fixture)).not.toContain('Elias');
       expect(text(fixture)).not.toContain('Nur für Elias');
       expect(text(fixture)).not.toContain('GEHEIME');
       expect(text(fixture)).not.toContain('Interne Planung');
       expect(text(fixture)).not.toContain('Belastungsindikator');
-      expect(text(fixture)).not.toContain('Schnitt der 3 Wochen davor');
+      // SCRUM-138: Der Spieler sieht seine eigene Wochenbelastung, aber nicht die Ampel des Trainers (Stufe, Gründe).
+      expect(text(fixture, '.sr-week')).toContain('Schnitt der 3 Wochen davor');
+      for (const tier of ['Unauffällig', 'Beobachten', 'Anpassen', 'Keine auffälligen Belastungsfaktoren']) expect(text(fixture)).not.toContain(tier);
     });
 
-    it('liest nur das eigene Dokument und eigene Daten, nie Kader, Notizen, Gegner oder Aufstellung', async () => {
-      const fixture = await render('player');
-      await settled(fixture, () => expect(text(fixture)).toContain('Starkes Spiel'));
+    it('liest nur die eigenen Kopien und eigene Daten, nie Bewertungen, Kader, Notizen, Gegner oder Aufstellung', async () => {
+      const fixture = await render('player', { mutate: (f) => releaseNow(f) });
+      await settled(fixture, () => expect(text(fixture, '.grade strong')).toBe('2,0'));
       const calls = firebase.calls;
       expect(calls).toContain('watchPlayerDoc:p1');
       expect(calls).not.toContain('watchPlayers');
-      expect(calls.filter((call) => call.startsWith('watchPrivateNotes') || call.startsWith('watchRatings:'))).toEqual([]);
+      expect(calls.filter((call) => call.startsWith('watchPrivateNotes') || call.startsWith('watchRatings:') || call.startsWith('watchRatingDoc:'))).toEqual([]);
       expect(calls).not.toContain('watchOpponents');
       expect(calls).not.toContain('watchLineup');
-      expect(calls.filter((call) => call.startsWith('watchRatingDoc:')).every((call) => call.endsWith(':p1'))).toBe(true);
+      expect(calls).toContain('watchRelease:p1');
+      expect(calls.filter((call) => call.startsWith('watchValuesDoc:') || call.startsWith('watchGradesDoc:')).every((call) => call.endsWith(':p1'))).toBe(true);
+      expect(calls).toContain('watchGradesDoc:e2:p1');
       // Zusatzdaten nur gefiltert auf die eigene playerId (verlangen die Regeln für Listenabfragen).
       for (const kind of ['developmentPlans', 'absences', 'measurements']) expect(calls).toContain(`ownOnly:p1:${kind}`);
+    });
+
+    it('ohne Veröffentlichung: Werte (Einsätze, Tore, Vorlagen, Anwesenheit) ja, Noten nein (SCRUM-115)', async () => {
+      const fixture = await render('player', {
+        mutate: (f) => f.ratings.ratings.get('e2')!.set('p1', grades(1, { playerId: 'p1', note: 'Starkes Spiel', goals: 2, assists: 1, minutes: 55 })),
+      });
+      await settled(fixture, () => expect(text(fixture)).toContain('Heimspiel'));
+      expect(root(fixture).querySelector('.grade')).toBeNull();
+      expect(text(fixture)).not.toContain('Notenverlauf');
+      expect(text(fixture)).not.toContain('Kompetenzprofil');
+      expect(text(fixture)).not.toContain('Notenschnitt');
+      expect(text(fixture, '.release-note')).toContain('Noten erscheinen hier, sobald der Trainer die Bewertung veröffentlicht');
+      expect(text(fixture)).toContain('55 Min. · 2 Tore · 1 Vorlagen');
+      expect(text(fixture)).toContain('Verfügbarkeit');
+      expect(text(fixture)).toContain('Einsatzminuten55');
+      expect(text(fixture)).toContain('Tore + Vorlagen2 + 1');
+      expect(text(fixture)).not.toContain('Starkes Spiel');
+      // Ohne Freigabe fragt die App keine Noten ab.
+      expect(firebase.calls.filter((call) => call.startsWith('watchGradesDoc:'))).toEqual([]);
+    });
+
+    it('nur Noten bis zum Veröffentlichungszeitpunkt; Zurücknehmen blendet sie sofort aus', async () => {
+      const fixture = await render('player', {
+        mutate: (f) => {
+          // e1 vor, e2 nach dem Klick bewertet.
+          f.ratings.grades.set('e1', new Map([['p1', { playerId: 'p1', grade: 3, effort: 3, technique: 3, tactics: 3, comprehension: 3, ratedAt: new Date(Date.now() - 3_600_000) }]]));
+          f.ratings.grades.set('e2', new Map([['p1', { playerId: 'p1', grade: 1, effort: 1, technique: 1, tactics: 1, comprehension: 1, ratedAt: new Date(Date.now() + 3_600_000) }]]));
+          releaseNow(f);
+        },
+      });
+      await settled(fixture, () => expect(text(fixture, '.grade strong')).toBe('3,0'));
+      firebase.gradeReleases.set('p1', null);
+      await settled(fixture, () => expect(root(fixture).querySelector('.grade')).toBeNull());
+      expect(text(fixture)).not.toContain('Notenverlauf');
+    });
+
+    it('abgelaufene Freigabe zeigt keine Noten', async () => {
+      const fixture = await render('player', { mutate: (f) => releaseNow(f, new Date(Date.now() - 60_000)) });
+      await settled(fixture, () => expect(text(fixture)).toContain('Heimspiel'));
+      expect(root(fixture).querySelector('.grade')).toBeNull();
+      expect(firebase.calls.filter((call) => call.startsWith('watchGradesDoc:'))).toEqual([]);
     });
 
     it('zeigt Förderplan, Abwesenheit und Messwerte; die Selbstreflexion lässt sich speichern', async () => {
@@ -179,10 +231,12 @@ describe('MemberView (Ansicht für Spieler, Eltern und Medizin)', () => {
 
   describe('Eltern', () => {
     it('sehen das Profil des Kindes nur lesend (keine Selbstreflexion)', async () => {
-      const fixture = await render('parent');
+      const fixture = await render('parent', { mutate: (f) => releaseNow(f) });
       await settled(fixture, () => expect(text(fixture)).toContain('Orientierung'));
       expect(text(fixture, 'h1')).toBe('Profil von Jonas Keller');
-      expect(text(fixture)).toContain('Starkes Spiel');
+      // Gleiche Regel wie für Spieler (SCRUM-115): veröffentlichte Noten ja, Kommentare nie.
+      await settled(fixture, () => expect(text(fixture, '.grade strong')).toBe('2,0'));
+      expect(text(fixture)).not.toContain('Starkes Spiel');
       expect(root(fixture).querySelector('textarea')).toBeNull();
       expect(text(fixture)).not.toContain('Elias');
       expect(firebase.calls).not.toContain('watchPlayers');

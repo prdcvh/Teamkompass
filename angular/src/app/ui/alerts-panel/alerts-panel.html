@@ -1,0 +1,60 @@
+@if (alerts.audience()) {
+  <tk-card>
+    <section class="panel" data-testid="alerts-panel" aria-labelledby="alerts-title">
+      <div class="panel-head">
+        <h2 id="alerts-title">Automatische Hinweise</h2>
+        @if (trainer()) {
+          <a class="more" routerLink="/einstellungen">Regeln einstellen</a>
+        }
+      </div>
+
+      @if (!alerts.ready()) {
+        <p class="muted" role="status">Hinweise werden berechnet …</p>
+      } @else {
+        @if (hints().length === 0) {
+          <p class="muted" data-testid="alerts-empty">Gerade keine Hinweise.</p>
+        } @else {
+          <ul class="hints">
+            @for (hint of hints(); track hint.key) {
+              <li class="hint" [attr.data-rule]="hint.ruleId" data-testid="alert-hint">
+                <div class="hint-text">
+                  <span class="rule">{{ hint.title }}</span>
+                  @if (hint.link) {
+                    <a class="subject" [routerLink]="hint.link">{{ hint.subject }}</a>
+                  } @else {
+                    <strong class="subject">{{ hint.subject }}</strong>
+                  }
+                  <span class="detail">{{ hint.detail }}</span>
+                </div>
+                <span class="since">{{ hint.sinceText }}</span>
+              </li>
+            }
+          </ul>
+        }
+        @if (alerts.incomplete()) {
+          <p class="muted" role="status">Das Befinden einzelner Spieler war nicht lesbar; für sie fehlen die Befindens-Hinweise.</p>
+        }
+        @if (!trainer()) {
+          <p class="muted">Du siehst die Hinweise zu Schmerz und Befinden. Welche Regeln laufen, stellt das Trainerteam ein.</p>
+        }
+
+        <details class="log" data-testid="alerts-log">
+          <summary>Protokoll der letzten {{ logDays }} Tage ({{ log().length }})</summary>
+          @if (log().length === 0) {
+            <p class="muted">In den letzten {{ logDays }} Tagen hat keine Regel angeschlagen.</p>
+          } @else {
+            <ul class="log-list">
+              @for (entry of log(); track entry.key + entry.date) {
+                <li data-testid="alert-log-entry">
+                  <span class="when">{{ entry.when }}</span>
+                  <span><strong>{{ entry.title }}</strong> · {{ entry.subject }} – {{ entry.detail }}</span>
+                </li>
+              }
+            </ul>
+          }
+          <p class="muted small">Das Protokoll wird aus den gespeicherten Daten berechnet. Werden Daten nachträglich geändert (z. B. eine Bewertung nachgetragen), passt es sich an.</p>
+        </details>
+      }
+    </section>
+  </tk-card>
+}

@@ -144,7 +144,7 @@ function figures(players: readonly Player[], events: readonly TeamEvent[], ratin
     dashboard: dashboardFigures(data, events, TODAY, NOW),
     leaders: leaders(data, 100),
     teamStats: teamStats(events, ratings, TODAY),
-    teamTrend: teamTrend(events, ratings),
+    teamTrend: teamTrend(events, ratings, TODAY),
     perPlayer: data.map(({ player: p, items }) => ({
       id: p.id,
       lineupGrade: averageGrade(gradedEvents(items)),

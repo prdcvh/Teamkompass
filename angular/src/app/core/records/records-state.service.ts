@@ -36,6 +36,7 @@ export class RecordsStateService {
 
   private unsubscribers: (() => void)[] = [];
   private generation = 0;
+  private healthHidden = false;
 
   constructor() {
     // Ohne Anmeldung dürfen keine Teamdaten im Speicher bleiben.
@@ -45,8 +46,8 @@ export class RecordsStateService {
   }
 
   /** Startet die Abos für den Spieler (ein anderer Spieler beendet die bisherigen). */
-  start(playerId: string): void {
-    if (this.playerId() === playerId) return;
+  start(playerId: string, options: { readonly healthHidden?: boolean } = {}): void {
+    if (this.playerId() === playerId && this.healthHidden === !!options.healthHidden) return;
     this.stop();
     const generation = ++this.generation;
     this.playerId.set(playerId);
@@ -54,10 +55,14 @@ export class RecordsStateService {
     const role = this.session.role();
     // Spieler und Eltern: nur Dokumente mit der eigenen playerId (so verlangen es die Regeln).
     const ownOnly = role === 'player' || role === 'parent';
-    this.expected.set(role === 'physio' ? 2 : 3);
+    // Widerrufene Einwilligung (SCRUM-245): Spieler/Eltern dürfen Abwesenheiten und Messwerte nicht mehr lesen.
+    const health = !(options.healthHidden && role !== 'trainer');
+    this.healthHidden = !!options.healthHidden;
+    this.expected.set((role === 'physio' ? 0 : 1) + (health ? 2 : 0));
     if (role !== 'physio') {
       this.open(generation, playerId, 'developmentPlans', ownOnly, (docs) => this.plans.set(docs.map((entry) => planFromDoc(entry.id, entry.data, today))));
     }
+    if (!health) return;
     this.open(generation, playerId, 'absences', ownOnly, (docs) => this.absences.set(docs.map((entry) => absenceFromDoc(entry.id, entry.data))));
     this.open(generation, playerId, 'measurements', ownOnly, (docs) => this.measurementList.set(docs.map((entry) => measurementFromDoc(entry.id, entry.data, today))));
   }
@@ -72,12 +77,14 @@ export class RecordsStateService {
     this.measurementList.set([]);
     this.answered.set(new Set());
     this.error.set('');
+    this.healthHidden = false;
   }
 
   retry(): void {
     const playerId = this.playerId();
+    const healthHidden = this.healthHidden;
     this.stop();
-    if (playerId) this.start(playerId);
+    if (playerId) this.start(playerId, { healthHidden });
   }
 
   // --- Schreib-Hilfen für die Fach-Services -------------------------------------------------------------------

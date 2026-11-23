@@ -78,6 +78,23 @@ describe('TeamSettingsService (Bundesland, SCRUM-186)', () => {
     expect(service.saveFederalState('XX' as never)).toBe(false);
   });
 
+  it('speichert das Teamziel für Check-ins nur als sinnvolle ganze Zahl (SCRUM-194)', async () => {
+    const firebase = new FakeFirebase();
+    TestBed.configureTestingModule({ providers: [...provideFakeFirebase(firebase)] });
+    TestBed.inject(SessionService).role.set('trainer');
+    const service = TestBed.inject(TeamSettingsService);
+    service.start();
+    await vi.waitFor(() => expect(service.load()).toBe('ready'));
+    expect(service.checkInGoal()).toBeNull();
+    expect(service.saveCheckInGoal(500)).toBe(true);
+    await vi.waitFor(() => expect(firebase.settings.settings).toMatchObject({ checkInGoal: 500 }));
+    expect(service.checkInGoal()).toBe(500);
+    for (const bad of [0, -1, 1.5, 10001]) expect(service.saveCheckInGoal(bad)).toBe(false);
+    expect(service.checkInGoal()).toBe(500);
+    expect(service.saveCheckInGoal(null)).toBe(true);
+    expect(service.checkInGoal()).toBeNull();
+  });
+
   it('lässt nur Trainer das Bundesland ändern', () => {
     const firebase = new FakeFirebase();
     TestBed.configureTestingModule({ providers: [...provideFakeFirebase(firebase)] });

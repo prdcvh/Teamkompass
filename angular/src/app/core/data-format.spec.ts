@@ -120,8 +120,10 @@ describe('Datenformat alte App ↔ Angular', () => {
     const timestamp = (iso: string) => ({ toDate: () => new Date(iso) });
     const member = { role: 'parent', playerId: 'p1', claimedInviteCode: 'abc', expiresAt: timestamp('2027-01-01T00:00:00Z'), createdAt: timestamp('2026-10-01T00:00:00Z') };
     expect(memberEntry({ id: 'u1', data: member })).toMatchObject({ kind: 'member', role: 'parent', playerId: 'p1' });
-    // Bisheriger Scout-Zugang der alten App (Kennung „medical“) wird seit SCRUM-170 als Scout gelesen.
-    const scout = { role: 'medical', createdAt: timestamp('2026-10-01T00:00:00Z') };
+    // Die alte Kennung „medical“ ist seit SCRUM-202 kein Alias für Scout mehr.
+    const old = { role: 'medical', createdAt: timestamp('2026-10-01T00:00:00Z') };
+    expect(memberEntry({ id: 'u2', data: old })).toBeNull();
+    const scout = { role: 'scout', createdAt: timestamp('2026-10-01T00:00:00Z') };
     expect(memberEntry({ id: 'u2', data: scout })).toMatchObject({ role: 'scout', email: '' });
     expect(memberEntry({ id: 'u4', data: { role: 'physio' } })).toMatchObject({ role: 'physio' });
     expect(memberEntry({ id: 'u3', data: { role: 'trainer' } })).toBeNull();

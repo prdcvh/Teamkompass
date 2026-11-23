@@ -45,9 +45,9 @@ describe('ScoutPublishService (Trainer pflegt die Scout-Sicht, SCRUM-170)', () =
     expect(firebase.scout.applied).toHaveLength(1);
   });
 
-  it('bisherige Scout-Konten („medical“) zählen als Scout', async () => {
+  it('SCRUM-202: Konten mit der alten Kennung „medical“ zählen nicht mehr als Scout', async () => {
     const publisher = setup('trainer', { old: { role: 'medical', email: 'alt@x.de' } });
-    await settle(() => expect(publisher.scoutAccounts()).toBe(1));
+    await settle(() => expect(publisher.scoutAccounts()).toBe(0));
   });
 
   it('löscht die Scout-Sicht, wenn es keinen Scout-Zugang (mehr) gibt, und lädt dafür keine Bewertungen', async () => {

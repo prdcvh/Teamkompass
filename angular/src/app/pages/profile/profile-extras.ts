@@ -1,9 +1,11 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { formatDate } from '../../core/events/event';
+import { HEALTH_HIDDEN_TEXT } from '../../core/player/consent';
 import { todayIso } from '../../core/shared/dates';
 import { type Absence, absencePeriodText, absenceTitle, isInjuryAbsence } from '../../core/records/absence';
-import { type Measurement, measurementText } from '../../core/records/measurement';
+import { type Measurement, measurementQuality, measurementText, readingsText } from '../../core/records/measurement';
+import { FLAG_TEXT, QUALITY_TEXT, decimalAgeAt, decimalText, legLengthCm } from '../../core/records/measurement-protocol';
 import { measurementChart } from '../../core/records/measurement-chart';
 import type { DevelopmentPlan } from '../../core/records/plan';
 import { AbsencesService } from '../../core/records/absences.service';
@@ -16,6 +18,8 @@ import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 import { Dialog } from '../../ui/dialog/dialog';
 import { AbsenceDialog } from './absence-dialog';
+import { GrowthVelocityCard } from './growth-velocity-card';
+import { MaturityCard } from './maturity-card';
 import { MeasurementDialog } from './measurement-dialog';
 import { PlanDialog } from './plan-dialog';
 
@@ -26,10 +30,10 @@ interface Deleting {
   readonly text: string;
 }
 
-/** Zusatzdaten im Profil: Förderpläne, Abwesenheiten/Verletzungen und Messwerte (mit Verlaufsdiagramm). */
+/** Zusatzdaten im Profil: Förderpläne, Abwesenheiten/Verletzungen, Messwerte (mit Verlaufsdiagramm) und Reife-Kompass. */
 @Component({
   selector: 'tk-profile-extras',
-  imports: [FormsModule, Button, Card, Dialog, PlanDialog, AbsenceDialog, MeasurementDialog],
+  imports: [FormsModule, Button, Card, Dialog, PlanDialog, AbsenceDialog, MeasurementDialog, MaturityCard, GrowthVelocityCard],
   templateUrl: './profile-extras.html',
   styleUrls: ['./profile-extras.css', '../../ui/chart/chart.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -48,12 +52,28 @@ export class ProfileExtras {
   readonly showPlans = input(true);
   /** Warntext bei widerrufener Einwilligung (leer = keine Warnung); blockiert nichts. */
   readonly consentWarning = input('');
+  /**
+   * Fremder Verein ohne dokumentierte Einwilligung (SCRUM-245): Hinweistext; Abwesenheiten und Messwerte lassen sich
+   * dann nicht anlegen oder ändern (die Regeln sperren es), nur löschen. Leer = keine Sperre.
+   */
+  readonly healthLocked = input('');
+  /** Spieler/Eltern bei widerrufener Einwilligung: Abwesenheiten und Messwerte sind ausgeblendet (SCRUM-245). */
+  readonly healthHidden = input(false);
 
   protected readonly plans = computed(() => [...this.records.plans()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
   protected readonly absences = computed(() => [...this.records.absences()].sort((a, b) => b.from.localeCompare(a.from)));
   protected readonly measurementsNewestFirst = computed(() => [...this.measurementsService.measurements()].reverse());
   protected readonly chart = computed(() => measurementChart(this.measurementsService.measurements(), todayIso()));
   protected readonly canEdit = computed(() => this.editable() && this.records.canWrite());
+  /** Abwesenheiten/Messwerte anlegen und ändern: nicht bei gesperrten Gesundheitsdaten (löschen geht immer). */
+  protected readonly canEditHealth = computed(() => this.canEdit() && !this.healthLocked());
+  protected readonly hiddenText = HEALTH_HIDDEN_TEXT;
+  /**
+   * Einzelmessungen, Sitzhöhe, Beinlänge, Prüfhinweise und Änderungsprotokoll (SCRUM-253): nur Trainer und Medizin –
+   * genau die Rollen, die Messwerte heute erfassen bzw. fachlich auswerten. Spieler/Eltern sehen wie bisher die
+   * verwendeten Werte, dazu nur das Qualitätskennzeichen.
+   */
+  protected readonly showDetails = computed(() => this.canEdit() || this.session.role() === 'physio');
 
   /** Nur der Spieler selbst schreibt die Selbstreflexion (Eltern lesen nur). */
   protected readonly canReflect = computed(() => this.session.role() === 'player');
@@ -72,6 +92,43 @@ export class ProfileExtras {
   protected absenceTitle = absenceTitle;
   protected absencePeriodText = absencePeriodText;
   protected measurementText = measurementText;
+  protected readonly qualityText = QUALITY_TEXT;
+  protected readonly flagText = FLAG_TEXT;
+  protected quality = measurementQuality;
+
+  /** Zeile unter den Werten: Qualität, Uhrzeit, Messstation. */
+  protected measurementMeta(measurement: Measurement): string {
+    return [QUALITY_TEXT[measurementQuality(measurement)], measurement.time ? `${measurement.time} Uhr` : '', measurement.station ?? ''].filter(Boolean).join(' · ');
+  }
+
+  /** Einzelmessungen, Sitzhöhe, Beinlänge und Alter am Messtag (nur Trainer/Medizin). */
+  protected measurementDetails(measurement: Measurement): string[] {
+    const lines: string[] = [];
+    if (measurement.heightReadings?.length) lines.push(`Größe gemessen: ${readingsText(measurement.heightReadings)} cm`);
+    if (measurement.weightReadings?.length) lines.push(`Gewicht gemessen: ${readingsText(measurement.weightReadings)} kg`);
+    if (measurement.sittingHeight) {
+      const raw = readingsText(measurement.sittingReadings);
+      const box = measurement.sittingBoxCm ? ` (abgelesen ${raw} cm, Sitzkasten ${decimalText(measurement.sittingBoxCm)} cm abgezogen)` : raw ? ` (gemessen ${raw} cm)` : '';
+      lines.push(`Sitzhöhe: ${decimalText(measurement.sittingHeight)} cm${box}`);
+      const spread = measurement.flags?.some((flag) => flag === 'height-spread' || flag === 'sitting-spread');
+      const leg = spread ? null : legLengthCm(measurement.height, measurement.sittingHeight);
+      if (leg !== null) lines.push(`Beinlänge: ${decimalText(leg)} cm`);
+    }
+    const age = decimalAgeAt(this.measurementsService.birthdate(), measurement.date);
+    if (age !== null) lines.push(`Alter am Messtag: ${decimalText(age)} Jahre`);
+    return lines;
+  }
+
+  /** Änderungsprotokoll: wann, warum, was vorher galt. */
+  protected changeText(change: NonNullable<Measurement['changes']>[number]): string {
+    const at = new Date(change.at);
+    const when = Number.isNaN(at.getTime())
+      ? change.at
+      : `${String(at.getDate()).padStart(2, '0')}.${String(at.getMonth() + 1).padStart(2, '0')}.${at.getFullYear()} ${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`;
+    const before = measurementText({ id: '', date: '', height: change.before.height, weight: change.before.weight });
+    const sitting = change.before.sittingHeight ? ` · Sitzhöhe ${decimalText(change.before.sittingHeight)} cm` : '';
+    return `Geändert am ${when}: ${change.reason} (vorher ${before}${sitting})`;
+  }
   protected isInjury = isInjuryAbsence;
 
   protected reflectionText(plan: DevelopmentPlan): string {
@@ -149,6 +206,13 @@ export class ProfileExtras {
     } finally {
       this.deleteBusy.set(false);
     }
+  }
+
+  /** Springt zum Abschnitt „Einwilligung“ im Profil. */
+  protected showConsent(): void {
+    const target = document.getElementById('einwilligung');
+    target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    target?.focus({ preventScroll: true });
   }
 
   protected get syncFailed(): boolean {

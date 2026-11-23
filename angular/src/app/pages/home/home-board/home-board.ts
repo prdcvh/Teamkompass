@@ -1,6 +1,5 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { numberLabel } from '../../../core/profile/profile';
 import { type Leader } from '../../../core/team/team';
 
 /** Eintrag der Formkurve: Bestenlisten-Eintrag plus fertig berechnete Anzeigewerte. */
@@ -13,6 +12,8 @@ export type HomeBoardEntry = Leader & {
     readonly label: string;
   };
   readonly trendText: string;
+  /** Schnitt in der Skala des Teams („2,3“ oder „kann es“, SCRUM-188). */
+  readonly gradeText: string;
   readonly tone: string;
   readonly initials: string;
 };
@@ -28,5 +29,4 @@ export type HomeBoardEntry = Leader & {
 export class HomeBoard {
   readonly entries = input.required<readonly HomeBoardEntry[]>();
   readonly mobile = input.required<boolean>();
-  protected readonly numberLabel = numberLabel;
 }
