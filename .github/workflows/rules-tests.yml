@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   rules:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # SCRUM-391 feste Runner-Version, ubuntu-latest (26.04) kann Playwright-Chromium nicht installieren
     steps:
       - uses: actions/checkout@v7
         with:

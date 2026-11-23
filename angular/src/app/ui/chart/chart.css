@@ -63,3 +63,22 @@
   font-size: 12px;
   font-weight: 700;
 }
+
+/* SCRUM-265: Lücke ohne Bewertung (gestrichelt) und Markierung eines Skalenwechsels. */
+.chart .gap {
+  stroke: var(--tk-chart-1);
+  stroke-width: 2;
+  stroke-dasharray: 4 6;
+  opacity: 0.6;
+}
+
+.chart .marker {
+  stroke: var(--tk-muted);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+}
+
+.chart .marker-label {
+  fill: var(--tk-muted);
+  font-size: 11px;
+}

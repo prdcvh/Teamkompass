@@ -33,7 +33,7 @@ describe('MemberView (Ansicht für Spieler, Eltern und Medizin)', () => {
     firebase.ratings.privateNotes.set('e2', new Map([['p1', { playerId: 'p1', note: 'GEHEIME Trainernotiz' }]]));
     firebase.records.playerRecords.set('p1/developmentPlans', new Map([['dp1', { focus: 'Orientierung', goal: 'Blick heben', status: 'In Arbeit', createdAt: '2026-09-01', selfReflection: '', coachReview: 'Gut dran' }]]));
     firebase.records.playerRecords.set('p1/absences', new Map([['ab1', { kind: 'absence', label: 'Schule', from: '2026-09-01', to: '2026-09-02', playerId: 'p1' }]]));
-    firebase.records.playerRecords.set('p1/measurements', new Map([['me1', { date: '2026-07-01', height: '150', weight: '40', playerId: 'p1' }]]));
+    firebase.records.playerRecords.set('p1/measurements', new Map([['me1', { date: '2026-07-02', height: '150', weight: '40', playerId: 'p1' }]]));
     firebase.records.playerRecords.set('p2/absences', new Map([['ab2', { kind: 'injury', label: 'Zerrung', from: '2026-09-01', to: '2026-12-01', playerId: 'p2' }]]));
     // Spieler und Eltern dürfen wie in den Regeln nur ihr eigenes Spielerdokument lesen.
     if (role === 'player' || role === 'parent') firebase.players.readablePlayerDocs = new Set(playerId ? [playerId] : []);
@@ -95,7 +95,8 @@ describe('MemberView (Ansicht für Spieler, Eltern und Medizin)', () => {
       await settled(fixture, () => expect(text(fixture, '.grade strong')).toBe('gut (2,0)'));
       expect(text(fixture, 'h1')).toBe('Mein Profil');
       expect(text(fixture, '.who strong')).toBe('Jonas Keller');
-      expect(root(fixture).querySelector('select')).toBeNull();
+      // Keine Spielerauswahl (nur die Zeitraumwahl des Notenverlaufs, SCRUM-265).
+      expect(root(fixture).querySelector('select:not([data-testid="trend-period"])')).toBeNull();
       expect(text(fixture)).toContain('Notenverlauf');
       expect(text(fixture, '.release-note')).toContain('veröffentlicht');
       // SCRUM-115: Kommentare der Bewertung sieht der Spieler nie.
@@ -174,7 +175,7 @@ describe('MemberView (Ansicht für Spieler, Eltern und Medizin)', () => {
       expect(text(fixture)).toContain('Blick heben');
       expect(text(fixture)).toContain('Trainerreview: Gut dran');
       expect(text(fixture)).toContain('Schule');
-      expect(text(fixture)).toContain('01.07.2026');
+      expect(text(fixture)).toContain('02.07.2026');
 
       const area = root(fixture).querySelector('textarea') as HTMLTextAreaElement;
       area.value = 'Ich achte mehr auf den Blick.';
@@ -253,7 +254,7 @@ describe('MemberView (Ansicht für Spieler, Eltern und Medizin)', () => {
       expect(root(fixture).querySelector('.chart')).toBeNull();
       expect(text(fixture)).not.toContain('Förderpläne');
       expect(text(fixture)).not.toContain('Starkes Spiel');
-      expect(text(fixture)).toContain('01.07.2026');
+      expect(text(fixture)).toContain('02.07.2026');
       const calls = firebase.calls;
       expect(calls.filter((call) => call.startsWith('watchRatingDoc') || call.startsWith('watchRatings') || call.startsWith('watchPrivateNotes'))).toEqual([]);
       expect(calls.filter((call) => call.includes('developmentPlans'))).toEqual([]);
@@ -293,7 +294,7 @@ describe('MemberView (Ansicht für Spieler, Eltern und Medizin)', () => {
       expect(root(fixture).querySelector('.chart')).not.toBeNull();
       expect(text(fixture)).toContain('Einsatzquote');
       expect(text(fixture)).toContain('Heimspiel');
-      for (const hidden of ['Fit', 'Verletzt', 'Schule', 'Zerrung', 'Starkes Spiel', 'GEHEIME', 'Interne Planung', 'Orientierung', 'Verfügbarkeit', '01.07.2026', 'Messwerte', 'Abwesenheiten']) {
+      for (const hidden of ['Fit', 'Verletzt', 'Schule', 'Zerrung', 'Starkes Spiel', 'GEHEIME', 'Interne Planung', 'Orientierung', 'Verfügbarkeit', '02.07.2026', 'Messwerte', 'Abwesenheiten']) {
         expect(text(fixture)).not.toContain(hidden);
       }
       expect(root(fixture).querySelector('tk-profile-extras')).toBeNull();

@@ -11,7 +11,7 @@ on:
       - main
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # SCRUM-391 feste Runner-Version, ubuntu-latest (26.04) kann Playwright-Chromium nicht installieren
     permissions:
       contents: read
     steps:
@@ -56,7 +56,7 @@ jobs:
           retention-days: 1
   build_and_deploy:
     needs: verify
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # SCRUM-391 feste Runner-Version, ubuntu-latest (26.04) kann Playwright-Chromium nicht installieren
     steps:
       - uses: actions/checkout@v7
         with:
