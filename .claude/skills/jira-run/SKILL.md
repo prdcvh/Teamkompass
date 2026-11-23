@@ -23,8 +23,8 @@ Verbindung zu Jira, und der PO sieht hier direkt, was passiert.
    die geplante Aufgabe `trig_017FTV4k2KaLfoyAMJHQ686S` („TeamKompass
    Nachtschicht“). Ihr Prompt (`derived_state.prompt`) enthält das komplette
    Regelwerk für den Run: Nachtplan, ein neuer Sub-Agent pro Ticket,
-   Modellwahl, höchstens 3 parallel im Worktree, Kontrolle, Kontingent, kein
-   Merge während des Runs. Findet sich die Aufgabe unter der ID nicht, per
+   Modellwahl, höchstens 3 parallel im Worktree, Kontrolle, Kontingent, Merge
+   nur für Tickets im Status „Genehmigt“. Findet sich die Aufgabe unter der ID nicht, per
    `list_triggers` nach „TeamKompass Nachtschicht“ suchen. Diesen Prompt
    befolgst du, zusammen mit `CLAUDE.md`, mit den Abweichungen unten.
 2. **Jira verbinden.** Lade die Jira-Tools des Atlassian-Connectors per
@@ -32,6 +32,11 @@ Verbindung zu Jira, und der PO sieht hier direkt, was passiert.
    Server noch verbindet, mehrmals nachfassen statt sofort aufzugeben. Ist
    Jira nach einigen Minuten immer noch nicht da: nichts bauen, dem PO hier
    Bescheid geben.
+2a. **Genehmigte Tickets zuerst mergen.** Suche in Jira ausdrücklich nach
+   `status = Genehmigt` (der Status zählt als „fertig“, eine Suche nach
+   offenen Tickets findet ihn nicht) und merge diese PRs sofort, siehe
+   „Mergen“ unten. Das geschieht vor dem Plan und auch später im Run, sobald
+   ein Ticket in „Genehmigt“ auftaucht.
 3. **Plan hier ins Fenster.** Den Nachtplan (Tickets, Schätzung, Modell,
    Reihenfolge, was parallel läuft, was nicht reinpasst oder auf den PO
    wartet) schreibst du direkt hier in den Chat. **Keine Push-Nachricht**:
@@ -45,19 +50,28 @@ Verbindung zu Jira, und der PO sieht hier direkt, was passiert.
    `send_message`, keine Push-Nachricht.
 6. **Abschlussbericht hier im Fenster**, wie im Regelwerk unter „Zum
    Schluss“: was in Überprüfung ist, was auf eine PO-Entscheidung wartet,
-   warum du aufhörst, Plan gegenüber dem tatsächlichen Verlauf. Am Ende die
-   Frage „Bist du bereit, diese PRs zu mergen?“ mit der Liste der PRs, die
-   deine Kontrolle bestanden haben (PR-Nummer + Ticket). Keine
-   Push-Nachricht.
+   warum du aufhörst, Plan gegenüber dem tatsächlichen Verlauf. Nenne, was
+   wegen „Genehmigt“ gemergt wurde, und liste die PRs, die deine Kontrolle
+   bestanden haben und in Jira noch auf „Genehmigt“ warten (PR-Nummer +
+   Ticket). Keine Frage „Bist du bereit zu mergen?“ mehr. Fragen an den PO
+   gehören als Kommentar ins Ticket, das Ticket geht in den Status „Frage“.
+   Keine Push-Nachricht.
 
 Uhrzeiten nennst du dem PO immer in deutscher Zeit (Europe/Berlin), nicht in
 UTC.
 
-## Mergen nach dem Ja des PO
+## Mergen: sofort bei „Genehmigt“ (PO, 2026-11-23)
 
-Sagt der PO ja (egal zu welcher Tageszeit): die genannten PRs hier mergen,
-einen nach dem anderen. Vor jedem Merge den aktuellen `main` in den PR holen,
-`npm run verify` laufen lassen und prüfen, dass CI grün ist; danach das Ticket
-in Jira auf „Erledigt“ setzen. Draft-PRs, die auf eine PO-Entscheidung warten,
-nicht mergen. Schlägt etwas fehl, nicht mergen, sondern dem PO sagen, was
-fehlt.
+Ein Ticket im Status „Genehmigt“ hat der PO freigegeben. Sein PR wird sofort
+gemergt, egal zu welcher Tageszeit und ohne Rückfrage, einen nach dem anderen:
+den aktuellen `main` in den PR holen, `npm run verify` laufen lassen und
+prüfen, dass CI grün ist; dann mergen und das Ticket in Jira auf „Erledigt“
+setzen. Eine Zeile hier im Fenster dazu („SCRUM-258 → Erledigt, PR #339
+gemergt“).
+
+Nicht mergen, sondern dem PO sagen, was fehlt: Konflikt, der sich nicht sauber
+lösen lässt, rotes `npm run verify` oder rote CI, PR noch Draft oder mit
+offenen blockierenden Review-Kommentaren, PR gehört nicht zu diesem Ticket.
+
+Tickets, die nicht auf „Genehmigt“ stehen (z. B. „In Überprüfung“), werden nie
+gemergt; der PO gibt sie in Jira frei.

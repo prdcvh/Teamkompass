@@ -121,7 +121,10 @@ keeps the board current, reports at sprint end).
 - Unclear or contradictory acceptance criteria → ask the PO before
   building, don't guess.
 - Ticket flow: `Zu erledigen` → `In Bearbeitung` (when starting) →
-  `In Überprüfung` (PR open) → `Erledigt` (merged to `main`, i.e. live).
+  `In Überprüfung` (PR open) → `Genehmigt` (set by the PO only) → `Erledigt`
+  (merged to `main`, i.e. live). Status `Frage` (column "Fragen an den PO"):
+  Claude puts a ticket there with the question as a ticket comment; once the
+  PO has answered, Claude moves it back to `In Bearbeitung`.
   Put the key in the PR title and commits (`SCRUM-15: …`) and comment the PR
   link plus a short "what changed / how to check" on the ticket.
 - **Ticket comments are written for the PO, in plain German (standing
@@ -155,21 +158,29 @@ keeps the board current, reports at sprint end).
   `/jira-run`), during the day Claude does **not** start new tickets unless
   the PO explicitly asks in chat. Answering questions and small Jira
   housekeeping are fine at any time.
-- **Merging is tied to a question, not the time of day (PO, 2026-10-22).** A
-  run (night session or `/jira-run`) never merges on its own. At the end of
-  every run Claude asks the PO whether they are ready to merge, listing the
-  PRs that passed the check. Once the PO says yes, Claude merges them (one at
-  a time, latest `main` brought in and `npm run verify` re-run first) and sets
-  the tickets to `Erledigt`, whatever the time of day. PRs that need a PO
-  decision (see below) stay Draft and are not part of that question.
+- **`Genehmigt` means: merge immediately (PO, 2026-11-23).** A ticket the PO
+  has set to `Genehmigt` is approved by the PO. A run (night session or
+  `/jira-run`) merges its PR at once, without a question and whatever the time
+  of day: at the start of every run (search `status = Genehmigt` explicitly,
+  the status counts as "done" for Jira's status category) and again whenever a
+  ticket is found in `Genehmigt`. One PR at a time, latest `main` brought in,
+  `npm run verify` re-run, CI green, then the ticket goes to `Erledigt`.
+  Not merged and reported to the PO instead: merge conflict that cannot be
+  resolved cleanly, red `npm run verify` or CI, a PR that is still Draft or
+  has unresolved blocking review comments, a PR that does not belong to that
+  ticket. Claude never merges a ticket the PO has not set to `Genehmigt`
+  (`In Überprüfung` stays untouched); at the end of every run Claude still
+  lists those PRs for the PO to approve in Jira. PRs that need a PO decision
+  (see below) stay Draft.
 - **Night-session rules.** Work the active sprint, critical tickets first,
   following everything in this file. Nobody can be asked at night, so
   anything that needs a PO decision (changes to `firestore.rules` or auth with
   uncertain real-world effect, new hosting targets, unclear acceptance
   criteria) stays a **Draft PR**, the ticket goes to `In Überprüfung` with a
-  comment saying exactly what the PO has to decide. Finish with a short
-  report (what is done, what waits for the PO) that ends with the merge
-  question above.
+  comment saying exactly what the PO has to decide (and, when a question is
+  involved, set the ticket to `Frage`). Finish with a short report (what is
+  done, what was merged because it was `Genehmigt`, what waits for the PO
+  approval in Jira).
 - **One sub-agent per ticket (standing instruction from the PO,
   2026-10-15).** In the night session, the main session only orchestrates:
   for each ticket it sends a separate sub-agent (Agent tool, one ticket at a
@@ -181,8 +192,7 @@ keeps the board current, reports at sprint end).
   comment as required above. If something is off, the sub-agent fixes it
   (via SendMessage, or a new sub-agent given a concrete list of the
   problems). Only after that check passes is the PR ready; it is merged and
-  the ticket set to `Erledigt` once the PO answers the end-of-run merge
-  question with yes. Every ticket gets a fresh
+  the ticket set to `Erledigt` once the PO has set the ticket to `Genehmigt`. Every ticket gets a fresh
   sub-agent; one is never reused for a second ticket.
 - **Parallel tickets (PO, 2026-10-15).** At most 3 sub-agents at once, each
   in its own worktree (`isolation: "worktree"`), and only for tickets that
@@ -225,8 +235,8 @@ keeps the board current, reports at sprint end).
   report compares the plan with what actually happened.
 - **Manual runs (`/jira-run`) run in the PO's own session (PO,
   2026-10-22).** No new session is fired: the session where the PO typed the
-  command is the main session. Plan, ticket moves and the final report with
-  the merge question go straight into that chat, with no PushNotification.
+  command is the main session. Plan, ticket moves and the final report go
+  straight into that chat, with no PushNotification.
   Push notifications are only for the automatically scheduled night run.
   Details in `.claude/skills/jira-run/SKILL.md`.
 - **Morning reminder.** A scheduled job (07:49 Europe/Berlin, daily) pushes
