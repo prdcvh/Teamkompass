@@ -116,7 +116,7 @@ function playerSection(report: SeasonReport, logoUrl: string): string {
 <h2>Entwicklung des Kompetenzprofils</h2>
 <div class="table-wrap">
 <table>
-  <thead><tr><th>Monat</th><th>Bewertete Termine</th><th>Einsatz</th><th>Fehlerquote</th><th>Entscheidungsfindung</th><th>Lernfähigkeit</th><th>${heading}</th></tr></thead>
+  <thead><tr><th>Monat</th><th>Bewertete Termine</th><th>Einsatz</th><th>Fehlerquote</th><th>Spielwirkung</th><th>Lernfähigkeit</th><th>${heading}</th></tr></thead>
   <tbody>${monthRows || '<tr><td colspan="7">Keine Bewertungen im Zeitraum.</td></tr>'}</tbody>
 </table>
 </div>

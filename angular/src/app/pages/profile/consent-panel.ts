@@ -17,6 +17,7 @@ import { SquadService } from '../../core/player/squad.service';
 import { AbsencesService } from '../../core/records/absences.service';
 import { hasMaturityData } from '../../core/records/maturity';
 import { MaturityService } from '../../core/records/maturity.service';
+import { GrowthReviewsService } from '../../core/records/growth-reviews.service';
 import { MeasurementsService } from '../../core/records/measurements.service';
 import { RecordsStateService } from '../../core/records/records-state.service';
 import { todayIso } from '../../core/shared/dates';
@@ -26,7 +27,7 @@ import { Card } from '../../ui/card/card';
 import { Dialog } from '../../ui/dialog/dialog';
 import { HealthReasonsTask } from './health-reasons-task';
 
-type Pending = 'grant' | 'status' | 'absences' | 'measurements' | 'maturity';
+type Pending = 'grant' | 'status' | 'absences' | 'measurements' | 'maturity' | 'growthReviews';
 
 /**
  * Einwilligung im Spielerprofil (nur Trainer, SCRUM-245): Stand der Einwilligung mit Datum und wer sie eingetragen hat,
@@ -51,10 +52,10 @@ type Pending = 'grant' | 'status' | 'absences' | 'measurements' | 'maturity';
           <div class="task" role="region" aria-labelledby="task-title">
             <h3 id="task-title">Aufgabe: Gesundheitsdaten prüfen und löschen</h3>
             <p>Die Einwilligung ist widerrufen. Spieler, Eltern und Medizin sehen diese Daten nicht mehr – du schon. Bitte prüfen und löschen, was nicht aus einem anderen Grund aufbewahrt werden muss. Gelöscht wird erst nach deiner Bestätigung.</p>
-            @if (!records.ready() || !maturityLoaded()) {
+            @if (!records.ready() || !maturityLoaded() || !reviewsLoaded()) {
               <p class="muted" role="status">Daten werden geladen …</p>
             } @else if (nothingLeft()) {
-              <p class="done">Keine Gesundheitsdaten mehr gespeichert (Status, Abwesenheiten, Messwerte, Angaben für den Reife-Kompass).</p>
+              <p class="done">Keine Gesundheitsdaten mehr gespeichert (Status, Abwesenheiten, Messwerte, Angaben für den Reife-Kompass, Prüfungen „Wachstum und Belastung“).</p>
             } @else {
               <ul>
                 @if (statusStored()) {
@@ -81,7 +82,16 @@ type Pending = 'grant' | 'status' | 'absences' | 'measurements' | 'maturity';
                     <button tkButton size="sm" type="button" class="danger" (click)="ask('maturity')">Angaben löschen</button>
                   </li>
                 }
+                @if (reviews.reviews().length > 0) {
+                  <li data-test="consent-task-growth-reviews">
+                    <span>{{ reviews.reviews().length }} Prüfung(en) „Wachstum und Belastung“ (Notizen am Förderplan)</span>
+                    <button tkButton size="sm" type="button" class="danger" (click)="ask('growthReviews')">Alle löschen</button>
+                  </li>
+                }
               </ul>
+              @if (reviews.state() === 'error') {
+                <p class="error" role="alert">{{ reviews.error() }}</p>
+              }
               @if (maturity.state() === 'error') {
                 <p class="error" role="alert">{{ maturity.error() }}</p>
               }
@@ -124,6 +134,7 @@ export class ConsentPanel {
   private readonly absences = inject(AbsencesService);
   private readonly measurements = inject(MeasurementsService);
   protected readonly maturity = inject(MaturityService);
+  protected readonly reviews = inject(GrowthReviewsService);
   private readonly team = inject(CurrentTeam);
   private readonly files = inject(FileOutput);
 
@@ -139,13 +150,17 @@ export class ConsentPanel {
   /** Angaben für den Reife-Kompass (SCRUM-252) dieses Spielers geladen (oder nicht ladbar – dann Fehlermeldung)? */
   protected readonly maturityLoaded = computed(() => this.maturity.playerId() === this.player().id && ['ready', 'error'].includes(this.maturity.state()));
   protected readonly maturityStored = computed(() => this.maturityLoaded() && hasMaturityData(this.maturity.inputs()));
+  /** Prüfungen „Wachstum und Belastung“ (SCRUM-257) dieses Spielers geladen (oder nicht ladbar)? */
+  protected readonly reviewsLoaded = computed(() => this.reviews.playerId() === this.player().id && ['ready', 'error'].includes(this.reviews.state()));
   protected readonly nothingLeft = computed(
     () =>
       !this.statusStored() &&
       this.records.absences().length === 0 &&
       this.records.measurementList().length === 0 &&
       !this.maturityStored() &&
-      this.maturity.state() !== 'error',
+      this.maturity.state() !== 'error' &&
+      this.reviews.reviews().length === 0 &&
+      this.reviews.state() !== 'error',
   );
   protected readonly stateLabel = computed(() => {
     const player = this.player();
@@ -182,6 +197,8 @@ export class ConsentPanel {
         return `Alle ${this.records.absences().length} Abwesenheiten/Verletzungen von ${name} werden gelöscht. Das lässt sich nicht rückgängig machen.`;
       case 'measurements':
         return `Alle ${this.records.measurementList().length} Messwerte von ${name} werden gelöscht. Das lässt sich nicht rückgängig machen.`;
+      case 'growthReviews':
+        return `Alle ${this.reviews.reviews().length} Prüfungen „Wachstum und Belastung“ von ${name} (Datum, Trainer, Maßnahme) werden gelöscht. Die Förderpläne selbst bleiben. Das lässt sich nicht rückgängig machen.`;
       case 'maturity':
         return `Die Angaben für den Reife-Kompass von ${name} (Größe der Eltern, Einverständnis der Eltern, Geschlecht für die Formel) werden gelöscht. Ein Reifestand lässt sich danach nicht mehr berechnen. Das lässt sich nicht rückgängig machen.`;
       default:
@@ -239,6 +256,7 @@ export class ConsentPanel {
       return true;
     }
     if (kind === 'maturity') return this.maturity.remove(player.id);
+    if (kind === 'growthReviews') return this.reviews.removeAll();
     for (const measurement of [...this.records.measurementList()]) if (!(await this.measurements.deleteMeasurement(measurement.id))) return false;
     return true;
   }
