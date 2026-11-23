@@ -1,6 +1,6 @@
 /** Druckbarer Saisonbericht (SCRUM-196): ein Dokument mit einer Seite (oder mehr) je Spieler. Jeder Nutzertext wird maskiert (SCRUM-13). */
 import { formatDate } from '../shared/dates';
-import { scoreLabel } from '../ratings/rating-scale';
+import { scoreWithWord } from '../ratings/rating-scale';
 import { escapeHtml } from './profile-report';
 import type { SeasonReport } from './season-report';
 
@@ -53,7 +53,7 @@ function trendText(report: SeasonReport): string {
 
 function playerSection(report: SeasonReport, logoUrl: string): string {
   const e = escapeHtml;
-  const label = (value: number | null) => scoreLabel(value, report.scale);
+  const label = (value: number | null) => scoreWithWord(value, report.scale);
   const heading = report.scale === 'levels' ? 'Ø Stufe' : 'Ø Note';
   const a = report.attendance;
   const quote = a.counted ? Math.round((a.took / a.counted) * 100) : 0;
@@ -116,7 +116,7 @@ function playerSection(report: SeasonReport, logoUrl: string): string {
 <h2>Entwicklung des Kompetenzprofils</h2>
 <div class="table-wrap">
 <table>
-  <thead><tr><th>Monat</th><th>Bewertete Termine</th><th>Einsatz</th><th>Fehlerquote</th><th>Entscheidungsfindung</th><th>Lernfähigkeit</th><th>${heading}</th></tr></thead>
+  <thead><tr><th>Monat</th><th>Bewertete Termine</th><th>Einsatz</th><th>Fehlerquote</th><th>Spielwirkung</th><th>Lernfähigkeit</th><th>${heading}</th></tr></thead>
   <tbody>${monthRows || '<tr><td colspan="7">Keine Bewertungen im Zeitraum.</td></tr>'}</tbody>
 </table>
 </div>

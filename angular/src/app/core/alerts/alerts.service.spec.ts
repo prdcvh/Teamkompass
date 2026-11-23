@@ -40,6 +40,20 @@ describe('AlertsService (Wenn-dann-Regeln)', () => {
     expect(firebase.calls.filter((call) => call.startsWith('watchSelfReports:p1:wellness')).length).toBe(2);
   });
 
+  it('Trainer lädt die Prüfungen „Wachstum und Belastung“ (SCRUM-257), Medizin nicht', async () => {
+    const { session, firebase } = setup();
+    session.role.set('physio');
+    const service = TestBed.inject(AlertsService);
+    service.start();
+    await vi.waitFor(() => expect(service.ready()).toBe(true));
+    expect(firebase.calls.some((call) => call.includes('growthReviews'))).toBe(false);
+    session.role.set('trainer');
+    TestBed.tick();
+    service.start();
+    await vi.waitFor(() => expect(service.ready()).toBe(true));
+    expect(firebase.calls).toContain('watchPlayerRecords:p1:growthReviews');
+  });
+
   it('startet für Spieler, Eltern und Scouts nichts', () => {
     const { session, firebase } = setup();
     for (const role of ['player', 'parent', 'scout'] as const) {

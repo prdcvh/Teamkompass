@@ -86,6 +86,10 @@
       </p>
     }
 
+    @if (consistency(); as check) {
+      <tk-match-check [check]="check" />
+    }
+
     <div class="toolbar">
       <div class="progress" [attr.data-complete]="progress().total > 0 && progress().done === progress().total">
         <span class="progress-label">{{ progress().done }} von {{ progress().total }} Spielern erfasst</span>
@@ -153,7 +157,7 @@
             @for (field of gradeFields; track field) {
               <div class="field" role="group" [attr.aria-label]="gradeLabels[field] + ': ' + player.name">
                 <span class="label">{{ gradeLabels[field] }}</span>
-                <div class="chips" [class.levels]="usesLevels(player)">
+                <div class="chips" [class.levels]="usesLevels(player)" [class.steps]="!usesLevels(player)">
                   <button type="button" class="chip" [attr.aria-pressed]="ratings.ratingFor(player.id)[field] === null" [attr.aria-label]="gradeLabels[field] + ' nicht erfasst'" (click)="set(player, field, '')">–</button>
                   @for (option of optionsFor(player); track option.value) {
                     <button type="button" class="chip" [attr.aria-pressed]="ratings.ratingFor(player.id)[field] === option.value" [attr.aria-label]="gradeLabels[field] + ' ' + option.aria" (click)="set(player, field, '' + option.value)">{{ option.label }}</button>
@@ -197,7 +201,7 @@
           <p class="scale-legend muted">Kompetenzstufen: <b>lernt</b> = lernt es noch · <b>kann</b> = kann es · <b>sicher</b> = kann es sicher</p>
         }
         <div class="table-wrap">
-          <table [class.game]="isGame()">
+          <table [class.game]="isGame()" [class.words]="scale() === 'grades'">
             <thead>
               <tr>
                 <th scope="col" class="col-player">Spieler</th>
@@ -247,7 +251,7 @@
                       <select class="tk-input grade-select" [attr.aria-label]="gradeLabels[field] + ': ' + player.name" [value]="ratings.ratingFor(player.id)[field] ?? ''" (change)="set(player, field, valueOf($event))">
                         <option value="" [selected]="ratings.ratingFor(player.id)[field] === null">–</option>
                         @for (option of optionsFor(player); track option.value) {
-                          <option [value]="option.value" [title]="option.label" [selected]="ratings.ratingFor(player.id)[field] === option.value">{{ option.short }}</option>
+                          <option [value]="option.value" [title]="option.aria" [selected]="ratings.ratingFor(player.id)[field] === option.value">{{ option.short }}</option>
                         }
                       </select>
                     </td>

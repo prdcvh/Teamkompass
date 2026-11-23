@@ -28,13 +28,15 @@ import { injuryRisk, playerLoadCurve } from '../../core/analysis/risk';
 import { canCreateLoadReport } from '../../core/analysis/load-report';
 import { SessionService } from '../../core/auth/session.service';
 import { ratingScaleOf } from '../../core/ratings/rating';
-import { scoreLabel } from '../../core/ratings/rating-scale';
+import { scoreLabel, scoreWithWord } from '../../core/ratings/rating-scale';
 import { RatingScaleService } from '../../core/ratings/rating-scale.service';
 import { SquadService } from '../../core/player/squad.service';
 import { SyncService } from '../../core/shell/sync.service';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
 import { Status } from '../../ui/status/status';
+import { GrowthLoadCard } from './growth-load-card';
+import { GrowthReviewsService } from '../../core/records/growth-reviews.service';
 import { LoadCurveCard } from './load-curve-card';
 import { LoadReportAction } from './load-report-action';
 import { ProfileExtras } from './profile-extras';
@@ -49,7 +51,7 @@ import { healthLockedMessage, mayStoreHealth } from '../../core/player/consent';
 /** Spielerprofil (Figma: Profil Desktop/Handy): Kopfbereich, Notenverlauf, Kompetenzprofil, Verfügbarkeit, Statistik, Eventhistorie. */
 @Component({
   selector: 'app-profile',
-  imports: [Button, Card, Status, ProfileExtras, LoadReportAction, LoadCurveCard, ConsentPanel, GradeReleasePanel, SelfReportHistory, LearningSummary, CohortCard],
+  imports: [Button, Card, Status, ProfileExtras, LoadReportAction, LoadCurveCard, GrowthLoadCard, ConsentPanel, GradeReleasePanel, SelfReportHistory, LearningSummary, CohortCard],
   templateUrl: './profile.html',
   // Reihenfolge = Kaskade (die Handy-Regeln überschreiben Kopf und Auswertung).
   styleUrls: ['./profile.css', './profile-stats.css', './profile-mobile.css', './profile-risk.css', '../../ui/chart/chart.css'],
@@ -63,6 +65,7 @@ export class Profile implements OnInit {
   protected readonly records = inject(RecordsStateService);
   private readonly selfReports = inject(SelfReportsService);
   private readonly measurements = inject(MeasurementsService);
+  private readonly growthReviews = inject(GrowthReviewsService);
   protected readonly sync = inject(SyncService);
   private readonly session = inject(SessionService);
   private readonly team = inject(CurrentTeam);
@@ -157,10 +160,12 @@ export class Profile implements OnInit {
           this.profile.start(player.id);
           this.records.start(player.id);
           this.selfReports.start(player.id);
+          this.growthReviews.start(player.id);
         } else {
           this.profile.stop();
           this.records.stop();
           this.selfReports.stop();
+          this.growthReviews.stop();
         }
       });
     });
@@ -185,7 +190,7 @@ export class Profile implements OnInit {
   protected positionText = positionText;
   protected readonly noteWord = noteWord;
   /** Schnitt (Gesamt, Kompetenzprofil) in der Skala des Teams. */
-  protected gradeLabel = (value: number | null): string => scoreLabel(value, this.scale());
+  protected gradeLabel = (value: number | null): string => scoreWithWord(value, this.scale());
 
   /** Eine einzelne Bewertung in der Skala, mit der sie vergeben wurde (alte Schulnoten bleiben Schulnoten). */
   protected entryScale(entry: GradedEvent) {

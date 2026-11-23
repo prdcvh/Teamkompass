@@ -26,14 +26,14 @@ describe('Settings: Automatische Hinweise (SCRUM-195)', () => {
       fixture.detectChanges();
       expect(toggle(fixture, 'pain')?.disabled).toBe(false);
     });
-    const ids = ['pain', 'wellness', 'loadSpike', 'consentRevoked', 'openRatings'];
-    expect(ids.map((id) => toggle(fixture, id)?.checked)).toEqual([true, true, true, true, true]);
+    const ids = ['pain', 'wellness', 'loadSpike', 'growthLoad', 'consentRevoked', 'openRatings'];
+    expect(ids.map((id) => toggle(fixture, id)?.checked)).toEqual([true, true, true, true, true, true]);
     expect(root(fixture).querySelector('[data-testid="alert-rules"]')?.textContent).toContain('Bitte schau in die App.');
     const input = toggle(fixture, 'openRatings')!;
     input.checked = false;
     input.dispatchEvent(new Event('change'));
     await vi.waitFor(() =>
-      expect(firebase.settings.settings).toEqual({ alertRules: { pain: true, wellness: true, loadSpike: true, consentRevoked: true, openRatings: false } }),
+      expect(firebase.settings.settings).toEqual({ alertRules: { pain: true, wellness: true, loadSpike: true, growthLoad: true, consentRevoked: true, openRatings: false } }),
     );
   });
 });

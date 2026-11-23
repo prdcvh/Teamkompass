@@ -65,7 +65,7 @@ describe('Bewertungsskala (SCRUM-188)', () => {
     await vi.waitFor(() => expect(firebase.calls).toContain('saveRating:e1:p1'));
     expect(firebase.ratings.ratings.get('e1')?.get('p1')).toMatchObject({ effort: 4.5, scale: 'levels' });
     const old = root(fixture).querySelector<HTMLSelectElement>('select[aria-label="Einsatz: Elias Wagner"]')!;
-    expect([...old.options].map((option) => option.text)).toEqual(['–', '1', '2', '3', '4', '5', '6']);
+    expect([...old.options].map((option) => option.text)).toEqual(['–', 'sehr gut', 'gut', 'befriedigend', 'ausreichend', 'mangelhaft', 'ungenügend']);
     expect(firebase.ratings.ratings.get('e1')?.get('p2')).not.toHaveProperty('scale');
   });
 
@@ -85,7 +85,7 @@ describe('Bewertungsskala (SCRUM-188)', () => {
     setup({ label: 'U14' });
     const fixture = await renderRating();
     const select = root(fixture).querySelector<HTMLSelectElement>('select[aria-label="Einsatz: Jonas Keller"]')!;
-    expect([...select.options].map((option) => option.text)).toEqual(['–', '1', '2', '3', '4', '5', '6']);
+    expect([...select.options].map((option) => option.text)).toEqual(['–', 'sehr gut', 'gut', 'befriedigend', 'ausreichend', 'mangelhaft', 'ungenügend']);
   });
 
   it('Einstellungen: Trainer wechselt die Skala, keine Bewertung wird geschrieben', async () => {

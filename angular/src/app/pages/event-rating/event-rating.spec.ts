@@ -165,7 +165,7 @@ describe('EventRating (Event bewerten)', () => {
     it('berechnet die Gesamtnote beim Erfassen der Teilnoten', async () => {
       const fixture = await render();
       pick(q<HTMLSelectElement>(fixture, 'select[aria-label="Anwesenheit: Elias Wagner"]')!, 'present');
-      for (const [label, value] of [['Einsatz', '1'], ['Fehlerquote', '1'], ['Entscheidungsfindung', '1'], ['Lernfähigkeit', '2']]) {
+      for (const [label, value] of [['Einsatz', '1'], ['Fehlerquote', '1'], ['Spielwirkung', '1'], ['Lernfähigkeit', '2']]) {
         pick(q<HTMLSelectElement>(fixture, `select[aria-label="${label}: Elias Wagner"]`)!, value);
       }
       fixture.detectChanges();
@@ -276,11 +276,11 @@ describe('EventRating (Event bewerten)', () => {
       fixture.detectChanges();
       pick(q<HTMLSelectElement>(fixture, 'select[aria-label="Anwesenheit: Elias Wagner"]')!, 'present');
       fixture.detectChanges();
-      for (const label of ['Einsatz', 'Fehlerquote', 'Entscheidungsfindung', 'Lernfähigkeit']) {
-        q<HTMLButtonElement>(fixture, `button[aria-label="${label} Note 2"]`)!.click();
+      for (const label of ['Einsatz', 'Fehlerquote', 'Spielwirkung', 'Lernfähigkeit']) {
+        q<HTMLButtonElement>(fixture, `button[aria-label="${label} gut, Note 2"]`)!.click();
         fixture.detectChanges();
       }
-      expect(q(fixture, 'button[aria-label="Einsatz Note 2"]')?.getAttribute('aria-pressed')).toBe('true');
+      expect(q(fixture, 'button[aria-label="Einsatz gut, Note 2"]')?.getAttribute('aria-pressed')).toBe('true');
       expect(text(q(fixture, '.card-head'))).toContain('Gesamtnote 2,0');
       await vi.waitFor(() => expect(firebase.ratings.ratings.get('e1')?.get('p2')).toMatchObject({ attendance: 'present', grade: 2, effort: 2, comprehension: 2 }));
       q<HTMLButtonElement>(fixture, 'button[aria-label="Einsatz nicht erfasst"]')!.click();

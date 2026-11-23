@@ -1,0 +1,157 @@
+:host {
+  display: block;
+}
+
+.panel {
+  display: grid;
+  gap: var(--tk-space-3);
+  padding: var(--tk-space-4);
+}
+
+h2,
+h3,
+p,
+dl,
+dd {
+  margin: 0;
+}
+
+h2 {
+  font-size: var(--tk-text-lg);
+}
+
+h3 {
+  font-size: var(--tk-text-base, 1rem);
+}
+
+.muted,
+small {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+.error {
+  color: var(--tk-red);
+  font-weight: 600;
+}
+
+.note {
+  padding: var(--tk-space-3);
+  background: var(--tk-surface);
+  border: 1px solid var(--tk-line);
+  border-radius: var(--tk-radius-lg);
+  font-size: var(--tk-text-sm);
+}
+
+.filters,
+.presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tk-space-3);
+  align-items: end;
+}
+
+.filters label {
+  display: grid;
+  gap: 4px;
+  font-size: var(--tk-text-sm);
+  color: var(--tk-muted);
+}
+
+.filters input,
+.filters select {
+  min-height: 44px;
+  padding: 0 var(--tk-space-2);
+  font: inherit;
+  color: var(--tk-text, inherit);
+  background: var(--tk-surface);
+  border: 1px solid var(--tk-line);
+  border-radius: var(--tk-radius-md, 8px);
+}
+
+.coverage {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--tk-space-3);
+}
+
+.coverage div {
+  display: grid;
+  gap: 2px;
+  padding: var(--tk-space-3);
+  background: var(--tk-surface);
+  border: 1px solid var(--tk-line);
+  border-radius: var(--tk-radius-lg);
+}
+
+.coverage dt {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+.coverage dd {
+  font-weight: 600;
+}
+
+/* Tabelle scrollt bei schmaler Breite im eigenen Rahmen, nicht die Seite. */
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--tk-line);
+  border-radius: var(--tk-radius-lg);
+}
+
+table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: var(--tk-space-2) var(--tk-space-3);
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--tk-line);
+}
+
+thead th,
+tfoot th,
+tfoot td {
+  background: var(--tk-surface);
+  font-size: var(--tk-text-sm);
+}
+
+td {
+  display: table-cell;
+}
+
+td strong,
+td span,
+td small {
+  display: block;
+}
+
+td.small {
+  background: var(--tk-soft-amber, var(--tk-surface));
+}
+
+td .flag {
+  font-weight: 600;
+}
+
+td.sum {
+  border-left: 1px solid var(--tk-line);
+}
+
+.explain {
+  display: grid;
+  gap: var(--tk-space-2);
+  font-size: var(--tk-text-sm);
+}
+
+.explain ul {
+  display: grid;
+  gap: var(--tk-space-2);
+  margin: 0;
+  padding-left: 1.2em;
+}
