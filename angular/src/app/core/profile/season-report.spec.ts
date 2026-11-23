@@ -149,6 +149,11 @@ describe('seasonReportsHtml', () => {
     expect(html).toContain('Zweiter');
   });
 
+  it('nennt die Teilnoten im Monatsverlauf wie in der Bewertung', () => {
+    expect(html).toContain('<th>Einsatz</th><th>Fehlerquote</th><th>Spielwirkung</th><th>Lernfähigkeit</th>');
+    expect(html).not.toContain('Entscheidungsfindung');
+  });
+
   it('meldet fehlende Daten', () => {
     const empty = seasonReportsHtml([buildSeasonReport({ ...base, items: [], plans: [], paths: [], comment: '' })]);
     expect(empty).toContain('Keine Bewertungen im Zeitraum.');

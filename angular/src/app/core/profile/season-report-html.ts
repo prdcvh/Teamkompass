@@ -1,5 +1,6 @@
 /** Druckbarer Saisonbericht (SCRUM-196): ein Dokument mit einer Seite (oder mehr) je Spieler. Jeder Nutzertext wird maskiert (SCRUM-13). */
 import { formatDate } from '../shared/dates';
+import { GRADE_FIELDS, GRADE_LABELS } from '../ratings/rating';
 import { scoreLabel } from '../ratings/rating-scale';
 import { escapeHtml } from './profile-report';
 import type { SeasonReport } from './season-report';
@@ -61,7 +62,7 @@ function playerSection(report: SeasonReport, logoUrl: string): string {
   const monthRows = report.months
     .map(
       (month) =>
-        `<tr><td>${e(monthLabel(month.month))}</td><td>${month.events}</td>${(['effort', 'technique', 'tactics', 'comprehension'] as const)
+        `<tr><td>${e(monthLabel(month.month))}</td><td>${month.events}</td>${GRADE_FIELDS
           .map((field) => `<td>${e(label(month.skills[field]))}</td>`)
           .join('')}<td><strong>${e(label(month.overall))}</strong></td></tr>`,
     )
@@ -116,7 +117,7 @@ function playerSection(report: SeasonReport, logoUrl: string): string {
 <h2>Entwicklung des Kompetenzprofils</h2>
 <div class="table-wrap">
 <table>
-  <thead><tr><th>Monat</th><th>Bewertete Termine</th><th>Einsatz</th><th>Fehlerquote</th><th>Entscheidungsfindung</th><th>Lernfähigkeit</th><th>${heading}</th></tr></thead>
+  <thead><tr><th>Monat</th><th>Bewertete Termine</th>${GRADE_FIELDS.map((field) => `<th>${GRADE_LABELS[field]}</th>`).join('')}<th>${heading}</th></tr></thead>
   <tbody>${monthRows || '<tr><td colspan="7">Keine Bewertungen im Zeitraum.</td></tr>'}</tbody>
 </table>
 </div>
