@@ -212,6 +212,18 @@ for (const [index, playerId] of ['p2', 'p3', 'p4'].entries()) {
   fake.puzzles.answers.set(`r1_${playerId}`, { puzzleId: 'r1', playerId, choice: index === 0 ? 1 : 0, by: 'player', answeredAt: Date.parse('2026-11-02T17:00:00Z') + index });
   fake.puzzles.answers.set(`r2_${playerId}`, { puzzleId: 'r2', playerId, choice: 1, by: 'player', answeredAt: Date.parse('2026-11-03T17:00:00Z') + index });
 }
+// Taktikdiagnostik (SCRUM-267): Szenen von p1 aus Spiel e2 und Training e1 (eine unklar, eine mit langem Kontext und Videolink).
+const sceneBase = { playerId: 'p1', by: 'Trainer', byUid: 'e2e-uid', createdAt: '2026-10-11T10:00:00.000Z', videoUrl: '' };
+const e2 = { eventId: 'e2', eventDate: '2026-10-10', eventType: 'Spiel', eventTitle: 'Heimspiel gegen die SG Eintracht Oberursel-Steinbach' };
+const e1 = { eventId: 'e1', eventDate: '2026-10-13', eventType: 'Training', eventTitle: 'Spiel in die Tiefe' };
+[
+  { ...e2, minute: 12, context: 'Aufbau gegen hohes Pressing, Stand 0:0', decision: 'good', execution: 'fail', situations: ['pass', 'scanning'] },
+  { ...e2, minute: 34, context: 'Ballgewinn im Mittelfeld, Umschalten auf rechts', decision: 'good', execution: 'success', situations: ['transition'], videoUrl: 'https://video.example.org/intern/heimspiel-oberursel/szene-34-mit-sehr-langem-dateinamen' },
+  { ...e2, minute: 51, context: 'Sehr langer Kontext ohne Leerzeichen Gegenpressingsituationnachballverlustimzentrum', decision: 'poor', execution: null, situations: ['pressing', 'cover'] },
+  { ...e2, minute: 66, context: 'Kamera verdeckt', decision: 'unclear', execution: null, situations: [] },
+  { ...e1, minute: 20, context: 'Spielform 4 gegen 4, Raum hinter der Kette', decision: 'good', execution: 'success', situations: ['space'] },
+  { ...e1, minute: 41, context: 'Spielform 4 gegen 4, Abschluss', decision: 'good', execution: 'unclear', situations: [] },
+].forEach((scene, index) => fake.tacticScenes.scenes.set(`ts${index + 1}`, { ...sceneBase, ...scene }));
 if (new URLSearchParams(location.search).get('as') === 'fresh') {
   fake.players.players.clear();
   fake.events.events.clear();

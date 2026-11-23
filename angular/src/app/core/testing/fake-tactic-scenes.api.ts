@@ -1,7 +1,11 @@
 import type { TacticSceneFilter, TacticScenesApi } from '../firebase/tactic-scenes.api';
 import type { RawDoc } from '../firebase/types';
 
-type Listener = { readonly filter: TacticSceneFilter; readonly onData: (docs: RawDoc[]) => void; readonly onError: (error: unknown) => void };
+interface Listener {
+  readonly filter: TacticSceneFilter;
+  readonly onData: (docs: RawDoc[]) => void;
+  readonly onError: (error: unknown) => void;
+}
 
 /**
  * Ersatz für {@link TacticScenesApi} in Tests: Szenen im Speicher, Abos werden sofort bedient. Eigene Aufrufliste,
