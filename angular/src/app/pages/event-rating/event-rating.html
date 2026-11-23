@@ -197,7 +197,7 @@
           <p class="scale-legend muted">Kompetenzstufen: <b>lernt</b> = lernt es noch · <b>kann</b> = kann es · <b>sicher</b> = kann es sicher</p>
         }
         <div class="table-wrap">
-          <table [class.game]="isGame()">
+          <table [class.game]="isGame()" [class.words]="scale() === 'grades'">
             <thead>
               <tr>
                 <th scope="col" class="col-player">Spieler</th>

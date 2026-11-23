@@ -412,3 +412,36 @@ tr[data-tone='grey'] td,
 .chips.steps .chip[aria-pressed='true']:not(:first-child)::before {
   content: '✓ ';
 }
+
+/* Notenstufen (SCRUM-393): sechs Wörter statt Zahlen, 2 x 3 Felder, "–" (nicht erfasst) als volle Zeile darunter. */
+.chips.steps {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.chips.steps .chip {
+  padding: 2px 4px;
+  line-height: 1.15;
+}
+
+.chips.steps .chip:first-child {
+  grid-column: 1 / -1;
+  order: 7;
+}
+
+/* Auswahl nicht nur an der Farbe erkennbar: Häkchen vor dem Wort. */
+.chips.steps .chip[aria-pressed='true']:not(:first-child)::before {
+  content: '✓ ';
+}
+
+/* Matrix mit Notenstufen: breitere Notenspalten, damit Wörter wie „befriedigend“ lesbar bleiben; darunter scrollt die Matrix im Kasten. */
+table.words { min-width: 1150px; }
+table.words.game { min-width: 1480px; }
+table.words .col-player { width: 13%; }
+table.words .col-attendance { width: 12%; }
+table.words .col-grade { width: 11.5%; }
+table.words .col-note { width: 10%; }
+table.words.game .col-grade { width: 10.5%; }
+table.words.game .col-player { width: 11%; }
+table.words.game .col-attendance { width: 11%; }
+table.words.game .col-total { width: 5%; }
+table.words.game .col-note { width: 6%; }
