@@ -57,7 +57,7 @@ export async function renderProfile(
   return { fixture, firebase, navigate };
 }
 
-export async function renderProfileExtras(role: 'trainer' | 'physio' = 'trainer') {
+export async function renderProfileExtras(role: 'trainer' | 'physio' = 'trainer', setup?: (firebase: FakeFirebase) => void) {
   isMobile.set(false);
   const firebase = new FakeFirebase();
   firebase.players.players.set('p1', { name: 'Jonas Keller', positions: ['TW'], number: 1, birthdate: '2012-05-05', status: 'Fit', consentStatus: 'granted' });
@@ -71,6 +71,7 @@ export async function renderProfileExtras(role: 'trainer' | 'physio' = 'trainer'
     ['me1', { date: '2026-08-01', height: '150', weight: '40' }],
     ['me2', { date: '2026-10-01', height: '155', weight: '43' }],
   ]));
+  setup?.(firebase);
   const navigate = vi.fn().mockResolvedValue(true);
   TestBed.configureTestingModule({
     providers: [

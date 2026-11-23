@@ -1,0 +1,315 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.block,
+tk-card {
+  min-width: 0;
+}
+
+.block {
+  display: grid;
+  gap: var(--tk-space-3);
+}
+
+h2 {
+  margin: 0;
+  font-size: var(--tk-text-lg);
+}
+
+.muted {
+  margin: 0;
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+.pad {
+  padding: var(--tk-space-3) var(--tk-space-1);
+}
+
+.hint {
+  margin: 0 0 var(--tk-space-3);
+  padding: var(--tk-space-3);
+  border: 1px solid var(--tk-line);
+  border-radius: var(--tk-radius);
+}
+
+.hint summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.facts {
+  display: grid;
+  gap: var(--tk-space-2);
+  margin: var(--tk-space-3) 0 0;
+}
+
+.facts div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--tk-space-2);
+}
+
+.facts dt {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+.facts dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.check {
+  margin: var(--tk-space-2) 0 0;
+  color: var(--tk-red);
+  font-size: var(--tk-text-sm);
+}
+
+.review {
+  display: grid;
+  gap: var(--tk-space-2);
+  margin: 0 0 var(--tk-space-3);
+  padding: var(--tk-space-3);
+  border: 1px solid var(--tk-line);
+  border-radius: var(--tk-radius);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.review h3,
+.review h4,
+.review p {
+  margin: 0;
+}
+
+.review h3 {
+  font-size: var(--tk-text-base, 1rem);
+}
+
+.review h4 {
+  font-size: var(--tk-text-sm);
+}
+
+.review .open,
+.review .done {
+  font-size: var(--tk-text-sm);
+}
+
+.review > button {
+  justify-self: start;
+}
+
+.review .error {
+  color: var(--tk-red);
+  font-size: var(--tk-text-sm);
+}
+
+.reviews {
+  display: grid;
+  gap: var(--tk-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.reviews li {
+  display: grid;
+  gap: 2px;
+  padding: var(--tk-space-2);
+  border-radius: var(--tk-radius);
+  background: var(--tk-surface-2, transparent);
+  font-size: var(--tk-text-sm);
+}
+
+.small {
+  font-size: var(--tk-text-xs, 0.75rem);
+}
+
+.chart .frame {
+  fill: none;
+  stroke: var(--tk-line);
+}
+
+.chart .nodata {
+  fill: var(--tk-muted);
+  fill-opacity: 0.12;
+}
+
+.chart .panel-title {
+  font-weight: 600;
+}
+
+.chart .empty-text {
+  font-style: italic;
+}
+
+.chart .bar {
+  fill: var(--tk-chart-1);
+  fill-opacity: 0.85;
+  outline: none;
+}
+
+.chart .bar.norate {
+  fill: var(--tk-muted);
+  fill-opacity: 0.18;
+}
+
+.chart .bar:hover,
+.chart .bar:focus-visible {
+  stroke: var(--tk-ink);
+  stroke-width: 2;
+}
+
+.chart .measure {
+  stroke: var(--tk-ink);
+  stroke-width: 2;
+}
+
+.chart .curve {
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.chart .curve.fitness {
+  stroke: var(--tk-chart-1);
+}
+
+.chart .curve.fatigue {
+  stroke: var(--tk-chart-4);
+}
+
+.chart .dot {
+  fill: var(--tk-chart-2);
+  stroke: var(--tk-surface);
+  stroke-width: 1.5;
+  outline: none;
+}
+
+.chart .dot:hover,
+.chart .dot:focus-visible {
+  stroke: var(--tk-ink);
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tk-space-2) var(--tk-space-4);
+  margin: 0 0 var(--tk-space-3);
+  padding: 0;
+  list-style: none;
+  font-size: var(--tk-text-sm);
+}
+
+.legend li {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.swatch {
+  width: 14px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--tk-chart-1);
+}
+
+.legend li[data-kind='norate'] .swatch,
+.legend li[data-kind='nodata'] .swatch {
+  background: var(--tk-muted);
+  opacity: 0.3;
+}
+
+.legend li[data-kind='fatigue'] .swatch {
+  background: var(--tk-chart-4);
+  height: 3px;
+}
+
+.legend li[data-kind='fitness'] .swatch {
+  height: 3px;
+}
+
+.sub {
+  display: block;
+  color: var(--tk-muted);
+  font-size: var(--tk-text-xs);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--tk-text-sm);
+}
+
+th,
+td {
+  padding: var(--tk-space-2) var(--tk-space-3);
+  text-align: left;
+  vertical-align: top;
+  border-top: 1px solid var(--tk-line);
+}
+
+th {
+  color: var(--tk-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Schmal: jede Zeile wird zur Karte mit Beschriftung, damit nichts seitlich scrollt. */
+@media (max-width: 860px) {
+  thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  table,
+  tbody,
+  tr,
+  td {
+    display: block;
+  }
+
+  tr {
+    padding: var(--tk-space-2) 0;
+    border-top: 1px solid var(--tk-line);
+  }
+
+  td {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--tk-space-3);
+    padding: 2px var(--tk-space-1);
+    border-top: 0;
+    text-align: right;
+  }
+
+  td::before {
+    content: attr(data-label);
+    flex: none;
+    color: var(--tk-muted);
+    font-weight: 600;
+    text-align: left;
+  }
+
+  .sub {
+    display: inline;
+    margin-left: var(--tk-space-2);
+  }
+}

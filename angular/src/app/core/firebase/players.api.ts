@@ -11,7 +11,7 @@ import type { RawDoc, SnapshotMeta } from './types';
  * Gesundheitsdatum, SCRUM-278) und die Angaben zum Reife-Kompass (`maturity`, SCRUM-190). Muss jede
  * `players/{playerId}/…`-Sammlung aus firestore.rules enthalten (geprüft in tests/project.test.mjs).
  */
-const PLAYER_SUBCOLLECTIONS = ['developmentPlans', 'absences', 'measurements', 'selfReports', 'wellness', 'maturity'] as const;
+const PLAYER_SUBCOLLECTIONS = ['developmentPlans', 'absences', 'measurements', 'growthReviews', 'selfReports', 'wellness', 'maturity'] as const;
 
 /** Spieler des Teams (players): Echtzeit-Abo, Speichern und Löschen samt aller Unterdaten. */
 @Injectable({ providedIn: 'root' })
