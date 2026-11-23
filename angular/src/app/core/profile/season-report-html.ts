@@ -3,6 +3,7 @@ import { formatDate } from '../shared/dates';
 import { scoreWithWord } from '../ratings/rating-scale';
 import { escapeHtml } from './profile-report';
 import type { SeasonReport } from './season-report';
+import { DEVELOPMENT_METHOD } from './development';
 
 const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 
@@ -40,15 +41,13 @@ export const SEASON_REPORT_CSS = `
   @media print { body { margin: 14mm; } h2 { break-after: avoid; } .player + .player { margin-top: 0; break-before: page; } }
 `;
 
-function trendText(report: SeasonReport): string {
-  const withGrade = report.months.filter((month) => month.overall !== null);
-  if (withGrade.length < 2) return '';
-  const first = withGrade[0].overall!;
-  const last = withGrade[withGrade.length - 1].overall!;
-  const diff = last - first;
-  const word = report.scale === 'levels' ? 'Kompetenzstufe' : 'Note';
-  if (Math.abs(diff) < 0.1) return `Die ${word} ist über den Zeitraum stabil geblieben.`;
-  return `Die ${word} hat sich von ${monthLabel(withGrade[0].month)} bis ${monthLabel(withGrade[withGrade.length - 1].month)} ${diff < 0 ? 'verbessert' : 'verschlechtert'}.`;
+/** Entwicklung im Zeitraum (SCRUM-265): Ergebnis, Vergleich und Hinweise statt „erster gegen letzten Monat“. */
+function developmentText(report: SeasonReport): string {
+  const e = escapeHtml;
+  const d = report.development;
+  if (d.state === 'none') return '';
+  const hints = d.hints.length ? `<ul class="muted">${d.hints.map((hint) => `<li>${e(hint)}</li>`).join('')}</ul>` : '';
+  return `<p><strong>Entwicklung im Zeitraum: ${e(d.label)}</strong>${d.detail ? ` – ${e(d.detail)}` : ''}</p>${hints}<p class="muted">${e(DEVELOPMENT_METHOD)}</p>`;
 }
 
 function playerSection(report: SeasonReport, logoUrl: string): string {
@@ -120,7 +119,7 @@ function playerSection(report: SeasonReport, logoUrl: string): string {
   <tbody>${monthRows || '<tr><td colspan="7">Keine Bewertungen im Zeitraum.</td></tr>'}</tbody>
 </table>
 </div>
-${trendText(report) ? `<p>${e(trendText(report))}</p>` : ''}
+${developmentText(report)}
 <table><thead><tr><th>Kriterium</th><th>${heading} im Zeitraum</th></tr></thead><tbody>${skills}</tbody></table>
 <h2>Erreichte Förderziele</h2>
 ${goals}

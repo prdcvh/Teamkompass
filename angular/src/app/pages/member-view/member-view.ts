@@ -18,8 +18,8 @@ import {
   numberLabel,
   profileFigures,
   skillAverages,
-  trendChart,
 } from '../../core/profile/profile';
+import { GradeTrendCard } from '../profile/grade-trend-card';
 import { ProfileService } from '../../core/profile/profile.service';
 import { ATTENDANCE_LABELS, type Rating, calculatedGrade, ratingScaleOf } from '../../core/ratings/rating';
 import { releaseText } from '../../core/ratings/grade-release';
@@ -68,7 +68,7 @@ import { StreakPanel } from './streak-panel';
  */
 @Component({
   selector: 'app-member-view',
-  imports: [RouterLink, Button, Card, InstallHint, Status, ProfileExtras, BreakNotice, LoadReportAction, HomeRanking, ConnectEmail, RsvpPanel, SelfReportPanel, SelfReportHistory, LearningPanel, LearningSummary, AlertsPanel, StreakPanel, PuzzlePanel],
+  imports: [RouterLink, Button, Card, InstallHint, Status, ProfileExtras, BreakNotice, LoadReportAction, HomeRanking, ConnectEmail, RsvpPanel, SelfReportPanel, SelfReportHistory, LearningPanel, LearningSummary, AlertsPanel, StreakPanel, PuzzlePanel, GradeTrendCard],
   templateUrl: './member-view.html',
   styleUrls: ['../profile/profile.css', './member-view.css', '../../ui/chart/chart.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -159,7 +159,6 @@ export class MemberView implements OnInit {
   protected readonly figures = computed(() => profileFigures(this.items(), this.today));
   protected readonly skills = computed(() => skillAverages(this.graded()));
   protected readonly attendance = computed(() => availability(this.items(), this.today));
-  protected readonly chart = computed(() => trendChart(this.graded(), this.scale()));
   protected readonly cards = computed(() => {
     const f = this.figures();
     const cards = [

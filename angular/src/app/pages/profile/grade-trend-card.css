@@ -1,0 +1,101 @@
+/* Notenverlauf mit Zeitachse und Entwicklung (SCRUM-265). */
+.trend {
+  display: grid;
+  gap: var(--tk-space-2);
+}
+
+.trend-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tk-space-2) var(--tk-space-3);
+}
+
+.trend-head h2 {
+  margin: 0;
+}
+
+.period {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tk-space-2);
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+.period select {
+  min-height: var(--tk-touch);
+  width: auto;
+}
+
+.range {
+  margin: 0;
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+.development {
+  display: grid;
+  gap: var(--tk-space-1);
+  padding: var(--tk-space-3);
+  border-radius: var(--tk-radius-md);
+  background: var(--tk-surface-2);
+  font-size: var(--tk-text-sm);
+}
+
+.development p {
+  margin: 0;
+}
+
+.result {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--tk-space-2);
+}
+
+.development > p:first-child span {
+  color: var(--tk-muted);
+}
+
+.development > p:first-child strong {
+  font-size: var(--tk-text-md);
+}
+
+.development[data-state='better'] > p:first-child strong {
+  color: var(--tk-green);
+}
+
+.development[data-state='worse'] > p:first-child strong {
+  color: var(--tk-red-dark);
+}
+
+.hints {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--tk-muted);
+}
+
+details {
+  color: var(--tk-muted);
+}
+
+details summary {
+  cursor: pointer;
+  padding: var(--tk-space-2) 0;
+}
+
+details p {
+  margin: 0;
+}
+
+/* Handy: das Diagramm wird auf gut ein Drittel verkleinert – Beschriftungen in Diagrammeinheiten größer setzen. */
+@media (max-width: 600px) {
+  .chart .axis,
+  .chart .axis.small,
+  .chart .value,
+  .chart .marker-label {
+    font-size: 20px;
+  }
+}

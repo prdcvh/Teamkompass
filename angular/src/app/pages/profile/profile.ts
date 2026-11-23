@@ -9,15 +9,14 @@ import { type Player, consentRevokedMessage, isConsentRevoked, positionText } fr
 import {
   type GradedEvent,
   availability,
-  deltaLabel,
   gradeToPercent,
   gradedEvents,
   noteWord,
   numberLabel,
   profileFigures,
   skillAverages,
-  trendChart,
 } from '../../core/profile/profile';
+import { lastStepLabel } from '../../core/profile/development';
 import { pointsHistory, totalPoints } from '../../core/points/points';
 import { ProfileService } from '../../core/profile/profile.service';
 import { effectiveStatus } from '../../core/records/availability';
@@ -45,13 +44,14 @@ import { LearningSummary } from './learning-summary';
 import { CohortCard } from './cohort-card';
 import { ConsentPanel } from './consent-panel';
 import { GradeReleasePanel } from './grade-release-panel';
+import { GradeTrendCard } from './grade-trend-card';
 import { CurrentTeam } from '../../core/team/current-team.service';
 import { healthLockedMessage, mayStoreHealth } from '../../core/player/consent';
 
 /** Spielerprofil (Figma: Profil Desktop/Handy): Kopfbereich, Notenverlauf, Kompetenzprofil, Verfügbarkeit, Statistik, Eventhistorie. */
 @Component({
   selector: 'app-profile',
-  imports: [Button, Card, Status, ProfileExtras, LoadReportAction, LoadCurveCard, GrowthLoadCard, ConsentPanel, GradeReleasePanel, SelfReportHistory, LearningSummary, CohortCard],
+  imports: [Button, Card, Status, ProfileExtras, LoadReportAction, LoadCurveCard, GrowthLoadCard, ConsentPanel, GradeReleasePanel, SelfReportHistory, LearningSummary, CohortCard, GradeTrendCard],
   templateUrl: './profile.html',
   // Reihenfolge = Kaskade (die Handy-Regeln überschreiben Kopf und Auswertung).
   styleUrls: ['./profile.css', './profile-stats.css', './profile-mobile.css', './profile-risk.css', '../../ui/chart/chart.css'],
@@ -99,7 +99,6 @@ export class Profile implements OnInit {
   protected readonly figures = computed(() => profileFigures(this.profile.items(), this.today));
   protected readonly skills = computed(() => skillAverages(this.graded()));
   protected readonly attendance = computed(() => availability(this.profile.items(), this.today));
-  protected readonly chart = computed(() => trendChart(this.graded(), this.scale()));
   /** Trainingspunkte (SCRUM-104) sieht nur der Trainer. Verlauf neueste zuerst, wie die Eventhistorie. */
   protected readonly pointsVisible = computed(() => this.session.role() === 'trainer');
   private readonly pointsAll = computed(() => pointsHistory(this.profile.pointItems()));
@@ -139,9 +138,9 @@ export class Profile implements OnInit {
       { label: 'Training-Schnitt', value: this.gradeLabel(f.trainingAverage) },
       { label: 'Bewertete Events', value: String(f.ratedEvents) },
       { label: 'Teilnahmen', value: String(f.attendances) },
-      { label: 'Trend', value: deltaLabel(f.trend, this.scale()) },
+      { label: 'Letzte Änderung', value: lastStepLabel(f.lastStep, this.scale()) },
       { label: 'Ø Anstrengung zuletzt', value: numberLabel(f.recentIntensity) },
-      { label: 'Entwicklung Saison', value: deltaLabel(f.development, this.scale()) },
+      { label: 'Entwicklung Saison', value: f.development.label },
       { label: 'Bestes Event', value: f.best ? `${this.gradeLabel(f.best.grade)} · ${f.best.event.type}` : '–' },
       { label: 'Einsatzquote', value: `${g.appearanceRate}%` },
       { label: 'Scorer/Spiel', value: numberLabel(g.scorersPerGame) },

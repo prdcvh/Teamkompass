@@ -56,8 +56,9 @@ describe('profile (Auswertungen)', () => {
 
     it('ohne Bewertungen sind alle Werte leer', () => {
       const figures = profileFigures([], TODAY);
-      expect(figures).toMatchObject({ average: null, trend: null, development: null, best: null, ratedEvents: 0, recentIntensity: null });
+      expect(figures).toMatchObject({ average: null, trend: null, lastStep: null, best: null, ratedEvents: 0, recentIntensity: null });
       expect(figures.games).toMatchObject({ games: 0, appearanceRate: 0, scorersPerGame: null, minutesPerScorer: null });
+      expect(figures.development.state).toBe('none');
     });
   });
 
@@ -69,10 +70,13 @@ describe('profile (Auswertungen)', () => {
       { event: game('d', '2026-10-04'), rating: rated(1) },
     ];
 
-    it('Trend = vorletzte minus letzte Note (positiv = besser), Entwicklung = erste minus letzte', () => {
+    it('Trend = vorletzte minus letzte Note (positiv = besser) mit Zeitabstand; Entwicklung braucht Zeit (SCRUM-265)', () => {
       const figures = profileFigures(items, TODAY);
       expect(figures.trend).toBe(1);
-      expect(figures.development).toBe(3);
+      expect(figures.lastStep).toEqual({ change: 1, days: 1, scaleChanged: false });
+      // Früher „erste minus letzte“ = 3 Noten besser – in nur drei Tagen ist das keine Entwicklung.
+      expect(figures.development.state).toBe('insufficient');
+      expect(figures.development.change).toBeNull();
       expect(figures.best?.event.id).toBe('d');
       expect(figures.recentIntensity).toBe(6.3);
     });
@@ -80,7 +84,8 @@ describe('profile (Auswertungen)', () => {
     it('Trend und Entwicklung brauchen mindestens zwei benotete Events', () => {
       const one = profileFigures([items[0]], TODAY);
       expect(one.trend).toBeNull();
-      expect(one.development).toBeNull();
+      expect(one.lastStep).toBeNull();
+      expect(one.development.state).toBe('insufficient');
     });
 
     it('formatiert mit Komma und Vorzeichen', () => {
