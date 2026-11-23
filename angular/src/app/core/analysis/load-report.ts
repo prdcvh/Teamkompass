@@ -16,7 +16,7 @@ import { type Absence, absenceTitle, activeAbsenceOn, isInjuryAbsence } from '..
 import type { Measurement } from '../records/measurement';
 import { type GrowthHintLevel, STATUS_LABELS, growthHintLevel, growthPoints, hintRateAt, perMonth } from '../records/growth-velocity';
 import { addDays, formatDate, isIsoDate } from '../shared/dates';
-import { type InjuryRisk, type LoadAvailability, injuryRisk, sessionLoad, sessionMinutes } from './risk';
+import { type InjuryRisk, type LoadAvailability, injuryRisk, loadSpike, sessionLoad, sessionMinutes } from './risk';
 
 export type LoadReportPeriod = '4' | '8' | '12' | 'custom';
 
@@ -194,7 +194,7 @@ export function buildLoadReport(input: LoadReportInput): LoadReport {
     weeks.unshift({ from: start, to: end, load: inWeek.reduce((sum, row) => sum + (row.load ?? 0), 0), sessions: inWeek.length });
   }
 
-  // Erholungs-Hinweise: zwei sehr harte Einheiten (≥ 7) innerhalb von 48 Stunden; Wochen ab dem 1,5-fachen der 3 Wochen davor.
+  // Erholungs-Hinweise: zwei sehr harte Einheiten (≥ 7) innerhalb von 48 Stunden; Belastungsspitze je Woche wie die Ampel.
   const recovery: string[] = [];
   const hard = rows.filter((row) => row.exertion !== null && row.exertion >= 7);
   hard.forEach((row, index) => {
@@ -202,17 +202,16 @@ export function buildLoadReport(input: LoadReportInput): LoadReport {
       recovery.push(`Zwei sehr harte Einheiten innerhalb von 48 Stunden (${formatDate(hard[index - 1].date)} und ${formatDate(row.date)})`);
     }
   });
-  const weekLoad = (end: string) => {
-    const start = addDays(end, -6);
-    return past.filter((item) => item.event.date >= start && item.event.date <= end && took(item)).reduce((sum, item) => sum + sessionLoad(item.event, item.rating!), 0);
-  };
+  // Belastungsspitze je Woche (SCRUM-249): dieselbe Rechnung wie die Ampel ({@link loadSpike}: Müdigkeit / Fitness mit beiden
+  // Schutzregeln), für jeden Tag der Woche gerechnet; genannt wird der Tag mit dem höchsten Verhältnis.
   for (const week of weeks) {
-    if (week.load <= 0 || days(week.from, week.to) < 6) continue;
-    const previous = [1, 2, 3].map((n) => weekLoad(addDays(week.to, -7 * n)));
-    if (previous.filter((value) => value > 0).length < 2) continue;
-    const baseline = (previous[0] + previous[1] + previous[2]) / 3;
-    if (baseline > 0 && week.load / baseline >= 1.5) {
-      recovery.push(`Belastungsspitze in der Woche ${formatDate(week.from)}–${formatDate(week.to)} (${comma(week.load / baseline, 1)}-fach des Schnitts der 3 Wochen davor)`);
+    let peak: { ratio: number; date: string } | null = null;
+    for (let day = week.from; day <= week.to; day = addDays(day, 1)) {
+      const spike = loadSpike(past, day);
+      if (spike.spikeHint && spike.ratio !== null && (!peak || spike.ratio > peak.ratio)) peak = { ratio: spike.ratio, date: day };
+    }
+    if (peak) {
+      recovery.push(`Belastungsspitze in der Woche ${formatDate(week.from)}–${formatDate(week.to)} (Müdigkeit ${comma(peak.ratio, 1)}-fach der Fitness, am ${formatDate(peak.date)})`);
     }
   }
 
