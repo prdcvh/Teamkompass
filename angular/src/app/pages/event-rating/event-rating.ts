@@ -7,6 +7,7 @@ import { EventsService } from '../../core/events/events.service';
 import { LineupService } from '../../core/lineup/lineup.service';
 import { lineupIsEmpty, lineupSummary } from '../../core/lineup/lineup';
 import { LayoutService, injectNarrowViewport } from '../../core/shell/layout.service';
+import { checkMatchConsistency } from '../../core/ratings/match-consistency';
 import { type Player, consentRevokedMessage, isConsentRevoked } from '../../core/player/player';
 import { CurrentTeam } from '../../core/team/current-team.service';
 import { healthLockedMessage, mayStoreHealth } from '../../core/player/consent';
@@ -44,6 +45,7 @@ import { Weather } from '../../ui/weather/weather';
 import { EventDeleteDialog, type EventDeleted } from '../events/event-delete-dialog';
 import { EventDialog } from '../events/event-dialog';
 import { EventDetails } from './event-details';
+import { MatchCheck } from './match-check';
 
 /** Spaltenköpfe der Matrix: lange Wörter mit weichen Trennstellen, damit sie in schmalen Spalten umbrechen statt abgeschnitten zu werden. */
 const GRADE_HEADERS: Readonly<Record<GradeField, string>> = {
@@ -60,7 +62,7 @@ const GRADE_HEADERS: Readonly<Record<GradeField, string>> = {
  */
 @Component({
   selector: 'app-event-rating',
-  imports: [RouterLink, Button, Card, Chip, Weather, EventDetails, EventDialog, EventDeleteDialog],
+  imports: [RouterLink, Button, Card, Chip, Weather, EventDetails, EventDialog, EventDeleteDialog, MatchCheck],
   templateUrl: './event-rating.html',
   styleUrl: './event-rating.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -121,6 +123,10 @@ export class EventRating implements OnInit {
   protected readonly allPlayers = computed(() => [...this.squad.players()].sort((a, b) => a.number - b.number));
   protected readonly players = computed(() => this.allPlayers().filter((player) => matchesView(this.ratings.ratingFor(player.id), this.view())));
   protected readonly progress = computed(() => progress(this.allPlayers().map((player) => this.ratings.ratingFor(player.id))));
+  /** Stimmigkeit von Minuten, Tore und Vorlagen (SCRUM-395); nur bei Spielen, nur Hinweis, blockiert nichts. */
+  protected readonly consistency = computed(() =>
+    this.isGame() ? checkMatchConsistency(this.allPlayers().map((player) => this.ratings.ratingFor(player.id)), this.ratings.matchDuration()) : null,
+  );
   protected readonly current = computed(() => this.players()[Math.min(this.index(), Math.max(0, this.players().length - 1))] ?? null);
   protected readonly currentIndex = computed(() => Math.min(this.index(), Math.max(0, this.players().length - 1)));
 
