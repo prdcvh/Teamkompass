@@ -24,7 +24,7 @@ describe('Profile (Spielerprofil)', () => {
     expect(text(q(fixture, '.who'))).toContain('TW');
     expect(text(q(fixture, '.who'))).toContain('Verletzt (ca. bis 01.12.2026)');
     expect(text(q(fixture, '.who'))).toContain('Datennutzung: dokumentiert am 01.09.2026');
-    expect(text(q(fixture, '.grade strong'))).toBe('2,0'); // Schnitt aus 3 und 1; „Fehlt“ und Zukunft zählen nicht
+    expect(text(q(fixture, '.grade strong'))).toBe('gut (2,0)'); // Schnitt aus 3 und 1; „Fehlt“ und Zukunft zählen nicht
   });
 
   it('zeigt Verlaufsdiagramm, Kompetenzprofil und Verfügbarkeit', async () => {
@@ -32,7 +32,7 @@ describe('Profile (Spielerprofil)', () => {
     expect(qa(fixture, 'svg circle')).toHaveLength(2);
     expect(q(fixture, 'svg')?.getAttribute('aria-label')).toContain('Notenverlauf (1 ist die beste Note): ');
     const labels = (list: Element) => [...list.querySelectorAll('.bar')].map((bar) => bar.getAttribute('aria-label'));
-    expect(labels(qa(fixture, '.bars')[0])).toEqual(['Einsatz 2,0', 'Fehlerquote 2,0', 'Spielwirkung 2,0', 'Lernfähigkeit 2,0']);
+    expect(labels(qa(fixture, '.bars')[0])).toEqual(['Einsatz gut (2,0)', 'Fehlerquote gut (2,0)', 'Spielwirkung gut (2,0)', 'Lernfähigkeit gut (2,0)']);
     // das Zukunftsevent mit „Fehlt“ zählt nicht
     expect(labels(qa(fixture, '.bars')[1])).toEqual(['Anwesend 2/2', 'Teilweise 0/2', 'Fehlt 0/2', 'Nicht im Kader 0/2']);
   });
@@ -50,14 +50,14 @@ describe('Profile (Spielerprofil)', () => {
   it('zeigt Statistik-Karten mit den berechneten Werten', async () => {
     const fixture = await render();
     const cards = Object.fromEntries(qa(fixture, '.stat').map((card) => [text(card.querySelector('span')), text(card.querySelector('strong'))]));
-    expect(cards['Notenschnitt']).toBe('2,0');
-    expect(cards['Spiel-Schnitt']).toBe('1,0');
-    expect(cards['Training-Schnitt']).toBe('3,0');
+    expect(cards['Notenschnitt']).toBe('gut (2,0)');
+    expect(cards['Spiel-Schnitt']).toBe('sehr gut (1,0)');
+    expect(cards['Training-Schnitt']).toBe('befriedigend (3,0)');
     expect(cards['Bewertete Events']).toBe('2');
     expect(cards['Teilnahmen']).toBe('2');
     expect(cards['Trend']).toBe('+2'); // 3 → 1
     expect(cards['Entwicklung Saison']).toBe('+2');
-    expect(cards['Bestes Event']).toBe('1,0 · Spiel');
+    expect(cards['Bestes Event']).toBe('sehr gut (1,0) · Spiel');
     expect(cards['Einsatzquote']).toBe('100%'); // 80 von 80 Minuten
     expect(cards['Tore + Vorlagen']).toBe('2 + 1');
     expect(cards['Scorer/Spiel']).toBe('3');

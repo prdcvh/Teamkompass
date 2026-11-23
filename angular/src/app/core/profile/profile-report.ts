@@ -7,7 +7,7 @@
 import { formatDate } from '../events/event';
 import { type Player, positionText } from '../player/player';
 import { type EventRating, availability, gameStats, gradedEvents, numberLabel, profileFigures, skillAverages } from './profile';
-import { type RatingScale, scoreLabel } from '../ratings/rating-scale';
+import { type RatingScale, scoreWithWord } from '../ratings/rating-scale';
 import type { Absence } from '../records/absence';
 import { effectiveStatus } from '../records/availability';
 import type { Measurement } from '../records/measurement';
@@ -56,7 +56,7 @@ export function profileReportHtml(input: ProfileReportInput): string {
   const { player, items, today } = input;
   // Skala des Teams (SCRUM-188); ohne Angabe Schulnoten wie bisher.
   const scale: RatingScale = input.scale ?? 'grades';
-  const gradeLabel = (value: number | null) => scoreLabel(value, scale);
+  const gradeLabel = (value: number | null) => scoreWithWord(value, scale);
   const heading = scale === 'levels' ? 'Ø Stufe' : 'Ø Note';
   const figures = profileFigures(items, today);
   const games = gameStats(items, today);
