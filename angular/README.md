@@ -135,3 +135,18 @@ zuerst gemeinsame Regeln in Tokens/Basis-Komponenten verschieben, bevor das Budg
 
 Architektur, Blaze-/Budget-Hinweis, geplantes Function-Deployment und die Schwellenwerte der Kleidungsempfehlung:
 [`docs/wetter-kleidung-erinnerung.md`](../docs/wetter-kleidung-erinnerung.md).
+
+## Tests in langsamer Umgebung (SCRUM-384)
+
+`ng test` nutzt `vitest-base.config.mts` (`runnerConfig` in `angular.json`) und
+setzt `testTimeout`/`hookTimeout` auf 30 s statt der Vitest-Vorgabe von 5 s.
+
+Ursache der früher wechselnden `Test timed out in 5000ms`: nicht die Testlogik
+und keine Produktregression, sondern eine stark gedrosselte Umgebung (CPU
+geteilt/überbucht). Unbelastet auf 4 Kernen braucht die Suite ~23 s, der
+langsamste Test ~0,6 s (Profil, kalter Start der ersten Komponente) – das
+5-s-Limit hatte nur ~8x Luft. Bei ~17x Verlangsamung (1 Kern, 10 konkurrierende
+Prozesse) riss genau dieser Test das Limit; welche Tests betroffen sind, hängt
+davon ab, welche gerade auf einen überlasteten Worker fallen. Das Limit ist nur
+die Obergrenze gegen echte Hänger (Endlos-Promise), keine Leistungsaussage.
+Neue Specs sollen weiterhin unter 1 s bleiben.
