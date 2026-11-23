@@ -23,7 +23,7 @@ import {
 import { ProfileService } from '../../core/profile/profile.service';
 import { ATTENDANCE_LABELS, type Rating, calculatedGrade, ratingScaleOf } from '../../core/ratings/rating';
 import { releaseText } from '../../core/ratings/grade-release';
-import { type RatingScale, scoreLabel } from '../../core/ratings/rating-scale';
+import { type RatingScale, scoreLabel, scoreWithWord } from '../../core/ratings/rating-scale';
 import { RatingScaleService } from '../../core/ratings/rating-scale.service';
 import { effectiveStatus } from '../../core/records/availability';
 import { RecordsStateService } from '../../core/records/records-state.service';
@@ -233,7 +233,7 @@ export class MemberView implements OnInit {
   protected formatDate = formatDate;
   protected positionText = positionText;
   protected readonly noteWord = noteWord;
-  protected gradeLabel = (value: number | null): string => scoreLabel(value, this.scale());
+  protected gradeLabel = (value: number | null): string => scoreWithWord(value, this.scale());
 
   /** Eine Bewertung in der Skala, mit der sie vergeben wurde (Scout-Sicht: Skala der Ansicht). */
   protected entryScale(entry: GradedEvent): RatingScale {

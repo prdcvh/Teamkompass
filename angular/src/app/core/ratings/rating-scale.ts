@@ -14,6 +14,8 @@
  * U15, U17, Hauptteam mit Bezeichnung U14) bleiben dadurch bei Schulnoten.
  */
 
+import { GRADE_STEPS, gradeWithWord } from './grade-steps';
+
 export const RATING_SCALES = ['grades', 'levels'] as const;
 export type RatingScale = (typeof RATING_SCALES)[number];
 
@@ -40,11 +42,12 @@ export const LEVEL_OPTIONS: readonly ScaleOption[] = [
   { value: 1.5, label: 'kann es sicher', short: 'sicher', aria: 'kann es sicher' },
 ];
 
-export const GRADE_SCALE_OPTIONS: readonly ScaleOption[] = [1, 2, 3, 4, 5, 6].map((value) => ({
-  value,
-  label: String(value),
-  short: String(value),
-  aria: `Note ${value}`,
+/** Schulnoten als benannte Stufen (SCRUM-393): angezeigt wird das Wort, gespeichert die Zahl 1–6. */
+export const GRADE_SCALE_OPTIONS: readonly ScaleOption[] = GRADE_STEPS.map((step) => ({
+  value: step.value,
+  label: step.word,
+  short: step.word,
+  aria: `${step.word}, Note ${step.value}`,
 }));
 
 export function isRatingScale(value: unknown): value is RatingScale {
@@ -74,6 +77,14 @@ export function levelFor(value: number): ScaleOption {
 export function scoreLabel(value: number | null, scale: RatingScale): string {
   if (value === null) return '–';
   return scale === 'levels' ? levelFor(value).label : value.toFixed(1).replace('.', ',');
+}
+
+/**
+ * Anzeige eines Durchschnitts im Profil und in Berichten: Schulnoten „gut (2,3)“ (Wort des Notenbereichs, in Klammern
+ * die Zahl), Stufen wie `scoreLabel`; ohne Wert „–“.
+ */
+export function scoreWithWord(value: number | null, scale: RatingScale): string {
+  return scale === 'levels' ? scoreLabel(value, scale) : gradeWithWord(value);
 }
 
 /** Kurzanzeige (Diagrammachse, Formkurve): Schulnoten „2,3“, Stufen „kann“. */

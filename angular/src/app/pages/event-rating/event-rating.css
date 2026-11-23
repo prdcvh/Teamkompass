@@ -390,3 +390,25 @@ tr[data-tone='grey'] td,
   white-space: normal;
   overflow-wrap: anywhere;
 }
+
+/* Notenstufen (SCRUM-393): sechs Wörter statt Zahlen, 3 x 2 Felder, "–" (nicht erfasst) als volle Zeile darunter. */
+.chips.steps {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.chips.steps .chip {
+  padding: 2px 4px;
+  font-size: 0.85rem;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.chips.steps .chip:first-child {
+  grid-column: 1 / -1;
+  order: 7;
+}
+
+/* Auswahl nicht nur an der Farbe erkennbar: Häkchen vor dem Wort. */
+.chips.steps .chip[aria-pressed='true']:not(:first-child)::before {
+  content: '✓ ';
+}

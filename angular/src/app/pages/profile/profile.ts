@@ -28,7 +28,7 @@ import { injuryRisk, playerLoadCurve } from '../../core/analysis/risk';
 import { canCreateLoadReport } from '../../core/analysis/load-report';
 import { SessionService } from '../../core/auth/session.service';
 import { ratingScaleOf } from '../../core/ratings/rating';
-import { scoreLabel } from '../../core/ratings/rating-scale';
+import { scoreLabel, scoreWithWord } from '../../core/ratings/rating-scale';
 import { RatingScaleService } from '../../core/ratings/rating-scale.service';
 import { SquadService } from '../../core/player/squad.service';
 import { SyncService } from '../../core/shell/sync.service';
@@ -190,7 +190,7 @@ export class Profile implements OnInit {
   protected positionText = positionText;
   protected readonly noteWord = noteWord;
   /** Schnitt (Gesamt, Kompetenzprofil) in der Skala des Teams. */
-  protected gradeLabel = (value: number | null): string => scoreLabel(value, this.scale());
+  protected gradeLabel = (value: number | null): string => scoreWithWord(value, this.scale());
 
   /** Eine einzelne Bewertung in der Skala, mit der sie vergeben wurde (alte Schulnoten bleiben Schulnoten). */
   protected entryScale(entry: GradedEvent) {

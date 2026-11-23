@@ -92,7 +92,7 @@ describe('MemberView (Ansicht für Spieler, Eltern und Medizin)', () => {
 
     it('zeigt nur das eigene Profil mit veröffentlichten Noten, nie Kommentare oder fremde Daten', async () => {
       const fixture = await render('player', { mutate: (f) => releaseNow(f) });
-      await settled(fixture, () => expect(text(fixture, '.grade strong')).toBe('2,0'));
+      await settled(fixture, () => expect(text(fixture, '.grade strong')).toBe('gut (2,0)'));
       expect(text(fixture, 'h1')).toBe('Mein Profil');
       expect(text(fixture, '.who strong')).toBe('Jonas Keller');
       expect(root(fixture).querySelector('select')).toBeNull();
@@ -113,7 +113,7 @@ describe('MemberView (Ansicht für Spieler, Eltern und Medizin)', () => {
 
     it('liest nur die eigenen Kopien und eigene Daten, nie Bewertungen, Kader, Notizen, Gegner oder Aufstellung', async () => {
       const fixture = await render('player', { mutate: (f) => releaseNow(f) });
-      await settled(fixture, () => expect(text(fixture, '.grade strong')).toBe('2,0'));
+      await settled(fixture, () => expect(text(fixture, '.grade strong')).toBe('gut (2,0)'));
       const calls = firebase.calls;
       expect(calls).toContain('watchPlayerDoc:p1');
       expect(calls).not.toContain('watchPlayers');
@@ -155,7 +155,7 @@ describe('MemberView (Ansicht für Spieler, Eltern und Medizin)', () => {
           releaseNow(f);
         },
       });
-      await settled(fixture, () => expect(text(fixture, '.grade strong')).toBe('3,0'));
+      await settled(fixture, () => expect(text(fixture, '.grade strong')).toBe('befriedigend (3,0)'));
       firebase.gradeReleases.set('p1', null);
       await settled(fixture, () => expect(root(fixture).querySelector('.grade')).toBeNull());
       expect(text(fixture)).not.toContain('Notenverlauf');
@@ -235,7 +235,7 @@ describe('MemberView (Ansicht für Spieler, Eltern und Medizin)', () => {
       await settled(fixture, () => expect(text(fixture)).toContain('Orientierung'));
       expect(text(fixture, 'h1')).toBe('Profil von Jonas Keller');
       // Gleiche Regel wie für Spieler (SCRUM-115): veröffentlichte Noten ja, Kommentare nie.
-      await settled(fixture, () => expect(text(fixture, '.grade strong')).toBe('2,0'));
+      await settled(fixture, () => expect(text(fixture, '.grade strong')).toBe('gut (2,0)'));
       expect(text(fixture)).not.toContain('Starkes Spiel');
       expect(root(fixture).querySelector('textarea')).toBeNull();
       expect(text(fixture)).not.toContain('Elias');
@@ -289,7 +289,7 @@ describe('MemberView (Ansicht für Spieler, Eltern und Medizin)', () => {
       await settled(fixture, () => expect(text(fixture)).toContain('Kompetenzprofil'));
       expect(text(fixture, 'h1')).toBe('Scout-Ansicht');
       expect(text(fixture, '.who strong')).toBe('Jonas Keller');
-      expect(text(fixture, '.grade')).toContain('2,0');
+      expect(text(fixture, '.grade')).toContain('gut (2,0)');
       expect(root(fixture).querySelector('.chart')).not.toBeNull();
       expect(text(fixture)).toContain('Einsatzquote');
       expect(text(fixture)).toContain('Heimspiel');
