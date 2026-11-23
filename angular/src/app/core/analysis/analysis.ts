@@ -117,6 +117,7 @@ export function teamTrend(events: readonly TeamEvent[], ratings: RatingsByEvent,
       label: event.date.slice(5),
       title: `${event.title}: Ø Note ${String(grade).replace('.', ',')}`,
       kind: event.type,
+      date: event.date,
     }));
   return plotChart(points);
 }

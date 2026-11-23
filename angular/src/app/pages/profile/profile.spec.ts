@@ -29,8 +29,16 @@ describe('Profile (Spielerprofil)', () => {
 
   it('zeigt Verlaufsdiagramm, Kompetenzprofil und Verfügbarkeit', async () => {
     const fixture = await render();
-    expect(qa(fixture, 'svg circle')).toHaveLength(2);
-    expect(q(fixture, 'svg')?.getAttribute('aria-label')).toContain('Notenverlauf (1 ist die beste Note): ');
+    // Zeitraum „Alles“, damit der Test nicht vom heutigen Datum abhängt (Standard: laufende Saison, SCRUM-265).
+    const period = q(fixture, '[data-testid="trend-period"]') as HTMLSelectElement;
+    period.value = 'all';
+    period.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(qa(fixture, 'tk-grade-trend-card svg circle')).toHaveLength(2);
+    expect(q(fixture, 'tk-grade-trend-card svg')?.getAttribute('aria-label')).toContain('Notenverlauf (1 ist die beste Note), gesamter Verlauf: ');
+    expect(text(q(fixture, '[data-testid="trend-range"]'))).toContain('gesamter Verlauf: 01.09.2026 – ');
+    expect(text(q(fixture, '[data-testid="trend-development"]'))).toContain('zu wenig Daten');
     const labels = (list: Element) => [...list.querySelectorAll('.bar')].map((bar) => bar.getAttribute('aria-label'));
     expect(labels(qa(fixture, '.bars')[0])).toEqual(['Einsatz gut (2,0)', 'Fehlerquote gut (2,0)', 'Spielwirkung gut (2,0)', 'Lernfähigkeit gut (2,0)']);
     // das Zukunftsevent mit „Fehlt“ zählt nicht
@@ -55,8 +63,9 @@ describe('Profile (Spielerprofil)', () => {
     expect(cards['Training-Schnitt']).toBe('befriedigend (3,0)');
     expect(cards['Bewertete Events']).toBe('2');
     expect(cards['Teilnahmen']).toBe('2');
-    expect(cards['Trend']).toBe('+2'); // 3 → 1
-    expect(cards['Entwicklung Saison']).toBe('+2');
+    expect(cards['Letzte Änderung']).toBe('+2 nach 7 Tagen'); // 3 → 1 von 01.09. bis 08.09.
+    // SCRUM-265: zwei Bewertungen eine Woche auseinander sind keine Entwicklung (früher „+2“).
+    expect(cards['Entwicklung Saison']).not.toMatch(/besser|schlechter|\+/);
     expect(cards['Bestes Event']).toBe('sehr gut (1,0) · Spiel');
     expect(cards['Einsatzquote']).toBe('100%'); // 80 von 80 Minuten
     expect(cards['Tore + Vorlagen']).toBe('2 + 1');

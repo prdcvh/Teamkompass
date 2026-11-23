@@ -15,6 +15,7 @@ import { type Absence, absenceTitle, isInjuryAbsence } from '../records/absence'
 import { type DevelopmentPlan } from '../records/plan';
 import { addDays, isIsoDate } from '../shared/dates';
 import { seasonStartIso } from '../shared/season';
+import { type DevelopmentSummary, developmentSummary } from './development';
 import { type AvailabilityRow, type EventRating, availability, averageGrade, countsForStats, gradedEvents, skillAverages } from './profile';
 
 export type SeasonReportPeriod = 'season' | 'previous' | 'custom';
@@ -100,6 +101,8 @@ export interface SeasonReport {
   };
   readonly months: readonly SeasonReportMonth[];
   readonly overall: number | null;
+  /** Entwicklung im Berichtszeitraum, gleiche Rechnung wie im Profil (SCRUM-265). */
+  readonly development: DevelopmentSummary;
   readonly skills: readonly { readonly field: GradeField; readonly label: string; readonly value: number | null }[];
   readonly goals: { readonly achieved: readonly SeasonReportGoal[]; readonly running: number };
   readonly paths: readonly SeasonReportPath[];
@@ -197,6 +200,7 @@ export function buildSeasonReport(input: SeasonReportInput): SeasonReport {
     },
     months,
     overall: averageGrade(graded),
+    development: developmentSummary(graded, { key: 'custom', from, to, label: 'Berichtszeitraum' }, today),
     skills: skillAverages(graded).map((item) => ({ field: item.field, label: GRADE_LABELS[item.field], value: item.value })),
     goals: { achieved, running: input.plans.filter((plan) => plan.status !== 'Erreicht').length },
     paths,

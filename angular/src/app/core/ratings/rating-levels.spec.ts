@@ -39,9 +39,10 @@ describe('Bewertungsskala – Kernzahl Noten (SCRUM-188)', () => {
 
     it('Notenschnitt, Spiel-/Trainingsschnitt, Trend, Entwicklung und bestes Event', () => {
       const p1 = profileFigures(itemsOf(schoolDocs['p1']), TODAY);
-      expect([p1.average, p1.gameAverage, p1.trainingAverage, p1.trend, p1.development, p1.best?.grade]).toEqual([2.2, 2.3, 2, -0.4, -0.1, 2]);
+      expect([p1.average, p1.gameAverage, p1.trainingAverage, p1.trend, p1.development.state, p1.best?.grade]).toEqual([2.2, 2.3, 2, -0.4, 'insufficient', 2]);
       const p2 = profileFigures(itemsOf(schoolDocs['p2']), TODAY);
-      expect([p2.average, p2.gameAverage, p2.trainingAverage, p2.trend, p2.development, p2.best?.grade]).toEqual([2.9, 3.6, 2.1, -0.4, 1.6, 1.2]);
+      expect([p2.average, p2.gameAverage, p2.trainingAverage, p2.trend, p2.development.state, p2.best?.grade]).toEqual([2.9, 3.6, 2.1, -0.4, 'insufficient', 1.2]);
+      // SCRUM-265: vier Bewertungen innerhalb einer Woche ergeben keine Entwicklung mehr (früher „erste minus letzte“: −0,1 bzw. 1,6).
     });
 
     it('Kompetenzprofil (Schnitt je Teilnote)', () => {
