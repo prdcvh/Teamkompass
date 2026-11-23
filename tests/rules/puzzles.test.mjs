@@ -99,6 +99,65 @@ test("Raetsel: nur die vorgesehenen Felder, https-Link, 2-4 Antworten, Schwierig
   await assertFails(setDoc(sol, { ...solution, note: "x", updatedAt: serverTimestamp() }));
 });
 
+test("Loesung (SCRUM-301): Raetsel muss existieren und der Index in dessen Antworten liegen", async () => {
+  const db = as("coach");
+  const sol = (correct) => ({ correct, explanation: "x", updatedAt: serverTimestamp() });
+  // r1 hat 3 Antworten (0-2): 3 liegt ausserhalb, obwohl 0-3 vom Typ her erlaubt waere.
+  await assertFails(setDoc(doc(db, t("puzzleSolutions/r1")), sol(3)));
+  await assertFails(updateDoc(doc(db, t("puzzleSolutions/r1")), { correct: 3, updatedAt: serverTimestamp() }));
+  await assertSucceeds(setDoc(doc(db, t("puzzleSolutions/r1")), sol(2)));
+  // verwaiste Loesung: Raetsel gibt es nicht
+  await assertFails(setDoc(doc(db, t("puzzleSolutions/gibtsnicht")), sol(0)));
+  // Raetsel mit 2 Antworten: Loesung 2 ungueltig, 1 gueltig - im selben Batch angelegt
+  const bad = writeBatch(db);
+  bad.set(doc(db, t("puzzles/r5")), { ...puzzle, answers: ["A", "B"], updatedAt: serverTimestamp() });
+  bad.set(doc(db, t("puzzleSolutions/r5")), sol(2));
+  await assertFails(bad.commit());
+  const good = writeBatch(db);
+  good.set(doc(db, t("puzzles/r5")), { ...puzzle, answers: ["A", "B"], updatedAt: serverTimestamp() });
+  good.set(doc(db, t("puzzleSolutions/r5")), sol(1));
+  await assertSucceeds(good.commit());
+});
+
+test("Raetsel aendern (SCRUM-301): vorhandene Loesung darf nicht ungueltig werden", async () => {
+  const db = as("coach");
+  const p = (answers) => ({ ...puzzle, answers, updatedAt: serverTimestamp() });
+  // r1: correct = 1. Nur das Raetsel auf 1 Antwort geht nicht (Minimum 2); auf 2 Antworten bleibt 1 gueltig.
+  await assertSucceeds(setDoc(doc(db, t("puzzles/r1")), p(["A", "B"])));
+  // Loesung auf 3 setzen, dann Raetsel allein kuerzen: abgewiesen; mit angepasster Loesung im Batch: ok.
+  await assertSucceeds(setDoc(doc(db, t("puzzles/r1")), p(["A", "B", "C"])));
+  await assertSucceeds(setDoc(doc(db, t("puzzleSolutions/r1")), { correct: 2, explanation: "x", updatedAt: serverTimestamp() }));
+  await assertFails(setDoc(doc(db, t("puzzles/r1")), p(["A", "B"])));
+  await assertFails(updateDoc(doc(db, t("puzzles/r1")), { answers: ["A", "B"], updatedAt: serverTimestamp() }));
+  const batch = writeBatch(db);
+  batch.set(doc(db, t("puzzles/r1")), p(["A", "B"]));
+  batch.set(doc(db, t("puzzleSolutions/r1")), { correct: 1, explanation: "x", updatedAt: serverTimestamp() });
+  await assertSucceeds(batch.commit());
+  // Batch, der die Loesung ausserhalb laesst, wird abgewiesen.
+  const wrong = writeBatch(db);
+  wrong.set(doc(db, t("puzzles/r1")), p(["A", "B"]));
+  wrong.set(doc(db, t("puzzleSolutions/r1")), { correct: 3, explanation: "x", updatedAt: serverTimestamp() });
+  await assertFails(wrong.commit());
+  // Raetsel allein loeschen laesst eine verwaiste Loesung zurueck: abgewiesen; zusammen mit der Loesung ok.
+  await assertFails(deleteDoc(doc(db, t("puzzles/r1"))));
+  const del = writeBatch(db);
+  del.delete(doc(db, t("puzzles/r1")));
+  del.delete(doc(db, t("puzzleSolutions/r1")));
+  await assertSucceeds(del.commit());
+});
+
+test("Loesung/Raetsel schreiben (SCRUM-301): Spieler und Eltern bekommen keine zusaetzlichen Rechte", async () => {
+  for (const uid of ["pl1", "parent1", "pl2", "medic", "scout"]) {
+    const db = as(uid);
+    await assertFails(setDoc(doc(db, t("puzzleSolutions/r1")), { correct: 0, explanation: "x", updatedAt: serverTimestamp() }));
+    await assertFails(deleteDoc(doc(db, t("puzzleSolutions/r1"))));
+    const batch = writeBatch(db);
+    batch.set(doc(db, t("puzzles/r1")), { ...puzzle, updatedAt: serverTimestamp() });
+    batch.set(doc(db, t("puzzleSolutions/r1")), { correct: 0, explanation: "x", updatedAt: serverTimestamp() });
+    await assertFails(batch.commit());
+  }
+});
+
 test("Spieler und Eltern lesen die Raetsel, aendern sie aber nicht", async () => {
   for (const uid of ["pl1", "parent1", "pl2"]) {
     const db = as(uid);

@@ -1135,6 +1135,10 @@ service cloud.firestore {
         return /databases/$(database)/documents/teams/$(teamId)/puzzles/$(puzzleId);
       }
 
+      function puzzleSolutionPath(puzzleId) {
+        return /databases/$(database)/documents/teams/$(teamId)/puzzleSolutions/$(puzzleId);
+      }
+
       match /puzzles/{puzzleId} {
         allow read: if isTrainer() || isClubAdminOfTeam() || (isTeamMember() && memberDoc().data.role in ["player", "parent"]);
         allow create, update: if isTrainer()
@@ -1151,8 +1155,15 @@ service cloud.firestore {
           && request.resource.data.answers is list
           && request.resource.data.answers.size() >= 2 && request.resource.data.answers.size() <= 4
           && request.resource.data.level in [1, 2, 3]
-          && request.resource.data.updatedAt == request.time;
-        allow delete: if isTrainer();
+          && request.resource.data.updatedAt == request.time
+          // SCRUM-301: eine vorhandene Loesung darf durch das Aendern der Antworten nicht ungueltig werden -
+          // sie muss im selben Schreibvorgang (Batch) mitgeaendert werden und danach noch auf eine Antwort zeigen.
+          && (!exists(puzzleSolutionPath(puzzleId))
+            || (existsAfter(puzzleSolutionPath(puzzleId))
+              && getAfter(puzzleSolutionPath(puzzleId)).data.correct is int
+              && getAfter(puzzleSolutionPath(puzzleId)).data.correct < request.resource.data.answers.size()));
+        // Loeschen: keine verwaiste Loesung zuruecklassen (die App loescht Raetsel und Loesung in einem Batch).
+        allow delete: if isTrainer() && !existsAfter(puzzleSolutionPath(puzzleId));
       }
 
       match /puzzleSolutions/{puzzleId} {
@@ -1164,6 +1175,9 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly(['correct', 'explanation', 'updatedAt'])
           && request.resource.data.correct is int
           && request.resource.data.correct >= 0 && request.resource.data.correct <= 3
+          // SCRUM-301: das Raetsel muss (nach dem Schreibvorgang) existieren und die Antwort darin vorkommen.
+          && existsAfter(puzzlePath(puzzleId))
+          && request.resource.data.correct < getAfter(puzzlePath(puzzleId)).data.answers.size()
           && request.resource.data.explanation is string && request.resource.data.explanation.size() <= 1000
           && request.resource.data.updatedAt == request.time;
         allow delete: if isTrainer();
