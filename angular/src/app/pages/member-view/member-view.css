@@ -53,3 +53,15 @@
 .release-note[data-state='on'] {
   background: var(--tk-soft-green, #e3f5e8);
 }
+
+/* Vergangene Termine einklappbar (SCRUM-402). */
+.history-toggle {
+  max-width: 100%;
+  white-space: normal;
+}
+#past-events-list {
+  margin-top: var(--tk-space-3);
+}
+.history-more {
+  margin-top: var(--tk-space-3);
+}

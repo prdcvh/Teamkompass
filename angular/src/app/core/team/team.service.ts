@@ -8,7 +8,7 @@ import type { RawDoc, SnapshotMeta } from '../firebase/types';
 import { addDays, todayIso } from '../shared/dates';
 import { type Rating, ratingFromDoc } from '../ratings/rating';
 import { GROWTH_MEASUREMENT_WINDOW_DAYS, MEASUREMENT_WINDOW_DAYS } from '../analysis/risk';
-import { type Measurement, measurementFromDoc } from '../records/measurement';
+import { type Measurement, growthMeasurementsFromDocs } from '../records/measurement';
 import { SquadAbsencesService } from '../records/squad-absences.service';
 import { SessionService } from '../auth/session.service';
 import { SquadService } from '../player/squad.service';
@@ -196,7 +196,7 @@ export class TeamService {
         });
         this.selfReports.update((map) => new Map(map).set(id, new Map(reports)));
       } else {
-        this.measurements.update((map) => new Map(map).set(id, docs.map((entry) => measurementFromDoc(entry.id, entry.data, today))));
+        this.measurements.update((map) => new Map(map).set(id, growthMeasurementsFromDocs(docs, today)));
       }
       this.pending.delete(key);
       this.waiting.set(this.pending.size);

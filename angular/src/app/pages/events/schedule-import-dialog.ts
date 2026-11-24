@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { formatDate } from '../../core/events/event';
+import { looksLikeIcs, parseIcs } from '../../core/events/ics-import';
 import { EventsService } from '../../core/events/events.service';
 import {
   type CheckedRow,
@@ -8,6 +9,7 @@ import {
   TEMPLATE_FILE_NAME,
   checkRows,
   draftsToImport,
+  type ParsedSchedule,
   parseSchedule,
   summarize,
   templateCsv,
@@ -35,7 +37,7 @@ function readFile(file: File): Promise<ArrayBuffer> {
 }
 
 /**
- * Spielplan-Import per CSV (SCRUM-189): Datei wählen (nur im Browser gelesen, nichts wird hochgeladen), Vorschau mit
+ * Spielplan-Import per CSV (SCRUM-189) oder Kalenderdatei/ICS (SCRUM-237): Datei wählen (nur im Browser gelesen, nichts wird hochgeladen), Vorschau mit
  * Prüfung, dann alle Spiele in einem Schritt anlegen. Nur Trainer sehen den Einstieg (Seite „Events“).
  */
 @Component({
@@ -60,6 +62,10 @@ export class ScheduleImportDialog {
   protected readonly busy = signal(false);
   protected readonly failure = signal('');
   protected readonly created = signal<number | null>(null);
+  /** Eigener Mannschaftsname: nur für ICS nötig, um Heim/Gast aus dem Titel „Heim - Gast“ zu erkennen. */
+  protected readonly ownName = signal('');
+  /** Inhalt der gewählten ICS-Datei; bleibt erhalten, damit eine Änderung des Namens neu auswertet. */
+  protected readonly icsText = signal<string | null>(null);
 
   protected readonly summary = computed(() => summarize(this.checked()));
   protected readonly previewing = computed(() => this.checked().length > 0);
@@ -81,6 +87,7 @@ export class ScheduleImportDialog {
     this.busy.set(false);
     this.failure.set('');
     this.created.set(null);
+    this.icsText.set(null);
   }
 
   protected downloadTemplate(): void {
@@ -101,18 +108,36 @@ export class ScheduleImportDialog {
     }
     this.reading.set(true);
     try {
-      const parsed = parseSchedule(decodeCsv(await readFile(file)));
-      if (parsed.fileError) {
-        this.fileError.set(parsed.fileError);
-        return;
-      }
-      // Für den Abgleich müssen auch ältere Saisons geladen sein, falls die Datei Spiele davor enthält.
-      if (parsed.rows.some((row) => row.date !== '' && row.date < this.events.seasonStart())) this.events.showAllSeasons();
-      const loaded = await this.events.whenLoaded();
-      const games = loaded.filter((entry) => entry.type === 'Spiel');
-      this.checked.set(checkRows(parsed.rows, games));
+      const text = decodeCsv(await readFile(file));
+      if (/\.ics$/i.test(file.name) || looksLikeIcs(text)) {
+        this.icsText.set(text);
+        await this.analyze(parseIcs(text, this.ownName()));
+      } else await this.analyze(parseSchedule(text));
     } catch {
       this.fileError.set('Die Datei konnte nicht gelesen werden.');
+    } finally {
+      this.reading.set(false);
+    }
+  }
+
+  /** Vorschau und Dublettenprüfung für beide Dateiarten (CSV und ICS): dieselbe Prüfung, dieselben Zeilen. */
+  private async analyze(parsed: ParsedSchedule): Promise<void> {
+    this.fileError.set(parsed.fileError ?? '');
+    this.checked.set([]);
+    if (parsed.fileError) return;
+    // Für den Abgleich müssen auch ältere Saisons geladen sein, falls die Datei Spiele davor enthält.
+    if (parsed.rows.some((row) => row.date !== '' && row.date < this.events.seasonStart())) this.events.showAllSeasons();
+    const loaded = await this.events.whenLoaded();
+    this.checked.set(checkRows(parsed.rows, loaded.filter((entry) => entry.type === 'Spiel')));
+  }
+
+  protected async changeOwnName(event: Event): Promise<void> {
+    this.ownName.set((event.target as HTMLInputElement).value);
+    const text = this.icsText();
+    if (text === null || this.reading() || this.busy()) return;
+    this.reading.set(true);
+    try {
+      await this.analyze(parseIcs(text, this.ownName()));
     } finally {
       this.reading.set(false);
     }

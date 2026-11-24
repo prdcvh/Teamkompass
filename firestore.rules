@@ -690,6 +690,38 @@ service cloud.firestore {
           allow delete: if isTrainer();
         }
 
+        // Entwicklungsraster (SCRUM-266, docs/bewertungsmodell.md §5 und §9): eine Beobachtung = ein Kriterium, ein Tag,
+        // eine bewertende Person. Getrennt von den Eventnoten (events/*/ratings), die unveraendert bleiben.
+        // - Lesen nur Trainer. Spieler, Eltern, Medizin, Scouts und - abweichend von SCRUM-183 - der Vereinsadmin nicht:
+        //   Einschaetzungen zu psychologischen und sozialen Faehigkeiten Minderjaehriger; Erweiterung nur nach PO-Entscheidung.
+        // - Anlegen nur Trainer, mit dem eigenen Konto, fuer einen bestehenden Spieler, nur diese Felder, Stufe 1-4,
+        //   nicht bei widerrufener Einwilligung. Aendern nie (der Verlauf bleibt nachvollziehbar), loeschen Trainer.
+        match /competenceObservations/{observationId} {
+          allow read: if isTrainer();
+          allow create: if isTrainer()
+            && exists(playerPath(playerId))
+            && !consentRevoked(playerId)
+            && request.resource.data.keys().hasOnly(['playerId', 'framework', 'criterionId', 'value', 'date', 'occasion', 'eventId', 'position', 'source', 'note', 'by', 'byUid', 'createdAt'])
+            && request.resource.data.keys().hasAll(['playerId', 'framework', 'criterionId', 'value', 'date', 'occasion', 'eventId', 'position', 'source', 'note', 'by', 'byUid', 'createdAt'])
+            && request.resource.data.playerId == playerId
+            && request.resource.data.byUid == request.auth.uid
+            && request.resource.data.framework is string && request.resource.data.framework.matches('raster-[0-9]{1,3}')
+            && request.resource.data.criterionId is string && request.resource.data.criterionId.size() <= 60
+            && request.resource.data.criterionId.matches('[a-z]+[.][A-Za-z]+')
+            && request.resource.data.value is int && request.resource.data.value >= 1 && request.resource.data.value <= 4
+            && request.resource.data.date is string && request.resource.data.date.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
+            && request.resource.data.occasion in ['training', 'match', 'test', 'other']
+            && (request.resource.data.eventId == null
+              || (request.resource.data.eventId is string && request.resource.data.eventId.size() > 0 && request.resource.data.eventId.size() <= 100))
+            && (request.resource.data.position == null
+              || (request.resource.data.position is string && request.resource.data.position.size() > 0 && request.resource.data.position.size() <= 30))
+            && request.resource.data.source == 'trainer'
+            && request.resource.data.note is string && request.resource.data.note.size() <= 300
+            && request.resource.data.by is string && request.resource.data.by.size() <= 80
+            && request.resource.data.createdAt is string && request.resource.data.createdAt.size() <= 40;
+          allow delete: if isTrainer();
+        }
+
         // -----------------------------------------------------------------------------------------
         // Reife-Kompass (SCRUM-190, PO-Entscheidung 02.11.2026; Einwilligung/Widerruf SCRUM-252). Ein Dokument "parents"
         // mit Geschlecht fuer die Formel, Einverstaendnis der Eltern und Groesse von Mutter und Vater (Angaben ueber
@@ -1019,6 +1051,13 @@ service cloud.firestore {
         allow write: if isTrainer();
       }
 
+      // Messplan (SCRUM-255/392): Entscheidungen je Spieler (Rhythmus, Termin, Pause) - bewusst ein eigenes Dokument
+      // und NICHT in meta/settings, das auch der Vereinsadmin liest. Nur Trainer lesen und schreiben; Vereinsadmin,
+      // Spieler, Eltern, Medizin und Scouts haben keinen Zugriff. Es stehen nur Termine und Entscheidungen darin.
+      match /meta/measurementPlan {
+        allow read, write: if isTrainer();
+      }
+
       // Planung (Trainingsserien, SCRUM-145) - nur Trainer.
       match /meta/planning {
         allow read: if isTrainer() || isClubAdminOfTeam();
@@ -1118,6 +1157,36 @@ service cloud.firestore {
         allow delete: if isTrainer();
       }
 
+      // Entwicklungsraster: Team-Konfiguration als unveraenderliche Versionen v1, v2, ... (SCRUM-266,
+      // docs/bewertungsmodell.md §7). Erhobene Bereiche, Gewichtsprofil (Hypothese), Gewichte 0-100 je Bereich und ob ein
+      // Gesamtindex gezeigt wird. Lesen nur Trainer. Anlegen nur Trainer, mit dem eigenen Konto, Dokument-ID = "v" +
+      // Version. Aendern und loeschen nie: so bleibt rekonstruierbar, mit welchen Gewichten an einem Tag gerechnet wurde.
+      match /competenceConfigs/{configId} {
+        function weightOk(weights, domain) {
+          return !(domain in weights) || (weights[domain] is int && weights[domain] >= 0 && weights[domain] <= 100);
+        }
+        allow read: if isTrainer();
+        allow create: if isTrainer()
+          && request.resource.data.keys().hasOnly(['version', 'framework', 'domains', 'weightProfile', 'weights', 'indexEnabled', 'createdAt', 'by', 'byUid'])
+          && request.resource.data.keys().hasAll(['version', 'framework', 'domains', 'weightProfile', 'weights', 'indexEnabled', 'createdAt', 'by', 'byUid'])
+          && request.resource.data.version is int && request.resource.data.version >= 1 && request.resource.data.version <= 100000
+          && configId == 'v' + string(request.resource.data.version)
+          && request.resource.data.framework is string && request.resource.data.framework.matches('raster-[0-9]{1,3}')
+          && request.resource.data.domains is list && request.resource.data.domains.size() >= 1 && request.resource.data.domains.size() <= 5
+          && request.resource.data.domains.hasOnly(['technique', 'tactics', 'physical', 'psychological', 'social'])
+          && (request.resource.data.weightProfile == null || request.resource.data.weightProfile in ['balanced', 'foundation', 'buildup'])
+          && request.resource.data.weights is map
+          && request.resource.data.weights.keys().hasOnly(['technique', 'tactics', 'physical', 'psychological', 'social'])
+          && weightOk(request.resource.data.weights, 'technique') && weightOk(request.resource.data.weights, 'tactics')
+          && weightOk(request.resource.data.weights, 'physical') && weightOk(request.resource.data.weights, 'psychological')
+          && weightOk(request.resource.data.weights, 'social')
+          && request.resource.data.indexEnabled is bool
+          && (request.resource.data.indexEnabled == false || request.resource.data.weightProfile != null)
+          && request.resource.data.byUid == request.auth.uid
+          && request.resource.data.by is string && request.resource.data.by.size() <= 80
+          && request.resource.data.createdAt is string && request.resource.data.createdAt.size() <= 40;
+      }
+
       // ---------------------------------------------------------------------------------------------
       // Situationsraetsel aus Spielszenen (SCRUM-193). Keine Gesundheitsdaten, keine Noten, keine Rangliste.
       // - puzzles/{puzzleId}: Szene (Bild- oder Video-Link mit Zeitmarke), Frage, 2-4 Antworten, Schwierigkeit 1-3 -
@@ -1133,6 +1202,10 @@ service cloud.firestore {
       // ---------------------------------------------------------------------------------------------
       function puzzlePath(puzzleId) {
         return /databases/$(database)/documents/teams/$(teamId)/puzzles/$(puzzleId);
+      }
+
+      function puzzleSolutionPath(puzzleId) {
+        return /databases/$(database)/documents/teams/$(teamId)/puzzleSolutions/$(puzzleId);
       }
 
       match /puzzles/{puzzleId} {
@@ -1151,8 +1224,15 @@ service cloud.firestore {
           && request.resource.data.answers is list
           && request.resource.data.answers.size() >= 2 && request.resource.data.answers.size() <= 4
           && request.resource.data.level in [1, 2, 3]
-          && request.resource.data.updatedAt == request.time;
-        allow delete: if isTrainer();
+          && request.resource.data.updatedAt == request.time
+          // SCRUM-301: eine vorhandene Loesung darf durch das Aendern der Antworten nicht ungueltig werden -
+          // sie muss im selben Schreibvorgang (Batch) mitgeaendert werden und danach noch auf eine Antwort zeigen.
+          && (!exists(puzzleSolutionPath(puzzleId))
+            || (existsAfter(puzzleSolutionPath(puzzleId))
+              && getAfter(puzzleSolutionPath(puzzleId)).data.correct is int
+              && getAfter(puzzleSolutionPath(puzzleId)).data.correct < request.resource.data.answers.size()));
+        // Loeschen: keine verwaiste Loesung zuruecklassen (die App loescht Raetsel und Loesung in einem Batch).
+        allow delete: if isTrainer() && !existsAfter(puzzleSolutionPath(puzzleId));
       }
 
       match /puzzleSolutions/{puzzleId} {
@@ -1164,6 +1244,9 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly(['correct', 'explanation', 'updatedAt'])
           && request.resource.data.correct is int
           && request.resource.data.correct >= 0 && request.resource.data.correct <= 3
+          // SCRUM-301: das Raetsel muss (nach dem Schreibvorgang) existieren und die Antwort darin vorkommen.
+          && existsAfter(puzzlePath(puzzleId))
+          && request.resource.data.correct < getAfter(puzzlePath(puzzleId)).data.answers.size()
           && request.resource.data.explanation is string && request.resource.data.explanation.size() <= 1000
           && request.resource.data.updatedAt == request.time;
         allow delete: if isTrainer();

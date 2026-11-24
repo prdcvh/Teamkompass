@@ -50,6 +50,13 @@ describe('Spielplan-Import (SCRUM-189)', () => {
     });
   }
 
+  /** Öffnet den Dialog (falls noch zu) und gibt das Fixture zurück. */
+  const importButtonOpen = (fixture: Awaited<ReturnType<typeof render>>) => {
+    importButton(fixture)!.click();
+    fixture.detectChanges();
+    return fixture;
+  };
+
   const header = 'Datum;Uhrzeit;Heim/Gast;Gegner;Ort';
   const rowsOf = (fixture: { nativeElement: unknown }) => [...root(fixture).querySelectorAll('tk-schedule-import-dialog .row')].map(text);
   const createButton = (fixture: { nativeElement: unknown }) => [...root(fixture).querySelectorAll<HTMLButtonElement>('tk-schedule-import-dialog button')].find((button) => /anlegen$/.test(text(button)))!;
@@ -112,6 +119,68 @@ describe('Spielplan-Import (SCRUM-189)', () => {
     await chooseFile(fixture, `${header}\n${many}`);
     expect(text(root(fixture).querySelector('[data-testid="import-file-error"]'))).toContain('höchstens 450');
     expect(firebase.calls.some((call) => call.startsWith('saveEventsBatch'))).toBe(false);
+  });
+
+  describe('Kalenderdatei (ICS, SCRUM-237)', () => {
+    const ics = [
+      'BEGIN:VCALENDAR',
+      'BEGIN:VEVENT',
+      'DTSTART:20990307T100000Z',
+      'SUMMARY:SG Muster - SV Nord',
+      'END:VEVENT',
+      'BEGIN:VEVENT',
+      'DTSTART;TZID=Europe/Berlin:20990314T110000',
+      'SUMMARY:FC Süd - SG Muster',
+      'LOCATION:Sportplatz\\, Süd',
+      'END:VEVENT',
+      'END:VCALENDAR',
+      '',
+    ].join('\r\n');
+    const nameInput = (fixture: { nativeElement: unknown }) => root(fixture).querySelector<HTMLInputElement>('[data-testid="import-own-name"]')!;
+    const setName = async (fixture: Awaited<ReturnType<typeof render>>, value: string) => {
+      const input = nameInput(fixture);
+      input.value = value;
+      input.dispatchEvent(new Event('change'));
+      await fixture.whenStable();
+      fixture.detectChanges();
+    };
+
+    it('verlangt zuerst den Mannschaftsnamen und wertet danach neu aus', async () => {
+      const fixture = await render();
+      await chooseFile(fixture, ics, 'plan.ics');
+      expect(text(root(fixture).querySelector('[data-testid="import-file-error"]'))).toContain('Namen deiner Mannschaft');
+      await setName(fixture, 'SG Muster');
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(root(fixture).querySelector('[data-testid="import-summary"]')).not.toBeNull();
+      });
+      expect(text(root(fixture).querySelector('[data-testid="import-summary"]'))).toContain('2 Zeilen – 1 neu, 1 Dubletten, 0 fehlerhaft');
+      expect(root(fixture).querySelector('[data-testid="import-file-error"]')).toBeNull();
+    });
+
+    it('legt Spiele aus der Kalenderdatei an: Gegner, Ort und Berliner Uhrzeit, Dubletten übersprungen', async () => {
+      const fixture = await render();
+      await setName(importButtonOpen(fixture), 'SG Muster');
+      await chooseFile(fixture, ics, 'plan.ics');
+      expect(rowsOf(fixture)[0]).toContain('Dublette');
+      expect(rowsOf(fixture)[1]).toContain('FC Süd');
+      expect(rowsOf(fixture)[1]).toContain('Gast');
+      createButton(fixture).click();
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(root(fixture).querySelector('[data-testid="import-done"]')).not.toBeNull();
+      });
+      const created = [...firebase.events.events.values()].filter((data) => data['id'] !== undefined);
+      expect(created.map((data) => [data['opponent'], data['startTime'], data['location'], data['date']])).toEqual([['FC Süd', '11:00', 'Sportplatz, Süd', '2099-03-14']]);
+    });
+
+    it('markiert nicht erkannte Titel als Fehler und legt dann nichts an', async () => {
+      const fixture = await render();
+      await setName(importButtonOpen(fixture), 'SG Muster');
+      await chooseFile(fixture, ics.replace('FC Süd - SG Muster', 'Mannschaftsabend'), 'plan.ics');
+      expect(text(root(fixture).querySelector('[data-testid="import-summary"]'))).toContain('1 fehlerhaft');
+      expect(createButton(fixture).disabled).toBe(true);
+    });
   });
 
   it('liest Windows-1252-Dateien (Umlaute) ebenso wie UTF-8', () => {

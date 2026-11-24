@@ -162,7 +162,7 @@ export function parseHomeAway(value: string): HomeAway | undefined {
 }
 
 /** Steuerzeichen raus, Leerraum glätten: Gegner und Ort sind reiner Text. */
-function cleanText(value: string): string {
+export function cleanText(value: string): string {
   // eslint-disable-next-line no-control-regex -- Steuerzeichen sollen gerade entfernt werden
   return value.replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim();
 }

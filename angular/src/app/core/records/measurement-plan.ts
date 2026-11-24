@@ -73,7 +73,7 @@ function validInterval(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isInteger(value) && value >= MIN_INTERVAL_MONTHS && value <= MAX_INTERVAL_MONTHS ? value : undefined;
 }
 
-/** `meta/settings.measurementPlan` → Einträge je Spieler; Unbrauchbares wird verworfen. */
+/** `meta/measurementPlan.measurementPlan` → Einträge je Spieler; Unbrauchbares wird verworfen. */
 export function planEntriesFromDoc(doc: Readonly<Record<string, unknown>> | null): PlanEntries {
   const raw = doc?.['measurementPlan'];
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return {};
