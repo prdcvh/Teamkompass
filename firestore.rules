@@ -1019,6 +1019,13 @@ service cloud.firestore {
         allow write: if isTrainer();
       }
 
+      // Messplan (SCRUM-255/392): Entscheidungen je Spieler (Rhythmus, Termin, Pause) - bewusst ein eigenes Dokument
+      // und NICHT in meta/settings, das auch der Vereinsadmin liest. Nur Trainer lesen und schreiben; Vereinsadmin,
+      // Spieler, Eltern, Medizin und Scouts haben keinen Zugriff. Es stehen nur Termine und Entscheidungen darin.
+      match /meta/measurementPlan {
+        allow read, write: if isTrainer();
+      }
+
       // Planung (Trainingsserien, SCRUM-145) - nur Trainer.
       match /meta/planning {
         allow read: if isTrainer() || isClubAdminOfTeam();

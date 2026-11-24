@@ -6,7 +6,8 @@ import { todayIso } from '../shared/dates';
 import { SessionService } from '../auth/session.service';
 import { SyncService } from '../shell/sync.service';
 import { type Absence, absenceFromDoc } from './absence';
-import { type Measurement, measurementFromDoc } from './measurement';
+import { type FieldTestResult, fieldTestFromDoc, isFieldTestDoc } from './field-test';
+import { type Measurement, growthMeasurementsFromDocs } from './measurement';
 import { type DevelopmentPlan, planFromDoc } from './plan';
 
 /**
@@ -25,6 +26,8 @@ export class RecordsStateService {
   readonly plans = signal<readonly DevelopmentPlan[]>([]);
   readonly absences = signal<readonly Absence[]>([]);
   readonly measurementList = signal<readonly Measurement[]>([]);
+  /** Feldtest-Ergebnisse (SCRUM-263): gleiche Sammlung und damit gleiche Lese-/Schreibrechte wie die Messwerte. */
+  readonly fieldTests = signal<readonly FieldTestResult[]>([]);
   readonly error = signal('');
   private readonly answered = signal<ReadonlySet<PlayerRecordKind>>(new Set());
   /** Welche Zusatzdaten die Rolle lesen darf: Medizin sieht keine Förderpläne (Regeln: players/{id}/developmentPlans). */
@@ -64,7 +67,10 @@ export class RecordsStateService {
     }
     if (!health) return;
     this.open(generation, playerId, 'absences', ownOnly, (docs) => this.absences.set(docs.map((entry) => absenceFromDoc(entry.id, entry.data))));
-    this.open(generation, playerId, 'measurements', ownOnly, (docs) => this.measurementList.set(docs.map((entry) => measurementFromDoc(entry.id, entry.data, today))));
+    this.open(generation, playerId, 'measurements', ownOnly, (docs) => {
+      this.measurementList.set(growthMeasurementsFromDocs(docs, today));
+      this.fieldTests.set(docs.filter((entry) => isFieldTestDoc(entry.data)).map((entry) => fieldTestFromDoc(entry.id, entry.data)));
+    });
   }
 
   stop(): void {
@@ -75,6 +81,7 @@ export class RecordsStateService {
     this.plans.set([]);
     this.absences.set([]);
     this.measurementList.set([]);
+    this.fieldTests.set([]);
     this.answered.set(new Set());
     this.error.set('');
     this.healthHidden = false;

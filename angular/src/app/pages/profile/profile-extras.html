@@ -173,6 +173,9 @@
     </tk-card>
   </section>
 
+  <!-- Feldtests (SCRUM-263): gleiche Sammlung und Sichtbarkeit wie die Messwerte; löschen nur Trainer. -->
+  <tk-field-test-card [canEdit]="canEdit()" [showDetails]="showDetails()" />
+
   <!-- Wachstumsgeschwindigkeit (SCRUM-254): gleiche Sichtbarkeit wie das Messwertdiagramm. -->
   <tk-growth-velocity-card />
 

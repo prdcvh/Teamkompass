@@ -9,6 +9,7 @@ import { type Opponent, docFromOpponent } from '../opponents/opponent';
 import { type Player, docFromPlayer, isConsentRevoked } from '../player/player';
 import { type Rating, docFromRating } from '../ratings/rating';
 import { type Absence, docFromAbsence } from '../records/absence';
+import { type FieldTestResult, docFromFieldTest } from '../records/field-test';
 import { type Measurement, docFromMeasurement } from '../records/measurement';
 import { type DevelopmentPlan, docFromPlan } from '../records/plan';
 import { type RatingsByEvent } from '../team/team';
@@ -22,6 +23,8 @@ export interface ExportInput {
   readonly plans: ReadonlyMap<string, readonly DevelopmentPlan[]>;
   readonly absences: ReadonlyMap<string, readonly Absence[]>;
   readonly measurements: ReadonlyMap<string, readonly Measurement[]>;
+  /** Feldtest-Ergebnisse (SCRUM-263); landen wie in der Datenbank bei den Messwerten des Spielers. */
+  readonly fieldTests?: ReadonlyMap<string, readonly FieldTestResult[]>;
   readonly opponents: readonly Opponent[];
 }
 
@@ -65,7 +68,14 @@ export function buildExport(input: ExportInput): ExportData {
       .map((event) => ({ id: event.id, ...docFromEvent(event), ratings: ratingsOf(event.id) })),
     developmentPlans: byPlayer(input.plans, players, (plan) => ({ id: plan.id, ...docFromPlan(plan) })),
     absences: byPlayer(input.absences, players, (absence) => ({ id: absence.id, ...docFromAbsence(absence) })),
-    measurements: byPlayer(input.measurements, players, (measurement) => ({ id: measurement.id, ...docFromMeasurement(measurement) })),
+    measurements: byPlayer(
+      new Map(players.map((player) => [player.id, [
+        ...(input.measurements.get(player.id) ?? []).map((measurement) => ({ id: measurement.id, ...docFromMeasurement(measurement) })),
+        ...(input.fieldTests?.get(player.id) ?? []).map((result) => ({ id: result.id, ...docFromFieldTest(result) })),
+      ]])),
+      players,
+      (doc) => doc,
+    ),
     opponents: [...input.opponents].sort((a, b) => a.name.localeCompare(b.name, 'de')).map((opponent) => ({ id: opponent.id, ...docFromOpponent(opponent) })),
   };
 }

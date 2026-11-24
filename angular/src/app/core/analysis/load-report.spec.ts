@@ -7,6 +7,7 @@ import type { Absence } from '../records/absence';
 import type { Measurement } from '../records/measurement';
 import { addDays } from '../shared/dates';
 import { type LoadReportInput, buildLoadReport, canCreateLoadReport, loadReportRange } from './load-report';
+import { injuryRisk } from './risk';
 import { LOAD_REPORT_CSS, loadReportHtml } from './load-report-html';
 
 const TODAY = '2026-10-20';
@@ -135,6 +136,41 @@ describe('buildLoadReport', () => {
     expect(report.markers.growth[0]).toMatchObject({ from: ago(100), to: ago(10), perMonth: 1.4, level: 'strong' });
     expect(report.markers.recovery[0]).toContain('48 Stunden');
     expect(loadReportHtml(report)).toContain('starker Wachstumsschub');
+  });
+
+  // SCRUM-249: Wochenmarkierung „Belastungsspitze“ = dieselbe Rechnung wie die Ampel (Müdigkeit / Fitness mit Schutzregeln).
+  // 12 normale Wochen mit je zwei Trainings à 90 Minuten × 5 (900 pro Woche), die letzten 4 Berichtswochen enden heute.
+  const normalWeeks = () => Array.from({ length: 12 }, (_, week) => [7, 9].map((day) => item(`n${week}-${day}`, day + 7 * week))).flat();
+  const spikes = (report: ReturnType<typeof build>) => report.markers.recovery.filter((text) => text.startsWith('Belastungsspitze'));
+
+  it('Belastungsspitze: 1,5-fache Woche nach der alten Regel ist für die Ampel keine Spitze und wird nicht markiert', () => {
+    // Letzte Woche 1350 = genau das 1,5-fache des Schnitts der 3 Wochen davor (alte Regel: Spitze), Müdigkeit/Fitness bleibt unter 1,5.
+    const items = [...normalWeeks(), item('a1', 0), item('a2', 2), item('a3', 4)];
+    const report = build({ items });
+    expect(report.weeks.map((week) => week.load)).toEqual([900, 900, 900, 1350]);
+    expect(spikes(report)).toEqual([]);
+    expect(injuryRisk(player, items, [], [], new Date(`${TODAY}T12:00:00`)).reasons).toEqual([]);
+  });
+
+  it('Belastungsspitze: markiert eine Woche, die nach der alten Regel keine Spitze war, und nennt dieselbe Zahl wie die Ampel', () => {
+    // Vier harte Einheiten (Anstrengung 6) über den Wochenwechsel: letzte Woche nur 1080 (alt: unter dem 1,5-fachen des Schnitts), die Kurve steigt aber stark.
+    const items = [...normalWeeks(), item('d1', 5, 'present', { exertion: 6 }), item('d2', 6, 'present', { exertion: 6 }), item('d3', 7, 'present', { exertion: 6 }), item('d4', 8, 'present', { exertion: 6 })];
+    const report = build({ items });
+    expect(report.weeks.map((week) => week.load)).toEqual([900, 900, 1980, 1080]);
+    expect(spikes(report)).toEqual([
+      'Belastungsspitze in der Woche 07.10.2026–13.10.2026 (Müdigkeit 2,0-fach der Fitness, am 13.10.2026)',
+      'Belastungsspitze in der Woche 14.10.2026–20.10.2026 (Müdigkeit 1,9-fach der Fitness, am 14.10.2026)',
+    ]);
+    // Dieselbe Rechnung wie die Ampel am Tag der Spitze.
+    expect(injuryRisk(player, items, [], [], new Date('2026-10-13T12:00:00')).reasons[0]).toBe('Belastungsspitze (Müdigkeit 2,0-fach der Fitness)');
+    expect(injuryRisk(player, items, [], [], new Date('2026-10-14T12:00:00')).reasons[0]).toBe('Belastungsspitze (Müdigkeit 1,9-fach der Fitness)');
+    expect(loadReportHtml(report)).toContain('Belastungsspitze in der Woche 14.10.2026');
+  });
+
+  it('Belastungsspitze: Schutzregel Wiedereinstieg – nach einer Pause keine Markierung', () => {
+    // Nur zwei Wochen Belastung (alte Regel würde 2000 gegen 3 Wochen davor mit nur 2 belasteten Wochen vergleichen), neue: weniger als 3 von 4 Wochen.
+    const items = [item('p1', 20), item('p2', 18), item('r1', 2, 'present', { exertion: 9 }), item('r2', 1, 'present', { exertion: 9 }), item('r3', 0, 'present', { exertion: 9 })];
+    expect(spikes(build({ items }))).toEqual([]);
   });
 
   it('Wachstum rechnet wie die Belastungsampel: Mindestabstand 90 Tage, keine Hochrechnung kurzer Abstände (SCRUM-305)', () => {
