@@ -6,7 +6,7 @@ import { isConsentRevoked } from '../player/player';
 import { SquadService } from '../player/squad.service';
 import { todayIso } from '../shared/dates';
 import { maturityInputsFromDoc } from '../records/maturity';
-import { measurementFromDoc } from '../records/measurement';
+import { growthMeasurementsFromDocs } from '../records/measurement';
 import type { DevelopmentPlayerData } from './development-view';
 
 /**
@@ -50,7 +50,7 @@ export class DevelopmentViewService {
         .map(async (player): Promise<[string, DevelopmentPlayerData]> => {
           try {
             const [doc, records] = await Promise.all([this.maturityApi.readMaturity(player.id), this.recordsApi.readPlayerRecords(player.id, 'measurements')]);
-            return [player.id, { inputs: maturityInputsFromDoc(doc), measurements: records.map((record) => measurementFromDoc(record.id, record.data, today)) }];
+            return [player.id, { inputs: maturityInputsFromDoc(doc), measurements: growthMeasurementsFromDocs(records, today) }];
           } catch (error) {
             console.error(error);
             return [player.id, null];

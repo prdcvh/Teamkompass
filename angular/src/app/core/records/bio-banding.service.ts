@@ -7,7 +7,7 @@ import { SquadService } from '../player/squad.service';
 import { todayIso } from '../shared/dates';
 import { type BioBandingData, type BioBandingSuggestion, suggestBioBanding } from './bio-banding';
 import { maturityInputsFromDoc } from './maturity';
-import { measurementFromDoc } from './measurement';
+import { growthMeasurementsFromDocs } from './measurement';
 
 /**
  * Bio-Banding-Vorschlag (SCRUM-191) für die Gruppeneinteilung eines Trainings. Liest einmalig (nicht in Echtzeit) je
@@ -44,7 +44,7 @@ export class BioBandingService {
         .map(async (player): Promise<[string, BioBandingData | null]> => {
           try {
             const [doc, records] = await Promise.all([this.maturityApi.readMaturity(player.id), this.recordsApi.readPlayerRecords(player.id, 'measurements')]);
-            return [player.id, { inputs: maturityInputsFromDoc(doc), measurements: records.map((record) => measurementFromDoc(record.id, record.data, today)) }];
+            return [player.id, { inputs: maturityInputsFromDoc(doc), measurements: growthMeasurementsFromDocs(records, today) }];
           } catch (error) {
             console.error(error);
             return [player.id, null];

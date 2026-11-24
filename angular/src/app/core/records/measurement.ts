@@ -7,6 +7,7 @@
  * gelten als "Messqualität nicht dokumentiert"; fehlende Rohwerte werden nie erfunden.
  * Formular und Prüfung: measurement-draft.ts; Regeln und Grenzwerte: measurement-protocol.ts.
  */
+import { isFieldTestDoc } from './field-test';
 import { MAX_READINGS, type MeasurementFlag, type MeasurementQuality, STATION_MAX, decimalText } from './measurement-protocol';
 
 export { MAX_HEIGHT_CM, MAX_WEIGHT_KG } from './measurement-protocol';
@@ -112,6 +113,14 @@ export function measurementFromDoc(id: string, data: Readonly<Record<string, unk
   const changes = changesFromDoc(data['changes']);
   if (changes) measurement['changes'] = changes;
   return measurement as unknown as Measurement;
+}
+
+/**
+ * Alle Größe/Gewicht-Messungen aus den Dokumenten von `players/{id}/measurements`. Feldtest-Ergebnisse (SCRUM-263,
+ * `kind: 'fieldTest'`) liegen in derselben Sammlung und werden hier übersprungen – sie sind keine Wachstumsmessung.
+ */
+export function growthMeasurementsFromDocs(docs: readonly { readonly id: string; readonly data: Readonly<Record<string, unknown>> }[], today: string): Measurement[] {
+  return docs.filter((doc) => !isFieldTestDoc(doc.data)).map((doc) => measurementFromDoc(doc.id, doc.data, today));
 }
 
 /** Größe/Gewicht wie die bisherige App als Text (leer = nicht erfasst); neue Felder nur, wenn vorhanden. */

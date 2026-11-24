@@ -33,6 +33,8 @@ export const ROUTES = [
   '/anmelden?as=none', '/ansicht?as=player', '/ansicht?as=player-email', '/ansicht?as=physio', '/ansicht?as=scout',
   // Registrierung, Teamauswahl und Einstieg (SCRUM-181).
   '/registrieren?as=none&code=ABCDEFGHJKLMNPQR', '/team-waehlen?as=multi', '/willkommen?as=fresh',
+  // Feldtests (SCRUM-263).
+  '/feldtests',
 ];
 
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json' };
