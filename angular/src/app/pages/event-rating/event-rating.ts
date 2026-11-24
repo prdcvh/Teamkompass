@@ -46,6 +46,7 @@ import { EventDeleteDialog, type EventDeleted } from '../events/event-delete-dia
 import { EventDialog } from '../events/event-dialog';
 import { EventDetails } from './event-details';
 import { MatchCheck } from './match-check';
+import { TacticScenesPanel } from './tactic-scenes-panel';
 
 /** Spaltenköpfe der Matrix: lange Wörter mit weichen Trennstellen, damit sie in schmalen Spalten umbrechen statt abgeschnitten zu werden. */
 const GRADE_HEADERS: Readonly<Record<GradeField, string>> = {
@@ -62,7 +63,7 @@ const GRADE_HEADERS: Readonly<Record<GradeField, string>> = {
  */
 @Component({
   selector: 'app-event-rating',
-  imports: [RouterLink, Button, Card, Chip, Weather, EventDetails, EventDialog, EventDeleteDialog, MatchCheck],
+  imports: [RouterLink, Button, Card, Chip, Weather, EventDetails, EventDialog, EventDeleteDialog, MatchCheck, TacticScenesPanel],
   templateUrl: './event-rating.html',
   styleUrl: './event-rating.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

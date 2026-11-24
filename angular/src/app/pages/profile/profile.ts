@@ -46,13 +46,16 @@ import { ConsentPanel } from './consent-panel';
 import { GradeReleasePanel } from './grade-release-panel';
 import { GradeTrendCard } from './grade-trend-card';
 import { BehaviorObservationsCard } from './behavior-observations-card';
+import { TacticDiagnosticsCard } from './tactic-diagnostics-card';
+import { CompetenceCard } from './competence-card';
+import { LEGACY_MODEL_LABEL } from '../../core/competence/competence-catalog';
 import { CurrentTeam } from '../../core/team/current-team.service';
 import { healthLockedMessage, mayStoreHealth } from '../../core/player/consent';
 
 /** Spielerprofil (Figma: Profil Desktop/Handy): Kopfbereich, Notenverlauf, Kompetenzprofil, Verfügbarkeit, Statistik, Eventhistorie. */
 @Component({
   selector: 'app-profile',
-  imports: [Button, Card, Status, ProfileExtras, LoadReportAction, LoadCurveCard, GrowthLoadCard, ConsentPanel, GradeReleasePanel, SelfReportHistory, LearningSummary, CohortCard, GradeTrendCard, BehaviorObservationsCard],
+  imports: [Button, Card, Status, ProfileExtras, LoadReportAction, LoadCurveCard, GrowthLoadCard, ConsentPanel, GradeReleasePanel, SelfReportHistory, LearningSummary, CohortCard, GradeTrendCard, CompetenceCard, TacticDiagnosticsCard, BehaviorObservationsCard],
   templateUrl: './profile.html',
   // Reihenfolge = Kaskade (die Handy-Regeln überschreiben Kopf und Auswertung).
   styleUrls: ['./profile.css', './profile-stats.css', './profile-mobile.css', './profile-risk.css', '../../ui/chart/chart.css'],
@@ -99,6 +102,9 @@ export class Profile implements OnInit {
   protected readonly history = computed(() => [...this.graded()].reverse());
   protected readonly figures = computed(() => profileFigures(this.profile.items(), this.today));
   protected readonly skills = computed(() => skillAverages(this.graded()));
+  /** Termine für den Dialog „Beobachtung eintragen“ (SCRUM-266). */
+  protected readonly events = computed(() => this.profile.items().map((item) => item.event));
+  protected readonly legacyLabel = LEGACY_MODEL_LABEL;
   protected readonly attendance = computed(() => availability(this.profile.items(), this.today));
   /** Trainingspunkte (SCRUM-104) sieht nur der Trainer. Verlauf neueste zuerst, wie die Eventhistorie. */
   protected readonly pointsVisible = computed(() => this.session.role() === 'trainer');

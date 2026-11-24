@@ -8,11 +8,12 @@ import type { RawDoc, SnapshotMeta } from './types';
 /**
  * Unterkollektionen eines Spielers, die beim Löschen mitgehen: Entwicklungspläne, Abwesenheiten, Messwerte, die
  * Angaben aus dem Check-in nach dem Termin (SCRUM-138: Anstrengung `selfReports`, Befinden `wellness` – ein
- * Gesundheitsdatum, SCRUM-278) und die Angaben zum Reife-Kompass (`maturity`, SCRUM-190); Trainerbeobachtungen mit Verhaltensankern
+ * Gesundheitsdatum, SCRUM-278) und die Angaben zum Reife-Kompass (`maturity`, SCRUM-190) sowie die Beobachtungen des Entwicklungsrasters
+ * (`competenceObservations`, SCRUM-266); Trainerbeobachtungen mit Verhaltensankern
  * (`behaviorObservations`, SCRUM-268). Muss jede
  * `players/{playerId}/…`-Sammlung aus firestore.rules enthalten (geprüft in tests/project.test.mjs).
  */
-const PLAYER_SUBCOLLECTIONS = ['developmentPlans', 'absences', 'measurements', 'growthReviews', 'selfReports', 'wellness', 'maturity', 'behaviorObservations'] as const;
+const PLAYER_SUBCOLLECTIONS = ['developmentPlans', 'absences', 'measurements', 'growthReviews', 'selfReports', 'wellness', 'maturity', 'competenceObservations', 'behaviorObservations'] as const;
 
 /** Spieler des Teams (players): Echtzeit-Abo, Speichern und Löschen samt aller Unterdaten. */
 @Injectable({ providedIn: 'root' })
@@ -157,18 +158,21 @@ export class PlayersApi {
     await deleteDoc(doc(db, ...base, 'learningProgress', id)).catch((error: unknown) => {
       if ((error as { code?: unknown } | null)?.code !== 'permission-denied') throw error;
     });
-    // Antworten auf Situationsrätsel (SCRUM-193), ebenso getrennt: ältere Regeln kennen die Sammlung noch nicht.
-    await getDocs(query(collection(db, ...base, 'puzzleAnswers'), where('playerId', '==', id)))
-      .then(async (answers) => {
-        for (let offset = 0; offset < answers.docs.length; offset += 450) {
-          const batch = writeBatch(db);
-          answers.docs.slice(offset, offset + 450).forEach((entry) => batch.delete(entry.ref));
-          await batch.commit();
-        }
-      })
-      .catch((error: unknown) => {
-        if ((error as { code?: unknown } | null)?.code !== 'permission-denied') throw error;
-      });
+    // Antworten auf Situationsrätsel (SCRUM-193) und Szenen der Taktikdiagnostik (SCRUM-267), ebenso getrennt: ältere
+    // Regeln kennen diese Sammlungen noch nicht.
+    for (const name of ['puzzleAnswers', 'tacticScenes'] as const) {
+      await getDocs(query(collection(db, ...base, name), where('playerId', '==', id)))
+        .then(async (answers) => {
+          for (let offset = 0; offset < answers.docs.length; offset += 450) {
+            const batch = writeBatch(db);
+            answers.docs.slice(offset, offset + 450).forEach((entry) => batch.delete(entry.ref));
+            await batch.commit();
+          }
+        })
+        .catch((error: unknown) => {
+          if ((error as { code?: unknown } | null)?.code !== 'permission-denied') throw error;
+        });
+    }
     for (let offset = 0; offset < refs.length; offset += 450) {
       const batch = writeBatch(db);
       refs.slice(offset, offset + 450).forEach((ref) => batch.delete(ref));

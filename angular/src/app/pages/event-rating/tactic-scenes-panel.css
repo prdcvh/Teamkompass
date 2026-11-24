@@ -1,0 +1,213 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+tk-card,
+.scenes,
+.form {
+  min-width: 0;
+}
+
+.section-title {
+  margin: 0;
+  font-size: var(--tk-text-lg);
+}
+
+/* Einklappbar wie im Profil (SCRUM-226): Überschrift ist die Tippfläche (>= 44 px). */
+.fold > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--tk-space-2);
+  min-height: 44px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.fold > summary::-webkit-details-marker {
+  display: none;
+}
+
+.fold > summary::before {
+  content: '▸';
+  color: var(--tk-muted);
+}
+
+.fold[open] > summary::before {
+  content: '▾';
+}
+
+.fold > summary:focus-visible {
+  outline: 2px solid var(--tk-primary, currentColor);
+  outline-offset: 2px;
+}
+
+.scenes {
+  display: grid;
+  gap: var(--tk-space-4);
+}
+
+.muted {
+  margin: 0;
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+  font-weight: 400;
+}
+
+.intro {
+  line-height: 1.45;
+}
+
+.form {
+  display: grid;
+  gap: var(--tk-space-3);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 9rem);
+  gap: var(--tk-space-3);
+}
+
+fieldset {
+  display: grid;
+  gap: var(--tk-space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+legend {
+  padding: 0;
+  margin-bottom: var(--tk-space-2);
+  font-size: var(--tk-text-sm);
+  font-weight: 600;
+}
+
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tk-space-2);
+}
+
+.choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 var(--tk-space-3);
+  background: var(--tk-surface);
+  border: 1px solid var(--tk-line);
+  border-radius: var(--tk-radius-pill);
+  font-size: var(--tk-text-sm);
+  cursor: pointer;
+}
+
+.choice[data-checked='true'] {
+  border-color: var(--tk-ink);
+  background: var(--tk-field);
+  font-weight: 600;
+}
+
+.choice input {
+  margin: 0;
+}
+
+.criteria {
+  line-height: 1.4;
+}
+
+.error {
+  margin: 0;
+  color: var(--tk-red);
+  font-size: var(--tk-text-sm);
+  font-weight: 500;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tk-space-3);
+}
+
+.saved {
+  color: var(--tk-green);
+  font-size: var(--tk-text-sm);
+}
+
+.notice {
+  display: grid;
+  justify-items: start;
+  gap: var(--tk-space-3);
+  padding: var(--tk-space-4);
+  color: var(--tk-red);
+  background: var(--tk-soft-red);
+  border-radius: var(--tk-radius-lg);
+}
+
+.notice p {
+  margin: 0;
+}
+
+h3 {
+  margin: 0;
+  font-size: var(--tk-text-md);
+}
+
+.list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.list li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--tk-space-3);
+  padding: var(--tk-space-3) 0;
+  border-top: 1px solid var(--tk-line);
+}
+
+.what {
+  display: grid;
+  gap: var(--tk-space-1);
+  min-width: 0;
+  flex: 1 1 16rem;
+  overflow-wrap: anywhere;
+}
+
+.what a {
+  color: inherit;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tk-space-1);
+}
+
+.video {
+  color: var(--tk-muted);
+}
+
+.url {
+  user-select: all;
+  overflow-wrap: anywhere;
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tk-space-2);
+}
+
+@media (max-width: 520px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -96,7 +96,16 @@ function seed(): FakeFirebase {
   // Laufende Abwesenheiten (SCRUM-164): der Kader zeigt dafür „Gesperrt“ / „Abwesend“ samt eigener Zähler.
   fake.records.playerRecords.set('p2/absences', new Map([['ab2', { kind: 'absence', label: 'Sperre', from: '2026-01-01', to: '2099-12-31' }]]));
   fake.records.playerRecords.set('p6/absences', new Map([['ab3', { kind: 'absence', label: 'Klassenfahrt', from: '2026-01-01', to: '2099-12-31' }]]));
-  fake.records.playerRecords.set('p1/measurements', new Map([['me1', { date: '2026-07-01', height: '150', weight: '40' }], ['me2', { date: '2026-09-01', height: '152', weight: '41' }], ['me3', { date: '2026-09-10', height: '152.3', weight: '41' }], ['me0', { date: '2025-12-01', height: '147', weight: '38' }]]));
+  fake.records.playerRecords.set('p1/measurements', new Map([['me1', { date: '2026-07-01', height: '150', weight: '40' }], ['me2', { date: '2026-09-01', height: '152', weight: '41' }], ['me3', { date: '2026-09-10', height: '152.3', weight: '41' }], ['me0', { date: '2025-12-01', height: '147', weight: '38' }],
+    // Feldtests (SCRUM-263) in derselben Sammlung: zweimal 10-m-Sprint mit unterschiedlicher Methode (Warnung im Profil).
+    ['ft1', { kind: 'fieldTest', date: '2026-09-01', sessionId: 's1', protocolId: 'sprint-10', protocolVersion: '1.0', unit: 's', method: 'stopwatch', tester: 'Trainer', surface: 'grass', conditions: '', attempts: [{ n: 1, value: 1.95, valid: true }, { n: 2, value: 1.91, valid: true }], recordedAt: '2026-09-01T18:00:00.000Z', playerId: 'p1' }],
+    ['ft2', { kind: 'fieldTest', date: '2026-11-20', sessionId: 's2', protocolId: 'sprint-10', protocolVersion: '1.0', unit: 's', method: 'light-gate', tester: 'Maximilian Alexander von Hohenzollern-Sigmaringen', surface: 'artificial', conditions: 'trocken, 8 °C, leichter Gegenwind auf der Zielgeraden', attempts: [{ n: 1, value: 1.92, valid: true }, { n: 2, value: 1.85, valid: true }, { n: 3, value: null, valid: false }], recordedAt: '2026-11-20T18:00:00.000Z', playerId: 'p1' }],
+    ['ft3', { kind: 'fieldTest', date: '2026-11-20', sessionId: 's2', protocolId: 'cmj', protocolVersion: '1.0', unit: 'cm', method: 'contact-mat', tester: 'Trainer', surface: 'indoor', conditions: '', attempts: [{ n: 1, value: 31.2, valid: true }, { n: 2, value: 30.4, valid: true }, { n: 3, value: 35, valid: false }], recordedAt: '2026-11-20T18:10:00.000Z', playerId: 'p1' }]]));
+  // Vergleich im Team (SCRUM-264): 10-m-Sprint mit Lichtschranke für weitere Spieler, damit Index und Perzentilrang erscheinen.
+  [1.98, 2.04, 1.88, 2.1, 1.95, 2.01, 2.12, 1.93, 2.06, 1.99, 2.2].forEach((value, i) => {
+    const id = `p${i + 2}`;
+    fake.records.playerRecords.set(`${id}/measurements`, new Map([[`ftr${i}`, { kind: 'fieldTest', date: '2026-11-20', sessionId: 's2', protocolId: 'sprint-10', protocolVersion: '1.0', unit: 's', method: 'light-gate', tester: 'Trainer', surface: 'artificial', conditions: '', attempts: [{ n: 1, value, valid: true }], recordedAt: '2026-11-20T18:00:00.000Z', playerId: id }]]));
+  });
   // Beobachtungen mit Verhaltensankern (SCRUM-268): zwei Trainer uneinig, eine knappe Einschätzung, ein Alteintrag ohne Beleg.
   const obsDay = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
   const obs = (criterionId: string, value: number, by: string, byUid: string, opportunities: number, extra: Record<string, unknown> = {}) => ({
@@ -152,6 +161,23 @@ function seed(): FakeFirebase {
   });
   fake.learning.progress.set('p1', { playerId: 'p1', paths: { lp1: { l1: '2026-10-13', l2: '2026-10-20' }, lp2: { m1: '2026-10-27' } } });
   fake.learning.progress.set('p2', { playerId: 'p2', paths: { lp2: { m1: '2026-10-27', m2: '2026-11-03' } } });
+  // Entwicklungsraster (SCRUM-266): Beobachtungen für p1 an zwei Tagen (relativ zu heute, damit sie im Profilzeitraum
+  // bleiben) und eine Team-Konfiguration mit eingeschaltetem Index. p2 hat keine Beobachtung („nicht erhoben“).
+  const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+  const competenceSample: [string, number, number][] = [
+    ['technique.firstTouch', 3, 20], ['technique.passing', 4, 6], ['tactics.scanning', 2, 20], ['tactics.decision', 3, 6],
+    ['physical.speed', 3, 20], ['physical.endurance', 2, 6], ['psychological.afterMistake', 3, 20], ['psychological.feedback', 4, 6],
+    ['social.communication', 2, 20], ['social.support', 3, 6],
+  ];
+  fake.competence.observations.set('p1', new Map(competenceSample.map(([criterionId, value, ago], index) => [`co${index}`, {
+    playerId: 'p1', framework: 'raster-1', criterionId, value, date: daysAgo(ago), occasion: ago === 6 ? 'match' : 'training', eventId: null,
+    position: ago === 6 ? 'ZM' : null, source: 'trainer', note: '', by: 'Trainer Demo', byUid: 'e2e-trainer', createdAt: `${daysAgo(ago)}T18:00:00.000Z`,
+  }])));
+  fake.competence.configs.set('v1', {
+    version: 1, framework: 'raster-1', domains: ['technique', 'tactics', 'physical', 'psychological', 'social'], weightProfile: 'buildup',
+    weights: { technique: 25, tactics: 25, physical: 15, psychological: 20, social: 15 }, indexEnabled: true,
+    createdAt: `${daysAgo(30)}T10:00:00.000Z`, by: 'Trainer Demo', byUid: 'e2e-trainer',
+  });
   // Scout-Sicht (SCRUM-170) so, wie sie der Trainer-Client aus diesen Daten schreiben würde.
   const players = [...fake.players.players].map(([id, data]) => playerFromDoc(id, data));
   const events = [...fake.events.events].map(([id, data]) => eventFromDoc(id, data));
@@ -225,6 +251,18 @@ for (const [index, playerId] of ['p2', 'p3', 'p4'].entries()) {
   fake.puzzles.answers.set(`r1_${playerId}`, { puzzleId: 'r1', playerId, choice: index === 0 ? 1 : 0, by: 'player', answeredAt: Date.parse('2026-11-02T17:00:00Z') + index });
   fake.puzzles.answers.set(`r2_${playerId}`, { puzzleId: 'r2', playerId, choice: 1, by: 'player', answeredAt: Date.parse('2026-11-03T17:00:00Z') + index });
 }
+// Taktikdiagnostik (SCRUM-267): Szenen von p1 aus Spiel e2 und Training e1 (eine unklar, eine mit langem Kontext und Videolink).
+const sceneBase = { playerId: 'p1', by: 'Trainer', byUid: 'e2e-uid', createdAt: '2026-10-11T10:00:00.000Z', videoUrl: '' };
+const e2 = { eventId: 'e2', eventDate: '2026-10-10', eventType: 'Spiel', eventTitle: 'Heimspiel gegen die SG Eintracht Oberursel-Steinbach' };
+const e1 = { eventId: 'e1', eventDate: '2026-10-13', eventType: 'Training', eventTitle: 'Spiel in die Tiefe' };
+[
+  { ...e2, minute: 12, context: 'Aufbau gegen hohes Pressing, Stand 0:0', decision: 'good', execution: 'fail', situations: ['pass', 'scanning'] },
+  { ...e2, minute: 34, context: 'Ballgewinn im Mittelfeld, Umschalten auf rechts', decision: 'good', execution: 'success', situations: ['transition'], videoUrl: 'https://video.example.org/intern/heimspiel-oberursel/szene-34-mit-sehr-langem-dateinamen' },
+  { ...e2, minute: 51, context: 'Sehr langer Kontext ohne Leerzeichen Gegenpressingsituationnachballverlustimzentrum', decision: 'poor', execution: null, situations: ['pressing', 'cover'] },
+  { ...e2, minute: 66, context: 'Kamera verdeckt', decision: 'unclear', execution: null, situations: [] },
+  { ...e1, minute: 20, context: 'Spielform 4 gegen 4, Raum hinter der Kette', decision: 'good', execution: 'success', situations: ['space'] },
+  { ...e1, minute: 41, context: 'Spielform 4 gegen 4, Abschluss', decision: 'good', execution: 'unclear', situations: [] },
+].forEach((scene, index) => fake.tacticScenes.scenes.set(`ts${index + 1}`, { ...sceneBase, ...scene }));
 if (new URLSearchParams(location.search).get('as') === 'fresh') {
   fake.players.players.clear();
   fake.events.events.clear();

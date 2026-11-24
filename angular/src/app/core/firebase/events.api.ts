@@ -66,7 +66,7 @@ export class EventsApi {
    */
   async findEventsWithRecords(ids: readonly string[]): Promise<ReadonlySet<string>> {
     const { db } = await this.connection.get();
-    const { collection, getDocs, limit, query } = await import('firebase/firestore');
+    const { collection, getDocs, limit, query, where } = await import('firebase/firestore');
     const found = new Set<string>();
     for (let offset = 0; offset < ids.length; offset += 10) {
       await Promise.all(
@@ -74,6 +74,12 @@ export class EventsApi {
           for (const name of ['ratings', 'privateNotes'] as const) {
             const snapshot = await getDocs(query(collection(db, 'teams', this.team.id(), 'events', id, name), limit(1)));
             if (!snapshot.empty) found.add(id);
+          }
+          // Szenen der Taktikdiagnostik (SCRUM-267) hängen über eventId am Termin. Ältere Regeln kennen die Sammlung
+          // noch nicht (permission-denied) – dann gibt es dort auch nichts.
+          if (!found.has(id)) {
+            const scenes = await getDocs(query(collection(db, 'teams', this.team.id(), 'tacticScenes'), where('eventId', '==', id), limit(1))).catch(ignorePermissionDenied);
+            if (scenes && !scenes.empty) found.add(id);
           }
         }),
       );
@@ -99,10 +105,10 @@ export class EventsApi {
    */
   async deleteEvent(id: string): Promise<void> {
     const { db } = await this.connection.get();
-    const { collection, deleteField, doc, getDocs, writeBatch } = await import('firebase/firestore');
+    const { collection, deleteField, doc, getDocs, query, where, writeBatch } = await import('firebase/firestore');
     const base = ['teams', this.team.id(), 'events', id] as const;
     const withCopies = await this.viewMode.writesCopies();
-    const [ratings, privateNotes, responses, withSummary, values, grades] = await Promise.all([
+    const [ratings, privateNotes, responses, withSummary, values, grades, scenes] = await Promise.all([
       getDocs(collection(db, ...base, 'ratings')),
       getDocs(collection(db, ...base, 'privateNotes')),
       // Zu-/Absagen (SCRUM-205): der Grund kann ein Gesundheitsdatum sein und darf nicht verwaist liegen bleiben.
@@ -111,6 +117,8 @@ export class EventsApi {
       // Kopien für die Spieleransicht (SCRUM-115) – nur, wenn die Regeln sie kennen.
       withCopies ? getDocs(collection(db, ...base, 'ratingValues')) : null,
       withCopies ? getDocs(collection(db, ...base, 'ratingGrades')) : null,
+      // Szenen der Taktikdiagnostik (SCRUM-267) zu diesem Termin; ältere Regeln kennen die Sammlung noch nicht.
+      getDocs(query(collection(db, 'teams', this.team.id(), 'tacticScenes'), where('eventId', '==', id))).catch(ignorePermissionDenied),
     ]);
     type Op = (batch: ReturnType<typeof writeBatch>) => void;
     const remove = (ref: Parameters<ReturnType<typeof writeBatch>['delete']>[0]): Op => (batch) => batch.delete(ref);
@@ -132,6 +140,7 @@ export class EventsApi {
       ...responses.docs.map((entry) => remove(entry.ref)),
       ...(values?.docs ?? []).map((entry) => remove(entry.ref)),
       ...(grades?.docs ?? []).map((entry) => remove(entry.ref)),
+      ...(scenes?.docs ?? []).map((entry) => remove(entry.ref)),
       remove(doc(db, ...base)), // zuletzt: bricht ein Block ab, bleibt das Event sichtbar und der Löschversuch wiederholbar
     ];
     for (let offset = 0; offset < ops.length; offset += 450) {
@@ -140,4 +149,10 @@ export class EventsApi {
       await batch.commit();
     }
   }
+}
+
+/** Abfrage einer Sammlung, die ältere Regeln noch nicht kennen: permission-denied heißt „nichts da“, alles andere wird weitergereicht. */
+function ignorePermissionDenied(error: unknown): null {
+  if ((error as { code?: unknown } | null)?.code !== 'permission-denied') throw error;
+  return null;
 }

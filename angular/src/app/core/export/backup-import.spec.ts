@@ -182,4 +182,25 @@ describe('Sicherung einspielen: Sicherungen der bisherigen App und dieser App', 
     expect(summary.players).toEqual({ created: 0, overwritten: 2 });
     expect(summary.plans).toEqual({ created: 0, overwritten: 1 });
   });
+
+  it('Feldtests (SCRUM-263) gehen bei Sicherung und Einspielen nicht verloren und werden keine Größe/Gewicht-Messung', () => {
+    const fieldTest = {
+      id: 'ft1', date: '2026-10-01', sessionId: 's1', protocolId: 'sprint-10', protocolVersion: '1.0', unit: 's', method: 'light-gate', tester: 'Tom',
+      surface: 'grass' as const, conditions: '', attempts: [{ n: 1, value: 1.9, valid: true }, { n: 2, value: null, valid: false }], recordedAt: '2026-10-01T18:00:00.000Z',
+    };
+    const exported = JSON.parse(
+      JSON.stringify(
+        buildExport({
+          teamId: 'U14', now: new Date('2026-10-15T20:00:00Z'), players: [player('p1', 'Ali')], events: [], ratings: new Map(), plans: new Map(), absences: new Map(),
+          measurements: new Map([['p1', [{ id: 'm1', date: '2026-09-01', height: 150, weight: 40 }]]]),
+          fieldTests: new Map([['p1', [fieldTest]]]),
+          opponents: [],
+        }),
+      ),
+    );
+    expect(exported.measurements.p1.map((doc: { id: string }) => doc.id)).toEqual(['m1', 'ft1']);
+    const ops = backupOperations(parseBackup(exported, TODAY));
+    expect(ops.find((op) => op.path.join('/') === 'players/p1/measurements/ft1')!.data).toEqual({ ...fieldTest, kind: 'fieldTest', playerId: 'p1' });
+    expect(ops.find((op) => op.path.join('/') === 'players/p1/measurements/m1')!.data).toMatchObject({ height: '150', weight: '40' });
+  });
 });

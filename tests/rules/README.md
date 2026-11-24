@@ -19,6 +19,12 @@ Bewertungen, interne Notizen, Förderpläne, Abwesenheiten, Messwerte, Gegner, A
 Mitgliedschaften, Einladungen), inklusive der Listenabfragen mit `playerId`-Filter. Seit SCRUM-234 auch der gezielte Abruf eines noch **nicht vorhandenen** Bewertungsdokuments
 (eigenes erlaubt, fremdes nicht; Scout, Medizin, abgelaufene Zugänge weiter gesperrt).
 
+`competence.test.mjs`: Entwicklungsraster (SCRUM-266, `docs/bewertungsmodell.md`) – Beobachtungen
+`players/{p}/competenceObservations` und Team-Konfiguration `competenceConfigs/v{n}` lesen und anlegen nur Trainer
+(eigenes Konto, nur erlaubte Felder/Werte, Beobachtungen nicht bei widerrufener Einwilligung); Beobachtungen nie ändern,
+nur Trainer löschen; Konfigurationsversionen nie ändern oder löschen. Spieler, Eltern, Medizin, Scouts, Vereinsadmin und
+andere Teams: kein Zugriff.
+
 `grade-release.test.mjs`: Noten erst nach „Bewertung veröffentlichen“ (SCRUM-115) – Spieler und Eltern lesen die
 Werte-Kopie `events/{e}/ratingValues/{p}` immer, die Noten-Kopie `events/{e}/ratingGrades/{p}` nur bei gültiger Freigabe
 `gradeReleases/{p}` und nur für Noten, die bis zum Klick vergeben wurden (`ratedAt <= publishedUntil`); abgelaufene

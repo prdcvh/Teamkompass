@@ -306,6 +306,20 @@ test("interne Trainer-Notizen liegen in einem eigenen, nur für Trainer lesbaren
 
 });
 
+test("Taktikdiagnostik: Szenen und Videolinks liest und schreibt nur der Trainer (SCRUM-267)", async () => {
+  const rules = await read("firestore.rules");
+  const block = rules.match(/match \/tacticScenes\/\{sceneId\} \{([\s\S]*?)\n      \}/);
+  assert.ok(block, "Regel für tacticScenes fehlt");
+  assert.match(block[1], /allow read: if isTrainer\(\);/);
+  assert.match(block[1], /allow update: if false;/);
+  assert.doesNotMatch(block[1], /isPlayerFor|isClubAdminOfTeam|isTeamMember\(\)|isPhysio|isScout|"player"|"parent"/);
+  const players = await read("angular/src/app/core/firebase/players.api.ts");
+  assert.match(players, /\['puzzleAnswers', 'tacticScenes'\]/, "Szenen bleiben beim Löschen eines Spielers zurück");
+  const events = await read("angular/src/app/core/firebase/events.api.ts");
+  const start = events.indexOf("async deleteEvent(");
+  assert.match(events.slice(start), /'tacticScenes'\), where\('eventId', '==', id\)/, "Szenen bleiben beim Löschen eines Termins zurück");
+});
+
 test("copy-team: Pfad-Mapping mein-team -> U14 und Schutz vor fremden Pfaden", () => {
   assert.equal(mapPath("teams/mein-team", "mein-team", "U14"), "teams/U14");
   assert.equal(mapPath("teams/mein-team/events/e1/ratings/p1", "mein-team", "U14"), "teams/U14/events/e1/ratings/p1");
@@ -342,7 +356,7 @@ test("copy-team: Service-Account-Schluessel sind per .gitignore ausgeschlossen",
 
 test("Angular: Spieler loeschen entfernt Entwicklungsplaene, Abwesenheiten, Messwerte und Beobachtungen", async () => {
   const service = await read("angular/src/app/core/firebase/players.api.ts");
-  assert.match(service, /PLAYER_SUBCOLLECTIONS = \['developmentPlans', 'absences', 'measurements', 'growthReviews', 'selfReports', 'wellness', 'maturity', 'behaviorObservations'\]/);
+  assert.match(service, /PLAYER_SUBCOLLECTIONS = \['developmentPlans', 'absences', 'measurements', 'growthReviews', 'selfReports', 'wellness', 'maturity', 'competenceObservations', 'behaviorObservations'\]/);
   const start = service.indexOf("async deletePlayer(");
   const body = service.slice(start, service.indexOf("\n  }\n", start));
   assert.match(body, /PLAYER_SUBCOLLECTIONS\.map\(\(name\) => getDocs\(collection\(db, \.\.\.base, 'players', id, name\)\)\)/);

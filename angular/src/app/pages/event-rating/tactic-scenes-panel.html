@@ -1,0 +1,149 @@
+<details class="fold scenes-fold">
+  <summary><h2 class="section-title">Taktikdiagnostik · {{ store.scenes().length }} {{ store.scenes().length === 1 ? 'Szene' : 'Szenen' }}</h2></summary>
+  <tk-card>
+    <section class="scenes" aria-label="Taktikdiagnostik (nur für Trainer sichtbar)">
+      <p class="muted intro">
+        Einzelne Szenen getrennt einordnen: War die <b>Entscheidung</b> sinnvoll? Und nur dann: Hat die <b>Ausführung</b> geklappt?
+        Ergänzt die Teilnote „Spielwirkung“. Die Auswertung steht im Spielerprofil. Nur für Trainer sichtbar.
+      </p>
+
+      @if (store.state() === 'error') {
+        <div class="notice" role="alert">
+          <p>{{ store.error() }}</p>
+          <button tkButton type="button" size="sm" (click)="store.retry()">Erneut versuchen</button>
+        </div>
+      } @else {
+        <form class="form" (submit)="submit($event)" novalidate>
+          <div class="row">
+            <label class="tk-label">
+              Spieler
+              <select class="tk-input" name="playerId" [value]="draft().playerId" (change)="update({ playerId: valueOf($event) })" [attr.aria-invalid]="!!errors().playerId">
+                <option value="" [selected]="draft().playerId === ''">Bitte wählen</option>
+                @for (player of players(); track player.id) {
+                  <option [value]="player.id" [selected]="player.id === draft().playerId">{{ player.number }} · {{ player.name }}</option>
+                }
+              </select>
+              @if (errors().playerId; as message) { <small class="error">{{ message }}</small> }
+            </label>
+            <label class="tk-label minute">
+              Minute <small class="muted">(optional)</small>
+              <input class="tk-input" name="minute" type="number" inputmode="numeric" min="0" [max]="limits.minute" step="1" [value]="draft().minute" (input)="update({ minute: valueOf($event) })" [attr.aria-invalid]="!!errors().minute" />
+              @if (errors().minute; as message) { <small class="error">{{ message }}</small> }
+            </label>
+          </div>
+
+          <label class="tk-label">
+            Situation / Kontext
+            <input class="tk-input" name="context" [attr.maxlength]="limits.context" placeholder="z. B. Aufbau gegen hohes Pressing, Stand 0:1" [value]="draft().context" (input)="update({ context: valueOf($event) })" [attr.aria-invalid]="!!errors().context" />
+            @if (errors().context; as message) { <small class="error" role="alert">{{ message }}</small> }
+          </label>
+
+          <fieldset>
+            <legend>Entscheidung</legend>
+            <div class="choices">
+              @for (decision of decisions; track decision) {
+                <label class="choice" [attr.data-checked]="draft().decision === decision">
+                  <input type="radio" name="decision" [value]="decision" [checked]="draft().decision === decision" (change)="setDecision(decision)" />
+                  <span>{{ decisionLabels[decision] }}</span>
+                </label>
+              }
+            </div>
+            @if (draft().decision; as decision) {
+              <small class="muted criteria">{{ decisionCriteria[decision] }}</small>
+            } @else {
+              <small class="muted criteria">Sinnvoll = passt zur Lage, auch wenn die Ausführung misslingt. Nicht beurteilbar = zählt nicht mit.</small>
+            }
+            @if (errors().decision; as message) { <small class="error">{{ message }}</small> }
+          </fieldset>
+
+          @if (draft().decision === 'good') {
+            <fieldset>
+              <legend>Ausführung</legend>
+              <div class="choices">
+                @for (execution of executions; track execution) {
+                  <label class="choice" [attr.data-checked]="draft().execution === execution">
+                    <input type="radio" name="execution" [value]="execution" [checked]="draft().execution === execution" (change)="update({ execution })" />
+                    <span>{{ executionLabels[execution] }}</span>
+                  </label>
+                }
+              </div>
+              @if (errors().execution; as message) { <small class="error">{{ message }}</small> }
+            </fieldset>
+          }
+
+          <fieldset>
+            <legend>Ereignistyp <small class="muted">(optional, mehrere möglich)</small></legend>
+            <div class="choices">
+              @for (type of situations; track type) {
+                <label class="choice" [attr.data-checked]="draft().situations.includes(type)">
+                  <input type="checkbox" [checked]="draft().situations.includes(type)" (change)="toggleSituation(type, checked($event))" />
+                  <span>{{ situationLabels[type] }}</span>
+                </label>
+              }
+            </div>
+          </fieldset>
+
+          <label class="tk-label">
+            Interner Videolink <small class="muted">(optional)</small>
+            <input class="tk-input" name="videoUrl" type="url" inputmode="url" [attr.maxlength]="limits.video" placeholder="https://…" [value]="draft().videoUrl" (input)="update({ videoUrl: valueOf($event) })" [attr.aria-invalid]="!!errors().videoUrl" />
+            <small class="muted">
+              Nur einen internen Link eintragen, wenn für den Spieler die Einwilligung zu Videoaufnahmen vorliegt und der Zugriff auf
+              das Video selbst geschützt ist. Der Link wird nur als Text gespeichert, nicht eingebettet und nur Trainern angezeigt.
+            </small>
+            @if (errors().videoUrl; as message) { <small class="error">{{ message }}</small> }
+          </label>
+
+          <div class="actions">
+            <button tkButton variant="primary" type="submit" [disabled]="busy() || store.state() !== 'ready'">{{ busy() ? 'Wird gespeichert …' : 'Szene speichern' }}</button>
+            @if (saved(); as message) { <span class="saved" role="status">{{ message }}</span> }
+          </div>
+        </form>
+
+        @if (store.error() && store.state() !== 'error') {
+          <p class="error" role="alert">{{ store.error() }}</p>
+        }
+
+        @if (store.state() === 'loading') {
+          <p class="muted" role="status">Szenen werden geladen …</p>
+        } @else if (store.scenes().length === 0) {
+          <p class="muted">Zu diesem Termin ist noch keine Szene erfasst.</p>
+        } @else {
+          <h3>Erfasste Szenen</h3>
+          <ul class="list">
+            @for (scene of store.scenes(); track scene.id) {
+              <li>
+                <div class="what">
+                  <strong>
+                    @if (scene.minute !== null) { {{ scene.minute }}. Min. · }
+                    <a [routerLink]="['/profile', scene.playerId]">{{ nameOf(scene) }}</a>
+                  </strong>
+                  <span>{{ scene.context }}</span>
+                  <span class="chips">
+                    <tk-chip [tone]="decisionTone(scene.decision)">Entscheidung: {{ decisionLabels[scene.decision] }}</tk-chip>
+                    @if (scene.execution; as execution) {
+                      <tk-chip [tone]="executionTone(execution)">Ausführung: {{ executionLabels[execution] }}</tk-chip>
+                    }
+                    @for (type of scene.situations; track type) {
+                      <tk-chip>{{ situationLabels[type] }}</tk-chip>
+                    }
+                  </span>
+                  @if (scene.videoUrl) {
+                    <small class="video">Video (intern, nur Trainer): <span class="url">{{ scene.videoUrl }}</span></small>
+                  }
+                </div>
+                <div class="row-actions">
+                  @if (confirmDelete() === scene.id) {
+                    <button tkButton type="button" size="sm" variant="primary" (click)="remove(scene)">Wirklich löschen</button>
+                    <button tkButton type="button" size="sm" (click)="cancelDelete()">Abbrechen</button>
+                  } @else {
+                    <button tkButton type="button" size="sm" variant="ghost" [attr.aria-label]="'Szene löschen: ' + nameOf(scene)" (click)="askDelete(scene)">Löschen</button>
+                  }
+                </div>
+              </li>
+            }
+          </ul>
+        }
+      }
+    </section>
+  </tk-card>
+</details>

@@ -86,7 +86,9 @@
         <tk-grade-trend-card [graded]="graded()" [scale]="scale()" [today]="today" />
 
         <tk-card>
-          <h2>Kompetenzprofil</h2>
+          <!-- Bisheriges Modell (SCRUM-266): Schnitt der vier Eventnoten, nicht das Entwicklungsraster. -->
+          <h2>Eventnoten im Schnitt</h2>
+          <p class="muted model-note" data-testid="legacy-model-note">{{ legacyLabel }} – Schnitt der Momentaufnahmen je Termin, kein Entwicklungsprofil.</p>
           <ul class="bars">
             @for (skill of skills(); track skill.field) {
               <li>
@@ -110,6 +112,14 @@
           </ul>
         </tk-card>
       </section>
+
+      <!-- Entwicklungsraster (SCRUM-266): Profil aus Beobachtungen, nur Trainer, getrennt von den Eventnoten. -->
+      <tk-competence-card [player]="p" [events]="events()" />
+
+      @if (trainer()) {
+        <!-- Taktikdiagnostik (SCRUM-267): Entscheidung und Ausführung getrennt, mit Nenner und Mindestfallzahl; nur Trainer. -->
+        <tk-tactic-diagnostics-card [player]="p" />
+      }
 
       <!-- Jahrgang im Verein (SCRUM-197): nur Trainer, nur wenn der Vereinsadmin den Vergleich eingeschaltet hat. -->
       <tk-cohort-card [player]="p" />
