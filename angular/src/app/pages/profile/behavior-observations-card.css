@@ -1,0 +1,129 @@
+/* Trainerbeobachtungen mit Verhaltensankern (SCRUM-268). */
+:host {
+  display: block;
+}
+
+.panel {
+  display: grid;
+  gap: var(--tk-space-3);
+  min-width: 0;
+}
+
+h2,
+p {
+  margin: 0;
+}
+
+h2 {
+  font-size: var(--tk-text-lg);
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tk-space-2);
+}
+
+.muted,
+small {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+.notice {
+  padding: var(--tk-space-2) var(--tk-space-3);
+  border-radius: var(--tk-radius-md);
+  background: var(--tk-soft-amber);
+}
+
+.error {
+  color: var(--tk-red);
+}
+
+ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.criteria {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: var(--tk-space-3);
+}
+
+.criterion {
+  display: grid;
+  align-content: start;
+  gap: var(--tk-space-2);
+  min-width: 0;
+  padding: var(--tk-space-3);
+  border: 1px solid var(--tk-line);
+  border-radius: var(--tk-radius-md);
+  overflow-wrap: anywhere;
+}
+
+.criterion-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tk-space-2);
+}
+
+.message {
+  font-size: var(--tk-text-sm);
+}
+
+.message.uncertain {
+  font-weight: 600;
+}
+
+.assessors {
+  display: grid;
+  gap: var(--tk-space-2);
+}
+
+.assessors li,
+.history li > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.add {
+  justify-self: start;
+}
+
+.fold summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.fold[open] summary {
+  margin-bottom: var(--tk-space-2);
+}
+
+.history {
+  display: grid;
+  gap: var(--tk-space-2);
+}
+
+.history li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tk-space-2);
+  padding-bottom: var(--tk-space-2);
+  border-bottom: 1px solid var(--tk-line);
+  overflow-wrap: anywhere;
+}
+
+.confirm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tk-space-2);
+}

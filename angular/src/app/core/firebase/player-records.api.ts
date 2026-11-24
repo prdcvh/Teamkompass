@@ -4,7 +4,8 @@ import { FirebaseConnection } from './firebase-connection';
 import type { RawDoc, SnapshotMeta } from './types';
 
 /** Unterkollektionen eines Spielers, die das Profil verwaltet. */
-export type PlayerRecordKind = 'developmentPlans' | 'absences' | 'measurements' | 'growthReviews';
+/** `behaviorObservations`: Trainerbeobachtungen mit Verhaltensankern (SCRUM-268), nur Trainer. */
+export type PlayerRecordKind = 'developmentPlans' | 'absences' | 'measurements' | 'growthReviews' | 'behaviorObservations';
 
 /** Unterdaten eines Spielers: Förderpläne (mit Selbstreflexion), Abwesenheiten und Messwerte. */
 @Injectable({ providedIn: 'root' })

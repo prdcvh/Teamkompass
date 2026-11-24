@@ -99,3 +99,9 @@ Häkchen `parentsConsent`; fremde Vereine nur mit dokumentierter Einwilligung. S
 Trainer anderer Teams lesen/schreiben nichts, collectionGroup-Abfrage `maturity` für niemanden, Nachweis des
 Einverständnisses (wer das Häkchen neu setzt, trägt eigenes Konto und Tag ein; danach unveränderlich) und Widerruf (keine
 neuen Größen der Eltern, auch nicht im selben Schreibvorgang; leeren und löschen geht). Datenblatt: `docs/legal/reife-kompass.md`.
+
+`behavior-observations.test.mjs`: Beobachtungen mit Verhaltensankern (SCRUM-268) unter
+`players/{p}/behaviorObservations/{id}` – lesen nur Trainer (nie Spieler, Eltern, Medizin, Scouts, Vereinsadmin, andere
+Teams, abgelaufene Zugänge, auch nicht per Abfrage mit `playerId`-Filter oder collectionGroup); anlegen nur Trainer mit
+eigenem Konto, nur die vorgesehenen Felder (Stufe 1–5, Zeitraum, 1–50 Gelegenheiten, Termin-Beleg nur bestehender
+Termin, Quelle nur `trainer`), nicht bei widerrufener Einwilligung; ändern nie, löschen Trainer.
