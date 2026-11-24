@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { SessionService } from '../../core/auth/session.service';
 import { type TeamEvent, formatDate } from '../../core/events/event';
 import { RSVP_REASON_MAX, type RsvpAnswer, type RsvpStatus } from '../../core/rsvp/rsvp';
@@ -8,8 +8,8 @@ import { Card } from '../../ui/card/card';
 import { Chip, type Tone } from '../../ui/chip/chip';
 
 /**
- * „Nächste Termine“ für Spieler und Eltern (SCRUM-205, wie SCRUM-175 in der bisherigen App): die nächsten 10 Termine
- * mit Zu-/Absage für den eigenen Spieler und einem freiwilligen Grund bei einer Absage. Für alle anderen Rollen
+ * „Nächste Termine“ für Spieler und Eltern (SCRUM-205, wie SCRUM-175 in der bisherigen App): die Termine der laufenden Woche (weitere bis
+ * zu den nächsten 10 auf Wunsch, SCRUM-401) mit Zu-/Absage für den eigenen Spieler und einem freiwilligen Grund bei einer Absage. Für alle anderen Rollen
  * wird nichts angezeigt.
  */
 @Component({
@@ -24,7 +24,10 @@ import { Chip, type Tone } from '../../ui/chip/chip';
           @if (rsvp.error()) {
             <p class="rsvp-error" role="alert">{{ rsvp.error() }}</p>
           }
-          @for (event of rsvp.upcoming(); track event.id) {
+          @if (view().weekEmpty) {
+            <p class="rsvp-hint rsvp-week-empty">Diese Woche keine Termine mehr. Der nächste Termin:</p>
+          }
+          @for (event of visible(); track event.id) {
             <article class="rsvp-item" [attr.data-status]="status(event)">
               <div class="rsvp-head">
                 <div class="rsvp-info">
@@ -72,6 +75,15 @@ import { Chip, type Tone } from '../../ui/chip/chip';
             </article>
           } @empty {
             <p class="rsvp-hint">Keine anstehenden Termine.</p>
+          }
+          @if (view().more.length > 0) {
+            <button
+              tkButton
+              type="button"
+              class="rsvp-more"
+              [attr.aria-expanded]="expanded()"
+              (click)="expanded.set(!expanded())"
+            >{{ expanded() ? 'Weniger Termine anzeigen' : 'Weitere Termine anzeigen (' + view().more.length + ')' }}</button>
           }
         </section>
       </tk-card>
@@ -132,6 +144,9 @@ import { Chip, type Tone } from '../../ui/chip/chip';
       display: grid;
       gap: 4px;
     }
+    .rsvp-more {
+      width: 100%;
+    }
     .rsvp-actions {
       display: flex;
       flex-wrap: wrap;
@@ -155,6 +170,9 @@ export class RsvpPanel {
 
   protected readonly parent = computed(() => this.session.role() === 'parent');
   protected readonly reasonMax = RSVP_REASON_MAX;
+  protected readonly view = this.rsvp.weekView;
+  protected readonly expanded = signal(false);
+  protected readonly visible = computed(() => (this.expanded() ? [...this.view().shown, ...this.view().more] : this.view().shown));
 
   protected status(event: TeamEvent): RsvpStatus {
     return this.rsvp.own(event.id)?.status ?? 'open';
