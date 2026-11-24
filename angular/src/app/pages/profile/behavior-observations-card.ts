@@ -82,7 +82,7 @@ const QUALITY_TONES: Readonly<Record<Quality, Tone>> = { none: 'neutral', limite
                       </ul>
                     }
                     @if (canAdd()) {
-                      <button tkButton size="sm" variant="neutral" type="button" class="add" (click)="openDialog(summary.criterion.id)">+ Einschätzung zu „{{ summary.criterion.label }}“</button>
+                      <button tkButton size="sm" variant="neutral" type="button" class="add" [attr.aria-label]="'Einschätzung zu ' + summary.criterion.label + ' eintragen'" (click)="openDialog(summary.criterion.id)">+ Einschätzung</button>
                     }
                   </li>
                 }

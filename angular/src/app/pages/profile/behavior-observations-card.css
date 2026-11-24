@@ -50,7 +50,8 @@ ul {
 
 .criteria {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  min-width: 0;
   gap: var(--tk-space-3);
 }
 
@@ -67,6 +68,7 @@ ul {
 
 .criterion-head {
   display: flex;
+  min-width: 0;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
@@ -95,6 +97,8 @@ ul {
 
 .add {
   justify-self: start;
+  max-width: 100%;
+  white-space: normal;
 }
 
 .fold summary {
