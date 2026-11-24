@@ -13,9 +13,17 @@
     <p class="muted">
       Spalten: Datum (TT.MM.JJJJ), Uhrzeit (HH:MM), Heim/Gast, Gegner, Ort. „Datum“ und „Gegner“ sind Pflicht. Höchstens {{ maxRows }} Zeilen.
     </p>
-    <input #csv class="file" type="file" accept=".csv,text/csv,text/plain" aria-label="CSV-Datei wählen" (change)="choose($event)" />
+    <p class="muted">
+      Oder eine Kalenderdatei (.ics), z. B. der Spielplan von fussball.de: Termine müssen „Heim - Gast“ heißen, Uhrzeiten gelten als deutsche Zeit.
+      Damit Heim und Gast erkannt werden, hier den Namen deiner Mannschaft so eintragen, wie er im Titel steht. Termine, die nicht eindeutig lesbar sind, werden als Fehler markiert.
+    </p>
+    <label class="own-name">
+      <span>Name deiner Mannschaft (für Kalenderdateien)</span>
+      <input type="text" maxlength="80" autocomplete="off" placeholder="z. B. SG Musterstadt" [value]="ownName()" (change)="changeOwnName($event)" data-testid="import-own-name" />
+    </label>
+    <input #csv class="file" type="file" accept=".csv,.ics,text/csv,text/calendar,text/plain" aria-label="Spielplan-Datei wählen (CSV oder ICS)" (change)="choose($event)" />
     <div class="actions start">
-      <button tkButton type="button" [disabled]="reading() || busy()" (click)="csv.click()">{{ previewing() ? 'Andere Datei wählen …' : 'CSV-Datei wählen …' }}</button>
+      <button tkButton type="button" [disabled]="reading() || busy()" (click)="csv.click()">{{ previewing() ? 'Andere Datei wählen …' : 'Datei wählen (CSV oder ICS) …' }}</button>
       <button tkButton type="button" variant="ghost" (click)="downloadTemplate()">Vorlage herunterladen</button>
     </div>
 
