@@ -1,0 +1,61 @@
+/* Verhaltensanker als Auswahlliste (SCRUM-268): jede Stufe mit Beschreibung und Beispiel. */
+.anchors {
+  display: grid;
+  gap: var(--tk-space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.anchors legend {
+  padding: 0;
+  margin-bottom: 4px;
+}
+
+.anchor {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: var(--tk-space-2);
+  align-items: start;
+  padding: var(--tk-space-2) var(--tk-space-3);
+  border: 1px solid var(--tk-line);
+  border-radius: var(--tk-radius-md);
+  cursor: pointer;
+}
+
+.anchor[data-selected='true'] {
+  border-color: var(--tk-blue);
+  box-shadow: inset 0 0 0 1px var(--tk-blue);
+}
+
+.anchor input {
+  margin-top: 3px;
+}
+
+.anchor .level {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.anchor .text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.anchor small {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+@media (max-width: 720px) {
+  .anchor {
+    grid-template-columns: auto 1fr;
+  }
+
+  .anchor .text {
+    grid-column: 1 / -1;
+  }
+}

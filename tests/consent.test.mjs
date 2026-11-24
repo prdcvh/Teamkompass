@@ -45,3 +45,14 @@ test("Trainerpruefungen Wachstum und Belastung (SCRUM-257): nur Trainer, kein Sp
   assert.match(block, /!consentRevoked\(playerId\)/);
   assert.ok(!/allow (update|write)/.test(block), "Pruefungen duerfen nicht geaendert werden");
 });
+
+test("Beobachtungen mit Verhaltensankern (SCRUM-268): nur Trainer lesen, kein Speichern bei Widerruf, nie aendern, nur Quelle Trainer", async () => {
+  const rules = await read("firestore.rules");
+  const block = rules.match(/match \/behaviorObservations\/\{observationId\} \{([\s\S]*?)\n        \}/)[1];
+  assert.match(block, /allow read: if isTrainer\(\);/);
+  assert.match(block, /!consentRevoked\(playerId\)/);
+  assert.match(block, /request\.resource\.data\.byUid == request\.auth\.uid/);
+  assert.match(block, /request\.resource\.data\.source == 'trainer'/);
+  assert.ok(!/allow (update|write)/.test(block), "Beobachtungen duerfen nicht geaendert werden");
+  assert.ok(!/isClubAdminOfTeam|isScout|isPhysio|isPlayerFor/.test(block), "Nur Trainer duerfen Beobachtungen lesen");
+});

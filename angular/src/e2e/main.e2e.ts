@@ -106,6 +106,19 @@ function seed(): FakeFirebase {
     const id = `p${i + 2}`;
     fake.records.playerRecords.set(`${id}/measurements`, new Map([[`ftr${i}`, { kind: 'fieldTest', date: '2026-11-20', sessionId: 's2', protocolId: 'sprint-10', protocolVersion: '1.0', unit: 's', method: 'light-gate', tester: 'Trainer', surface: 'artificial', conditions: '', attempts: [{ n: 1, value, valid: true }], recordedAt: '2026-11-20T18:00:00.000Z', playerId: id }]]));
   });
+  // Beobachtungen mit Verhaltensankern (SCRUM-268): zwei Trainer uneinig, eine knappe Einschätzung, ein Alteintrag ohne Beleg.
+  const obsDay = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+  const obs = (criterionId: string, value: number, by: string, byUid: string, opportunities: number, extra: Record<string, unknown> = {}) => ({
+    playerId: 'p1', framework: 'anker-1', criterionId, value, date: obsDay(2), periodFrom: obsDay(30), periodTo: obsDay(2), opportunities, eventId: null,
+    evidence: '', source: 'trainer', by, byUid, createdAt: `${obsDay(2)}T18:00:00.000Z`, ...extra,
+  });
+  fake.records.playerRecords.set('p1/behaviorObservations', new Map<string, Record<string, unknown>>([
+    ['bo1', obs('afterMistake', 2, 'Trainer Demo', 'e2e-uid', 4, { evidence: 'Nach dem Ballverlust stehen geblieben' })],
+    ['bo2', obs('afterMistake', 4, 'Co-Trainerin Demo', 'e2e-co', 5)],
+    ['bo3', obs('communication', 3, 'Trainer Demo', 'e2e-uid', 2)],
+    ['bo4', obs('learning', 4, 'Trainer Demo', 'e2e-uid', 8)],
+    ['bo5', { playerId: 'p1', criterionId: 'learning', value: 2, date: '2025-04-01', by: 'Früherer Trainer' }],
+  ]));
   fake.planning.doc = {
     series: {
       s1: { weekday: 2, startTime: '17:30', durationMinutes: 90, location: 'Kunstrasen - heim', locationCoords: null, title: '', trainingFocus: 'Eigener Ballbesitz', intensity: 2, startDate: '2026-10-20', endDate: '2027-03-30' },

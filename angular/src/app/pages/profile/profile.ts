@@ -45,6 +45,7 @@ import { CohortCard } from './cohort-card';
 import { ConsentPanel } from './consent-panel';
 import { GradeReleasePanel } from './grade-release-panel';
 import { GradeTrendCard } from './grade-trend-card';
+import { BehaviorObservationsCard } from './behavior-observations-card';
 import { TacticDiagnosticsCard } from './tactic-diagnostics-card';
 import { CompetenceCard } from './competence-card';
 import { LEGACY_MODEL_LABEL } from '../../core/competence/competence-catalog';
@@ -54,7 +55,7 @@ import { healthLockedMessage, mayStoreHealth } from '../../core/player/consent';
 /** Spielerprofil (Figma: Profil Desktop/Handy): Kopfbereich, Notenverlauf, Kompetenzprofil, Verfügbarkeit, Statistik, Eventhistorie. */
 @Component({
   selector: 'app-profile',
-  imports: [Button, Card, Status, ProfileExtras, LoadReportAction, LoadCurveCard, GrowthLoadCard, ConsentPanel, GradeReleasePanel, SelfReportHistory, LearningSummary, CohortCard, GradeTrendCard, CompetenceCard, TacticDiagnosticsCard],
+  imports: [Button, Card, Status, ProfileExtras, LoadReportAction, LoadCurveCard, GrowthLoadCard, ConsentPanel, GradeReleasePanel, SelfReportHistory, LearningSummary, CohortCard, GradeTrendCard, CompetenceCard, TacticDiagnosticsCard, BehaviorObservationsCard],
   templateUrl: './profile.html',
   // Reihenfolge = Kaskade (die Handy-Regeln überschreiben Kopf und Auswertung).
   styleUrls: ['./profile.css', './profile-stats.css', './profile-mobile.css', './profile-risk.css', '../../ui/chart/chart.css'],

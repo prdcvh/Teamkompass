@@ -690,6 +690,42 @@ service cloud.firestore {
           allow delete: if isTrainer();
         }
 
+        // Trainerbeobachtungen mit Verhaltensankern (SCRUM-268, docs/beobachtungsanker.md): ein Kriterium, eine Stufe 1-5
+        // mit Verhaltensbeschreibung, Beobachtungszeitraum, Zahl der Gelegenheiten, optional Beleg (Termin, Beispiel),
+        // Quelle und bewertende Person. Einschaetzungen zu psychologischen/sozialen Faehigkeiten Minderjaehriger:
+        // - Lesen nur Trainer. Spieler, Eltern, Medizin, Scouts und - wie bei den Trainerpruefungen - der Vereinsadmin
+        //   nicht. Kein collectionGroup-Zugriff (keine Regel dafuer). Erweiterung nur nach PO-Entscheidung.
+        // - Anlegen nur Trainer, mit dem eigenen Konto, fuer einen bestehenden Spieler, nur diese Felder, Quelle
+        //   "trainer" (Selbsteinschaetzung/Peer-Feedback gibt es nicht), Termin als Beleg nur ein bestehender Termin,
+        //   nicht bei widerrufener Einwilligung. Aendern nie (Verlauf bleibt nachvollziehbar), loeschen Trainer.
+        match /behaviorObservations/{observationId} {
+          allow read: if isTrainer();
+          allow create: if isTrainer()
+            && exists(playerPath(playerId))
+            && !consentRevoked(playerId)
+            && request.resource.data.keys().hasOnly(['playerId', 'framework', 'criterionId', 'value', 'date', 'periodFrom', 'periodTo', 'opportunities', 'eventId', 'evidence', 'source', 'by', 'byUid', 'createdAt'])
+            && request.resource.data.keys().hasAll(['playerId', 'framework', 'criterionId', 'value', 'date', 'periodFrom', 'periodTo', 'opportunities', 'eventId', 'evidence', 'source', 'by', 'byUid', 'createdAt'])
+            && request.resource.data.playerId == playerId
+            && request.resource.data.byUid == request.auth.uid
+            && request.resource.data.framework is string && request.resource.data.framework.matches('anker-[0-9]{1,3}')
+            && request.resource.data.criterionId is string && request.resource.data.criterionId.matches('[A-Za-z]{1,40}')
+            && request.resource.data.value is int && request.resource.data.value >= 1 && request.resource.data.value <= 5
+            && request.resource.data.date is string && request.resource.data.date.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
+            && request.resource.data.periodFrom is string && request.resource.data.periodFrom.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
+            && request.resource.data.periodTo is string && request.resource.data.periodTo.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
+            && request.resource.data.periodFrom <= request.resource.data.periodTo
+            && request.resource.data.periodTo <= request.resource.data.date
+            && request.resource.data.opportunities is int && request.resource.data.opportunities >= 1 && request.resource.data.opportunities <= 50
+            && (request.resource.data.eventId == null
+              || (request.resource.data.eventId is string && request.resource.data.eventId.size() > 0 && request.resource.data.eventId.size() <= 100
+                && exists(/databases/$(database)/documents/teams/$(teamId)/events/$(request.resource.data.eventId))))
+            && request.resource.data.evidence is string && request.resource.data.evidence.size() <= 300
+            && request.resource.data.source == 'trainer'
+            && request.resource.data.by is string && request.resource.data.by.size() <= 80
+            && request.resource.data.createdAt is string && request.resource.data.createdAt.size() <= 40;
+          allow delete: if isTrainer();
+        }
+
         // Entwicklungsraster (SCRUM-266, docs/bewertungsmodell.md §5 und §9): eine Beobachtung = ein Kriterium, ein Tag,
         // eine bewertende Person. Getrennt von den Eventnoten (events/*/ratings), die unveraendert bleiben.
         // - Lesen nur Trainer. Spieler, Eltern, Medizin, Scouts und - abweichend von SCRUM-183 - der Vereinsadmin nicht:

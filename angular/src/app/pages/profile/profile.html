@@ -97,6 +97,8 @@
               </li>
             }
           </ul>
+          <!-- SCRUM-268: Eventnoten haben keinen Verhaltensanker und keine Beobachtungszahl. -->
+          <p class="muted" data-testid="grades-uncalibrated">Bisherige Eventnoten: historisch/unkalibriert, ohne Verhaltensanker und Beobachtungszahl.</p>
           <!-- Bestätigte Lernpfad-Stufen (SCRUM-192). -->
           <tk-learning-summary [player]="p" />
           <h2>Verfügbarkeit</h2>
@@ -121,6 +123,9 @@
 
       <!-- Jahrgang im Verein (SCRUM-197): nur Trainer, nur wenn der Vereinsadmin den Vergleich eingeschaltet hat. -->
       <tk-cohort-card [player]="p" />
+
+      <!-- Beobachtungen mit Verhaltensankern (SCRUM-268): nur Trainer, je Trainer getrennt, kein Mittelwert. -->
+      <tk-behavior-observations-card [player]="p" [items]="profile.items()" />
 
       <tk-load-curve-card [curve]="loadCurve()" [compact]="mobile()" />
 
