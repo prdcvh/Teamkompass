@@ -12,7 +12,9 @@ import {
   rsvpCountsText,
   rsvpEventIds,
   rsvpReason,
+  splitWeekEvents,
   upcomingRsvpEvents,
+  weekEnd,
 } from './rsvp';
 
 const no = (reason = ''): RsvpResponse => ({ status: 'no', reason, by: 'player' });
@@ -126,6 +128,41 @@ describe('Zu-/Absagen (SCRUM-205, gleiche Regeln wie SCRUM-175)', () => {
       expect(responseKey(null)).toBe('open');
       expect(responseKey(yes)).toBe('yes');
       expect(responseKey(no('Schule'))).toBe('no|Schule');
+    });
+  });
+
+  describe('Woche (SCRUM-401)', () => {
+    const ev = (id: string, date: string) => eventFromDoc(id, { type: 'Training', title: id, date });
+    const ids = (list: readonly { id: string }[]) => list.map((event) => event.id);
+
+    it('Sonntag der Kalenderwoche: Montag, Sonntag, Jahreswechsel, Zeitumstellung', () => {
+      expect(weekEnd('2026-11-23')).toBe('2026-11-29'); // Montag
+      expect(weekEnd('2026-11-24')).toBe('2026-11-29');
+      expect(weekEnd('2026-11-29')).toBe('2026-11-29'); // Sonntag
+      expect(weekEnd('2026-11-30')).toBe('2026-12-06'); // Montag danach
+      expect(weekEnd('2026-12-30')).toBe('2027-01-03'); // Jahreswechsel
+      expect(weekEnd('2026-03-25')).toBe('2026-03-29'); // Zeitumstellung (Sommerzeit)
+      expect(weekEnd('2026-10-26')).toBe('2026-11-01'); // Zeitumstellung (Winterzeit am 25.10. davor)
+      expect(weekEnd('2026-10-24')).toBe('2026-10-25'); // Umstellungstag selbst
+    });
+
+    it('Diese Woche sofort, der Rest auf Wunsch', () => {
+      const list = [ev('a', '2026-11-24'), ev('b', '2026-11-29'), ev('c', '2026-11-30'), ev('d', '2026-12-10')];
+      const view = splitWeekEvents(list, '2026-11-24');
+      expect(ids(view.shown)).toEqual(['a', 'b']);
+      expect(ids(view.more)).toEqual(['c', 'd']);
+      expect(view.weekEmpty).toBe(false);
+    });
+
+    it('Ohne Termin diese Woche: nächster Termin trotzdem, Hinweis', () => {
+      const view = splitWeekEvents([ev('c', '2026-11-30'), ev('d', '2026-12-10')], '2026-11-24');
+      expect(ids(view.shown)).toEqual(['c']);
+      expect(ids(view.more)).toEqual(['d']);
+      expect(view.weekEmpty).toBe(true);
+    });
+
+    it('Gar keine Termine: nichts, kein Wochenhinweis', () => {
+      expect(splitWeekEvents([], '2026-11-24')).toEqual({ shown: [], more: [], weekEmpty: false });
     });
   });
 
