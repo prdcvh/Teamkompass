@@ -158,20 +158,24 @@ keeps the board current, reports at sprint end).
   `/jira-run`), during the day Claude does **not** start new tickets unless
   the PO explicitly asks in chat. Answering questions and small Jira
   housekeeping are fine at any time.
-- **`Genehmigt` means: merge immediately (PO, 2026-11-23).** A ticket the PO
-  has set to `Genehmigt` is approved by the PO. A run (night session or
-  `/jira-run`) merges its PR at once, without a question and whatever the time
-  of day: at the start of every run (search `status = Genehmigt` explicitly,
-  the status counts as "done" for Jira's status category) and again whenever a
-  ticket is found in `Genehmigt`. One PR at a time, latest `main` brought in,
-  `npm run verify` re-run, CI green, then the ticket goes to `Erledigt`.
-  Not merged and reported to the PO instead: merge conflict that cannot be
-  resolved cleanly, red `npm run verify` or CI, a PR that is still Draft or
-  has unresolved blocking review comments, a PR that does not belong to that
-  ticket. Claude never merges a ticket the PO has not set to `Genehmigt`
-  (`In Überprüfung` stays untouched); at the end of every run Claude still
-  lists those PRs for the PO to approve in Jira. PRs that need a PO decision
-  (see below) stay Draft.
+- **`Genehmigt` means: merge immediately (PO, 2026-11-23, extended
+  2026-11-24).** A ticket the PO has set to `Genehmigt` is approved by the PO.
+  **Every run (night session or `/jira-run`) starts by merging everything in
+  `Genehmigt`**, before the plan or any ticket work (search
+  `status = Genehmigt` explicitly, the status counts as "done" for Jira's
+  status category), and again whenever a ticket is found in `Genehmigt`
+  later in the run. No question, whatever the time of day. One PR at a time,
+  latest `main` brought in, `npm run verify` re-run, CI green, then the
+  ticket goes to `Erledigt`. **A Draft PR is no blocker:** `Genehmigt` is the
+  PO's approval, also for PRs kept as Draft because of a `firestore.rules`/
+  auth change or another PO decision. Claude marks such a PR ready for review
+  and merges it. Not merged and reported to the PO instead: merge conflict
+  that cannot be resolved cleanly, red `npm run verify` or CI, unresolved
+  blocking review comments, a PR that does not belong to that ticket. Claude
+  never merges a ticket the PO has not set to `Genehmigt` (`In Überprüfung`
+  stays untouched); at the end of every run Claude still lists those PRs for
+  the PO to approve in Jira. PRs that need a PO decision (see below) stay
+  Draft until the PO sets the ticket to `Genehmigt`.
 - **Night-session rules.** Work the active sprint, critical tickets first,
   following everything in this file. Nobody can be asked at night, so
   anything that needs a PO decision (changes to `firestore.rules` or auth with
