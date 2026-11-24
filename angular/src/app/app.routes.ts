@@ -62,6 +62,7 @@ export const routes: Routes = [
           { path: 'planung', loadComponent: () => import('./pages/planning/planning').then((m) => m.Planning) },
           { path: 'wissen', loadComponent: () => import('./pages/knowledge/knowledge').then((m) => m.Knowledge) },
           { path: 'messplan', loadComponent: () => import('./pages/measurement-plan/measurement-plan').then((m) => m.MeasurementPlan) },
+          { path: 'feldtests', loadComponent: () => import('./pages/field-tests/field-tests').then((m) => m.FieldTests) },
           { path: 'profile', loadComponent: () => import('./pages/profile/profile').then((m) => m.Profile) },
           { path: 'profile/:id', loadComponent: () => import('./pages/profile/profile').then((m) => m.Profile) },
           { path: 'teamanalyse', loadComponent: () => import('./pages/team-analysis/team-analysis').then((m) => m.TeamAnalysis) },

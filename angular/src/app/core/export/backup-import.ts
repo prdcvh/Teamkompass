@@ -11,6 +11,7 @@ import { docFromPlayer, playerFromDoc } from '../player/player';
 import { docFromRating, ratingFromDoc } from '../ratings/rating';
 import { SERVER_TIME, gradesDoc, valuesDoc } from '../ratings/player-view';
 import { absenceFromDoc, docFromAbsence } from '../records/absence';
+import { docFromFieldTest, fieldTestFromDoc, isFieldTestDoc } from '../records/field-test';
 import { docFromMeasurement, measurementFromDoc } from '../records/measurement';
 import { docFromPlan, planFromDoc } from '../records/plan';
 
@@ -113,7 +114,8 @@ export function parseBackup(raw: Record<string, unknown>, today: string, newId: 
     events,
     developmentPlans: group('developmentPlans', 'dp', (id, data) => docFromPlan(planFromDoc(id, data, today))),
     absences: group('absences', 'ab', (id, data) => docFromAbsence(absenceFromDoc(id, data))),
-    measurements: group('measurements', 'me', (id, data) => docFromMeasurement(measurementFromDoc(id, data, today))),
+    // Feldtests (SCRUM-263) liegen in derselben Sammlung wie die Messwerte und behalten ihr eigenes Format.
+    measurements: group('measurements', 'me', (id, data) => (isFieldTestDoc(data) ? { id, ...docFromFieldTest(fieldTestFromDoc(id, data)) } : docFromMeasurement(measurementFromDoc(id, data, today)))),
     opponents: list(raw['opponents']).map((doc) => docFromOpponent(opponentFromDoc(idOf(doc, 'o'), doc))),
     lineup: lineupIsEmpty(lineup) ? null : docFromLineup(lineup),
   };

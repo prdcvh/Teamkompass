@@ -5,7 +5,7 @@ import { MeasurementPlanApi } from '../firebase/measurement-plan.api';
 import { PlayerRecordsApi } from '../firebase/player-records.api';
 import { SquadService } from '../player/squad.service';
 import { SyncService } from '../shell/sync.service';
-import { type Measurement, measurementFromDoc } from './measurement';
+import { type Measurement, growthMeasurementsFromDocs } from './measurement';
 import {
   DEFAULT_INTERVAL_MONTHS,
   MAX_INTERVAL_MONTHS,
@@ -158,7 +158,7 @@ export class MeasurementPlanService {
       const entries = await Promise.all(
         players.map(async (player): Promise<[string, readonly Measurement[]]> => {
           const docs = await this.recordsApi.readPlayerRecords(player.id, 'measurements');
-          return [player.id, docs.map((doc) => measurementFromDoc(doc.id, doc.data, today))];
+          return [player.id, growthMeasurementsFromDocs(docs, today)];
         }),
       );
       if (generation !== this.generation) return;

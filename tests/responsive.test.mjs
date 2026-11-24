@@ -9,6 +9,7 @@ import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import { extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { closeServer, withCleanup, withTimeout } from './lifecycle-lib.mjs';
 
 const root = resolve(fileURLToPath(import.meta.url), '..', '..');
 const angular = join(root, 'angular');
@@ -32,6 +33,8 @@ export const ROUTES = [
   '/anmelden?as=none', '/ansicht?as=player', '/ansicht?as=player-email', '/ansicht?as=physio', '/ansicht?as=scout',
   // Registrierung, Teamauswahl und Einstieg (SCRUM-181).
   '/registrieren?as=none&code=ABCDEFGHJKLMNPQR', '/team-waehlen?as=multi', '/willkommen?as=fresh',
+  // Feldtests (SCRUM-263).
+  '/feldtests',
 ];
 
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json' };
@@ -103,40 +106,58 @@ function measure() {
 const playwright = loadPlaywright();
 
 // Beide Tests prüfen denselben, einmal frisch gebauten Stand (sonst prüfte ein Test einen alten Stand).
+// Zeitgrenzen (SCRUM-299): Ein hängender Build, Browser oder Seitenaufruf bricht mit klarer Meldung ab, statt `npm test` zu blockieren.
+const BUILD_TIMEOUT_MS = 300_000;
+const STEP_TIMEOUT_MS = 30_000;
 let built = false;
+
+/** Startet Server und Browser; beides wird von `withCleanup` in jedem Fall geschlossen. */
+async function startServerAndBrowser(cleanup, headers) {
+  const server = await withTimeout(serve(headers), STEP_TIMEOUT_MS, 'HTTP-Server starten');
+  cleanup.add('HTTP-Server', () => closeServer(server));
+  const browser = await withTimeout(playwright.chromium.launch(), STEP_TIMEOUT_MS, 'Chromium starten');
+  cleanup.add('Browser', () => browser.close());
+  return { base: `http://127.0.0.1:${server.address().port}`, browser };
+}
+
+function openPage(context) {
+  return context.newPage().then((page) => {
+    page.setDefaultTimeout(STEP_TIMEOUT_MS);
+    page.setDefaultNavigationTimeout(STEP_TIMEOUT_MS);
+    return page;
+  });
+}
 function buildOnce() {
-  if (!built) execSync('npm run build:e2e', { cwd: angular, stdio: 'inherit' });
+  if (!built) execSync('npm run build:e2e', { cwd: angular, stdio: 'inherit', timeout: BUILD_TIMEOUT_MS });
   built = true;
 }
 
 test('Keine Seite scrollt seitlich (alle Breiten, alle Seiten)', { skip: playwright ? false : 'Playwright nicht installiert', timeout: 600_000 }, async () => {
   buildOnce();
-  const server = await serve();
-  const base = `http://127.0.0.1:${server.address().port}`;
-  const browser = await playwright.chromium.launch();
   const shots = process.env.RESPONSIVE_SHOTS;
   if (shots) mkdirSync(shots, { recursive: true });
   const failures = [];
-  try {
+  await withCleanup(async (cleanup) => {
+    const { base, browser } = await startServerAndBrowser(cleanup);
     const widths = process.env.RESPONSIVE_WIDTHS ? process.env.RESPONSIVE_WIDTHS.split(',').map(Number) : WIDTHS;
     const routes = process.env.RESPONSIVE_ONLY ? ROUTES.filter((r) => r.includes(process.env.RESPONSIVE_ONLY)) : ROUTES;
     for (const width of widths) {
       const context = await browser.newContext({ viewport: { width, height: 900 }, hasTouch: width < 768, isMobile: width < 768 });
-      const page = await context.newPage();
+      cleanup.add(`Context ${width}px`, () => context.close());
+      const page = await openPage(context);
       for (const route of routes) {
-        await page.goto(base + route);
-        await page.waitForSelector('main, form, h1', { timeout: 15_000 });
-        await page.waitForTimeout(400);
-        const problems = await page.evaluate(measure);
-        if (shots) await page.screenshot({ path: join(shots, `${route.replace(/[/?=]/g, '_')}-${width}.png`), fullPage: true });
-        if (problems.length) failures.push(`${width}px ${route}: ${problems.join('; ')}`);
+        await withTimeout(async () => {
+          await page.goto(base + route);
+          await page.waitForSelector('main, form, h1', { timeout: 15_000 });
+          await page.waitForTimeout(400);
+          const problems = await page.evaluate(measure);
+          if (shots) await page.screenshot({ path: join(shots, `${route.replace(/[/?=]/g, '_')}-${width}.png`), fullPage: true });
+          if (problems.length) failures.push(`${width}px ${route}: ${problems.join('; ')}`);
+        }, STEP_TIMEOUT_MS * 2, `${width}px ${route}`);
       }
       await context.close();
     }
-  } finally {
-    await browser.close();
-    server.close();
-  }
+  });
   assert.deepEqual(failures, [], `Seitliches Scrollen bzw. Überstand gefunden:\n${failures.join('\n')}`);
 });
 
@@ -157,11 +178,9 @@ test('Strenge CSP für Styles: keine Inline-Style-Attribute, Berichte per CSSOM 
   buildOnce();
   const index = readFileSync(join(dist, 'index.html'), 'utf8');
   assert.doesNotMatch(index, /<style|\sstyle\s*=|\son[a-z]+\s*=/i, 'index.html enthält Inline-Styles oder Inline-Handler');
-  const server = await serve({ 'content-security-policy': strictStyleCsp() });
-  const base = `http://127.0.0.1:${server.address().port}`;
-  const browser = await playwright.chromium.launch();
   const failures = [];
-  try {
+  await withCleanup(async (cleanup) => {
+    const { base, browser } = await startServerAndBrowser(cleanup, { 'content-security-policy': strictStyleCsp() });
     const routes = process.env.RESPONSIVE_ONLY ? ROUTES.filter((r) => r.includes(process.env.RESPONSIVE_ONLY)) : ROUTES;
     for (const viewport of [{ width: 390, height: 844 }, { width: 1365, height: 900 }]) {
       const mobile = viewport.width < 768;
@@ -174,7 +193,8 @@ test('Strenge CSP für Styles: keine Inline-Style-Attribute, Berichte per CSSOM 
           window.__cspViolations.push({ directive: event.violatedDirective, angularStyle, sample: event.sample });
         });
       });
-      const page = await context.newPage();
+      cleanup.add(`Context ${viewport.width}px`, () => context.close());
+      const page = await openPage(context);
       for (const route of routes) {
         await page.goto(base + route);
         await page.waitForSelector('main, form, h1', { timeout: 15_000 });
@@ -187,7 +207,8 @@ test('Strenge CSP für Styles: keine Inline-Style-Attribute, Berichte per CSSOM 
     }
     // PDF-Bericht: läuft im sandboxed iframe, das die CSP der App erbt; die Gestaltung muss trotzdem greifen.
     const context = await browser.newContext({ serviceWorkers: 'block' });
-    const page = await context.newPage();
+    cleanup.add('Context PDF-Bericht', () => context.close());
+    const page = await openPage(context);
     await page.addInitScript(() => { window.print = () => {}; });
     await page.goto(`${base}/export`);
     await page.getByRole('button', { name: 'Bericht erstellen' }).click();
@@ -200,9 +221,6 @@ test('Strenge CSP für Styles: keine Inline-Style-Attribute, Berichte per CSSOM 
     if (margin !== '32px') failures.push(`PDF-Bericht ungestaltet (Rand ${margin} statt 32px)`);
     if (inline) failures.push(`PDF-Bericht enthält ${inline} Inline-Styles`);
     await context.close();
-  } finally {
-    await browser.close();
-    server.close();
-  }
+  });
   assert.deepEqual(failures, [], `CSP-Verstöße bei strengem style-src:\n${failures.join('\n')}`);
 });

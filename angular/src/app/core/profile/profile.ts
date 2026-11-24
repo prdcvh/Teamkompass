@@ -5,10 +5,10 @@
  * kleiner ist besser. Wichtig für die Kernzahlen (siehe CLAUDE.md „wrong core numbers“): Anwesenheits- und
  * Einsatzquote zählen nur Events, die nicht in der Zukunft liegen und deren Anwesenheit schon gesetzt ist (SCRUM-20).
  */
-import { areaPath, smoothPath } from '../chart-path';
 import { type TeamEvent } from '../events/event';
 import { GRADE_FIELDS, GRADE_LABELS, type GradeField, type Rating, calculatedGrade, roundGrade } from '../ratings/rating';
-import { LEVEL_OPTIONS, type RatingScale, scoreLabel, scoreShortLabel } from '../ratings/rating-scale';
+import { type RatingScale } from '../ratings/rating-scale';
+import { type DevelopmentPeriodKey, type DevelopmentSummary, type StepChange, developmentPeriod, developmentSummary, lastStep } from './development';
 
 /** Ein Event samt der Bewertung eines Spielers (die Bewertung kann fehlen). */
 export interface EventRating {
@@ -144,14 +144,19 @@ export interface ProfileFigures {
   readonly attendances: number;
   /** Letzte Note minus vorletzte, umgekehrt zur Rechnung: positiv = besser geworden. */
   readonly trend: number | null;
+  /** Dieselbe Veränderung mit Zeitabstand und Skalenwechsel (SCRUM-265). */
+  readonly lastStep: StepChange | null;
   readonly recentIntensity: number | null;
-  /** Erste minus letzte Note: positiv = besser geworden. */
-  readonly development: number | null;
+  /**
+   * Entwicklung im Beobachtungszeitraum (Standard: laufende Saison) mit Mindestdaten und Unsicherheit (SCRUM-265);
+   * Rechnung in development.ts.
+   */
+  readonly development: DevelopmentSummary;
   readonly best: GradedEvent | null;
   readonly games: GameStats;
 }
 
-export function profileFigures(items: readonly EventRating[], today: string): ProfileFigures {
+export function profileFigures(items: readonly EventRating[], today: string, period: DevelopmentPeriodKey = 'season'): ProfileFigures {
   const graded = gradedEvents(items);
   const last = graded.at(-1)?.grade;
   const previous = graded.at(-2)?.grade;
@@ -163,8 +168,9 @@ export function profileFigures(items: readonly EventRating[], today: string): Pr
     ratedEvents: graded.length,
     attendances: attendanceCount(items),
     trend: last !== undefined && previous !== undefined ? roundGrade(previous - last) : null,
+    lastStep: lastStep(graded),
     recentIntensity: recent.length ? roundGrade(recent.reduce((sum, value) => sum + value, 0) / recent.length) : null,
-    development: graded.length >= 2 ? roundGrade(graded[0].grade - graded[graded.length - 1].grade) : null,
+    development: developmentSummary(graded, developmentPeriod(period, today, graded), today),
     best: graded.length ? graded.reduce((best, entry) => (entry.grade < best.grade ? entry : best), graded[0]) : null,
     games: gameStats(items, today),
   };
@@ -177,122 +183,21 @@ export function numberLabel(value: number | null, options: { signed?: boolean } 
   return options.signed && value > 0 ? `+${text}` : text;
 }
 
-/** Trend und Entwicklung: Schulnoten „+0,5“; bei Kompetenzstufen „besser“, „schlechter“ oder „gleich“ (SCRUM-188). */
-export function deltaLabel(value: number | null, scale: RatingScale): string {
-  if (scale !== 'levels' || value === null) return numberLabel(value, { signed: true });
-  return value > 0 ? 'besser' : value < 0 ? 'schlechter' : 'gleich';
-}
-
-export const CHART_WIDTH = 760;
-export const CHART_HEIGHT = 260;
-const CHART_LEFT = 54;
-const CHART_RIGHT = 24;
-const CHART_TOP = 46;
-const CHART_BOTTOM = 38;
-
-export interface ChartPoint {
-  readonly x: number;
-  readonly y: number;
-  readonly grade: number;
-  readonly label: string;
-  readonly title: string;
-  /** Note als Text („2,3“) für die Beschriftung am Punkt. */
-  readonly valueLabel: string;
-}
-
-export interface TrendChart {
-  readonly width: number;
-  readonly height: number;
-  readonly grid: readonly GridLine[];
-  readonly points: readonly ChartPoint[];
-  readonly path: string;
-  /** Fläche unter der Kurve (leer bei weniger als zwei Punkten). */
-  readonly area: string;
-  /** Textalternative: alle Werte in einem Satz. */
-  readonly summary: string;
-  /** Index des besten Wertes (kleinste Note), -1 ohne Punkte. */
-  readonly best: number;
-}
-
-/** Rasterlinie mit Achsenbeschriftung (Schulnote „1“ … „6“ oder Stufe „lernt“/„kann“/„sicher“, SCRUM-188). */
-export interface GridLine {
-  readonly y: number;
-  readonly grade: number;
-  readonly label: string;
-  /** Linker Rand der Beschriftung. */
-  readonly x: number;
-}
-
-/** Ein Punkt eines Notendiagramms. */
-export interface PlotPoint {
-  readonly grade: number;
-  readonly label: string;
-  readonly title: string;
-  /** Wird unverändert am Punkt weitergereicht (z. B. Spiel/Training). */
-  readonly kind?: string;
-}
-
-export interface PlottedPoint extends PlotPoint {
-  readonly x: number;
-  readonly y: number;
-  readonly valueLabel: string;
-}
-
-export interface PlotChart {
-  readonly width: number;
-  readonly height: number;
-  readonly grid: readonly GridLine[];
-  readonly points: readonly PlottedPoint[];
-  readonly path: string;
-  readonly area: string;
-  readonly summary: string;
-  readonly best: number;
-}
-
-/**
- * Notendiagramm: Note 1 oben, Note 6 unten, Punkte gleichmäßig von links nach rechts. Bei Kompetenzstufen (SCRUM-188)
- * bleibt die Zahlenachse gleich, nur Raster und Beschriftung zeigen die drei Stufen.
- */
-export function plotChart(input: readonly PlotPoint[], scale: RatingScale = 'grades'): PlotChart {
-  const plotWidth = CHART_WIDTH - CHART_LEFT - CHART_RIGHT;
-  const plotHeight = CHART_HEIGHT - CHART_TOP - CHART_BOTTOM;
-  const y = (grade: number) => CHART_TOP + ((grade - 1) / 5) * plotHeight;
-  const points = input.map((entry, index) => ({
-    ...entry,
-    x: CHART_LEFT + (index * plotWidth) / Math.max(input.length - 1, 1),
-    y: y(entry.grade),
-    valueLabel: scoreLabel(entry.grade, scale),
-  }));
-  const grid: GridLine[] =
-    scale === 'levels'
-      ? LEVEL_OPTIONS.map((option) => ({ y: y(option.value), grade: option.value, label: scoreShortLabel(option.value, scale), x: 4 }))
-      : [1, 2, 3, 4, 5, 6].map((grade) => ({ y: y(grade), grade, label: String(grade), x: 24 }));
-  const best = points.length ? points.reduce((index, point, at) => (point.grade < points[index].grade ? at : index), 0) : -1;
-  return {
-    width: CHART_WIDTH,
-    height: CHART_HEIGHT,
-    grid,
-    points,
-    path: smoothPath(points),
-    area: areaPath(points, CHART_HEIGHT - CHART_BOTTOM),
-    summary: points.map((point) => `${point.label}${point.kind ? ` ${point.kind}` : ''} ${noteWord(scale)} ${scoreLabel(point.grade, scale)}`).join(', '),
-    best,
-  };
-}
-
-/** „Note 2,3“ bei Schulnoten, „Stufe kann es“ bei Kompetenzstufen. */
-export function noteWord(scale: RatingScale): string {
-  return scale === 'levels' ? 'Stufe' : 'Note';
-}
-
-/** Verlaufsdiagramm: Note 1 oben, Note 6 unten, ein Punkt je benotetem Event (älteste links). */
-export function trendChart(graded: readonly GradedEvent[], scale: RatingScale = 'grades'): TrendChart {
-  return plotChart(
-    graded.map((entry) => ({
-      grade: entry.grade,
-      label: entry.event.date.slice(5),
-      title: `${entry.event.title}: ${noteWord(scale)} ${scoreLabel(entry.grade, scale)}`,
-    })),
-    scale,
-  );
-}
+// Notendiagramm (Zeitachse, SCRUM-265) steht in grade-chart.ts; hier weiter exportiert für bestehende Importe.
+export {
+  type AxisTick,
+  CHART_HEIGHT,
+  CHART_WIDTH,
+  type ChartGap,
+  type ChartMarker,
+  type ChartPoint,
+  type GridLine,
+  type PlotChart,
+  type PlotOptions,
+  type PlotPoint,
+  type PlottedPoint,
+  type TrendChart,
+  noteWord,
+  plotChart,
+  trendChart,
+} from './grade-chart';

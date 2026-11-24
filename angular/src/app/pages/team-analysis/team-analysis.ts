@@ -68,11 +68,12 @@ export class TeamAnalysis implements OnInit {
   protected readonly teamForm = computed(() => {
     const chart = this.trend();
     if (this.scale() !== 'levels') return chart;
-    const points = chart.points.map(({ grade, label, title, kind }) => ({
+    const points = chart.points.map(({ grade, label, title, kind, date }) => ({
       grade,
       label,
       title: title.replace(/Ø Note [\d,]+$/, `Ø ${scoreLabel(grade, 'levels')}`),
       kind,
+      date,
     }));
     return plotChart(points, 'levels');
   });

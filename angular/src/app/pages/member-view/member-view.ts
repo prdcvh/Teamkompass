@@ -18,8 +18,8 @@ import {
   numberLabel,
   profileFigures,
   skillAverages,
-  trendChart,
 } from '../../core/profile/profile';
+import { GradeTrendCard } from '../profile/grade-trend-card';
 import { ProfileService } from '../../core/profile/profile.service';
 import { ATTENDANCE_LABELS, type Rating, calculatedGrade, ratingScaleOf } from '../../core/ratings/rating';
 import { releaseText } from '../../core/ratings/grade-release';
@@ -50,6 +50,9 @@ import { PuzzlePanel } from './puzzle-panel';
 import { AlertsPanel } from '../../ui/alerts-panel/alerts-panel';
 import { StreakPanel } from './streak-panel';
 
+/** So viele der neuesten vergangenen Termine zeigt die Spieleransicht nach dem Aufklappen (SCRUM-402). */
+const PAST_PREVIEW = 5;
+
 /**
  * Die eine Ansicht für Spieler, Eltern, Medizin und Scouts (Figma 01c/01d). Sie zeigt nur, was die Firestore-Regeln
  * der Rolle erlauben:
@@ -68,7 +71,7 @@ import { StreakPanel } from './streak-panel';
  */
 @Component({
   selector: 'app-member-view',
-  imports: [RouterLink, Button, Card, InstallHint, Status, ProfileExtras, BreakNotice, LoadReportAction, HomeRanking, ConnectEmail, RsvpPanel, SelfReportPanel, SelfReportHistory, LearningPanel, LearningSummary, AlertsPanel, StreakPanel, PuzzlePanel],
+  imports: [RouterLink, Button, Card, InstallHint, Status, ProfileExtras, BreakNotice, LoadReportAction, HomeRanking, ConnectEmail, RsvpPanel, SelfReportPanel, SelfReportHistory, LearningPanel, LearningSummary, AlertsPanel, StreakPanel, PuzzlePanel, GradeTrendCard],
   templateUrl: './member-view.html',
   styleUrls: ['../profile/profile.css', './member-view.css', '../../ui/chart/chart.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -154,12 +157,20 @@ export class MemberView implements OnInit {
       .filter(({ event, rating }) => countsForStats(event, rating, this.today))
       .map(({ event, rating }) => ({ event, rating: rating!, grade: calculatedGrade(rating!) })),
   );
+  /** Vergangene Termine für Spieler/Eltern: standardmäßig eingeklappt, aufgeklappt zuerst die 5 neuesten (SCRUM-402). */
+  protected readonly pastOpen = signal(false);
+  protected readonly showAllPast = signal(false);
+  protected readonly visibleValueHistory = computed(() => (this.showAllPast() ? this.valueHistory() : this.valueHistory().slice(0, PAST_PREVIEW)));
+  protected readonly hiddenOlder = computed(() => this.valueHistory().length - this.visibleValueHistory().length);
+  protected togglePast(): void {
+    this.pastOpen.update((open) => !open);
+    this.showAllPast.set(false);
+  }
   protected readonly attendanceLabels = ATTENDANCE_LABELS;
   protected readonly history = computed(() => [...this.graded()].reverse());
   protected readonly figures = computed(() => profileFigures(this.items(), this.today));
   protected readonly skills = computed(() => skillAverages(this.graded()));
   protected readonly attendance = computed(() => availability(this.items(), this.today));
-  protected readonly chart = computed(() => trendChart(this.graded(), this.scale()));
   protected readonly cards = computed(() => {
     const f = this.figures();
     const cards = [

@@ -35,3 +35,8 @@ export function addDays(iso: string, days: number): string {
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().slice(0, 10);
 }
+
+/** Ganze Kalendertage von `from` bis `to` (negativ, wenn `to` früher liegt); rechnet in UTC wie `addDays`. */
+export function daysBetween(from: string, to: string): number {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000);
+}

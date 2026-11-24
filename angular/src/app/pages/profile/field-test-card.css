@@ -1,0 +1,160 @@
+:host {
+  display: block;
+}
+
+.ft-block {
+  display: grid;
+  gap: var(--tk-space-3);
+}
+
+.ft-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tk-space-3);
+}
+
+h2,
+h3 {
+  margin: 0;
+}
+
+h2 {
+  font-size: var(--tk-text-lg);
+}
+
+h3 {
+  font-size: var(--tk-text-md);
+}
+
+.muted {
+  margin: 0;
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+.pad {
+  padding: var(--tk-space-3) var(--tk-space-1);
+}
+
+.group {
+  display: grid;
+  gap: 2px;
+  padding: var(--tk-space-3) 0 0;
+}
+
+.group + .group {
+  border-top: 1px solid var(--tk-line);
+}
+
+.ft-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ft-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--tk-space-3);
+  padding: var(--tk-space-3) 0;
+  min-width: 0;
+}
+
+.ft-list li + li {
+  border-top: 1px dashed var(--tk-line);
+}
+
+.ft-list li > div:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ft-list p {
+  margin: 4px 0 0;
+}
+
+.small {
+  font-size: var(--tk-text-sm);
+}
+
+.method {
+  color: var(--tk-muted);
+}
+
+.warning {
+  padding: 2px var(--tk-space-2);
+  color: var(--tk-ink);
+  background: var(--tk-soft-amber);
+  border-left: 3px solid var(--tk-amber);
+  border-radius: var(--tk-radius-sm);
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  justify-content: flex-end;
+  gap: var(--tk-space-2);
+}
+
+.danger,
+.error {
+  color: var(--tk-red);
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--tk-space-2);
+}
+
+@media (max-width: 720px) {
+  .ft-list li {
+    flex-direction: column;
+  }
+
+  .row-actions {
+    justify-content: flex-start;
+  }
+}
+
+.ref {
+  display: grid;
+  gap: 2px;
+  margin: var(--tk-space-2) 0;
+  padding: var(--tk-space-2) var(--tk-space-3);
+  border-left: 3px solid var(--tk-line);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ref-title {
+  margin: 0;
+}
+
+.ref-facts {
+  display: grid;
+  gap: var(--tk-space-1);
+  margin: 0 0 var(--tk-space-1);
+}
+
+.ref-facts div {
+  display: grid;
+  gap: 0;
+}
+
+.ref-facts dt {
+  font-size: var(--tk-text-sm);
+  color: var(--tk-muted);
+}
+
+.ref-facts dd {
+  margin: 0;
+  font-size: var(--tk-text-sm);
+}
+
+.ref-title span {
+  margin-left: 0.35em;
+}

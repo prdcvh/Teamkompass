@@ -12,6 +12,7 @@ import type { Absence } from '../records/absence';
 import { effectiveStatus } from '../records/availability';
 import type { Measurement } from '../records/measurement';
 import { injuryRisk } from '../analysis/risk';
+import { DEVELOPMENT_METHOD } from './development';
 
 /** Ersetzt die fünf HTML-Sonderzeichen, damit Text nie als Markup gelesen wird. */
 export function escapeHtml(value: unknown): string {
@@ -99,6 +100,12 @@ export function profileReportHtml(input: ProfileReportInput): string {
   ${card('Tore + Vorlagen', `${games.goals} + ${games.assists}`)}
   ${card('Min./Spiel', games.minutesPerGame ? String(games.minutesPerGame) : '–')}
   ${card('Spiele', `${games.appearances}/${games.games}`)}
+</section>
+<section class="development">
+  <h2>Entwicklung (${escapeHtml(figures.development.period.label)})</h2>
+  <p><strong>${escapeHtml(figures.development.label)}</strong>${figures.development.detail ? ` – ${escapeHtml(figures.development.detail)}` : ''}</p>
+  ${figures.development.hints.length ? `<ul class="muted">${figures.development.hints.map((hint) => `<li>${escapeHtml(hint)}</li>`).join('')}</ul>` : ''}
+  <p class="muted">${escapeHtml(DEVELOPMENT_METHOD)}</p>
 </section>
 <section class="load-box">
   <h2>Belastung</h2>
