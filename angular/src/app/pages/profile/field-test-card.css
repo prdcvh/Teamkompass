@@ -119,3 +119,38 @@ h3 {
     justify-content: flex-start;
   }
 }
+
+.ref {
+  display: grid;
+  gap: 2px;
+  margin: var(--tk-space-2) 0;
+  padding: var(--tk-space-2) var(--tk-space-3);
+  border-left: 3px solid var(--tk-line);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ref-title {
+  margin: 0;
+}
+
+.ref-facts {
+  display: grid;
+  gap: var(--tk-space-1);
+  margin: 0 0 var(--tk-space-1);
+}
+
+.ref-facts div {
+  display: grid;
+  gap: 0;
+}
+
+.ref-facts dt {
+  font-size: var(--tk-text-sm);
+  color: var(--tk-muted);
+}
+
+.ref-facts dd {
+  margin: 0;
+  font-size: var(--tk-text-sm);
+}
