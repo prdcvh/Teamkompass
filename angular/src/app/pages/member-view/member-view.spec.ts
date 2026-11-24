@@ -67,6 +67,13 @@ describe('MemberView (Ansicht für Spieler, Eltern und Medizin)', () => {
     });
   }
 
+  /** Spieler/Eltern: die vergangenen Termine sind eingeklappt (SCRUM-402) – aufklappen und auf den Termin warten. */
+  async function openPast(fixture: { detectChanges: () => void; whenStable: () => Promise<unknown>; nativeElement: unknown }) {
+    await settled(fixture, () => expect(root(fixture).querySelector('[data-testid="history-toggle"]')).not.toBeNull());
+    (root(fixture).querySelector('[data-testid="history-toggle"]') as HTMLButtonElement).click();
+    await settled(fixture, () => expect(text(fixture)).toContain('Heimspiel'));
+  }
+
   describe('Spieler', () => {
     it('zeigt die MVP-Ranglisten aus dem Ranglisten-Dokument, ohne Einzelpunkte zu lesen (SCRUM-105)', async () => {
       const today = new Date();
@@ -132,7 +139,7 @@ describe('MemberView (Ansicht für Spieler, Eltern und Medizin)', () => {
       const fixture = await render('player', {
         mutate: (f) => f.ratings.ratings.get('e2')!.set('p1', grades(1, { playerId: 'p1', note: 'Starkes Spiel', goals: 2, assists: 1, minutes: 55 })),
       });
-      await settled(fixture, () => expect(text(fixture)).toContain('Heimspiel'));
+      await openPast(fixture);
       expect(root(fixture).querySelector('.grade')).toBeNull();
       expect(text(fixture)).not.toContain('Notenverlauf');
       expect(text(fixture)).not.toContain('Kompetenzprofil');
@@ -164,7 +171,7 @@ describe('MemberView (Ansicht für Spieler, Eltern und Medizin)', () => {
 
     it('abgelaufene Freigabe zeigt keine Noten', async () => {
       const fixture = await render('player', { mutate: (f) => releaseNow(f, new Date(Date.now() - 60_000)) });
-      await settled(fixture, () => expect(text(fixture)).toContain('Heimspiel'));
+      await openPast(fixture);
       expect(root(fixture).querySelector('.grade')).toBeNull();
       expect(firebase.calls.filter((call) => call.startsWith('watchGradesDoc:'))).toEqual([]);
     });
