@@ -1270,6 +1270,50 @@ service cloud.firestore {
         allow delete: if isTrainer();
       }
 
+      // ---------------------------------------------------------------------------------------------
+      // Taktikdiagnostik (SCRUM-267): kodierte Spielszenen je Spieler und Termin - Entscheidung (sinnvoll / nicht
+      // sinnvoll / nicht beurteilbar) und, nur bei sinnvoller Entscheidung, Ausfuehrung (erfolgreich / nicht
+      // erfolgreich / nicht beurteilbar), optional Ereignistypen und ein interner Videolink (nur Text).
+      // Lesen und schreiben NUR Trainer: keine Spieler/Eltern, keine Medizin, keine Scouts und bewusst auch NICHT der
+      // Vereinsadmin (Szenen und Videolinks bleiben im Trainerteam). Lesen haengt nicht von resource ab, deshalb sind
+      // die Abfragen der App (where eventId == ... / where playerId == ...) erlaubt.
+      // Anlegen nur mit erlaubten Feldern, nur fuer bestehenden Spieler und bestehenden Termin, mit dem eigenen Konto.
+      // Geaendert wird eine Szene nie (falsch erfasst = loeschen und neu erfassen); loeschen Trainer (auch beim
+      // Loeschen eines Spielers oder Termins).
+      // ---------------------------------------------------------------------------------------------
+      function validTacticScene(data) {
+        return data.keys().hasOnly(['playerId', 'eventId', 'eventDate', 'eventType', 'eventTitle', 'minute', 'context',
+            'decision', 'execution', 'situations', 'videoUrl', 'by', 'byUid', 'createdAt'])
+          && data.keys().hasAll(['playerId', 'eventId', 'eventDate', 'eventType', 'decision', 'context', 'byUid'])
+          && data.playerId is string && data.playerId.size() > 0 && data.playerId.size() <= 100
+          && data.eventId is string && data.eventId.size() > 0 && data.eventId.size() <= 100
+          && data.eventDate is string && data.eventDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+          && data.eventType in ['Spiel', 'Training']
+          && data.get('eventTitle', '') is string && data.get('eventTitle', '').size() <= 60
+          && (data.get('minute', null) == null
+            || (data.minute is int && data.minute >= 0 && data.minute <= 150))
+          && data.context is string && data.context.size() > 0 && data.context.size() <= 300
+          && ((data.decision == 'good' && data.get('execution', null) in ['success', 'fail', 'unclear'])
+            || (data.decision in ['poor', 'unclear'] && data.get('execution', null) == null))
+          && data.get('situations', []) is list && data.get('situations', []).size() <= 6
+          && data.get('situations', []).hasOnly(['scanning', 'space', 'pass', 'cover', 'pressing', 'transition'])
+          && data.get('videoUrl', '') is string && data.get('videoUrl', '').size() <= 500
+          && (data.get('videoUrl', '') == '' || data.get('videoUrl', '').matches('^https://[^\\s]+$'))
+          && data.get('by', '') is string && data.get('by', '').size() <= 80
+          && data.get('createdAt', '') is string && data.get('createdAt', '').size() <= 40;
+      }
+
+      match /tacticScenes/{sceneId} {
+        allow read: if isTrainer();
+        allow create: if isTrainer()
+          && validTacticScene(request.resource.data)
+          && request.resource.data.byUid == request.auth.uid
+          && exists(playerPath(request.resource.data.playerId))
+          && exists(/databases/$(database)/documents/teams/$(teamId)/events/$(request.resource.data.eventId));
+        allow update: if false;
+        allow delete: if isTrainer();
+      }
+
       // Altes Einzeldokument aus dem frueheren Single-Blob-Modell. Die App liest oder schreibt es nicht mehr,
       // die Migration in die neue Struktur ist aus der App entfernt (SCRUM-36).
       // Die Regel bleibt nur, damit ein noch vorhandenes Dokument vom Trainer gelesen/geloescht werden kann.

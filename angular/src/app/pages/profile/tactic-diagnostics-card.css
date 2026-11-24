@@ -1,0 +1,237 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.block,
+tk-card {
+  min-width: 0;
+}
+
+.block {
+  display: grid;
+  gap: var(--tk-space-3);
+}
+
+.section-title {
+  margin: var(--tk-space-2) 0 0;
+  font-size: var(--tk-text-lg);
+}
+
+h3 {
+  margin: var(--tk-space-4) 0 var(--tk-space-2);
+  font-size: var(--tk-text-md);
+}
+
+.muted {
+  margin: 0;
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+.hint {
+  margin-top: var(--tk-space-3);
+  line-height: 1.45;
+}
+
+.notice {
+  display: grid;
+  justify-items: start;
+  gap: var(--tk-space-3);
+  padding: var(--tk-space-4);
+  color: var(--tk-red);
+  background: var(--tk-soft-red);
+  border-radius: var(--tk-radius-lg);
+}
+
+.notice p {
+  margin: 0;
+}
+
+.facts {
+  display: grid;
+  gap: var(--tk-space-2);
+  margin: 0 0 var(--tk-space-4);
+}
+
+.facts div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--tk-space-1) var(--tk-space-3);
+}
+
+.facts dt {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+}
+
+.facts dd {
+  margin: 0;
+  font-weight: 600;
+  text-align: right;
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: var(--tk-space-3);
+}
+
+.kpi {
+  display: grid;
+  gap: var(--tk-space-1);
+  padding: var(--tk-space-3) var(--tk-space-4);
+  background: var(--tk-surface-2);
+  border-radius: var(--tk-radius-md);
+  min-width: 0;
+}
+
+.kpi span {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-sm);
+  font-weight: 600;
+}
+
+.kpi strong {
+  font-size: var(--tk-text-lg);
+  overflow-wrap: anywhere;
+}
+
+.kpi[data-reliable='false'] strong {
+  font-size: var(--tk-text-md);
+  font-weight: 600;
+}
+
+.kpi small {
+  color: var(--tk-muted);
+  font-size: var(--tk-text-xs);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--tk-text-sm);
+}
+
+th,
+td {
+  padding: var(--tk-space-2) var(--tk-space-3);
+  text-align: left;
+  vertical-align: top;
+  border-top: 1px solid var(--tk-line);
+}
+
+th {
+  color: var(--tk-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+td[data-reliable='false'] {
+  color: var(--tk-muted);
+}
+
+.fold > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--tk-space-2);
+  min-height: 44px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.fold > summary::-webkit-details-marker {
+  display: none;
+}
+
+.fold > summary::before {
+  content: '▸';
+  color: var(--tk-muted);
+}
+
+.fold[open] > summary::before {
+  content: '▾';
+}
+
+.fold > summary h3 {
+  margin: 0;
+}
+
+.fold > summary:focus-visible {
+  outline: 2px solid var(--tk-primary, currentColor);
+  outline-offset: 2px;
+}
+
+.list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.list li {
+  display: grid;
+  gap: 2px;
+  padding: var(--tk-space-2) 0;
+  border-top: 1px solid var(--tk-line);
+  overflow-wrap: anywhere;
+}
+
+.list a {
+  color: inherit;
+}
+
+.list small {
+  color: var(--tk-muted);
+}
+
+.url {
+  user-select: all;
+}
+
+/* Schmal: jede Tabellenzeile wird zur Karte mit Beschriftung, damit nichts seitlich scrollt. */
+@media (max-width: 560px) {
+  thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  table,
+  tbody,
+  tr,
+  td {
+    display: block;
+  }
+
+  tr {
+    padding: var(--tk-space-2) 0;
+    border-top: 1px solid var(--tk-line);
+  }
+
+  td {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--tk-space-3);
+    padding: 2px var(--tk-space-1);
+    border-top: 0;
+    text-align: right;
+  }
+
+  td::before {
+    content: attr(data-label);
+    color: var(--tk-muted);
+    text-align: left;
+  }
+
+  td:first-child {
+    font-weight: 600;
+  }
+
+  .facts dd {
+    text-align: left;
+  }
+}
