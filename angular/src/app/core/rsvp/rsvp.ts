@@ -105,6 +105,30 @@ export function upcomingRsvpEvents(events: readonly TeamEvent[], today: string, 
     .slice(0, limit);
 }
 
+/** Sonntag der Kalenderwoche (Mo–So), in der `today` liegt; rechnet in UTC, damit Zeitumstellungen nichts verschieben. */
+export function weekEnd(today: string): string {
+  const weekday = new Date(`${today}T00:00:00Z`).getUTCDay() || 7;
+  return addDays(today, 7 - weekday);
+}
+
+/** Anzeige „Nächste Termine“ (SCRUM-401): zuerst die Termine bis Sonntag, die übrigen erst auf Wunsch. */
+export interface RsvpWeekView {
+  /** Immer sichtbar: Termine von heute bis Sonntag; ist die Woche leer, der nächste anstehende Termin. */
+  readonly shown: readonly TeamEvent[];
+  /** Nur auf Wunsch sichtbar: die übrigen anstehenden Termine. */
+  readonly more: readonly TeamEvent[];
+  /** In dieser Woche steht kein Termin mehr an (dann ist `shown` leer oder der nächste Termin einer späteren Woche). */
+  readonly weekEmpty: boolean;
+}
+
+/** Teilt die anstehenden Termine (chronologisch, wie {@link upcomingRsvpEvents}) in „diese Woche“ und „weitere“. */
+export function splitWeekEvents(upcoming: readonly TeamEvent[], today: string): RsvpWeekView {
+  const end = weekEnd(today);
+  const week = upcoming.filter((event) => event.date <= end);
+  if (week.length > 0 || upcoming.length === 0) return { shown: week, more: upcoming.slice(week.length), weekEmpty: false };
+  return { shown: upcoming.slice(0, 1), more: upcoming.slice(1), weekEmpty: true };
+}
+
 /** Kommt ein Termin noch (heute oder später)? Nur dafür zeigt die Eventliste die Zählung. */
 export function isUpcoming(event: TeamEvent, today: string): boolean {
   return !!event.date && event.date >= today;
