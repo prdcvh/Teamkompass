@@ -148,6 +148,23 @@ function seed(): FakeFirebase {
   });
   fake.learning.progress.set('p1', { playerId: 'p1', paths: { lp1: { l1: '2026-10-13', l2: '2026-10-20' }, lp2: { m1: '2026-10-27' } } });
   fake.learning.progress.set('p2', { playerId: 'p2', paths: { lp2: { m1: '2026-10-27', m2: '2026-11-03' } } });
+  // Entwicklungsraster (SCRUM-266): Beobachtungen für p1 an zwei Tagen (relativ zu heute, damit sie im Profilzeitraum
+  // bleiben) und eine Team-Konfiguration mit eingeschaltetem Index. p2 hat keine Beobachtung („nicht erhoben“).
+  const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+  const competenceSample: [string, number, number][] = [
+    ['technique.firstTouch', 3, 20], ['technique.passing', 4, 6], ['tactics.scanning', 2, 20], ['tactics.decision', 3, 6],
+    ['physical.speed', 3, 20], ['physical.endurance', 2, 6], ['psychological.afterMistake', 3, 20], ['psychological.feedback', 4, 6],
+    ['social.communication', 2, 20], ['social.support', 3, 6],
+  ];
+  fake.competence.observations.set('p1', new Map(competenceSample.map(([criterionId, value, ago], index) => [`co${index}`, {
+    playerId: 'p1', framework: 'raster-1', criterionId, value, date: daysAgo(ago), occasion: ago === 6 ? 'match' : 'training', eventId: null,
+    position: ago === 6 ? 'ZM' : null, source: 'trainer', note: '', by: 'Trainer Demo', byUid: 'e2e-trainer', createdAt: `${daysAgo(ago)}T18:00:00.000Z`,
+  }])));
+  fake.competence.configs.set('v1', {
+    version: 1, framework: 'raster-1', domains: ['technique', 'tactics', 'physical', 'psychological', 'social'], weightProfile: 'buildup',
+    weights: { technique: 25, tactics: 25, physical: 15, psychological: 20, social: 15 }, indexEnabled: true,
+    createdAt: `${daysAgo(30)}T10:00:00.000Z`, by: 'Trainer Demo', byUid: 'e2e-trainer',
+  });
   // Scout-Sicht (SCRUM-170) so, wie sie der Trainer-Client aus diesen Daten schreiben würde.
   const players = [...fake.players.players].map(([id, data]) => playerFromDoc(id, data));
   const events = [...fake.events.events].map(([id, data]) => eventFromDoc(id, data));
