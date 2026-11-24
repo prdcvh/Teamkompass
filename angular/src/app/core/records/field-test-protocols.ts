@@ -7,8 +7,8 @@
  * Version des Protokolls; ändert sich der Aufbau, kommt eine neue Version dazu (die alte bleibt im Katalog, damit alte
  * Ergebnisse lesbar bleiben). Ergebnisse verschiedener Versionen oder Messmethoden werden nur mit Warnung verglichen.
  *
- * Bewusst keine Gesamtnote und keine Normwerte: Feldtests beschreiben einzelne Fähigkeiten. z-Werte/Perzentile kommen
- * erst mit SCRUM-264.
+ * Bewusst keine Gesamtnote und keine Normwerte: Feldtests beschreiben einzelne Fähigkeiten. z-Werte/Perzentile im Team
+ * (SCRUM-264) rechnet field-test-reference.ts, nur innerhalb gleicher Protokollversion und Methode.
  *
  * Wertebereiche sind harte Eingabegrenzen (darunter/darüber ist es fast sicher ein Tipp- oder Einheitenfehler) und
  * EIGENE VORSCHLAGSWERTE für U13–U21, keine Leistungsnormen.
