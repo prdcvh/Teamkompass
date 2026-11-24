@@ -30,7 +30,7 @@ const teamPaths = (prefix) => [
   "events/e1", "events/e1/ratings/p1", "events/e1/ratingValues/p1", "events/e1/ratingGrades/p1", "gradeReleases/p1",
   "events/e1/privateNotes/p1", "events/e1/responses/p1",
   "scoutProfiles/p1", "playerStats/p1", "opponents/o1",
-  "meta/lineup", "meta/settings", "meta/planning", "meta/breaks", "meta/operations", "meta/playerStats", "meta/playerView",
+  "meta/lineup", "meta/settings", "meta/planning", "meta/breaks", "meta/operations", "meta/playerStats", "meta/playerView", "meta/measurementPlan",
   `notifications/${prefix}coach`
 ];
 // Was der Vereinsadmin davon im eigenen Verein mitlesen darf (SCRUM-183) - alles andere (Spielerdokument, Gesundheitsdaten,
@@ -61,7 +61,7 @@ async function seedTeam(db, teamId, prefix, { withUid = true } = {}) {
   await setDoc(doc(db, t("playerStats/p1")), { playerId: "p1", version: 1, events: {} });
   await setDoc(doc(db, t("opponents/o1")), { name: "Gegner" });
   await setDoc(doc(db, t("invites/c1")), { role: "player", playerId: "p1", expiresAt: null });
-  for (const name of ["lineup", "settings", "planning", "breaks", "operations", "playerStats"]) await setDoc(doc(db, t(`meta/${name}`)), { x: 1 });
+  for (const name of ["lineup", "settings", "planning", "breaks", "operations", "playerStats", "measurementPlan"]) await setDoc(doc(db, t(`meta/${name}`)), { x: 1 });
   await setDoc(doc(db, t(`notifications/${prefix}coach`)), { emailReminders: true });
 }
 

@@ -1,0 +1,165 @@
+<section class="page">
+  <header class="head">
+    <p class="tk-eyebrow">Mannschaft</p>
+    <h1>Feldtests</h1>
+    <p class="muted">
+      Einen Testtermin für mehrere Spieler eintragen: ein Test, ein Datum und eine Messmethode für alle, dazu je Spieler die einzelnen Versuche. Gespeichert werden
+      die Rohwerte; das Ergebnis bildet die App nach der Regel des Tests. Feldtests beschreiben einzelne Fähigkeiten und ergeben keine Gesamtnote. Nur Trainer sehen
+      diese Seite.
+    </p>
+  </header>
+
+  @if (!isTrainer()) {
+    <p class="muted">Feldtests erfassen nur Trainer.</p>
+  } @else if (squad.load() === 'error') {
+    <div class="notice" role="alert"><p>Der Kader konnte nicht geladen werden. Bitte Verbindung prüfen.</p></div>
+  } @else if (squad.load() !== 'ready') {
+    <p class="muted" role="status">Kader wird geladen …</p>
+  } @else {
+    <form (submit)="save($event)" novalidate>
+      <tk-card>
+        <div class="panel">
+          <h2>Testtermin</h2>
+          <div class="grid">
+            <div class="field wide">
+              <label class="tk-label">
+                Test
+                <select class="tk-input" name="protocol" [attr.aria-invalid]="errors().protocol ? 'true' : null" (change)="chooseProtocol(value($event))">
+                  <option value="" [selected]="!draft().protocolId">Bitte wählen …</option>
+                  @for (entry of protocols; track entry.id) {
+                    <option [value]="entry.id" [selected]="entry.id === draft().protocolId">{{ entry.name }} ({{ entry.category }})</option>
+                  }
+                </select>
+              </label>
+              @if (errors().protocol) { <span class="error" role="alert">{{ errors().protocol }}</span> }
+            </div>
+            <div class="field">
+              <label class="tk-label">
+                Datum
+                <input class="tk-input" type="date" name="date" [min]="minDate" [max]="today" [value]="draft().date" [attr.aria-invalid]="errors().date ? 'true' : null" (input)="patch({ date: value($event) })" />
+              </label>
+              @if (errors().date) { <span class="error" role="alert">{{ errors().date }}</span> }
+            </div>
+            <div class="field">
+              <label class="tk-label">
+                Messmethode
+                <select class="tk-input" name="method" [disabled]="!protocol()" [attr.aria-invalid]="errors().method ? 'true' : null" (change)="patch({ method: value($event) })">
+                  @for (method of methodsOf(protocol()); track method) {
+                    <option [value]="method" [selected]="method === draft().method">{{ methodLabels[method] }}{{ $first ? ' (empfohlen)' : '' }}</option>
+                  }
+                </select>
+              </label>
+              @if (errors().method) { <span class="error" role="alert">{{ errors().method }}</span> }
+            </div>
+            <div class="field">
+              <label class="tk-label">
+                Gemessen von
+                <input class="tk-input" name="tester" autocomplete="off" [attr.maxlength]="testerMax" [value]="draft().tester" [attr.aria-invalid]="errors().tester ? 'true' : null" (input)="patch({ tester: value($event) })" />
+              </label>
+              @if (errors().tester) { <span class="error" role="alert">{{ errors().tester }}</span> }
+            </div>
+            <div class="field">
+              <label class="tk-label">
+                Untergrund
+                <select class="tk-input" name="surface" (change)="patch({ surface: $any(value($event)) })">
+                  <option value="" [selected]="!draft().surface">nicht angegeben</option>
+                  @for (surface of surfaces; track surface[0]) {
+                    <option [value]="surface[0]" [selected]="surface[0] === draft().surface">{{ surface[1] }}</option>
+                  }
+                </select>
+              </label>
+            </div>
+            <div class="field wide">
+              <label class="tk-label">
+                Bedingungen (optional)
+                <input class="tk-input" name="conditions" autocomplete="off" [attr.maxlength]="conditionsMax" placeholder="z. B. trocken, 12 °C, Gegenwind, nach dem Aufwärmen" [value]="draft().conditions" [attr.aria-invalid]="errors().conditions ? 'true' : null" (input)="patch({ conditions: value($event) })" />
+              </label>
+              @if (errors().conditions) { <span class="error" role="alert">{{ errors().conditions }}</span> }
+            </div>
+          </div>
+
+          @if (protocol(); as p) {
+            <div class="protocol" data-testid="protocol">
+              <p class="facts">
+                <span><strong>Einheit:</strong> {{ p.unit }}</span>
+                <span><strong>Richtung:</strong> {{ directionLabels[p.direction] }}</span>
+                <span><strong>Versuche:</strong> {{ p.attempts }}</span>
+                <span><strong>Ergebnis:</strong> {{ ruleText(p) }}</span>
+                <span><strong>Erlaubt:</strong> {{ rangeText(p) }}</span>
+                <span><strong>Protokoll:</strong> Version {{ p.version }}</span>
+              </p>
+              <details>
+                <summary>So wird getestet</summary>
+                <ul>
+                  @for (line of p.setup; track $index) { <li>{{ line }}</li> }
+                </ul>
+              </details>
+            </div>
+          }
+        </div>
+      </tk-card>
+
+      @if (protocol(); as p) {
+        <tk-card>
+          <div class="panel">
+            <h2>Versuche je Spieler</h2>
+            <p class="muted">
+              Werte in {{ p.unit }} eintragen. Fehlversuch (z. B. Fehlstart): „ungültig“ ankreuzen – mit oder ohne Wert; er zählt nicht zum Ergebnis, bleibt aber als
+              Rohwert gespeichert. Wer heute nicht dabei ist, bleibt leer und bekommt kein Ergebnis.
+            </p>
+            @if (allowed().length === 0) {
+              <p class="muted">Kein Spieler im Kader, für den Feldtests gespeichert werden dürfen.</p>
+            }
+            <ul class="players" aria-label="Versuche je Spieler">
+              @for (player of allowed(); track player.id) {
+                <li class="player" [attr.data-player]="player.id">
+                  <a class="name" [routerLink]="['/profile', player.id]">{{ player.name }}</a>
+                  <div class="attempts">
+                    @for (index of slots(); track index) {
+                      <div class="attempt">
+                        <label class="tk-label">
+                          {{ index + 1 }}. Versuch
+                          <input
+                            class="tk-input"
+                            inputmode="decimal"
+                            autocomplete="off"
+                            [name]="'a-' + player.id + '-' + index"
+                            [value]="row(player.id).values[index] ?? ''"
+                            [attr.aria-invalid]="attemptMessage(player.id, index) ? 'true' : null"
+                            (input)="setValue(player.id, index, value($event))"
+                          />
+                        </label>
+                        <label class="invalid">
+                          <input type="checkbox" [name]="'i-' + player.id + '-' + index" [checked]="!!row(player.id).invalid[index]" (change)="toggleInvalid(player.id, index, $any($event.target).checked)" />
+                          ungültig
+                        </label>
+                        @if (attemptMessage(player.id, index)) { <span class="error" role="alert">{{ attemptMessage(player.id, index) }}</span> }
+                      </div>
+                    }
+                  </div>
+                  @if (generalMessage(player.id)) { <span class="error" role="alert">{{ generalMessage(player.id) }}</span> }
+                </li>
+              }
+            </ul>
+            @if (blocked().length > 0) {
+              <p class="muted" data-testid="blocked">
+                Nicht dabei (Einwilligung widerrufen oder nicht dokumentiert, Feldtests werden wie Messwerte behandelt):
+                @for (player of blocked(); track player.id) {
+                  <span>{{ player.name }} ({{ consentLabels[player.consentStatus] }}){{ $last ? '' : ', ' }}</span>
+                }
+              </p>
+            }
+          </div>
+        </tk-card>
+      }
+
+      <div class="actions">
+        <button tkButton variant="primary" type="submit" [disabled]="busy() || !protocol()">{{ busy() ? 'Speichert …' : 'Testtermin speichern (' + filled() + ' Spieler)' }}</button>
+        @if (errors().entries) { <span class="error" role="alert">{{ errors().entries }}</span> }
+      </div>
+      @if (saveError()) { <p class="notice" role="alert">{{ saveError() }}</p> }
+      @if (done()) { <p class="done" role="status">{{ done() }}</p> }
+      @if (playerErrors().size > 0) { <p class="error" role="alert">Bitte die markierten Werte prüfen – gespeichert wurde noch nichts.</p> }
+    </form>
+  }
+</section>

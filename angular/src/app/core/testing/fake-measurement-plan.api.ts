@@ -1,7 +1,7 @@
 import type { MeasurementPlanApi } from '../firebase/measurement-plan.api';
 import type { SnapshotMeta } from '../firebase/types';
 
-/** Ersatz für {@link MeasurementPlanApi} in Tests (Dokument meta/settings mit `measurementPlan`-Map). */
+/** Ersatz für {@link MeasurementPlanApi} in Tests (Dokument meta/measurementPlan mit `measurementPlan`-Map). */
 export class FakeMeasurementPlanApi implements Pick<MeasurementPlanApi, keyof MeasurementPlanApi> {
   constructor(readonly calls: string[] = []) {}
 

@@ -25,6 +25,7 @@ import {
   responseKey,
   rsvpAbsenceRating,
   rsvpEventIds,
+  splitWeekEvents,
   upcomingRsvpEvents,
 } from './rsvp';
 
@@ -58,6 +59,8 @@ export class RsvpService {
   readonly error = signal('');
   /** Termine, auf die Spieler/Eltern antworten können (heute und später, höchstens 10). */
   readonly upcoming = computed<readonly TeamEvent[]>(() => upcomingRsvpEvents(this.events.events(), this.today()));
+  /** Dieselben Termine für die Anzeige: diese Woche sofort, die übrigen auf Wunsch (SCRUM-401). */
+  readonly weekView = computed(() => splitWeekEvents(this.upcoming(), this.today()));
   readonly canAnswer = computed(() => {
     const role = this.session.role();
     return (role === 'player' || role === 'parent') && !!this.session.playerId();
