@@ -13,7 +13,8 @@ import { type Player, consentRevokedMessage } from '../../core/player/player';
 import { RatingScaleService } from '../../core/ratings/rating-scale.service';
 import { PROFILE_REPORT_CSS, profileReportHtml } from '../../core/profile/profile-report';
 import { type Absence, absenceFromDoc } from '../../core/records/absence';
-import { type Measurement, measurementFromDoc } from '../../core/records/measurement';
+import { type FieldTestResult, fieldTestFromDoc, isFieldTestDoc } from '../../core/records/field-test';
+import { type Measurement, growthMeasurementsFromDocs } from '../../core/records/measurement';
 import { type DevelopmentPlan, planFromDoc } from '../../core/records/plan';
 import { SessionService } from '../../core/auth/session.service';
 import { SyncService } from '../../core/shell/sync.service';
@@ -156,6 +157,7 @@ export class Export implements OnInit, OnDestroy {
       plans,
       absences: new Map(players.map((player) => [player.id, history.get(player.id)!.absences])),
       measurements: new Map(players.map((player) => [player.id, history.get(player.id)!.measurements])),
+      fieldTests: new Map(players.map((player) => [player.id, history.get(player.id)!.fieldTests])),
       opponents: this.opponents.opponents(),
     });
     this.files.saveText(exportFileName(now), JSON.stringify(data, null, 2));
@@ -167,7 +169,9 @@ export class Export implements OnInit, OnDestroy {
    * Volle Abwesenheits- und Messhistorie je Spieler, einmalig beim Export gelesen: die Übersichten halten nur das
    * Fenster, das sie brauchen (SCRUM-200).
    */
-  private async readHistory(players: readonly Player[]): Promise<Map<string, { absences: readonly Absence[]; measurements: readonly Measurement[] }>> {
+  private async readHistory(
+    players: readonly Player[],
+  ): Promise<Map<string, { absences: readonly Absence[]; measurements: readonly Measurement[]; fieldTests: readonly FieldTestResult[] }>> {
     const today = todayIso();
     return new Map(
       await Promise.all(
@@ -180,7 +184,8 @@ export class Export implements OnInit, OnDestroy {
             player.id,
             {
               absences: absences.map((doc) => absenceFromDoc(doc.id, doc.data)),
-              measurements: measurements.map((doc) => measurementFromDoc(doc.id, doc.data, today)),
+              measurements: growthMeasurementsFromDocs(measurements, today),
+              fieldTests: measurements.filter((doc) => isFieldTestDoc(doc.data)).map((doc) => fieldTestFromDoc(doc.id, doc.data)),
             },
           ] as const;
         }),
@@ -255,7 +260,7 @@ export class Export implements OnInit, OnDestroy {
       opponents: ids(this.opponents.opponents()),
       developmentPlans: plans,
       absences: new Map(entries.map((entry) => [entry.player.id, ids(history.get(entry.player.id)!.absences)])),
-      measurements: new Map(entries.map((entry) => [entry.player.id, ids(history.get(entry.player.id)!.measurements)])),
+      measurements: new Map(entries.map((entry) => [entry.player.id, ids([...history.get(entry.player.id)!.measurements, ...history.get(entry.player.id)!.fieldTests])])),
     };
   }
 

@@ -18,6 +18,7 @@ import { AbsencesService } from '../../core/records/absences.service';
 import { hasMaturityData } from '../../core/records/maturity';
 import { MaturityService } from '../../core/records/maturity.service';
 import { GrowthReviewsService } from '../../core/records/growth-reviews.service';
+import { FieldTestsService } from '../../core/records/field-tests.service';
 import { MeasurementsService } from '../../core/records/measurements.service';
 import { RecordsStateService } from '../../core/records/records-state.service';
 import { todayIso } from '../../core/shared/dates';
@@ -70,9 +71,9 @@ type Pending = 'grant' | 'status' | 'absences' | 'measurements' | 'maturity' | '
                     <button tkButton size="sm" type="button" class="danger" (click)="ask('absences')">Alle löschen</button>
                   </li>
                 }
-                @if (records.measurementList().length > 0) {
+                @if (measurementCount() > 0) {
                   <li>
-                    <span>{{ records.measurementList().length }} Messwert(e)</span>
+                    <span>{{ measurementLabel() }}</span>
                     <button tkButton size="sm" type="button" class="danger" (click)="ask('measurements')">Alle löschen</button>
                   </li>
                 }
@@ -133,6 +134,7 @@ export class ConsentPanel {
   protected readonly records = inject(RecordsStateService);
   private readonly absences = inject(AbsencesService);
   private readonly measurements = inject(MeasurementsService);
+  private readonly fieldTests = inject(FieldTestsService);
   protected readonly maturity = inject(MaturityService);
   protected readonly reviews = inject(GrowthReviewsService);
   private readonly team = inject(CurrentTeam);
@@ -152,11 +154,17 @@ export class ConsentPanel {
   protected readonly maturityStored = computed(() => this.maturityLoaded() && hasMaturityData(this.maturity.inputs()));
   /** Prüfungen „Wachstum und Belastung“ (SCRUM-257) dieses Spielers geladen (oder nicht ladbar)? */
   protected readonly reviewsLoaded = computed(() => this.reviews.playerId() === this.player().id && ['ready', 'error'].includes(this.reviews.state()));
+  /** Messwerte und Feldtest-Ergebnisse (SCRUM-263) liegen in derselben Sammlung und werden gemeinsam gelöscht. */
+  protected readonly measurementCount = computed(() => this.records.measurementList().length + this.records.fieldTests().length);
+  protected readonly measurementLabel = computed(() => {
+    const tests = this.records.fieldTests().length;
+    return `${this.records.measurementList().length} Messwert(e)${tests > 0 ? ` und ${tests} Feldtest-Ergebnis(se)` : ''}`;
+  });
   protected readonly nothingLeft = computed(
     () =>
       !this.statusStored() &&
       this.records.absences().length === 0 &&
-      this.records.measurementList().length === 0 &&
+      this.measurementCount() === 0 &&
       !this.maturityStored() &&
       this.maturity.state() !== 'error' &&
       this.reviews.reviews().length === 0 &&
@@ -196,7 +204,7 @@ export class ConsentPanel {
       case 'absences':
         return `Alle ${this.records.absences().length} Abwesenheiten/Verletzungen von ${name} werden gelöscht. Das lässt sich nicht rückgängig machen.`;
       case 'measurements':
-        return `Alle ${this.records.measurementList().length} Messwerte von ${name} werden gelöscht. Das lässt sich nicht rückgängig machen.`;
+        return `Alle ${this.measurementLabel()} von ${name} werden gelöscht. Das lässt sich nicht rückgängig machen.`;
       case 'growthReviews':
         return `Alle ${this.reviews.reviews().length} Prüfungen „Wachstum und Belastung“ von ${name} (Datum, Trainer, Maßnahme) werden gelöscht. Die Förderpläne selbst bleiben. Das lässt sich nicht rückgängig machen.`;
       case 'maturity':
@@ -258,6 +266,7 @@ export class ConsentPanel {
     if (kind === 'maturity') return this.maturity.remove(player.id);
     if (kind === 'growthReviews') return this.reviews.removeAll();
     for (const measurement of [...this.records.measurementList()]) if (!(await this.measurements.deleteMeasurement(measurement.id))) return false;
+    for (const result of [...this.records.fieldTests()]) if (!(await this.fieldTests.deleteResult(result.id))) return false;
     return true;
   }
 
