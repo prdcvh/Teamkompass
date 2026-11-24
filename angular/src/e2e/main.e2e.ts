@@ -101,6 +101,11 @@ function seed(): FakeFirebase {
     ['ft1', { kind: 'fieldTest', date: '2026-09-01', sessionId: 's1', protocolId: 'sprint-10', protocolVersion: '1.0', unit: 's', method: 'stopwatch', tester: 'Trainer', surface: 'grass', conditions: '', attempts: [{ n: 1, value: 1.95, valid: true }, { n: 2, value: 1.91, valid: true }], recordedAt: '2026-09-01T18:00:00.000Z', playerId: 'p1' }],
     ['ft2', { kind: 'fieldTest', date: '2026-11-20', sessionId: 's2', protocolId: 'sprint-10', protocolVersion: '1.0', unit: 's', method: 'light-gate', tester: 'Maximilian Alexander von Hohenzollern-Sigmaringen', surface: 'artificial', conditions: 'trocken, 8 °C, leichter Gegenwind auf der Zielgeraden', attempts: [{ n: 1, value: 1.92, valid: true }, { n: 2, value: 1.85, valid: true }, { n: 3, value: null, valid: false }], recordedAt: '2026-11-20T18:00:00.000Z', playerId: 'p1' }],
     ['ft3', { kind: 'fieldTest', date: '2026-11-20', sessionId: 's2', protocolId: 'cmj', protocolVersion: '1.0', unit: 'cm', method: 'contact-mat', tester: 'Trainer', surface: 'indoor', conditions: '', attempts: [{ n: 1, value: 31.2, valid: true }, { n: 2, value: 30.4, valid: true }, { n: 3, value: 35, valid: false }], recordedAt: '2026-11-20T18:10:00.000Z', playerId: 'p1' }]]));
+  // Vergleich im Team (SCRUM-264): 10-m-Sprint mit Lichtschranke für weitere Spieler, damit Index und Perzentilrang erscheinen.
+  [1.98, 2.04, 1.88, 2.1, 1.95, 2.01, 2.12, 1.93, 2.06, 1.99, 2.2].forEach((value, i) => {
+    const id = `p${i + 2}`;
+    fake.records.playerRecords.set(`${id}/measurements`, new Map([[`ftr${i}`, { kind: 'fieldTest', date: '2026-11-20', sessionId: 's2', protocolId: 'sprint-10', protocolVersion: '1.0', unit: 's', method: 'light-gate', tester: 'Trainer', surface: 'artificial', conditions: '', attempts: [{ n: 1, value, valid: true }], recordedAt: '2026-11-20T18:00:00.000Z', playerId: id }]]));
+  });
   fake.planning.doc = {
     series: {
       s1: { weekday: 2, startTime: '17:30', durationMinutes: 90, location: 'Kunstrasen - heim', locationCoords: null, title: '', trainingFocus: 'Eigener Ballbesitz', intensity: 2, startDate: '2026-10-20', endDate: '2027-03-30' },

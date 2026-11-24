@@ -154,3 +154,7 @@ h3 {
   margin: 0;
   font-size: var(--tk-text-sm);
 }
+
+.ref-title span {
+  margin-left: 0.35em;
+}
