@@ -123,6 +123,9 @@ describe('Bewertungsskala (SCRUM-188)', () => {
       fixture.detectChanges();
       expect(text(root(fixture).querySelector('.header .grade'))).toBe('Ø Stufekann es');
     });
+    // Vergangene Termine sind für Spieler eingeklappt (SCRUM-402).
+    (root(fixture).querySelector('[data-testid="history-toggle"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
     const history = text(root(fixture).querySelector('.history'));
     expect(history).toContain('Stufe kann es');
     expect(history).toContain('Note 2,0');

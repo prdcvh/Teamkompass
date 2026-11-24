@@ -50,6 +50,9 @@ import { PuzzlePanel } from './puzzle-panel';
 import { AlertsPanel } from '../../ui/alerts-panel/alerts-panel';
 import { StreakPanel } from './streak-panel';
 
+/** So viele der neuesten vergangenen Termine zeigt die Spieleransicht nach dem Aufklappen (SCRUM-402). */
+const PAST_PREVIEW = 5;
+
 /**
  * Die eine Ansicht für Spieler, Eltern, Medizin und Scouts (Figma 01c/01d). Sie zeigt nur, was die Firestore-Regeln
  * der Rolle erlauben:
@@ -154,6 +157,15 @@ export class MemberView implements OnInit {
       .filter(({ event, rating }) => countsForStats(event, rating, this.today))
       .map(({ event, rating }) => ({ event, rating: rating!, grade: calculatedGrade(rating!) })),
   );
+  /** Vergangene Termine für Spieler/Eltern: standardmäßig eingeklappt, aufgeklappt zuerst die 5 neuesten (SCRUM-402). */
+  protected readonly pastOpen = signal(false);
+  protected readonly showAllPast = signal(false);
+  protected readonly visibleValueHistory = computed(() => (this.showAllPast() ? this.valueHistory() : this.valueHistory().slice(0, PAST_PREVIEW)));
+  protected readonly hiddenOlder = computed(() => this.valueHistory().length - this.visibleValueHistory().length);
+  protected togglePast(): void {
+    this.pastOpen.update((open) => !open);
+    this.showAllPast.set(false);
+  }
   protected readonly attendanceLabels = ATTENDANCE_LABELS;
   protected readonly history = computed(() => [...this.graded()].reverse());
   protected readonly figures = computed(() => profileFigures(this.items(), this.today));
