@@ -60,17 +60,7 @@
       <tk-alerts-panel />
     }
     @if (player(); as p) {
-      <tk-rsvp-panel />
-      <tk-self-report-panel [player]="p" />
-      <!-- Eigene Serien (SCRUM-194): nur Spieler und Eltern, keine Rangliste. -->
-      <tk-streak-panel [player]="p" />
-      @if (!picks()) {
-        <app-home-ranking [mobile]="mobile()" />
-        <!-- Lernpfad und nächster Schritt (SCRUM-192), nur Spieler und Eltern. -->
-        <tk-learning-panel [player]="p" />
-        <!-- Situationsrätsel mit eigener Wertung (SCRUM-193), nur Spieler und Eltern. -->
-        <tk-puzzle-panel [player]="p" />
-      }
+      <!-- SCRUM-403: Spielerkarte zuerst – wer, Status, Ø Note und Belastungsprotokoll auf einen Blick. -->
       <tk-card>
         <div class="header">
           <span class="number">{{ p.number }}</span>
@@ -97,65 +87,126 @@
         }
       </tk-card>
 
+      @if (member()) {
+        <!-- SCRUM-403: Sprungleiste zu den Bereichen. Knöpfe statt #-Links, weil #-Links wegen der Basis-URL die Seite verlassen. -->
+        <nav class="jump" aria-label="Bereiche der Seite" data-testid="jump-nav">
+          @for (group of groups; track group.id) {
+            <button tkButton size="sm" type="button" (click)="jump(group.id)">{{ group.label }}</button>
+          }
+        </nav>
+
+        <!-- Diese Woche (SCRUM-403): was Spieler und Eltern jede Woche brauchen. -->
+        <section class="group" id="bereich-woche" data-group="woche" aria-labelledby="bereich-woche-titel">
+          <h2 class="group-title" id="bereich-woche-titel">Diese Woche</h2>
+          <tk-rsvp-panel />
+          <tk-self-report-panel [player]="p" />
+          <!-- Eigene Serien (SCRUM-194): nur Spieler und Eltern, keine Rangliste. -->
+          <tk-streak-panel [player]="p" />
+        </section>
+      }
+
       @if (!physio()) {
-        @if (!scout()) {
-          <!-- Noten erst nach Veröffentlichung durch den Trainer (SCRUM-115). -->
-          <p class="release-note" role="status" [attr.data-state]="gradesShown() ? 'on' : 'off'">
-            @if (gradesShown()) {
-              {{ releaseText() }}
-            } @else {
-              Noten erscheinen hier, sobald der Trainer die Bewertung veröffentlicht. Einsätze, Tore, Vorlagen und Anwesenheit sind immer sichtbar.
-            }
-          </p>
-        }
-        <section class="columns">
-          @if (gradesShown()) {
-          <tk-grade-trend-card [graded]="graded()" [scale]="scale()" [today]="today" />
-
-          }
-          <tk-card>
-            @if (gradesShown()) {
-            <h2>Kompetenzprofil</h2>
-            <ul class="bars">
-              @for (skill of skills(); track skill.field) {
-                <li>
-                  <div><strong>{{ skill.label }}</strong><span>{{ gradeLabel(skill.value) }}</span></div>
-                  <div class="bar" role="img" [attr.aria-label]="skill.label + ' ' + gradeLabel(skill.value)"><span [style.width.%]="gradeToPercent(skill.value)"></span></div>
-                </li>
+        <!-- Entwicklung (SCRUM-403): Kennzahlen, Noten, Kompetenzen, Förderpläne. Scout: ohne Gruppenüberschrift. -->
+        <section class="group" id="bereich-entwicklung" data-group="entwicklung" [attr.aria-labelledby]="member() ? 'bereich-entwicklung-titel' : null">
+          @if (member()) {
+            <h2 class="group-title" id="bereich-entwicklung-titel">{{ developmentTitle() }}</h2>
+            <!-- Noten erst nach Veröffentlichung durch den Trainer (SCRUM-115). -->
+            <p class="release-note" role="status" [attr.data-state]="gradesShown() ? 'on' : 'off'">
+              @if (gradesShown()) {
+                {{ releaseText() }}
+              } @else {
+                Noten erscheinen hier, sobald der Trainer die Bewertung veröffentlicht. Einsätze, Tore, Vorlagen und Anwesenheit sind immer sichtbar.
               }
-            </ul>
-            }
-            @if (!scout()) {
-              <!-- Bestätigte Lernpfad-Stufen (SCRUM-192). -->
-              <tk-learning-summary [player]="p" />
-              <h2>Verfügbarkeit</h2>
-              <ul class="bars">
-                @for (row of attendance(); track row.label) {
-                  <li>
-                    <div><strong>{{ row.label }}</strong><span>{{ row.display }}</span></div>
-                    <div class="bar muted-bar" role="img" [attr.aria-label]="row.label + ' ' + row.display"><span [style.width.%]="row.percent"></span></div>
-                  </li>
-                }
-              </ul>
-            }
-          </tk-card>
-        </section>
+            </p>
+          }
 
-        <h2 class="section-title">Übersicht</h2>
-        <section class="cards" aria-label="Übersicht">
-          @for (card of cards(); track card.label) {
-            <article class="stat"><span>{{ card.label }}</span><strong>{{ card.value }}</strong></article>
+          <h2 class="section-title">Übersicht</h2>
+          <section class="cards" aria-label="Übersicht">
+            @for (card of cards(); track card.label) {
+              <article class="stat"><span>{{ card.label }}</span><strong>{{ card.value }}</strong></article>
+            }
+          </section>
+
+          <section class="columns">
+            @if (gradesShown()) {
+              <tk-grade-trend-card [graded]="graded()" [scale]="scale()" [today]="today" />
+            }
+            <tk-card>
+              @if (gradesShown()) {
+                <h2>Kompetenzprofil</h2>
+                <ul class="bars">
+                  @for (skill of skills(); track skill.field) {
+                    <li>
+                      <div><strong>{{ skill.label }}</strong><span>{{ gradeLabel(skill.value) }}</span></div>
+                      <div class="bar" role="img" [attr.aria-label]="skill.label + ' ' + gradeLabel(skill.value)"><span [style.width.%]="gradeToPercent(skill.value)"></span></div>
+                    </li>
+                  }
+                </ul>
+              }
+              @if (member()) {
+                <!-- Bestätigte Lernpfad-Stufen (SCRUM-192). -->
+                <tk-learning-summary [player]="p" />
+                <h2>Verfügbarkeit</h2>
+                <ul class="bars">
+                  @for (row of attendance(); track row.label) {
+                    <li>
+                      <div><strong>{{ row.label }}</strong><span>{{ row.display }}</span></div>
+                      <div class="bar muted-bar" role="img" [attr.aria-label]="row.label + ' ' + row.display"><span [style.width.%]="row.percent"></span></div>
+                    </li>
+                  }
+                </ul>
+              }
+            </tk-card>
+          </section>
+
+          @if (member()) {
+            <!-- Förderpläne mit Selbstreflexion gehören zur Entwicklung (SCRUM-403); Abwesenheiten/Messwerte stehen im Rückblick. -->
+            <tk-profile-extras part="plans" [editable]="false" [healthHidden]="!!p.healthHidden" />
+          } @else {
+            <h2 class="section-title">Events</h2>
+            <tk-card>
+              @if (history().length === 0) {
+                <div class="empty"><p>Es gibt noch keine Bewertungen.</p></div>
+              } @else {
+                <ul class="history">
+                  @for (entry of history(); track entry.event.id) {
+                    <li>
+                      <div>
+                        <strong>{{ entry.event.title }}</strong>
+                        <small>
+                          {{ formatDate(entry.event.date) }} · {{ entry.event.type }}@if (entry.event.goalsFor !== null && entry.event.goalsAgainst !== null) { · {{ entry.event.goalsFor }}:{{ entry.event.goalsAgainst }}} · {{ noteWord(entryScale(entry)) }} {{ entryLabel(entry) }}
+                        </small>
+                      </div>
+                      <span class="badge">{{ entryLabel(entry) }}</span>
+                    </li>
+                  }
+                </ul>
+              }
+            </tk-card>
           }
         </section>
+      }
 
-        <h2 class="section-title">Events</h2>
-        <tk-card>
-          @if (!scout()) {
+      @if (member()) {
+        <!-- Mitmachen (SCRUM-403): freiwillige Angebote. -->
+        <section class="group" id="bereich-mitmachen" data-group="mitmachen" aria-labelledby="bereich-mitmachen-titel">
+          <h2 class="group-title" id="bereich-mitmachen-titel">Mitmachen</h2>
+          <!-- Lernpfad und nächster Schritt (SCRUM-192), nur Spieler und Eltern. -->
+          <tk-learning-panel [player]="p" />
+          <!-- Situationsrätsel mit eigener Wertung (SCRUM-193), nur Spieler und Eltern. -->
+          <tk-puzzle-panel [player]="p" />
+          <app-home-ranking [mobile]="mobile()" />
+        </section>
+
+        <!-- Rückblick (SCRUM-403): selten gebraucht, darum eingeklappt. -->
+        <section class="group" id="bereich-rueckblick" data-group="rueckblick" aria-labelledby="bereich-rueckblick-titel">
+          <h2 class="group-title" id="bereich-rueckblick-titel">Rückblick</h2>
+          <tk-card>
             <!-- Spieler/Eltern: alle vergangenen Termine mit Werten, Note nur wenn veröffentlicht, nie Kommentare (SCRUM-115). -->
             @if (valueHistory().length === 0) {
               <div class="empty"><p>Es gibt noch keine erfassten Termine.</p></div>
             } @else {
-              <!-- SCRUM-402: Für Spieler/Eltern standardmäßig eingeklappt; zuerst die 5 neuesten, dann „Ältere anzeigen“. -->
+              <!-- SCRUM-402: standardmäßig eingeklappt; zuerst die 5 neuesten, dann „Ältere anzeigen“. -->
               <button tkButton size="sm" type="button" class="history-toggle" data-testid="history-toggle" aria-controls="past-events-list" [attr.aria-expanded]="pastOpen()" (click)="togglePast()">
                 @if (pastOpen()) { Vergangene Termine einklappen } @else { Vergangene Termine ({{ valueHistory().length }}) anzeigen }
               </button>
@@ -185,30 +236,23 @@
                 </div>
               }
             }
-          } @else if (history().length === 0) {
-            <div class="empty"><p>Es gibt noch keine Bewertungen.</p></div>
-          } @else {
-            <ul class="history">
-              @for (entry of history(); track entry.event.id) {
-                <li>
-                  <div>
-                    <strong>{{ entry.event.title }}</strong>
-                    <small>
-                      {{ formatDate(entry.event.date) }} · {{ entry.event.type }}@if (entry.event.goalsFor !== null && entry.event.goalsAgainst !== null) { · {{ entry.event.goalsFor }}:{{ entry.event.goalsAgainst }}} · {{ noteWord(entryScale(entry)) }} {{ entryLabel(entry) }}
-                    </small>
-                  </div>
-                  <span class="badge">{{ entryLabel(entry) }}</span>
-                </li>
-              }
-            </ul>
-          }
-        </tk-card>
+          </tk-card>
+          <!-- Anstrengung und Befinden (SCRUM-138): die eigenen Angaben; eingeklappt (SCRUM-403), bleiben aber geladen. -->
+          <details class="fold" data-testid="fold-self-reports">
+            <summary>{{ historyHeading() }}</summary>
+            <tk-self-report-history [compare]="false" [heading]="historyHeading()" />
+          </details>
+          <details class="fold" data-testid="fold-health">
+            <summary>Abwesenheiten und Messwerte</summary>
+            <tk-profile-extras part="health" [editable]="false" [healthHidden]="!!p.healthHidden" />
+          </details>
+        </section>
       }
 
-      @if (!scout()) {
-        <!-- Anstrengung und Befinden (SCRUM-138): Spieler/Eltern die eigenen Angaben, Medizin mit Trainerwert und Hinweisen. -->
-        <tk-self-report-history [compare]="physio()" [heading]="historyHeading()" />
-        <tk-profile-extras [editable]="false" [showPlans]="!physio()" [healthHidden]="!!p.healthHidden" />
+      @if (physio()) {
+        <!-- Medizin: Anstrengung und Befinden mit Trainerwert und Hinweisen, Abwesenheiten und Messwerte – offen wie bisher. -->
+        <tk-self-report-history [compare]="true" [heading]="historyHeading()" />
+        <tk-profile-extras [editable]="false" [showPlans]="false" [healthHidden]="!!p.healthHidden" />
       }
     }
   }

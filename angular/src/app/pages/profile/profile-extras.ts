@@ -58,9 +58,22 @@ export class ProfileExtras {
    * dann nicht anlegen oder ändern (die Regeln sperren es), nur löschen. Leer = keine Sperre.
    */
   readonly healthLocked = input('');
+  /**
+   * Welcher Teil gezeigt wird (SCRUM-403): `all` wie bisher; die Spieleransicht zeigt `plans` (Förderpläne) bei
+   * „Meine Entwicklung“ und `health` (Abwesenheiten, Messwerte) eingeklappt im „Rückblick“.
+   */
+  readonly part = input<'all' | 'plans' | 'health'>('all');
   /** Spieler/Eltern bei widerrufener Einwilligung: Abwesenheiten und Messwerte sind ausgeblendet (SCRUM-245). */
   readonly healthHidden = input(false);
 
+  protected readonly plansShown = computed(() => this.showPlans() && this.part() !== 'health');
+  protected readonly healthShown = computed(() => this.part() !== 'plans');
+  protected readonly loadingText = computed(() => {
+    const part = this.part();
+    if (part === 'plans') return 'Förderpläne werden geladen …';
+    if (part === 'health' || !this.showPlans()) return 'Abwesenheiten und Messwerte werden geladen …';
+    return 'Förderpläne, Abwesenheiten und Messwerte werden geladen …';
+  });
   protected readonly plans = computed(() => [...this.records.plans()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
   protected readonly absences = computed(() => [...this.records.absences()].sort((a, b) => b.from.localeCompare(a.from)));
   protected readonly measurementsNewestFirst = computed(() => [...this.measurementsService.measurements()].reverse());
