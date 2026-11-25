@@ -25,8 +25,12 @@ test('ein Run per /jira-run wird erkannt und mit dem Abschlussbericht beendet', 
   await $.turn.complete({ ...ANSWER, answer: 'SCRUM-42 ist in Überprüfung' })
   expect(statuses).toEqual(['Run läuft'])
 
+  // Eine beiläufige Erwähnung im Plan beendet den Run nicht.
+  await $.turn.complete({ ...ANSWER, answer: 'Plan: erst SCRUM-42, dann den Abschlussbericht schreiben.' })
+  expect(statuses).toEqual(['Run läuft'])
+
   // Der Abschlussbericht der Hauptsitzung beendet den Run.
-  await $.turn.complete({ ...ANSWER, answer: 'Abschlussbericht: alles fertig' })
+  await $.turn.complete({ ...ANSWER, answer: 'Fertig.\n\n## Abschlussbericht\nalles erledigt' })
   expect(statuses).toEqual(['Run läuft', undefined])
 })
 
@@ -42,7 +46,7 @@ test('die Nachtschicht wird am geplanten Prompt erkannt', async ($, on) => {
   on('prompt.submit', (_, e) => ({ text: e.text }))
   await $.session.start(SESSION)
 
-  await $.prompt.submit({ text: 'Du bist die TeamKompass Nachtschicht ...', origin: { kind: 'composer' }, wait: false })
+  await $.prompt.submit({ text: 'Nachtschicht für die TeamKompass-App: arbeite Tickets aus dem aktiven Jira-Sprint ab.', origin: { kind: 'composer' }, wait: false })
   expect(statuses).toEqual(['Run läuft'])
 })
 
