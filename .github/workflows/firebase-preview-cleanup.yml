@@ -11,7 +11,7 @@
 # werden gleich behandelt.
 #
 # Sicherheit (wie SCRUM-57): Hier laeuft kein Code aus dem PR. Ausgecheckt wird nur der Standard-Branch (fuer
-# firebase.json/.firebaserc), es gibt kein npm install aus dem Repo; firebase-tools ist fest gepinnt.
+# firebase.json/.firebaserc), npm ci --ignore-scripts nur fuer tests/rules (Lockfile); firebase-tools ist dort fest gepinnt (SCRUM-229).
 
 name: Clean up Firebase preview channels
 on:
@@ -31,7 +31,7 @@ jobs:
     env:
       SITES: teamkompass-b8aac teamkompass-u14 teamkompass-u15 teamkompass-u17
       PROJECT: teamkompass-b8aac
-      FIREBASE_TOOLS: firebase-tools@15.32.1
+      FIREBASE: tests/rules/node_modules/.bin/firebase # SCRUM-229 lokale, gelockte CLI (wie Rules-Deploy)
     steps:
       - uses: actions/checkout@v7
         with:
@@ -42,6 +42,10 @@ jobs:
           node-version: 22
           # SCRUM-165: Angular CLI 22 braucht Node >= 22.22.3 – immer das neueste 22.x holen, nicht ein älteres aus dem Runner-Cache.
           check-latest: true
+      # SCRUM-229: Firebase-CLI aus tests/rules (exakt gepinnt + package-lock.json mit Hashes), ohne Install-Skripte und
+      # vor dem Schreiben des Schluessels - gleiche Version wie im Rules-Deploy, kein npx.
+      - name: Gepinnte Firebase-CLI installieren (ohne Install-Skripte)
+        run: npm ci --ignore-scripts --prefix tests/rules
       - name: Service-Account bereitstellen
         env:
           SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TEAMKOMPASS_B8AAC }}
@@ -56,7 +60,7 @@ jobs:
           set -euo pipefail
           deleted=0
           for SITE in $SITES; do
-            npx --yes "$FIREBASE_TOOLS" hosting:channel:list --site "$SITE" --project "$PROJECT" --json > "$RUNNER_TEMP/channels.json"
+            "$FIREBASE" hosting:channel:list --site "$SITE" --project "$PROJECT" --json > "$RUNNER_TEMP/channels.json"
             # Kanal-IDs der PR-Vorschauen haben die Form pr<Nummer>-<Branch> (FirebaseExtended/action-hosting-deploy).
             node -e '
               const out = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
@@ -75,7 +79,7 @@ jobs:
                 [ "$state" != "OPEN" ] || { echo "behalte $SITE/$channel (PR #$number ist offen)"; continue; }
               fi
               echo "loesche $SITE/$channel"
-              npx --yes "$FIREBASE_TOOLS" hosting:channel:delete "$channel" --site "$SITE" --project "$PROJECT" --force < /dev/null
+              "$FIREBASE" hosting:channel:delete "$channel" --site "$SITE" --project "$PROJECT" --force < /dev/null
               deleted=$((deleted + 1))
             done 3< "$RUNNER_TEMP/pr-channels.txt"
           done
