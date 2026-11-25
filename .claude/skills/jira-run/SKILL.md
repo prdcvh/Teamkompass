@@ -58,16 +58,18 @@ lassen sich nicht sicher aus Tool-Aufrufen ablesen, deshalb meldest du sie
   `passed: false` zeigt den Hinweis „Nacharbeit nötig“.
 - **Phase:** `mcp__jira-run-mod__run_phase` mit `{ phase: "report" }`, bevor du
   den Abschlussbericht schreibst (optional `{ phase: "plan" }` beim Planen).
+
 **Freigabe-Leiste (SCRUM-241).** Nach dem Abschlussbericht zeigt der Mod über
 dem Eingabefeld eine Leiste mit den PRs, die deine Kontrolle bestanden haben
 und in Jira auf „Genehmigt“ des PO warten (Ticket „In Überprüfung“, kein
-Draft, CI nicht rot, `run_check` nicht mit `passed: false` beendet). Getrennt
+Draft, CI nicht rot, Kontrolle mit `run_check` und `passed: true` gemeldet). Getrennt
 und mit Grund markiert stehen Drafts und Fragen, die eine Entscheidung des PO
 brauchen. Jeder Eintrag hat einen Link „In Jira öffnen“; „Später“ blendet die
 Leiste aus, ein neuer Run oder ein Merge entfernt sie. Die Leiste merged nie
 und schickt nichts in den Chat. Damit sie stimmt, melde die Kontrolle jedes
-PRs mit `run_check` (`passed: true`/`false`) und schreibe den Abschlussbericht
+PRs mit `run_check` (`passed: true`/`false`; ohne Meldung erscheint der PR nicht in der Leiste) und schreibe den Abschlussbericht
 wie bisher mit der Überschrift „Abschlussbericht“.
+
 Die frühere Phase „wartet auf Merge-Antwort“ gibt es nicht mehr: seit dem
 23.11. gibt der PO in Jira mit „Genehmigt“ frei, am Ende steht keine Merge-Frage.
 

@@ -137,7 +137,7 @@ export function approvalOf(run: RunState | null): Approval {
   for (const t of run?.tickets ?? []) {
     const reason = waitingForPo(t)
     if (reason !== null) decide.push({ ticket: t, reason })
-    else if (t.status === 'In Überprüfung' && t.pr !== null && t.ci !== 'rot' && t.checkPassed !== false) ready.push(t)
+    else if (t.status === 'In Überprüfung' && t.pr !== null && t.ci !== 'rot' && t.checkPassed === true) ready.push(t)
   }
 
   return { ready, decide }

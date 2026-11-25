@@ -69,6 +69,7 @@ async function finishedRun($: any) {
   await ticket($, 'SCRUM-175', { passed: true })
   await ticket($, 'SCRUM-180', { passed: false })
   await ticket($, 'SCRUM-190', { draft: true })
+  await ticket($, 'SCRUM-200')
   await $.turn.complete({ ...FINAL, answer: '## Abschlussbericht\nfertig' })
 }
 
@@ -90,8 +91,9 @@ test('nach dem Abschlussbericht: nur bestandene PRs, Drafts getrennt markiert, K
   expect(text).toMatch(/2 PRs warten auf deine Freigabe in Jira/)
   expect(text).toMatch(/#236 \(SCRUM-171\)/)
   expect(text).toMatch(/#237 \(SCRUM-175\)/)
-  // Kontrolle nicht bestanden: nicht in der Liste
+  // Kontrolle nicht bestanden oder nicht gemeldet: nicht in der Liste
   expect(text).not.toMatch(/SCRUM-180/)
+  expect(text).not.toMatch(/SCRUM-200/)
   // Draft: eigener Abschnitt mit Grund, nicht unter den freigabebereiten
   expect(text).toMatch(/Wartet auf deine Entscheidung/)
   expect(text).toMatch(/\(SCRUM-190, Draft\): neues Hosting-Ziel/)
