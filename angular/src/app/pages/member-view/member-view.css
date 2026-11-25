@@ -65,3 +65,67 @@
 .history-more {
   margin-top: var(--tk-space-3);
 }
+
+/* Bereiche der Spieleransicht (SCRUM-403): Diese Woche, Entwicklung, Mitmachen, Rückblick. */
+.group {
+  display: grid;
+  gap: var(--tk-space-4);
+  min-width: 0;
+  scroll-margin-top: var(--tk-space-4);
+}
+.group-title {
+  margin: var(--tk-space-3) 0 0;
+  padding-bottom: var(--tk-space-2);
+  border-bottom: 1px solid var(--tk-line);
+  color: var(--tk-red);
+  font-size: var(--tk-text-sm);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.group-title:focus {
+  outline: none;
+}
+.group .release-note {
+  margin: 0;
+}
+
+/* Sprungleiste: bricht auf dem Handy um, kein seitliches Scrollen. */
+.jump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tk-space-2);
+}
+
+/* Eingeklappte Bereiche im Rückblick: wie eine Karte, Tippfläche >= 44 px (Muster aus SCRUM-226). */
+.group > .fold {
+  min-width: 0;
+  padding: 0 var(--tk-space-4);
+  background: var(--tk-surface);
+  border: 1px solid var(--tk-line);
+  border-radius: var(--tk-radius-lg);
+}
+.group > .fold > summary {
+  font-weight: 600;
+}
+.group > .fold[open] {
+  padding-bottom: var(--tk-space-4);
+}
+
+/* Handy (SCRUM-403): Spielerkarte zweispaltig, Ø Note in eigener Zeile; Notenverlauf und Kompetenzprofil untereinander
+   (wie profile-mobile.css der Trainer-Profilseite, ohne deren Seitenabstände für die Navigation). */
+@media (max-width: 720px) {
+  .header {
+    grid-template-columns: auto 1fr;
+  }
+  .grade {
+    grid-column: 1 / -1;
+    justify-items: start;
+  }
+  .grade strong {
+    font-size: 24px;
+  }
+  .columns {
+    grid-template-columns: 1fr;
+  }
+}

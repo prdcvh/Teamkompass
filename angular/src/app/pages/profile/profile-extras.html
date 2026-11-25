@@ -2,14 +2,17 @@
   <p class="consent-warning" role="alert">{{ consentWarning() }}</p>
 }
 @if (records.error()) {
+  <!-- Teilansicht „health“ (SCRUM-403): Fehler meldet bereits die Teilansicht „plans“ darüber. -->
+  @if (part() !== 'health') {
   <div class="notice" role="alert">
     <p>{{ records.error() }}</p>
     <button tkButton type="button" (click)="records.retry()">Erneut versuchen</button>
   </div>
+  }
 } @else if (!records.ready()) {
-  <p class="muted" role="status">Förderpläne, Abwesenheiten und Messwerte werden geladen …</p>
+  <p class="muted" role="status">{{ loadingText() }}</p>
 } @else {
-  @if (showPlans()) {
+  @if (plansShown()) {
   <section class="block" aria-labelledby="plans-title">
     <div class="block-head">
       <h2 id="plans-title">Förderpläne</h2>
@@ -61,6 +64,7 @@
   </section>
   }
 
+  @if (healthShown()) {
   @if (healthHidden()) {
   <p class="muted health-hidden" role="status">{{ hiddenText }}</p>
   } @else {
@@ -181,6 +185,7 @@
 
   <!-- Reife-Kompass (SCRUM-190): nur Trainer und Medizin; die Karte blendet sich für andere Rollen selbst aus. -->
   <tk-maturity-card [editable]="canEdit()" [healthLocked]="healthLocked()" />
+  }
   }
 }
 

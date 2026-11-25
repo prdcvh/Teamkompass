@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { CurrentTeam } from '../../core/team/current-team.service';
 import { formatDate } from '../../core/events/event';
@@ -50,6 +50,17 @@ import { PuzzlePanel } from './puzzle-panel';
 import { AlertsPanel } from '../../ui/alerts-panel/alerts-panel';
 import { StreakPanel } from './streak-panel';
 
+/**
+ * Bereiche der Spieleransicht für Spieler und Eltern (SCRUM-403), in dieser Reihenfolge nach der Spielerkarte:
+ * was jede Woche gebraucht wird zuerst, Selteneres zuletzt und eingeklappt.
+ */
+export const MEMBER_GROUPS = [
+  { id: 'bereich-woche', label: 'Diese Woche' },
+  { id: 'bereich-entwicklung', label: 'Entwicklung' },
+  { id: 'bereich-mitmachen', label: 'Mitmachen' },
+  { id: 'bereich-rueckblick', label: 'Rückblick' },
+] as const;
+
 /** So viele der neuesten vergangenen Termine zeigt die Spieleransicht nach dem Aufklappen (SCRUM-402). */
 const PAST_PREVIEW = 5;
 
@@ -68,15 +79,20 @@ const PAST_PREVIEW = 5;
  * Es gibt keine Navigation zu Trainer-Bereichen; die Trainer-Routen sperrt `trainerGuard`.
  * Spieler-Zugänge ohne E-Mail können sich hier nachträglich mit E-Mail und Passwort verbinden (SCRUM-114).
  * Spieler und Eltern sagen hier für die nächsten Termine zu oder ab (SCRUM-205).
+ * Aufbau für Spieler und Eltern (SCRUM-403): Spielerkarte, dann „Diese Woche“, „(Meine) Entwicklung“, „Mitmachen“ und
+ * „Rückblick“ (vergangene Termine, eigene Angaben, Abwesenheiten/Messwerte – eingeklappt). Medizin und Scout behalten
+ * ihre schlanke Ansicht ohne diese Bereiche.
  */
 @Component({
   selector: 'app-member-view',
   imports: [RouterLink, Button, Card, InstallHint, Status, ProfileExtras, BreakNotice, LoadReportAction, HomeRanking, ConnectEmail, RsvpPanel, SelfReportPanel, SelfReportHistory, LearningPanel, LearningSummary, AlertsPanel, StreakPanel, PuzzlePanel, GradeTrendCard],
   templateUrl: './member-view.html',
-  styleUrls: ['../profile/profile.css', './member-view.css', '../../ui/chart/chart.css'],
+  // SCRUM-403: profile-stats.css fehlte – Kennzahlen, Balken und Terminliste waren in der Spieleransicht ungestaltet.
+  styleUrls: ['../profile/profile.css', '../profile/profile-stats.css', './member-view.css', '../../ui/chart/chart.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MemberView implements OnInit {
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly session = inject(SessionService);
   protected readonly squad = inject(SquadService);
   protected readonly profile = inject(ProfileService);
@@ -97,6 +113,11 @@ export class MemberView implements OnInit {
   protected readonly scout = computed(() => this.role() === 'scout');
   /** Medizin und Scout wählen unter allen Spielern; Spieler und Eltern sehen nur das verknüpfte Profil. */
   protected readonly picks = computed(() => this.physio() || this.scout());
+  /** Spieler und Eltern (nicht Medizin, nicht Scout): bekommen die Bereiche „Diese Woche“ bis „Rückblick“ (SCRUM-403). */
+  protected readonly member = computed(() => !this.picks());
+  /** Bereiche der Spieleransicht in Seitenreihenfolge, für die Sprungleiste (SCRUM-403). */
+  protected readonly groups = MEMBER_GROUPS;
+  protected readonly developmentTitle = computed(() => (this.role() === 'parent' ? 'Entwicklung' : 'Meine Entwicklung'));
   /** Spieler und Eltern sind an ein Profil gebunden; ohne Verknüpfung gibt es nichts zu zeigen. */
   protected readonly unlinked = computed(() => !this.picks() && !this.session.playerId());
 
@@ -273,6 +294,18 @@ export class MemberView implements OnInit {
   protected injury(): string {
     const player = this.player();
     return this.status() === 'Verletzt' && player?.injuryUntil ? ` (ca. bis ${formatDate(player.injuryUntil)})` : '';
+  }
+
+  /** Sprungleiste (SCRUM-403): zum Bereich scrollen und den Fokus auf dessen Überschrift setzen. */
+  protected jump(id: string): void {
+    const target = this.host.nativeElement.querySelector<HTMLElement>(`#${id}`);
+    if (!target) return;
+    target.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+    const heading = target.querySelector<HTMLElement>('.group-title');
+    if (heading) {
+      heading.tabIndex = -1;
+      heading.focus({ preventScroll: true });
+    }
   }
 
   protected choose(event: Event): void {
