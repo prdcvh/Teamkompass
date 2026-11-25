@@ -14,7 +14,7 @@ async function sourceFiles(dir) {
   return Promise.all(names.map(async (name) => ({ name, text: await readFile(new URL(name, base), "utf8") })));
 }
 
-test("firebase.json: Functions aus functions/, Node 22, Quelltext und Tests werden nicht hochgeladen (SCRUM-198)", async () => {
+test("firebase.json: Functions aus functions/, Node 22, ignore schliesst den gebauten Code nicht aus (SCRUM-198)", async () => {
   const config = JSON.parse(await read("firebase.json"));
   assert.equal(config.functions.length, 1);
   const [fn] = config.functions;
