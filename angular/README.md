@@ -125,10 +125,13 @@ Version (5.0.0 bis 5.3.1) zurückfällt.
 
 ## Component-Style-Budget
 
-`anyComponentStyle` warnt ab 6 kB (Fehler ab 8 kB). Die Grenze wurde in SCRUM-82/SCRUM-85
-bewusst von 4 kB auf 6 kB angehoben: Login (~5,4 kB) und Profil (~4,4 kB) sind
+`anyComponentStyle` warnt ab 7 kB (Fehler ab 8 kB). Die Grenze wurde in SCRUM-82/SCRUM-85
+bewusst von 4 kB auf 6 kB und in SCRUM-231 auf 7 kB angehoben (Live-Modus, ~6,5 kB nach dem
+Aufräumen doppelter Regeln: Schrittweite, Spielerkarten, Speicherhinweis, Rückmeldeleiste und
+Zusammenfassung teilen sich eine Datei, weiteres Kürzen ginge nur auf Kosten der Lesbarkeit).
+Grund für die 6 kB: Login (~5,4 kB) und Profil (~4,4 kB) sind
 Seiten mit vielen Zuständen und Mobil-/Desktop-Varianten; das CSS ließ sich ohne Risiko
-für das Erscheinungsbild nicht ohne Weiteres kürzen. Wächst eine Komponente über 6 kB,
+für das Erscheinungsbild nicht ohne Weiteres kürzen. Wächst eine Komponente über 7 kB,
 zuerst gemeinsame Regeln in Tokens/Basis-Komponenten verschieben, bevor das Budget erneut steigt.
 
 ## Wetter, Kleidung, Erinnerung
