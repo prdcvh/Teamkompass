@@ -38,6 +38,10 @@ jobs:
           check-latest: true
       - name: Install Angular dependencies (ohne Install-Skripte)
         run: npm ci --ignore-scripts --prefix angular
+      # SCRUM-198: Cloud Functions (functions/) bauen, linten, testen; Emulator-Test mit der gelockten Firebase-CLI
+      # aus tests/rules (Functions-Emulator braucht kein Java). Kein Secret, Demo-Projekt ohne echte Daten.
+      - name: Install functions and Firebase CLI dependencies (ohne Install-Skripte)
+        run: npm ci --ignore-scripts --prefix functions && npm ci --ignore-scripts --prefix tests/rules
       - name: Verify application
         run: npm run verify
       # Angular-Standard-Build (Testteam U14, kein Live-Team) als Vorschau auf der Site teamkompass-u14.

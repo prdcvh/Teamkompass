@@ -1,0 +1,30 @@
+{
+  "name": "teamkompass-functions",
+  "private": true,
+  "description": "Backend von TeamKompass: Firebase Cloud Functions (2. Generation), Region europe-west3 (SCRUM-198).",
+  "main": "lib/functions/src/index.js",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "build": "node -e \"require('fs').rmSync('functions.yaml',{force:true})\" && tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "node --test test/*.test.mjs",
+    "test:emulator": "cd .. && tests/rules/node_modules/.bin/firebase emulators:exec --only functions --project demo-teamkompass \"node --test functions/test/emulator/*.test.mjs\"",
+    "verify": "npm run lint && npm run build && npm test && npm run test:emulator",
+    "manifest": "node scripts/write-manifest.mjs",
+    "gcp-build": ""
+  },
+  "dependencies": {
+    "firebase-admin": "^14.5.1",
+    "firebase-functions": "^7.4.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.20.7",
+    "eslint": "^10.14.0",
+    "globals": "^17.14.0",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.74.0"
+  }
+}
