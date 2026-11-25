@@ -163,3 +163,29 @@ export function textRows(run: RunState | null): string[] {
 
   return [head, ...(rows.length > 0 ? rows : ['Noch keine Tickets im Run.'])]
 }
+
+/** Toast, wenn ein Sub-Agent fertig ist: "SCRUM-171 fertig – PR #236". */
+export const toastAgentDone = (key: string, pr: number | null) => `${key} fertig${pr !== null ? ` – PR #${pr}` : ''}`
+
+/** Toast, wenn ein Ticket in Jira verschoben wird: "SCRUM-171 → In Überprüfung". */
+export const toastMoved = (key: string, status: string) => `${key} → ${status}`
+
+/** Toast, wenn eine Kontrolle nicht bestanden ist. */
+export const toastRework = (key: string) => `${key}: Nacharbeit nötig`
+
+/**
+ * Die Statuszeile ("Run: Plan", "Run: 2/3 Agenten aktiv", "Run: Kontrolle SCRUM-171", "Run: Merge SCRUM-171",
+ * "Run: Abschlussbericht"); ohne laufenden Run undefined, also leer.
+ */
+export function statusLine(run: RunState | null): string | undefined {
+  if (run === null) return undefined
+  const phase = run.phase ?? null
+  if (phase?.kind === 'check') return `Run: Kontrolle ${phase.key}`
+  if (phase?.kind === 'merge') return `Run: Merge ${phase.key}`
+  if (phase?.kind === 'report') return 'Run: Abschlussbericht'
+  const busy = summarize(run).slotsBusy
+  if (busy > 0) return `Run: ${busy}/${SLOTS} Agenten aktiv`
+  if (phase?.kind === 'plan' || !run.tickets.some(t => t.agentId !== null)) return 'Run: Plan'
+
+  return 'Run: läuft'
+}

@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { RunSource, RunState, RunTicket } from '../types'
+import type { RunPhase, RunSource, RunState, RunTicket } from '../types'
 import { isFinalReport, primaryTicketKey, runSourceOfPrompt } from './detect'
 import {
   SIZE_TOKENS,
@@ -14,7 +14,11 @@ import {
   patchTicket,
   poReasonOf,
   prNumberOf,
+  statusLine,
   statusOfTransition,
+  toastAgentDone,
+  toastMoved,
+  toastRework,
   textRows,
   ticketOfAgent,
   ticketOfPr,
@@ -29,6 +33,9 @@ export const PANE = 'run-status'
 const PANE_TITLE = 'Run-Status'
 /** Das Werkzeug, mit dem die Hauptsitzung den Nachtplan meldet (siehe `.claude/skills/jira-run/SKILL.md`). */
 export const PLAN_TOOL = 'mcp__jira-run-mod__run_plan'
+/** Phase der Hauptsitzung (Plan, Abschlussbericht) und Kontrolle eines Tickets (Beginn/Ergebnis), siehe SKILL.md. */
+export const PHASE_TOOL = 'mcp__jira-run-mod__run_phase'
+export const CHECK_TOOL = 'mcp__jira-run-mod__run_check'
 
 type PlanEntry = { key?: string; size?: 'S' | 'M' | 'L'; estimateTokens?: number; model?: string; reason?: string }
 
@@ -36,6 +43,28 @@ type PlanEntry = { key?: string; size?: 'S' | 'M' | 'L'; estimateTokens?: number
 async function change($: EngineInterface, fn: (r: RunState, now: number) => RunState) {
   const now = await $.clock.now()
   await update($, run, r => (r === null ? r : fn(r, now)))
+  await refreshStatus($)
+}
+
+/** Die Statuszeile folgt dem Run-Zustand; ohne Run ist sie leer. */
+async function refreshStatus($: EngineInterface) {
+  $.ui.status(statusLine(await read($, run)))
+}
+
+const setPhase = (phase: RunPhase | null) => (r: RunState, now: number): RunState => ({ ...r, phase, updatedAt: now })
+
+/** Die Kontrolle eines Tickets beginnt (passed fehlt) oder ist zu Ende (passed true/false). */
+async function applyCheck($: EngineInterface, key: string, passed: boolean | undefined): Promise<string> {
+  if ((await read($, run)) === null) await start($, 'jira-run')
+  if (passed === undefined) {
+    await change($, setPhase({ kind: 'check', key }))
+
+    return `Kontrolle ${key} läuft.`
+  }
+  await change($, setPhase(null))
+  if (!passed) $.ui.toast(toastRework(key))
+
+  return passed ? `Kontrolle ${key} bestanden.` : `Kontrolle ${key} nicht bestanden: Nacharbeit nötig.`
 }
 
 async function openPane($: EngineInterface): Promise<boolean> {
@@ -49,7 +78,7 @@ async function start($: EngineInterface, source: RunSource) {
   const startedAt = await $.clock.now()
   // Ein neuer Run beginnt immer mit leerer Tabelle.
   await update($, run, () => ({ source, startedAt, updatedAt: startedAt, tickets: [] }))
-  $.ui.status('Run läuft')
+  await refreshStatus($)
   // Ohne Fläche für das Panel bleiben die Zeilen im Chat (Schritt 5 des Skills) der Rückfall.
   if (!(await openPane($))) $.ui.toast('Run-Status: kein Platz für das Panel, die Zeilen im Chat gelten.')
 }
@@ -79,7 +108,9 @@ async function onJira($: EngineInterface, op: string, args: Record<string, unkno
   if (op === 'transitionJiraIssue' && key !== null) {
     // Die Antwort nennt den Status, in dem das Ticket gelandet ist; sonst gilt die gewählte Transition.
     const status = landedStatus(result) ?? statusOfTransition(args)
-    if (status !== null) await change($, (r, now) => patchTicket(r, key, { status }, now))
+    if (status === null) return
+    await change($, (r, now) => patchTicket(r, key, { status }, now))
+    $.ui.toast(toastMoved(key, status))
   }
 }
 
@@ -136,7 +167,10 @@ async function tokensOf($: EngineInterface, agentId: string): Promise<number> {
 
 async function agentFinished($: EngineInterface, agentId: string) {
   const current = await read($, run)
-  if (current === null || ticketOfAgent(current, agentId) === undefined) return
+  const before = current === null ? undefined : ticketOfAgent(current, agentId)
+  if (before === undefined) return
+  // agent.report und turn.complete melden denselben Agenten: nur das erste Mal gibt einen Hinweis.
+  if (!before.agentDone) $.ui.toast(toastAgentDone(before.key, before.pr))
   const tokensActual = await tokensOf($, agentId)
   await change($, (r, now) => {
     const t = ticketOfAgent(r, agentId)
@@ -180,6 +214,32 @@ export const register: Register = on => {
       isDeferred: false,
     })
 
+    await $.tool.register({
+      name: 'run_phase',
+      description:
+        'Meldet die Phase der Hauptsitzung an die Statuszeile: "plan" (Nachtplan wird erstellt) oder "report" (Abschlussbericht wird geschrieben). Kontrolle und Merge laufen über run_check bzw. werden am Merge erkannt.',
+      inputSchema: {
+        type: 'object',
+        properties: { phase: { type: 'string', enum: ['plan', 'report'] } },
+        required: ['phase'],
+      },
+      isDeferred: false,
+    })
+    await $.tool.register({
+      name: 'run_check',
+      description:
+        'Meldet die Kontrolle eines Tickets: ohne "passed" zu Beginn (Statuszeile "Run: Kontrolle SCRUM-xxx"), am Ende mit "passed" true/false; false zeigt den Hinweis "Nacharbeit nötig".',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          key: { type: 'string', description: 'Jira-Schlüssel, z. B. SCRUM-171' },
+          passed: { type: 'boolean', description: 'Ergebnis; weglassen, wenn die Kontrolle beginnt' },
+        },
+        required: ['key'],
+      },
+      isDeferred: false,
+    })
+
     return next(e)
   })
 
@@ -213,10 +273,29 @@ export const register: Register = on => {
 
       return { result: await applyPlan($, Array.isArray(tickets) ? (tickets as PlanEntry[]) : []) }
     }
+    if (e.tool === PHASE_TOOL) {
+      const phase = (e as { phase?: unknown }).phase
+      if (phase !== 'plan' && phase !== 'report') return { result: 'Unbekannte Phase (plan oder report).' }
+      if ((await read($, run)) === null) await start($, 'jira-run')
+      await change($, setPhase({ kind: phase }))
+
+      return { result: `Phase gemeldet: ${phase}.` }
+    }
+    if (e.tool === CHECK_TOOL) {
+      const { key, passed } = e as { key?: unknown; passed?: unknown }
+      if (typeof key !== 'string' || !/^SCRUM-\d+$/.test(key)) return { result: 'Ungültiger Ticket-Schlüssel.' }
+
+      return { result: await applyCheck($, key, typeof passed === 'boolean' ? passed : undefined) }
+    }
     const call = jiraCall(e as Record<string, unknown>)
     if (call === null || (await read($, run)) === null) return next(e)
 
+    // Beim Mergen genehmigter PRs zeigt die Statuszeile "Run: Merge SCRUM-xxx".
+    const merging = call.op === 'merge_pull_request' && typeof call.args.pullNumber === 'number' ? call.args.pullNumber : null
+    const mergeKey = merging === null ? undefined : ticketOfPr((await read($, run))!, merging)?.key
+    if (mergeKey !== undefined) await change($, setPhase({ kind: 'merge', key: mergeKey }))
     const ran = await next(e)
+    if (mergeKey !== undefined) await change($, setPhase(null))
     if (ran.deny !== undefined || ran.isError === true) return ran
     const result = asText(ran.result)
     await onJira($, call.op, call.args, result)
@@ -263,7 +342,7 @@ export const register: Register = on => {
       const endedAt = await $.clock.now()
       await update($, lastRun, () => ({ ...current, endedAt, updatedAt: endedAt }))
       await update($, run, () => null)
-      $.ui.status(undefined)
+      await refreshStatus($)
     }
 
     return next(e)
