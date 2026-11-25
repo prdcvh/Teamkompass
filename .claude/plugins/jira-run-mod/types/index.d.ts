@@ -36,6 +36,21 @@ export type RunTicket = {
   ci: 'läuft' | 'grün' | 'rot' | null
   /** Bisher verbrauchte Tokens des Sub-Agenten (Eingabe + Ausgabe). */
   tokensActual: number
+  /** Größe aus dem Nachtplan (SCRUM-243); fehlt, wenn nur eine Token-Zahl gemeldet wurde. */
+  size?: 'S' | 'M' | 'L'
+  /** Tokens früherer Sub-Agenten desselben Tickets (Nacharbeit); `tokensActual` = dies + aktueller Agent. */
+  tokensBase?: number
+}
+
+/** Verbrauch eines abgeschlossenen Tickets (SCRUM-243). Nur Zahlen und Schlüssel, nichts Persönliches. */
+export type StatEntry = {
+  key: string
+  size: 'S' | 'M' | 'L'
+  model: string
+  estimateTokens: number
+  actualTokens: number
+  /** Datum des Runs, JJJJ-MM-TT (UTC). */
+  date: string
 }
 
 /**
