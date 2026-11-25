@@ -38,6 +38,18 @@ export type RunTicket = {
   tokensActual: number
 }
 
+/**
+ * Aktuelle Phase der Hauptsitzung für die Statuszeile (SCRUM-242); null = keine besondere
+ * Phase (die Zeile ergibt sich dann aus Plan bzw. den aktiven Agenten).
+ * `check`: Kontrolle eines Tickets (Werkzeug `run_check`), `merge`: Merge eines genehmigten PRs
+ * (aus `merge_pull_request`), `plan`/`report`: Nachtplan bzw. Abschlussbericht (Werkzeug `run_phase`).
+ */
+export type RunPhase =
+  | { kind: 'plan' }
+  | { kind: 'report' }
+  | { kind: 'check'; key: string }
+  | { kind: 'merge'; key: string }
+
 export type RunState = {
   source: RunSource
   /** Startzeit, Millisekunden seit 1970. */
@@ -45,6 +57,8 @@ export type RunState = {
   /** Letzte Änderung am Zustand, Millisekunden seit 1970 (Anzeige "Stand HH:MM"). */
   updatedAt: number
   tickets: RunTicket[]
+  /** Phase für die Statuszeile; fehlt oder null = keine besondere. */
+  phase?: RunPhase | null
 }
 
 export type FinishedRun = RunState & { endedAt: number }

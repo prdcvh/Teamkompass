@@ -43,6 +43,24 @@ Das Panel ersetzt die Zeilen im Chat nicht: Schritt 5 bleibt, denn wo keine
 Fläche für ein Panel da ist (`/run-status` gibt dann den Stand als Text aus),
 sind diese Zeilen der Rückfall.
 
+**Hinweise und Statuszeile (SCRUM-242).** Derselbe Mod zeigt kurze Hinweise
+(Toasts, deutsch) bei „SCRUM-171 fertig – PR #236“ (Sub-Agent meldet sich
+zurück), „SCRUM-171 → In Überprüfung“ (Jira-Statuswechsel) und „SCRUM-171:
+Nacharbeit nötig“ (Kontrolle nicht bestanden), dazu eine Statuszeile mit der
+Phase: „Run: Plan“, „Run: 2/3 Agenten aktiv“, „Run: Kontrolle SCRUM-171“,
+„Run: Merge SCRUM-171“, „Run: Abschlussbericht“; ohne Run ist sie leer. Der
+Mod sendet nie eine Push-Nachricht. Agenten, Statuswechsel und Merge erkennt er
+selbst (Merge am Aufruf `merge_pull_request`). Kontrolle und Abschlussbericht
+lassen sich nicht sicher aus Tool-Aufrufen ablesen, deshalb meldest du sie
+(Werkzeuge per ToolSearch laden: `select:mcp__jira-run-mod__run_check,mcp__jira-run-mod__run_phase`):
+- **Kontrolle:** `mcp__jira-run-mod__run_check` mit `{ key }` zu Beginn der
+  Kontrolle eines fertigen PRs, und mit `{ key, passed: true|false }` am Ende.
+  `passed: false` zeigt den Hinweis „Nacharbeit nötig“.
+- **Phase:** `mcp__jira-run-mod__run_phase` mit `{ phase: "report" }`, bevor du
+  den Abschlussbericht schreibst (optional `{ phase: "plan" }` beim Planen).
+Die frühere Phase „wartet auf Merge-Antwort“ gibt es nicht mehr: seit dem
+23.11. gibt der PO in Jira mit „Genehmigt“ frei, am Ende steht keine Merge-Frage.
+
 ## Ablauf
 
 1. **Regeln laden.** Lade per ToolSearch

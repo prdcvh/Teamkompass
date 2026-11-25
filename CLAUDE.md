@@ -191,7 +191,8 @@ keeps the board current, reports at sprint end).
   criteria, the change in `angular/`, test present, verify/CI green, ticket
   comment as required above. If something is off, the sub-agent fixes it
   (via SendMessage, or a new sub-agent given a concrete list of the
-  problems). Only after that check passes is the PR ready; it is merged and
+  problems). The main session reports start and result of each check to the
+  run mod (`run_check`, see `.claude/skills/jira-run/SKILL.md`). Only after that check passes is the PR ready; it is merged and
   the ticket set to `Erledigt` once the PO has set the ticket to `Genehmigt`. Every ticket gets a fresh
   sub-agent; one is never reused for a second ticket.
 - **Parallel tickets (PO, 2026-10-15).** At most 3 sub-agents at once, each
