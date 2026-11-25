@@ -20,8 +20,28 @@ Verbindung zu Jira, und der PO sieht hier direkt, was passiert.
 `.claude/settings.json` in jeder Sitzung geladen. Es erkennt den Start eines
 Runs (dieser Skill oder der Nachtschicht-Prompt) und sein Ende (der
 Abschlussbericht der Hauptsitzung) und hält den Run-Zustand (Tickets, Status,
-Modell, PR, Schätzung) an einer Stelle. Du musst dafür nichts tun; Panel und
-Hinweise kommen mit den Folge-Tickets.
+Modell, PR, Schätzung) an einer Stelle.
+
+**Run-Status-Panel (SCRUM-240).** Das Panel neben dem Chat (Befehl
+`/run-status`, öffnet sich beim Start von selbst) liest den Run-Zustand und
+zeigt Ticketstand, belegte Slots, fertig/offen und Tokens (geplant gegenüber
+bisher). Gepflegt wird es nicht von Hand, sondern aus Tool-Aufrufen:
+Jira-`transitionJiraIssue` (Status), Agent-Start/-Ende (Slot, Modell, Tokens),
+GitHub `create_pull_request` / `update_pull_request` (PR, Draft) und
+`pull_request_read` mit `get_check_runs` (CI). Zwei Dinge musst du dafür tun:
+- **Plan melden:** Direkt nach dem Plan (Schritt 3) einmal das Werkzeug
+  `mcp__jira-run-mod__run_plan` aufrufen (per ToolSearch laden:
+  `select:mcp__jira-run-mod__run_plan`) mit `tickets: [{ key, size: "S"|"M"|"L"
+  oder estimateTokens, model, reason? }]`. Das ist die einzige Quelle für
+  Schätzung und geplantes Modell; bei Planänderungen erneut aufrufen.
+- **Grund für PO-Entscheidung:** Ein Draft-PR, der auf den PO wartet, bekommt
+  in der PR-Beschreibung eine Zeile `PO-Entscheidung: <Grund>`; das Panel
+  markiert das Ticket damit deutlich. Tickets im Status „Frage“ sind ebenfalls
+  markiert.
+
+Das Panel ersetzt die Zeilen im Chat nicht: Schritt 5 bleibt, denn wo keine
+Fläche für ein Panel da ist (`/run-status` gibt dann den Stand als Text aus),
+sind diese Zeilen der Rückfall.
 
 ## Ablauf
 

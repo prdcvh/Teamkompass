@@ -233,6 +233,10 @@ keeps the board current, reports at sprint end).
   PushNotification + the full plan in the chat) and starts work right away
   — the PO does not confirm it; it is for information only. The final
   report compares the plan with what actually happened.
+  Right after writing it, the main session also reports the plan to the
+  run-status panel (SCRUM-240) with the tool `mcp__jira-run-mod__run_plan`
+  (ticket, size or token estimate, model); details in
+  `.claude/skills/jira-run/SKILL.md`.
 - **Manual runs (`/jira-run`) run in the PO's own session (PO,
   2026-10-22).** No new session is fired: the session where the PO typed the
   command is the main session. Plan, ticket moves and the final report go

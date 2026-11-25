@@ -1,29 +1,188 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { RunSource, RunTicket } from '../types'
-import { isFinalReport, runSourceOfPrompt, ticketKeys } from './detect'
+import type { RunSource, RunState, RunTicket } from '../types'
+import { isFinalReport, primaryTicketKey, runSourceOfPrompt } from './detect'
+import {
+  SIZE_TOKENS,
+  asText,
+  berlinTime,
+  ciOfChecks,
+  jiraCall,
+  landedStatus,
+  modelLabel,
+  patchTicket,
+  poReasonOf,
+  prNumberOf,
+  statusOfTransition,
+  textRows,
+  ticketOfAgent,
+  ticketOfPr,
+} from './model'
+import { RunPanel } from './panel'
 
 /** Der Run-Zustand an einer einzigen Stelle; Folge-Tickets lesen und ändern ihn hier. */
 export const run = atom({ plugin: 'jira-run-mod', key: 'run' } as const, null)
 export const lastRun = atom({ plugin: 'jira-run-mod', key: 'lastRun' } as const, null)
 
-const newTicket = (key: string): RunTicket => ({
-  key,
-  status: 'In Bearbeitung',
-  model: null,
-  pr: null,
-  estimateTokens: null,
-})
+export const PANE = 'run-status'
+const PANE_TITLE = 'Run-Status'
+/** Das Werkzeug, mit dem die Hauptsitzung den Nachtplan meldet (siehe `.claude/skills/jira-run/SKILL.md`). */
+export const PLAN_TOOL = 'mcp__jira-run-mod__run_plan'
+
+type PlanEntry = { key?: string; size?: 'S' | 'M' | 'L'; estimateTokens?: number; model?: string; reason?: string }
+
+/** Ändert den laufenden Run (falls einer läuft) und stempelt die Zeit. */
+async function change($: EngineInterface, fn: (r: RunState, now: number) => RunState) {
+  const now = await $.clock.now()
+  await update($, run, r => (r === null ? r : fn(r, now)))
+}
+
+async function openPane($: EngineInterface): Promise<boolean> {
+  const opened = await $.ui.open({ id: PANE, title: PANE_TITLE })
+
+  return opened.isPlaced
+}
 
 async function start($: EngineInterface, source: RunSource) {
   if ((await read($, run)) !== null) return
   const startedAt = await $.clock.now()
-  await update($, run, () => ({ source, startedAt, tickets: [] }))
+  // Ein neuer Run beginnt immer mit leerer Tabelle.
+  await update($, run, () => ({ source, startedAt, updatedAt: startedAt, tickets: [] }))
   $.ui.status('Run läuft')
+  // Ohne Fläche für das Panel bleiben die Zeilen im Chat (Schritt 5 des Skills) der Rückfall.
+  if (!(await openPane($))) $.ui.toast('Run-Status: kein Platz für das Panel, die Zeilen im Chat gelten.')
+}
+
+/** Der Nachtplan: Tickets, Größe/Schätzung, Modell, ggf. Grund für eine PO-Entscheidung. */
+async function applyPlan($: EngineInterface, entries: PlanEntry[]): Promise<string> {
+  if ((await read($, run)) === null) await start($, 'jira-run')
+  let count = 0
+  for (const p of entries) {
+    if (typeof p.key !== 'string' || !/^SCRUM-\d+$/.test(p.key)) continue
+    const key = p.key
+    const patch: Partial<RunTicket> = {}
+    if (typeof p.estimateTokens === 'number') patch.estimateTokens = p.estimateTokens
+    else if (p.size !== undefined && p.size in SIZE_TOKENS) patch.estimateTokens = SIZE_TOKENS[p.size]
+    const label = modelLabel(p.model)
+    if (label !== null) patch.model = label
+    if (typeof p.reason === 'string' && p.reason !== '') patch.reason = p.reason
+    await change($, (r, now) => patchTicket(r, key, patch, now))
+    count++
+  }
+
+  return `Plan übernommen: ${count} Tickets im Run-Status.`
+}
+
+async function onJira($: EngineInterface, op: string, args: Record<string, unknown>, result: string) {
+  const key = typeof args.issueIdOrKey === 'string' ? (/SCRUM-\d+/.exec(args.issueIdOrKey)?.[0] ?? null) : null
+  if (op === 'transitionJiraIssue' && key !== null) {
+    // Die Antwort nennt den Status, in dem das Ticket gelandet ist; sonst gilt die gewählte Transition.
+    const status = landedStatus(result) ?? statusOfTransition(args)
+    if (status !== null) await change($, (r, now) => patchTicket(r, key, { status }, now))
+  }
+}
+
+async function onGithub($: EngineInterface, op: string, args: Record<string, unknown>, result: string) {
+  const body = typeof args.body === 'string' ? args.body : ''
+  if (op === 'create_pull_request') {
+    const text = `${asText(args.title)} ${asText(args.head)}`
+    const key = /SCRUM-\d+/i.exec(text.replace(/scrum[-/](\d+)/gi, 'SCRUM-$1'))?.[0]?.toUpperCase()
+    const pr = prNumberOf(result)
+    if (key === undefined || pr === null) return
+    const reason = poReasonOf(body)
+    await change($, (r, now) =>
+      patchTicket(r, key, { pr, draft: args.draft === true, ...(reason !== null ? { reason } : {}) }, now),
+    )
+  } else if (op === 'update_pull_request' && typeof args.pullNumber === 'number') {
+    const number = args.pullNumber
+    await change($, (r, now) => {
+      const t = ticketOfPr(r, number)
+      if (t === undefined) return r
+      const reason = poReasonOf(body)
+      const patch: Partial<RunTicket> = {}
+      if (typeof args.draft === 'boolean') patch.draft = args.draft
+      if (reason !== null) patch.reason = reason
+      else if (args.draft === false) patch.reason = null
+
+      return patchTicket(r, t.key, patch, now)
+    })
+  } else if (op === 'pull_request_read' && typeof args.pullNumber === 'number') {
+    const number = args.pullNumber
+    if (args.method !== 'get_check_runs' && args.method !== 'get_status') return
+    const ci = ciOfChecks(result)
+    if (ci === null) return
+    await change($, (r, now) => {
+      const t = ticketOfPr(r, number)
+
+      return t === undefined ? r : patchTicket(r, t.key, { ci }, now)
+    })
+  }
+}
+
+/** Bisher verbrauchte Tokens (Eingabe + Ausgabe + geschriebener Cache) eines Sub-Agenten. */
+async function tokensOf($: EngineInterface, agentId: string): Promise<number> {
+  try {
+    const agent = (await $.agent.list()).find(a => a.id === agentId)
+
+    return (agent?.usage ?? []).reduce(
+      (n, u) => n + u.input_tokens + u.output_tokens + u.cache_creation_input_tokens,
+      0,
+    )
+  } catch {
+    return 0
+  }
+}
+
+async function agentFinished($: EngineInterface, agentId: string) {
+  const current = await read($, run)
+  if (current === null || ticketOfAgent(current, agentId) === undefined) return
+  const tokensActual = await tokensOf($, agentId)
+  await change($, (r, now) => {
+    const t = ticketOfAgent(r, agentId)
+
+    return t === undefined
+      ? r
+      : patchTicket(r, t.key, { agentDone: true, tokensActual: Math.max(tokensActual, t.tokensActual) }, now)
+  })
 }
 
 export const register: Register = on => {
+  on('session.start', async ($, e, next) => {
+    await $.command.register({
+      name: 'run-status',
+      description: 'Zeigt den Stand des Runs (Tickets, Slots, Tokens) in einem Panel neben dem Chat',
+    })
+    await $.tool.register({
+      name: 'run_plan',
+      description:
+        'Meldet den Nachtplan an das Run-Status-Panel: je Ticket Schlüssel, Größe (S/M/L) oder Token-Schätzung, Modell und ggf. den Grund, warum der PO entscheiden muss. Einmal nach dem Plan aufrufen, bei Änderungen erneut.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          tickets: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                key: { type: 'string', description: 'Jira-Schlüssel, z. B. SCRUM-240' },
+                size: { type: 'string', enum: ['S', 'M', 'L'] },
+                estimateTokens: { type: 'number' },
+                model: { type: 'string', description: 'Sonnet, Opus oder Haiku' },
+                reason: { type: 'string', description: 'Wofür der PO gebraucht wird' },
+              },
+              required: ['key'],
+            },
+          },
+        },
+        required: ['tickets'],
+      },
+      isDeferred: false,
+    })
+
+    return next(e)
+  })
+
   // Start durch /jira-run: der Skill wird geladen.
   on('skill.prompt', { skill: 'jira-run' }, async ($, e, next) => {
     await start($, 'jira-run')
@@ -39,36 +198,84 @@ export const register: Register = on => {
     return next(e)
   })
 
-  // Jeder Sub-Agent, der während eines Runs ein Ticket bearbeitet, trägt es ein.
-  on('agent.spawn', async ($, e, next) => {
-    if ((await read($, run)) !== null) {
-      const keys = ticketKeys(`${e.description ?? ''} ${e.prompt}`)
-      await update($, run, r =>
-        r === null
-          ? r
-          : {
-              ...r,
-              tickets: [
-                ...r.tickets,
-                ...keys.filter(k => !r.tickets.some(t => t.key === k)).map(newTicket),
-              ],
-            },
-      )
+  on('command.run', { command: 'run-status' }, async $ => {
+    const isPlaced = await openPane($)
+    if (isPlaced) return { text: 'Run-Status geöffnet.' }
+    const state = (await read($, run)) ?? (await read($, lastRun))
+
+    return { text: textRows(state).join('\n') }
+  })
+
+  // Statuswechsel in Jira und PRs auf GitHub: das Panel liest sie aus den Tool-Aufrufen, niemand pflegt es.
+  on('tool.call', async ($, e, next) => {
+    if (e.tool === PLAN_TOOL) {
+      const tickets = (e as { tickets?: unknown }).tickets
+
+      return { result: await applyPlan($, Array.isArray(tickets) ? (tickets as PlanEntry[]) : []) }
     }
+    const call = jiraCall(e as Record<string, unknown>)
+    if (call === null || (await read($, run)) === null) return next(e)
+
+    const ran = await next(e)
+    if (ran.deny !== undefined || ran.isError === true) return ran
+    const result = asText(ran.result)
+    await onJira($, call.op, call.args, result)
+    await onGithub($, call.op, call.args, result)
+
+    return ran
+  })
+
+  // Jeder Sub-Agent, der während eines Runs ein Ticket bearbeitet, belegt einen Platz.
+  on('agent.spawn', async ($, e, next) => {
+    const started = await next(e)
+    const key = primaryTicketKey(e.description, e.prompt)
+    if (started.deny === undefined && key !== null && (await read($, run)) !== null) {
+      const model = modelLabel(e.model) ?? modelLabel(started.model)
+      await change($, (r, now) => {
+        const t = r.tickets.find(x => x.key === key)
+        const status = t === undefined || t.status === 'Zu erledigen' ? 'In Bearbeitung' : t.status
+
+        return patchTicket(
+          r,
+          key,
+          { agentId: started.agentId ?? null, agentDone: false, status, ...(model !== null ? { model } : {}) },
+          now,
+        )
+      })
+    }
+
+    return started
+  })
+
+  // Der Sub-Agent hat sich zurückgemeldet: sein Platz wird frei.
+  on('agent.report', async ($, e, next) => {
+    await agentFinished($, e.agentId)
 
     return next(e)
   })
 
-  // Ende: der Abschlussbericht der Hauptsitzung (nicht die Antwort eines Sub-Agenten).
   on('turn.complete', async ($, e, next) => {
+    if (e.agentId !== undefined) await agentFinished($, e.agentId)
+
+    // Ende: der Abschlussbericht der Hauptsitzung (nicht die Antwort eines Sub-Agenten).
     const current = await read($, run)
     if (current !== null && e.agentId === undefined && isFinalReport(e.answer)) {
       const endedAt = await $.clock.now()
-      await update($, lastRun, () => ({ ...current, endedAt }))
+      await update($, lastRun, () => ({ ...current, endedAt, updatedAt: endedAt }))
       await update($, run, () => null)
       $.ui.status(undefined)
     }
 
     return next(e)
   })
+
+  on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
+    const { Box, Text } = $.ui.resolve(e)
+    const running = await read($, run)
+    const state = running ?? (await read($, lastRun))
+
+    return RunPanel({ Box, Text }, state, running === null)
+  })
 }
+
+export { berlinTime }
