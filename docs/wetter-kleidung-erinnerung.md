@@ -100,5 +100,5 @@ nur die E-Mail-Adresse des Trainers. Es werden keine personenbezogenen Daten von
 
 ## Style-Budget
 
-Komponenten-Styles bleiben unter 6 kB (`anyComponentStyle` in `angular/angular.json`); `npm run verify`
+Komponenten-Styles bleiben unter 7 kB (`anyComponentStyle` in `angular/angular.json`); `npm run verify`
 baut damit und würde eine Überschreitung als Warnung melden (siehe `angular/README.md`).
