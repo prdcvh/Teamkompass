@@ -42,3 +42,15 @@ test("der Skill jira-run erwähnt den Mod", async () => {
   const skill = await readFile(new URL("../.claude/skills/jira-run/SKILL.md", import.meta.url), "utf8");
   assert.match(skill, /jira-run-mod/);
 });
+
+test("SCRUM-240: Run-Status-Panel liegt im Mod, der Skill beschreibt den Plan-Weg", async () => {
+  const register = await readFile(new URL(`../${PLUGIN_DIR}/hooks/register.tsx`, import.meta.url), "utf8");
+  assert.match(register, /name: 'run-status'/);
+  assert.match(register, /component: 'Pane', requestId: PANE/);
+  assert.match(register, /mcp__jira-run-mod__run_plan/);
+  const skill = await readFile(new URL("../.claude/skills/jira-run/SKILL.md", import.meta.url), "utf8");
+  assert.match(skill, /mcp__jira-run-mod__run_plan/);
+  assert.match(skill, /PO-Entscheidung:/);
+  const claude = await readFile(new URL("../CLAUDE.md", import.meta.url), "utf8");
+  assert.match(claude, /mcp__jira-run-mod__run_plan/);
+});

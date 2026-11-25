@@ -24,12 +24,26 @@ export type RunTicket = {
   pr: number | null
   /** Schätzung aus dem Nachtplan in Tokens (S ≈ 50k, M ≈ 150k, L ≈ 400k); null = keine. */
   estimateTokens: number | null
+  /** Id des Sub-Agenten, der das Ticket bearbeitet; null = (noch) keiner. */
+  agentId: string | null
+  /** Der Sub-Agent hat sich zurückgemeldet. */
+  agentDone: boolean
+  /** Der PR ist ein Draft. */
+  draft: boolean
+  /** Wofür der PO gebraucht wird (Draft-PR oder Frage); null = nichts offen. */
+  reason: string | null
+  /** Stand der PR-Prüfungen (CI); null = unbekannt. */
+  ci: 'läuft' | 'grün' | 'rot' | null
+  /** Bisher verbrauchte Tokens des Sub-Agenten (Eingabe + Ausgabe). */
+  tokensActual: number
 }
 
 export type RunState = {
   source: RunSource
   /** Startzeit, Millisekunden seit 1970. */
   startedAt: number
+  /** Letzte Änderung am Zustand, Millisekunden seit 1970 (Anzeige "Stand HH:MM"). */
+  updatedAt: number
   tickets: RunTicket[]
 }
 

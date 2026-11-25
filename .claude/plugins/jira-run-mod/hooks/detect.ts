@@ -18,3 +18,8 @@ export function isFinalReport(answer: string): boolean {
 export function ticketKeys(text: string): string[] {
   return [...new Set(text.match(/\bSCRUM-\d+\b/g) ?? [])]
 }
+
+/** Das Ticket, an dem ein Sub-Agent arbeitet: der erste Schlüssel der Beschreibung, sonst des Prompts. */
+export function primaryTicketKey(description: string | undefined, prompt: string): string | null {
+  return ticketKeys(description ?? "")[0] ?? ticketKeys(prompt)[0] ?? null
+}
