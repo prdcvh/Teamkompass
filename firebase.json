@@ -13,11 +13,7 @@
         ".git",
         "firebase-debug.log",
         "firebase-debug.*.log",
-        "*.local",
-        "src",
-        "test",
-        "tsconfig.json",
-        "eslint.config.mjs"
+        "*.local"
       ]
     }
   ],

@@ -21,8 +21,10 @@ test("firebase.json: Functions aus functions/, Node 22, Quelltext und Tests werd
   assert.equal(fn.source, "functions");
   assert.equal(fn.codebase, "default");
   assert.equal(fn.runtime, "nodejs22");
-  for (const entry of ["node_modules", "src", "test", "*.local"]) assert.ok(fn.ignore.includes(entry), `ignore: ${entry} fehlt`);
-  assert.ok(!fn.ignore.includes("lib"), "lib/ (gebaute Funktionen) muss hochgeladen werden");
+  for (const entry of ["node_modules", "*.local"]) assert.ok(fn.ignore.includes(entry), `ignore: ${entry} fehlt`);
+  // Die CLI vergleicht Muster ohne "/" mit jedem Datei-/Ordnernamen (matchBase): "src" oder "lib" wuerde auch
+  // lib/functions/src/index.js ausschliessen. Ob lib/ wirklich hochgeladen wird, prueft functions/test/upload.test.mjs.
+  for (const entry of ["lib", "src", "functions", "angular", "app", "core", "ratings"]) assert.ok(!fn.ignore.includes(entry), `ignore: ${entry} schliesst gebaute Funktionen aus`);
   const pkg = JSON.parse(await read("functions/package.json"));
   assert.equal(pkg.engines.node, "22");
   assert.equal(pkg.main, "lib/functions/src/index.js");
