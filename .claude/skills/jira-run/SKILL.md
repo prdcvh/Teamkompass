@@ -16,6 +16,13 @@ den Befehl gegeben hat (Entscheidung des PO vom 2026-10-22). Keine neue Sitzung
 per `fire_trigger` starten: Frisch gestartete Sitzungen bekamen oft keine
 Verbindung zu Jira, und der PO sieht hier direkt, was passiert.
 
+**Run-Mod (SCRUM-239).** Das Plugin `.claude/plugins/jira-run-mod/` wird über
+`.claude/settings.json` in jeder Sitzung geladen. Es erkennt den Start eines
+Runs (dieser Skill oder der Nachtschicht-Prompt) und sein Ende (der
+Abschlussbericht der Hauptsitzung) und hält den Run-Zustand (Tickets, Status,
+Modell, PR, Schätzung) an einer Stelle. Du musst dafür nichts tun; Panel und
+Hinweise kommen mit den Folge-Tickets.
+
 ## Ablauf
 
 1. **Regeln laden.** Lade per ToolSearch

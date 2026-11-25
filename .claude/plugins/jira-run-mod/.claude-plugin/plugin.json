@@ -1,0 +1,6 @@
+{
+  "name": "jira-run-mod",
+  "version": "0.1.0",
+  "description": "Macht den Jira-Run (/jira-run und Nachtschicht) sichtbar: erkennt Start und Ende und hält den Run-Zustand an einer Stelle.",
+  "types": "./types/index.d.ts"
+}

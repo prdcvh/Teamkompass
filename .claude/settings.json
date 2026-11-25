@@ -1,4 +1,12 @@
 {
+  "extraKnownMarketplaces": {
+    "teamkompass": {
+      "source": { "source": "github", "repo": "prdcvh/teamkompass" }
+    }
+  },
+  "enabledPlugins": {
+    "jira-run-mod@teamkompass": true
+  },
   "hooks": {
     "SessionStart": [
       {

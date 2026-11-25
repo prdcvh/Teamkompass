@@ -1,0 +1,11 @@
+{
+  "name": "teamkompass",
+  "owner": { "name": "TeamKompass" },
+  "plugins": [
+    {
+      "name": "jira-run-mod",
+      "source": "./.claude/plugins/jira-run-mod",
+      "description": "Run-Mod für /jira-run und die Nachtschicht"
+    }
+  ]
+}
