@@ -113,7 +113,8 @@ export class FakePlayerRecordsApi implements Pick<PlayerRecordsApi, keyof Player
     const key = `${playerId}/measurements`;
     const current = this.playerRecords.get(key)?.get(id);
     if (!current) throw new Error('not-found');
-    const { review: _old, ...rest } = current;
+    const rest = { ...current };
+    delete rest['review'];
     this.playerRecords.get(key)!.set(id, review ? { ...rest, review } : rest);
     this.emitRecords(key);
   }

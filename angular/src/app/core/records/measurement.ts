@@ -174,6 +174,13 @@ export function docFromMeasurement(measurement: Measurement): Record<string, unk
   return doc;
 }
 
+/** Kopie ohne Bestätigung (`review`); Messwerte bleiben unverändert. */
+export function withoutReview<T extends { readonly review?: unknown }>(value: T): Omit<T, 'review'> {
+  const copy: Record<string, unknown> = { ...value };
+  delete copy['review'];
+  return copy as Omit<T, 'review'>;
+}
+
 /** Bestätigung als Dokumentfeld; Begründung nur, wenn vorhanden. */
 export function reviewDoc(review: MeasurementReview): Record<string, unknown> {
   return { at: review.at, by: review.by, byUid: review.byUid, ...(review.reason ? { reason: review.reason } : {}) };

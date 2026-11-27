@@ -3,7 +3,7 @@ import { PlayerRecordsApi } from '../firebase/player-records.api';
 import { SquadService } from '../player/squad.service';
 import { todayIso } from '../shared/dates';
 import { SessionService } from '../auth/session.service';
-import { type Measurement, REVIEW_BY_MAX, REVIEW_REASON_MAX, docFromMeasurement, measurementQuality, reviewDoc, sortedMeasurements } from './measurement';
+import { type Measurement, REVIEW_BY_MAX, REVIEW_REASON_MAX, docFromMeasurement, measurementQuality, reviewDoc, withoutReview, sortedMeasurements } from './measurement';
 import { type MeasurementContext, type MeasurementDraft, type MeasurementErrors, evaluateMeasurement, measurementFromDraft } from './measurement-draft';
 import { RecordsStateService } from './records-state.service';
 
@@ -82,7 +82,7 @@ export class MeasurementsService {
       this.state.measurementList.update((list) =>
         list.map((entry) => {
           if (entry.id !== target.id) return entry;
-          const { review: _old, ...rest } = entry;
+          const rest = withoutReview(entry);
           return review ? { ...rest, review } : rest;
         }),
       );
