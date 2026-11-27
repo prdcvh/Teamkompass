@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { formatDate } from '../../core/shared/dates';
+import { MATURITY_BAND_NOTE } from '../../core/records/maturity-note';
 import { MATURITY_BAND_LABELS, type MaturityBand, percentText } from '../../core/records/maturity';
 import { MATURITY_STALE_DAYS, type MaturityAssessment, pahSentence } from '../../core/records/maturity-assessment';
 
@@ -41,6 +42,9 @@ export const MATURITY_HELP_LINES: readonly string[] = [
           <span class="pill maturity-status" data-tone="warning" data-test="maturity-status">{{ assessment().statusText }}</span>
         }
       </div>
+      @if (assessment().band) {
+        <p class="muted maturity-band-note" data-test="maturity-band-note">{{ bandNote }}</p>
+      }
       <p class="muted" data-test="maturity-sentence">Stand {{ formatDate(last.date) }} · {{ sentence(last.heightCm, last.predictedAdultCm) }}</p>
       @if (assessment().status !== 'classified') {
         <div class="maturity-causes" role="status" data-test="maturity-causes">
@@ -179,6 +183,8 @@ export class MaturityExplanation {
   protected ageText(age: number): string {
     return String(Math.floor(age * 10) / 10).replace('.', ',');
   }
+
+  protected readonly bandNote = MATURITY_BAND_NOTE;
 
   protected bandLabel(band: MaturityBand): string {
     return MATURITY_BAND_LABELS[band];
