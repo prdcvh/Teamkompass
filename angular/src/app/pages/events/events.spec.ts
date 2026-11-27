@@ -69,6 +69,18 @@ describe('Events (Events-Seite)', () => {
       expect(q(fixture, '.sync')?.getAttribute('data-state')).toBe('saved');
     });
 
+    it('behält Suche, Filter und Sortierung nach dem Verlassen der Seite (SCRUM-310)', async () => {
+      const fixture = await render();
+      type(q<HTMLInputElement>(fixture, 'input[type="search"]')!, 'nord');
+      fixture.detectChanges();
+      fixture.destroy();
+      const again = TestBed.createComponent(Events);
+      await again.whenStable();
+      again.detectChanges();
+      expect(q<HTMLInputElement>(again, 'input[type="search"]')!.value).toBe('nord');
+      expect(qa(again, 'tbody tr')).toHaveLength(1);
+    });
+
     it('sucht, filtert nach Typ, sortiert und setzt Filter zurück', async () => {
       const fixture = await render();
       type(q<HTMLInputElement>(fixture, 'input[type="search"]')!, 'nord');

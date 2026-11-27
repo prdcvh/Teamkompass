@@ -1,4 +1,5 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
+import { ListFilters } from '../shell/list-filters';
 import type { Role } from './role';
 
 /**
@@ -7,6 +8,7 @@ import type { Role } from './role';
  */
 @Injectable({ providedIn: 'root' })
 export class SessionService {
+  private readonly listFilters = inject(ListFilters);
   readonly role = signal<Role | null>(null);
   readonly displayName = signal('');
   /** Spielerprofil, auf das sich Spieler/Eltern beschränken (leer bei Trainer/Medizin). */
@@ -31,5 +33,7 @@ export class SessionService {
     this.playerId.set(null);
     this.uid.set(null);
     this.email.set(null);
+    // Kein Filterstand eines anderen Kontos/Teams stehen lassen (SCRUM-310).
+    this.listFilters.reset();
   }
 }
