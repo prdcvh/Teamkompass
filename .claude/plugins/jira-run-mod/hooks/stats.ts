@@ -1,7 +1,7 @@
 import type { RunState, StatEntry } from '../types'
 import { fmtTokens } from './model'
 
-/** Schlüssel im `$.store` des Plugins (JSON-Datei im Claude-Konfigurationsordner der Maschine). */
+/** Schlüssel im `$.store` des Plugins (JSON-Datei im Claude-Konfigurationsordner der Maschine; nur lokal, in Cloud-Containern flüchtig – PO-Entscheidung SCRUM-243). */
 export const STORE_KEY = 'token-stats'
 /** So viele Einträge bleiben höchstens (das `$.store` fasst insgesamt 4 MiB). */
 export const MAX_ENTRIES = 500

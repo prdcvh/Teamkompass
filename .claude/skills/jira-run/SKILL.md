@@ -79,8 +79,10 @@ Nacharbeit; die Kontrolle in der Hauptsitzung ist nicht je Ticket messbar und
 steckt nicht drin) und Datum fest und speichert sie am Ende des Runs im
 `$.store` des Mods (nur Zahlen, Modellname, Schlüssel, Datum). Achtung: Das ist
 eine Datei im Claude-Konfigurationsordner *der Maschine*; in einem kurzlebigen
-Cloud-Container ist sie nach dem Container weg (offene Frage an den PO, siehe
-SCRUM-243). Du nutzt es so:
+Cloud-Container ist sie nach dem Container weg. Das ist entschieden (PO,
+2026-11-27, „Option 2“): Die Statistik überdauert nur lokal, z. B. bei
+`/jira-run` auf dem eigenen Rechner; in Cloud-Sitzungen (Nachtlauf) ist sie
+flüchtig und wird nicht anderswo gespeichert. Du nutzt es so:
 - **Nachtplan:** Die Antwort von `mcp__jira-run-mod__run_plan` enthält die
   Durchschnittswerte je Größe und Modell („M mit Sonnet: im Schnitt 180k aus 6
   Tickets (geschätzt war 150k)“). Mit `mcp__jira-run-mod__run_stats` (ohne
