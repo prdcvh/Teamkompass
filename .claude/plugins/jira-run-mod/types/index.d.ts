@@ -34,6 +34,8 @@ export type RunTicket = {
   reason: string | null
   /** Stand der PR-Prüfungen (CI); null = unbekannt. */
   ci: 'läuft' | 'grün' | 'rot' | null
+  /** Ergebnis der Kontrolle durch die Hauptsitzung (`run_check`): true bestanden, false Nacharbeit; null/fehlt = (noch) keine. */
+  checkPassed?: boolean | null
   /** Bisher verbrauchte Tokens des Sub-Agenten (Eingabe + Ausgabe). */
   tokensActual: number
   /** Größe aus dem Nachtplan (SCRUM-243); fehlt, wenn nur eine Token-Zahl gemeldet wurde. */
@@ -85,6 +87,8 @@ declare module 'claude-code' {
       run: RunState | null
       /** Der zuletzt beendete Run (für Panel und Statistik); null, wenn es noch keinen gab. */
       lastRun: FinishedRun | null
+      /** Der PO hat die Freigabe-Leiste über dem Eingabefeld mit „Später“ ausgeblendet (SCRUM-241). */
+      approvalHidden: boolean
     }
   }
 }

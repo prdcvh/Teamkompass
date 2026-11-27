@@ -5,6 +5,7 @@ import type { RunPhase, RunSource, RunState, RunTicket } from '../types'
 import { isFinalReport, primaryTicketKey, runSourceOfPrompt } from './detect'
 import {
   SIZE_TOKENS,
+  approvalOf,
   asText,
   berlinTime,
   ciOfChecks,
@@ -23,12 +24,15 @@ import {
   ticketOfAgent,
   ticketOfPr,
 } from './model'
+import { ApprovalBar } from './bar'
 import { RunPanel } from './panel'
 import { STORE_KEY, addEntries, averageLines, entriesOfRun, isoDate, parseEntries, reportLines, sizeOfEstimate } from './stats'
 
 /** Der Run-Zustand an einer einzigen Stelle; Folge-Tickets lesen und ändern ihn hier. */
 export const run = atom({ plugin: 'jira-run-mod', key: 'run' } as const, null)
 export const lastRun = atom({ plugin: 'jira-run-mod', key: 'lastRun' } as const, null)
+
+export const approvalHidden = atom({ plugin: 'jira-run-mod', key: 'approvalHidden' } as const, false)
 
 export const PANE = 'run-status'
 const PANE_TITLE = 'Run-Status'
@@ -64,7 +68,7 @@ async function applyCheck($: EngineInterface, key: string, passed: boolean | und
 
     return `Kontrolle ${key} läuft.`
   }
-  await change($, setPhase(null))
+  await change($, (r, now) => patchTicket(setPhase(null)(r, now), key, { checkPassed: passed }, now))
   if (!passed) $.ui.toast(toastRework(key))
 
   return passed ? `Kontrolle ${key} bestanden.` : `Kontrolle ${key} nicht bestanden: Nacharbeit nötig.`
@@ -81,6 +85,7 @@ async function start($: EngineInterface, source: RunSource) {
   const startedAt = await $.clock.now()
   // Ein neuer Run beginnt immer mit leerer Tabelle.
   await update($, run, () => ({ source, startedAt, updatedAt: startedAt, tickets: [] }))
+  await update($, approvalHidden, () => false)
   await refreshStatus($)
   // Ohne Fläche für das Panel bleiben die Zeilen im Chat (Schritt 5 des Skills) der Rückfall.
   if (!(await openPane($))) $.ui.toast('Run-Status: kein Platz für das Panel, die Zeilen im Chat gelten.')
@@ -333,7 +338,19 @@ export const register: Register = on => {
       return { result: await applyCheck($, key, typeof passed === 'boolean' ? passed : undefined) }
     }
     const call = jiraCall(e as Record<string, unknown>)
-    if (call === null || (await read($, run)) === null) return next(e)
+    if (call !== null && (await read($, run)) === null) {
+      // Außerhalb eines Runs: wird ein PR der Freigabe-Leiste gemergt, verschwindet er aus ihr.
+      const ran = await next(e)
+      const pr = call.args.pullNumber
+      if (call.op === 'merge_pull_request' && typeof pr === 'number' && ran.deny === undefined && ran.isError !== true) {
+        await update($, lastRun, l =>
+          l === null ? l : { ...l, tickets: l.tickets.map(t => (t.pr === pr ? { ...t, status: 'Erledigt' as const } : t)) },
+        )
+      }
+
+      return ran
+    }
+    if (call === null) return next(e)
 
     // Beim Mergen genehmigter PRs zeigt die Statuszeile "Run: Merge SCRUM-xxx".
     const merging = call.op === 'merge_pull_request' && typeof call.args.pullNumber === 'number' ? call.args.pullNumber : null
@@ -395,10 +412,21 @@ export const register: Register = on => {
       await saveStats($, current)
       await update($, lastRun, () => ({ ...current, endedAt, updatedAt: endedAt }))
       await update($, run, () => null)
+      await update($, approvalHidden, () => false)
       await refreshStatus($)
     }
 
     return next(e)
+  })
+
+  // Freigabe-Leiste (SCRUM-241): nur Anzeige, öffnet das Ticket in Jira; gemergt wird hier nie.
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    if (e.props.hasSurvey || (await read($, run)) !== null || (await read($, approvalHidden))) return next(e)
+    const approval = approvalOf(await read($, lastRun))
+    if (approval.ready.length === 0 && approval.decide.length === 0) return next(e)
+    const { Box, Text, Button, Link } = $.ui.resolve(e)
+
+    return ApprovalBar({ Box, Text, Button, Link }, approval, () => update($, approvalHidden, () => true))
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
