@@ -43,6 +43,16 @@ test("der Skill jira-run erwähnt den Mod", async () => {
   assert.match(skill, /jira-run-mod/);
 });
 
+test("SCRUM-241: Freigabe-Leiste öffnet Jira, merged nie, Skill beschreibt sie", async () => {
+  const register = await readFile(new URL(`../${PLUGIN_DIR}/hooks/register.tsx`, import.meta.url), "utf8");
+  assert.match(register, /component: 'AbovePrompt'/);
+  const bar = await readFile(new URL(`../${PLUGIN_DIR}/hooks/bar.tsx`, import.meta.url), "utf8");
+  assert.match(bar, /<Link href=\{jiraUrl/);
+  assert.doesNotMatch(bar, /merge_pull_request|prompt\.fill|submit/);
+  const skill = await readFile(new URL("../.claude/skills/jira-run/SKILL.md", import.meta.url), "utf8");
+  assert.match(skill, /Freigabe-Leiste \(SCRUM-241\)/);
+});
+
 test("SCRUM-240: Run-Status-Panel liegt im Mod, der Skill beschreibt den Plan-Weg", async () => {
   const register = await readFile(new URL(`../${PLUGIN_DIR}/hooks/register.tsx`, import.meta.url), "utf8");
   assert.match(register, /name: 'run-status'/);
