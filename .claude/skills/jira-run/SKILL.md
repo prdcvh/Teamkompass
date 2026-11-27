@@ -73,6 +73,24 @@ wie bisher mit der Überschrift „Abschlussbericht“.
 Die frühere Phase „wartet auf Merge-Antwort“ gibt es nicht mehr: seit dem
 23.11. gibt der PO in Jira mit „Genehmigt“ frei, am Ende steht keine Merge-Frage.
 
+**Token-Statistik (SCRUM-243).** Der Mod hält je Ticket Größe (S/M/L), Modell,
+geschätzte und tatsächliche Tokens (alle Sub-Agenten des Tickets, auch
+Nacharbeit; die Kontrolle in der Hauptsitzung ist nicht je Ticket messbar und
+steckt nicht drin) und Datum fest und speichert sie am Ende des Runs im
+`$.store` des Mods (nur Zahlen, Modellname, Schlüssel, Datum). Achtung: Das ist
+eine Datei im Claude-Konfigurationsordner *der Maschine*; in einem kurzlebigen
+Cloud-Container ist sie nach dem Container weg. Das ist entschieden (PO,
+2026-11-27, „Option 2“): Die Statistik überdauert nur lokal, z. B. bei
+`/jira-run` auf dem eigenen Rechner; in Cloud-Sitzungen (Nachtlauf) ist sie
+flüchtig und wird nicht anderswo gespeichert. Du nutzt es so:
+- **Nachtplan:** Die Antwort von `mcp__jira-run-mod__run_plan` enthält die
+  Durchschnittswerte je Größe und Modell („M mit Sonnet: im Schnitt 180k aus 6
+  Tickets (geschätzt war 150k)“). Mit `mcp__jira-run-mod__run_stats` (ohne
+  Eingabe) holst du sie auch vor dem Plan. Schätze damit statt pauschal.
+- **Abschlussbericht:** Die Antwort von `run_phase` mit `{ phase: "report" }`
+  listet je Ticket „geschätzt … / tatsächlich …“. Diese Zeilen kommen in den
+  Abschlussbericht.
+
 ## Ablauf
 
 1. **Regeln laden.** Lade per ToolSearch

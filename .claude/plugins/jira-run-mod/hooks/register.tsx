@@ -26,6 +26,7 @@ import {
 } from './model'
 import { ApprovalBar } from './bar'
 import { RunPanel } from './panel'
+import { STORE_KEY, addEntries, averageLines, entriesOfRun, isoDate, parseEntries, reportLines, sizeOfEstimate } from './stats'
 
 /** Der Run-Zustand an einer einzigen Stelle; Folge-Tickets lesen und ändern ihn hier. */
 export const run = atom({ plugin: 'jira-run-mod', key: 'run' } as const, null)
@@ -40,6 +41,8 @@ export const PLAN_TOOL = 'mcp__jira-run-mod__run_plan'
 /** Phase der Hauptsitzung (Plan, Abschlussbericht) und Kontrolle eines Tickets (Beginn/Ergebnis), siehe SKILL.md. */
 export const PHASE_TOOL = 'mcp__jira-run-mod__run_phase'
 export const CHECK_TOOL = 'mcp__jira-run-mod__run_check'
+/** Liefert die Durchschnittswerte aus früheren Runs (SCRUM-243). */
+export const STATS_TOOL = 'mcp__jira-run-mod__run_stats'
 
 type PlanEntry = { key?: string; size?: 'S' | 'M' | 'L'; estimateTokens?: number; model?: string; reason?: string }
 
@@ -98,6 +101,8 @@ async function applyPlan($: EngineInterface, entries: PlanEntry[]): Promise<stri
     const patch: Partial<RunTicket> = {}
     if (typeof p.estimateTokens === 'number') patch.estimateTokens = p.estimateTokens
     else if (p.size !== undefined && p.size in SIZE_TOKENS) patch.estimateTokens = SIZE_TOKENS[p.size]
+    if (p.size !== undefined && p.size in SIZE_TOKENS) patch.size = p.size
+    else if (patch.estimateTokens !== undefined) patch.size = sizeOfEstimate(patch.estimateTokens, SIZE_TOKENS)
     const label = modelLabel(p.model)
     if (label !== null) patch.model = label
     if (typeof p.reason === 'string' && p.reason !== '') patch.reason = p.reason
@@ -105,7 +110,28 @@ async function applyPlan($: EngineInterface, entries: PlanEntry[]): Promise<stri
     count++
   }
 
-  return `Plan übernommen: ${count} Tickets im Run-Status.`
+  const lines = averageLines(await loadStats($))
+
+  return `Plan übernommen: ${count} Tickets im Run-Status.\nBisherige Durchschnittswerte (für die Schätzung im Plan):\n${lines.join('\n')}`
+}
+
+async function loadStats($: EngineInterface) {
+  try {
+    return parseEntries(await $.store.get(STORE_KEY))
+  } catch {
+    return []
+  }
+}
+
+/** Speichert den Verbrauch der Tickets des Runs; ein Fehler beim Speichern stört den Run nicht. */
+async function saveStats($: EngineInterface, finished: RunState) {
+  try {
+    const date = isoDate(await $.clock.now())
+    const added = entriesOfRun(finished, date, e => sizeOfEstimate(e, SIZE_TOKENS))
+    if (added.length > 0) await $.store.set(STORE_KEY, addEntries(await loadStats($), added))
+  } catch {
+    $.ui.toast('Token-Statistik konnte nicht gespeichert werden.')
+  }
 }
 
 async function onJira($: EngineInterface, op: string, args: Record<string, unknown>, result: string) {
@@ -182,7 +208,7 @@ async function agentFinished($: EngineInterface, agentId: string) {
 
     return t === undefined
       ? r
-      : patchTicket(r, t.key, { agentDone: true, tokensActual: Math.max(tokensActual, t.tokensActual) }, now)
+      : patchTicket(r, t.key, { agentDone: true, tokensActual: Math.max((t.tokensBase ?? 0) + tokensActual, t.tokensActual) }, now)
   })
 }
 
@@ -228,6 +254,13 @@ export const register: Register = on => {
         properties: { phase: { type: 'string', enum: ['plan', 'report'] } },
         required: ['phase'],
       },
+      isDeferred: false,
+    })
+    await $.tool.register({
+      name: 'run_stats',
+      description:
+        'Liefert die Durchschnittswerte des tatsächlichen Token-Verbrauchs je Größe und Modell aus früheren Runs (für den Nachtplan) und, wenn ein Run läuft, je Ticket geschätzt gegenüber tatsächlich (für den Abschlussbericht).',
+      inputSchema: { type: 'object', properties: {} },
       isDeferred: false,
     })
     await $.tool.register({
@@ -283,8 +316,20 @@ export const register: Register = on => {
       if (phase !== 'plan' && phase !== 'report') return { result: 'Unbekannte Phase (plan oder report).' }
       if ((await read($, run)) === null) await start($, 'jira-run')
       await change($, setPhase({ kind: phase }))
+      const current = await read($, run)
+      const extra =
+        phase === 'report' && current !== null
+          ? `\nFür den Abschlussbericht, je Ticket geschätzt und tatsächlich:\n${reportLines(current).join('\n')}`
+          : ''
 
-      return { result: `Phase gemeldet: ${phase}.` }
+      return { result: `Phase gemeldet: ${phase}.${extra}` }
+    }
+    if (e.tool === STATS_TOOL) {
+      const current = await read($, run)
+      const parts = ['Durchschnitt aus früheren Runs:', ...averageLines(await loadStats($))]
+      if (current !== null) parts.push('Dieser Run, geschätzt gegenüber tatsächlich:', ...reportLines(current))
+
+      return { result: parts.join('\n') }
     }
     if (e.tool === CHECK_TOOL) {
       const { key, passed } = e as { key?: unknown; passed?: unknown }
@@ -334,7 +379,14 @@ export const register: Register = on => {
         return patchTicket(
           r,
           key,
-          { agentId: started.agentId ?? null, agentDone: false, status, ...(model !== null ? { model } : {}) },
+          {
+            agentId: started.agentId ?? null,
+            agentDone: false,
+            status,
+            // Nacharbeit durch einen neuen Agenten: der bisherige Verbrauch bleibt in der Summe.
+            tokensBase: t !== undefined && t.agentId !== null ? t.tokensActual : 0,
+            ...(model !== null ? { model } : {}),
+          },
           now,
         )
       })
@@ -357,6 +409,7 @@ export const register: Register = on => {
     const current = await read($, run)
     if (current !== null && e.agentId === undefined && isFinalReport(e.answer)) {
       const endedAt = await $.clock.now()
+      await saveStats($, current)
       await update($, lastRun, () => ({ ...current, endedAt, updatedAt: endedAt }))
       await update($, run, () => null)
       await update($, approvalHidden, () => false)
