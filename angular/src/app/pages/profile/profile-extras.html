@@ -158,16 +158,28 @@
                 <p class="measurement-meta" [attr.data-quality]="quality(measurement)">{{ measurementMeta(measurement) }}</p>
                 @if (showDetails()) {
                   @for (line of measurementDetails(measurement); track $index) { <p class="measurement-detail">{{ line }}</p> }
-                  @for (flag of measurement.flags ?? []; track flag) { <p class="measurement-detail measurement-flag">Prüfen: {{ flagText[flag] }}</p> }
+                  @if (measurement.review) {
+                    <p class="measurement-detail measurement-review">{{ reviewText(measurement) }}</p>
+                  } @else {
+                    @for (flag of measurement.flags ?? []; track flag) { <p class="measurement-detail measurement-flag">Prüfen: {{ flagText[flag] }}</p> }
+                  }
                   @for (change of measurement.changes ?? []; track $index) { <p class="measurement-detail measurement-change">{{ changeText(change) }}</p> }
                 }
               </div>
-              @if (canEdit()) {
+              @if (canEdit() || (canReview() && (isFlagged(measurement) || measurement.review))) {
                 <div class="row-actions">
+                  @if (canReview() && isFlagged(measurement)) {
+                  <button tkButton size="sm" type="button" (click)="askReview(measurement)" [attr.aria-label]="'Messung stimmt: ' + formatDate(measurement.date)">Messung stimmt</button>
+                  }
+                  @if (canReview() && measurement.review && measurement.quality === 'flagged') {
+                  <button tkButton size="sm" type="button" [disabled]="reviewBusy()" (click)="withdrawReview(measurement)" [attr.aria-label]="'Bestätigung zurücknehmen: ' + formatDate(measurement.date)">Bestätigung zurücknehmen</button>
+                  }
+                  @if (canEdit()) {
                   @if (canEditHealth()) {
                   <button tkButton size="sm" type="button" (click)="openMeasurement(measurement)" [attr.aria-label]="'Messung bearbeiten: ' + formatDate(measurement.date)">Bearbeiten</button>
                   }
                   <button tkButton size="sm" type="button" class="danger" (click)="askDelete('measurement', measurement.id, 'die Messung vom ' + formatDate(measurement.date))" [attr.aria-label]="'Messung löschen: ' + formatDate(measurement.date)">Löschen</button>
+                  }
                 </div>
               }
             </li>
@@ -202,6 +214,22 @@
     <div class="confirm-actions">
       <button tkButton type="button" (click)="cancelDelete()">Abbrechen</button>
       <button tkButton type="button" variant="primary" [disabled]="deleteBusy()" (click)="confirmDelete()">{{ deleteBusy() ? 'Löscht …' : 'Endgültig löschen' }}</button>
+    </div>
+  </tk-dialog>
+}
+
+@if (canReview()) {
+  <tk-dialog [open]="reviewing() !== null" title="Messung stimmt?" (closed)="cancelReview()">
+    <p>Du bestätigst, dass {{ reviewing()?.text }} so stimmt. Der Messwert bleibt unverändert; die Messung zählt danach normal für die Wachstumsrate und die Hinweise. Du kannst die Bestätigung später zurücknehmen.</p>
+    <label class="review-field">Begründung (optional)
+      <textarea class="tk-input" rows="2" [attr.maxlength]="reviewMax" [ngModel]="reviewReason()" (ngModelChange)="reviewReason.set($event)" placeholder="z. B. Spieler ist wirklich so gewachsen, zweimal nachgemessen"></textarea>
+    </label>
+    @if (reviewFailed()) {
+      <p class="error" role="alert">{{ reviewFailed() }}</p>
+    }
+    <div class="confirm-actions">
+      <button tkButton type="button" (click)="cancelReview()">Abbrechen</button>
+      <button tkButton type="button" variant="primary" [disabled]="reviewBusy()" (click)="confirmReview()">{{ reviewBusy() ? 'Speichert …' : 'Messung stimmt' }}</button>
     </div>
   </tk-dialog>
 }

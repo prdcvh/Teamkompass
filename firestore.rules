@@ -658,11 +658,33 @@ service cloud.firestore {
           allow delete: if isTrainer();
         }
 
+        // Bestaetigung einer markierten Messung "stimmt so" (SCRUM-387): Feld `review` {at, by, byUid, reason?}. Ausser dem
+        // Trainer (darf wie bisher alles schreiben) darf die Medizin NUR dieses eine Feld setzen oder entfernen - nie
+        // Messwerte, nie anlegen oder loeschen. Setzen nur bei einer als "flagged" markierten Messung (keine Feldtests),
+        // mit dem eigenen Konto und kurzen Textfeldern; nicht bei widerrufener Einwilligung, fremde Vereine nur mit
+        // dokumentierter Einwilligung. Spieler und Eltern schreiben nie.
         match /measurements/{measurementId} {
+          function physioReviewOnly() {
+            return isPhysio()
+              && mayStoreHealth(playerId)
+              && !consentRevoked(playerId)
+              && resource.data.get('kind', null) == null
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['review'])
+              && (!('review' in request.resource.data) || (
+                resource.data.get('quality', null) == 'flagged'
+                && request.resource.data.review is map
+                && request.resource.data.review.keys().hasOnly(['at', 'by', 'byUid', 'reason'])
+                && request.resource.data.review.byUid == request.auth.uid
+                && request.resource.data.review.at is string && request.resource.data.review.at.size() <= 40
+                && request.resource.data.review.by is string && request.resource.data.review.by.size() <= 80
+                && request.resource.data.review.get('reason', '') is string && request.resource.data.review.get('reason', '').size() <= 200
+              ));
+          }
           allow read: if isTrainer()
             || ((isPhysio() || (isTeamMember() && memberDoc().data.role in ["player", "parent"] && resource.data.playerId == memberDoc().data.get('playerId', null)))
               && !consentRevoked(playerId));
-          allow create, update: if isTrainer() && mayStoreHealth(playerId);
+          allow create: if isTrainer() && mayStoreHealth(playerId);
+          allow update: if (isTrainer() && mayStoreHealth(playerId)) || physioReviewOnly();
           allow delete: if isTrainer();
         }
 

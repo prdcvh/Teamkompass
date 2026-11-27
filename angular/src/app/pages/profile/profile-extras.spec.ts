@@ -172,6 +172,52 @@ describe('Profile: Zusatzdaten', () => {
     expect(text(q(fixture, 'tk-profile-extras'))).toContain('Messqualität nicht dokumentiert');
   });
 
+  describe('Messung bestätigen (SCRUM-387)', () => {
+    const flagged = (firebase: FakeFirebase) => firebase.records.playerRecords.get('p1/measurements')!.set('me2', { date: '2026-10-01', height: '149', weight: '43', quality: 'flagged', flags: ['height-drop'] });
+    const button = (fixture: Awaited<ReturnType<typeof renderExtras>>, label: string) => qa<HTMLButtonElement>(fixture, 'tk-profile-extras button').find((entry) => entry.getAttribute('aria-label') === label);
+
+    it('Trainer bestätigt mit Begründung: Markierung weg, „Geprüft am … von …“ sichtbar, Zurücknehmen möglich', async () => {
+      const fixture = await renderExtras('trainer', flagged);
+      const session = TestBed.inject(SessionService);
+      session.uid.set('coach1');
+      session.displayName.set('Trainer Test');
+      fixture.detectChanges();
+      await settle(fixture);
+      const item = () => qa(fixture, 'tk-profile-extras .items li').map(text).find((entry) => entry.includes('149 cm'))!;
+      expect(item()).toContain('Messung prüfen');
+      expect(item()).toContain('Prüfen:');
+      button(fixture, 'Messung stimmt: 01.10.2026')!.click();
+      await settle(fixture);
+      typeInto(q<HTMLTextAreaElement>(fixture, 'tk-profile-extras textarea.tk-input[placeholder^="z. B. Spieler"]')!, 'Zweimal nachgemessen');
+      await settle(fixture);
+      clickByText(fixture, 'tk-profile-extras .confirm-actions button', 'Messung stimmt');
+      await vi.waitFor(() => expect(firebase.records.playerRecords.get('p1/measurements')!.get('me2')).toMatchObject({ height: '149', review: { by: 'Trainer Test', byUid: 'coach1', reason: 'Zweimal nachgemessen' } }));
+      await settle(fixture);
+      expect(item()).toContain('Messung geprüft');
+      expect(item()).not.toContain('Prüfen:');
+      expect(item()).toMatch(/Geprüft am \d{2}\.\d{2}\.\d{4} von Trainer Test: Zweimal nachgemessen/);
+      expect(button(fixture, 'Messung stimmt: 01.10.2026')).toBeUndefined();
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(button(fixture, 'Bestätigung zurücknehmen: 01.10.2026')!.disabled).toBe(false);
+      });
+      button(fixture, 'Bestätigung zurücknehmen: 01.10.2026')!.click();
+      await vi.waitFor(() => expect(firebase.records.playerRecords.get('p1/measurements')!.get('me2')).not.toHaveProperty('review'));
+      await settle(fixture);
+      expect(item()).toContain('Messung prüfen');
+    });
+
+    it('Medizin kann bestätigen; unmarkierte Messungen haben keinen Knopf', async () => {
+      const fixture = await renderExtras('physio', flagged);
+      TestBed.inject(SessionService).uid.set('medic1');
+      fixture.detectChanges();
+      await settle(fixture);
+      expect(button(fixture, 'Messung stimmt: 01.10.2026')).toBeDefined();
+      expect(button(fixture, 'Messung stimmt: 01.08.2026')).toBeUndefined();
+      expect(button(fixture, 'Messung bearbeiten: 01.10.2026')).toBeUndefined();
+    });
+  });
+
   it('löscht erst nach Bestätigung', async () => {
     const fixture = await renderExtras();
     const button = qa<HTMLButtonElement>(fixture, 'tk-profile-extras button').find((entry) => entry.getAttribute('aria-label') === 'Messung löschen: 01.08.2026')!;

@@ -3,6 +3,7 @@
  * Regeln und Grenzwerte: measurement-protocol.ts (Methodenversion 1.0, docs/reife-kompass-methoden.md §6).
  */
 import { isIsoDate } from '../shared/dates';
+import { effectiveQuality } from './growth-velocity';
 import type { Measurement } from './measurement';
 import {
   HEIGHT_MIN_READINGS,
@@ -147,7 +148,7 @@ function readings(values: readonly string[], min: number, max: number): { values
 export function previousHeight(others: readonly Measurement[], date: string): PreviousHeight | null {
   let best: PreviousHeight | null = null;
   for (const entry of others) {
-    if (entry.height === null || entry.quality === 'flagged' || entry.date >= date) continue;
+    if (entry.height === null || effectiveQuality(entry) === 'flagged' || entry.date >= date) continue;
     if (!best || entry.date > best.date) best = { date: entry.date, height: entry.height };
   }
   return best;
