@@ -19,6 +19,10 @@ jobs:
           # SCRUM-165: Angular CLI 22 braucht Node >= 22.22.3 – immer das neueste 22.x holen, nicht ein älteres aus dem Runner-Cache.
           check-latest: true
       - run: npm ci --prefix angular
+      # SCRUM-198: Cloud Functions (functions/) bauen, linten, testen; Emulator-Test mit der gelockten Firebase-CLI
+      # aus tests/rules (Functions-Emulator braucht kein Java). Kein Secret, Demo-Projekt ohne echte Daten.
+      - name: Install functions and Firebase CLI dependencies (ohne Install-Skripte)
+        run: npm ci --ignore-scripts --prefix functions && npm ci --ignore-scripts --prefix tests/rules
       # Browser für den Test „kein seitliches Scrollen“ (tests/responsive.test.mjs, SCRUM-134); ohne ihn würde der Test übersprungen.
       - run: npm install --no-save --no-package-lock --prefix angular playwright@1.56.1
       - run: npx --prefix angular playwright install --with-deps chromium

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
 import test from "node:test";
 import { collectionKey, mapPath, mapValue, parseArgs } from "../scripts/copy-team-lib.mjs";
+import { splitJobs } from "../scripts/preview-guard-lib.mjs";
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 const exists = (path) => read(path).then(() => true, () => false);
@@ -419,13 +420,21 @@ test("SessionStart-Hook stellt ein festes Node mit geprueftem SHA-256 bereit (SC
 
 test("Workflows: PR-Code laeuft ohne Service-Account-Secret, Secrets nicht inline interpoliert (SCRUM-57)", async () => {
   for (const file of [".github/workflows/firebase-hosting-pull-request.yml", ".github/workflows/firebase-hosting-merge.yml"]) {
-    const workflow = await read(file);
-    const [verifyJob, deployJob] = workflow.split(/\n  build_and_(?:preview|deploy):/);
+    const jobs = splitJobs(await read(file));
+    const deployJob = jobs.build_and_preview ?? jobs.build_and_deploy;
     assert.ok(deployJob, `${file}: Deploy-Job fehlt`);
-    assert.doesNotMatch(verifyJob, /secrets\.FIREBASE_SERVICE_ACCOUNT/, `${file}: Verify-Job darf das Secret nicht sehen`);
-    assert.match(verifyJob, /npm ci --ignore-scripts/, `${file}: npm ci ohne Install-Skripte`);
+    assert.doesNotMatch(jobs.verify, /secrets\.FIREBASE_SERVICE_ACCOUNT/, `${file}: Verify-Job darf das Secret nicht sehen`);
+    assert.match(jobs.verify, /npm ci --ignore-scripts/, `${file}: npm ci ohne Install-Skripte`);
     assert.doesNotMatch(deployJob, /npm (ci|run|install)/, `${file}: Deploy-Job fuehrt keinen Projektcode aus`);
     assert.match(deployJob, /needs: verify/);
+    // Jeder Job mit dem Schluessel (auch deploy_functions, SCRUM-198) fuehrt keinen Projektcode aus. Erlaubt ist nur
+    // die gelockte Firebase-CLI aus tests/rules (SCRUM-90), ohne Install-Skripte.
+    for (const [name, job] of Object.entries(jobs).filter(([, job]) => /secrets\.FIREBASE_SERVICE_ACCOUNT/.test(job))) {
+      assert.notEqual(name, "verify");
+      const npm = job.replaceAll("npm ci --ignore-scripts --prefix tests/rules", "");
+      assert.doesNotMatch(npm, /npm (ci|run|install|exec|test)|npx /, `${file}/${name}: Job mit Schluessel fuehrt Projektcode aus`);
+      assert.match(job, /^ {4}needs: (verify|build_functions)\s*$/m, `${file}/${name}: muss nach verify laufen`);
+    }
   }
   const rules = await read(".github/workflows/firestore-rules-deploy.yml");
   assert.doesNotMatch(rules, /echo '\$\{\{ secrets/, "Secret nicht in die Shell-Zeile interpolieren");

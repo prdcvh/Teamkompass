@@ -1,0 +1,8 @@
+# Build-Ausgabe (entsteht bei npm run build, im CI und beim Deploy)
+lib/
+# Funktionsliste fuer den Deploy, entsteht nur im CI (npm run manifest), nie einchecken
+functions.yaml
+node_modules/
+*.local
+.runtimeconfig.json
+.secret.local
