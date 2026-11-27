@@ -530,3 +530,101 @@ nur das Feld `role` von `medical` auf `scout`. Es kann gefahrlos mehrfach laufen
 4. Echter Lauf: gleicher Aufruf mit `--apply` am Ende.
 5. Kontrolle: Probelauf erneut – muss `0 Konto/Konten` und „Kein Konto mit medical“ melden. **Erst dann den PR mit
    dem Entfernen des Alias mergen** (er deployt die Regeln und alle vier Team-Builds).
+
+## 14. Backend: Firebase Cloud Functions (`functions/`, SCRUM-198)
+
+TeamKompass hat ein Backend aus **Firebase Cloud Functions (2. Generation)** im Ordner `functions/` (TypeScript,
+Node 22). Heute gibt es nur die Beispielfunktion `healthCheck` (keine Daten, Antwort immer `{"status":"ok"}`); sie
+beweist die Kette Build → Test → Deploy. Fachliche Funktionen kommen mit eigenen Tickets.
+
+- **Region:** alle Funktionen laufen in **europe-west3 (Frankfurt)** – Datenschutz, die Daten bleiben in der EU.
+  Gesetzt einmal global in `functions/src/options.ts`; keine Funktion setzt eine eigene Region
+  (`tests/functions.test.mjs` prueft das). Adresse der Beispielfunktion nach dem Deploy:
+  `https://europe-west3-teamkompass-b8aac.cloudfunctions.net/healthCheck` (die genaue URL steht auch im Log des
+  Deploy-Jobs und in der Firebase Console unter Functions).
+- **Kosten:** Cloud Functions brauchen den **Blaze-Tarif** (nutzungsabhaengig; ist aktiv). Dazu gehoert ein
+  **Budget-Alarm**: Google Cloud Console → Abrechnung → Budgets und Benachrichtigungen → Budget erstellen (Projekt
+  `teamkompass-b8aac`, z. B. 5 EUR/Monat, Benachrichtigung bei 50/90/100 %). Ein Budget-Alarm warnt nur, er stoppt
+  nichts. Zusaetzlich begrenzt `maxInstances` (global, `options.ts`) die Zahl gleichzeitiger Instanzen; dauerhaft
+  laufende Instanzen (`minInstances`) sind verboten (Test). Alte Container-Images loescht eine Aufraeumregel nach
+  1 Tag (setzt der Deploy-Job beim ersten Deploy selbst).
+- **Sicherheit:** Funktionen laufen mit Admin-Rechten und **umgehen `firestore.rules`**. Jede Funktion, die Daten
+  liest oder schreibt, muss selbst pruefen, wer sie aufruft: angemeldet (`request.auth`), Rolle (Trainer/Spieler …)
+  und eigenes Team (`teams/{teamId}/members/{uid}`), und darf nur das zurueckgeben, was diese Rolle auch in der App
+  sehen duerfte. Bevorzugt `onCall` (bringt die Anmeldung mit) statt offener HTTP-Funktionen.
+- **Gemeinsame Logik:** Fachlogik, die App und Backend brauchen (z. B. „Spieler bewertet?“), steht **einmal** in
+  `angular/src/app/core/...` als reines TypeScript ohne Angular/Firebase-Import und wird von `functions/` mitkompiliert
+  (Beispiel `functions/src/shared/rating.ts` → `angular/src/app/core/ratings/rating.ts`). Getestet wird sie dort
+  (`*.spec.ts`); `tests/functions.test.mjs` prueft, dass die geteilten Dateien frei von App-Abhaengigkeiten bleiben.
+- **Geheimnisse** (API-Schluessel fuer spaetere Funktionen) nie ins Repo, nur in den **Secret Manager**:
+  `firebase functions:secrets:set NAME --project teamkompass-b8aac` und in der Funktion `defineSecret('NAME')` aus
+  `firebase-functions/params`. Dann braucht das Deploy-Dienstkonto zusaetzlich „Secret Manager-Betrachter“ (unten).
+  Lokale Dateien `.secret.local`, `*.local`, `.runtimeconfig.json` sind per `.gitignore` ausgeschlossen.
+
+### Pruefen und Testen
+
+`npm run verify` (Repo-Root) baut, lintet und testet `functions/` mit (`npm run verify:functions`):
+Unit-Tests (`functions/test/*.test.mjs`) und ein Test im **Functions-Emulator** (`functions/test/emulator/`, Projekt
+`demo-teamkompass` = keine echten Daten, kein Zugang; braucht kein Java). Vorher einmalig:
+`npm ci --prefix functions` und `npm ci --prefix tests/rules` (gepinnte Firebase-CLI, SCRUM-90).
+
+### Deploy
+
+Jeder Merge nach `main` deployt die Funktionen automatisch: `.github/workflows/firebase-hosting-merge.yml`, Jobs
+`build_functions` (ohne Schluessel: `lib/` bauen und mit `npm run manifest` die Funktionsliste `functions.yaml`
+schreiben) und `deploy_functions` (`firebase deploy --only functions`, gepinnte CLI aus `tests/rules`). Weil
+`functions.yaml` vorliegt, fuehrt die CLI im Job mit dem Schluessel keinen Projektcode aus (wie bei Hosting,
+SCRUM-57). Beide Jobs laufen **getrennt** von den vier Hosting-Deploys: schlaegt einer fehl, gehen die App-Updates
+trotzdem live, der Job ist rot und GitHub schickt die uebliche Mail ueber den fehlgeschlagenen Lauf. Die Warnung
+„Couldn't find firebase-functions package“ im Deploy-Log ist erwartet (die Pakete installiert Cloud Build in der
+Cloud aus `functions/package-lock.json`). Bewusst ohne `--force`: eine Funktion, die im Code
+geloescht wurde, aber in der Cloud noch laeuft, wird nicht still geloescht – der Deploy bricht mit Hinweis ab; dann
+einmal `firebase functions:delete <name> --region europe-west3 --project teamkompass-b8aac`. Die PR-Vorschau deployt
+**nie** Funktionen (`tests/functions.test.mjs`).
+
+Manuell (nur PO, normalerweise nicht noetig): `npm ci --prefix functions && npm --prefix functions run build &&
+firebase deploy --only functions --project teamkompass-b8aac`.
+
+### Einmalig vor dem ersten Deploy (nur PO, Google Cloud Console)
+
+Das Dienstkonto, mit dem GitHub deployt (GitHub-Secret `FIREBASE_SERVICE_ACCOUNT_TEAMKOMPASS_B8AAC`; die Adresse
+steht im Feld `client_email` des Schluessels, meist `github-action-…@teamkompass-b8aac.iam.gserviceaccount.com`;
+zu finden unter IAM und Verwaltung → Dienstkonten), braucht fuer Functions zusaetzliche Rollen. Ohne sie ist der Job
+`deploy_functions` bei jedem Merge rot (die Hosting-Deploys laufen weiter).
+
+1. **APIs aktivieren** (APIs und Dienste → Bibliothek, je „Aktivieren“): Cloud Functions API, Cloud Build API,
+   Artifact Registry API, Cloud Run Admin API, Eventarc API, Cloud Pub/Sub API, Cloud Storage API (meist schon an).
+2. **Rollen fuer das Deploy-Dienstkonto** (IAM und Verwaltung → IAM → Zugriff gewaehren → Hauptkonto = Adresse des
+   Dienstkontos):
+   | Rolle (Konsole) | Rollen-ID | wofuer |
+   |---|---|---|
+   | Cloud Functions-Administrator | `roles/cloudfunctions.admin` | Funktionen anlegen/aendern, oeffentlichen Aufruf erlauben |
+   | Cloud Run-Administrator | `roles/run.admin` | Functions 2. Gen. sind Cloud-Run-Dienste |
+   | Artifact Registry-Administrator | `roles/artifactregistry.admin` | Container-Images, Aufraeumregel |
+   | Cloud Build-Bearbeiter | `roles/cloudbuild.builds.editor` | Build starten und Status lesen |
+   | Service Usage-Administrator | `roles/serviceusage.serviceUsageAdmin` | CLI prueft/aktiviert die APIs und erzeugt Dienst-Identitaeten |
+3. **Dienstkonto-Nutzer nur auf dem Laufzeit-Konto:** IAM und Verwaltung → Dienstkonten →
+   `<Projektnummer>-compute@developer.gserviceaccount.com` („Default compute service account“) → Tab
+   „Berechtigungen“ → Zugriff gewaehren → Hauptkonto = Deploy-Dienstkonto, Rolle **Dienstkontonutzer**
+   (`roles/iam.serviceAccountUser`). Nicht projektweit vergeben.
+4. Pruefen, dass das Laufzeit-/Build-Konto `<Projektnummer>-compute@developer.gserviceaccount.com` im IAM die Rolle
+   „Bearbeiter“ oder „Cloud Build-Dienstkonto“ (`roles/cloudbuild.builds.builder`) hat (bei Projekten ohne
+   Organisation Standard). Fehlt sie, bricht der Build mit „missing permission on the build service account“ ab.
+5. Spaeter, sobald eine Funktion Geheimnisse nutzt: zusaetzlich **Secret Manager-Betrachter**
+   (`roles/secretmanager.viewer`) und, damit die CLI dem Laufzeit-Konto Lesezugriff auf das Geheimnis geben kann,
+   **Secret Manager-Administrator** (`roles/secretmanager.admin`) – oder diesen Zugriff einmal von Hand vergeben.
+6. Danach mergen; im Actions-Lauf muss der Job `deploy_functions` gruen sein. Pruefen:
+   `https://europe-west3-teamkompass-b8aac.cloudfunctions.net/healthCheck` im Browser → `{"status":"ok"}`.
+   Ist der Job rot, steht im Log, welche Berechtigung oder API fehlt; nachtragen und den Lauf in GitHub → Actions
+   mit „Re-run failed jobs“ wiederholen.
+
+### Neue Funktion hinzufuegen
+
+1. Eigene Datei `functions/src/<thema>.ts`, oben `import './options';`, Funktion mit `onCall`/`onRequest`/
+   Firestore-Trigger aus `firebase-functions/v2/...` definieren – ohne eigene Region.
+2. Reine Logik als eigene Funktion daneben (ohne Firebase testbar), Aufrufer-Pruefung (siehe Sicherheit) zuerst.
+3. In `functions/src/index.ts` exportieren.
+4. Tests: Unit-Test in `functions/test/`, bei Bedarf Emulator-Test in `functions/test/emulator/` (fuer Firestore-
+   Trigger: `--only functions,firestore` im Skript `test:emulator`, dann braucht der Emulator Java 21 wie die
+   Regel-Tests).
+5. `npm run verify`, PR, Merge → der Job `deploy_functions` deployt sie.

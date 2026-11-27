@@ -1,0 +1,23 @@
+{
+  // SCRUM-198: rootDir ist das Repo, damit die gemeinsame Logik der App (angular/src/app/core/ratings, reines TypeScript
+  // ohne Angular) mitkompiliert wird statt kopiert. Ausgabe: lib/functions/src/** und lib/angular/src/** – beides liegt
+  // in functions/lib und wird mit hochgeladen.
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "target": "ES2022",
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "rootDir": "..",
+    "outDir": "lib",
+    "strict": true,
+    "noImplicitReturns": true,
+    "noUnusedLocals": true,
+    "noFallthroughCasesInSwitch": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "sourceMap": true
+  },
+  "include": ["src/**/*.ts"]
+}

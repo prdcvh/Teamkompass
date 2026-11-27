@@ -25,6 +25,10 @@ jobs:
           check-latest: true
       - name: Install Angular dependencies (ohne Install-Skripte)
         run: npm ci --ignore-scripts --prefix angular
+      # SCRUM-198: Cloud Functions (functions/) bauen, linten, testen; Emulator-Test mit der gelockten Firebase-CLI
+      # aus tests/rules (Functions-Emulator braucht kein Java). Kein Secret, Demo-Projekt ohne echte Daten.
+      - name: Install functions and Firebase CLI dependencies (ohne Install-Skripte)
+        run: npm ci --ignore-scripts --prefix functions && npm ci --ignore-scripts --prefix tests/rules
       - name: Verify application
         run: npm run verify
       # Die Angular-Builds (Hosting-Ziel u14 = Testteam, u17 = Live-Team U17 seit SCRUM-169, main = Haupt-Team
@@ -105,3 +109,82 @@ jobs:
           channelId: live
           projectId: teamkompass-b8aac
           target: u14
+  # SCRUM-198: Cloud Functions (functions/, Region europe-west3) in zwei eigenen Jobs neben build_and_deploy. Schlaegt
+  # dort etwas fehl (z. B. fehlende Rechte des Dienstkontos), laufen die vier Hosting-Deploys trotzdem; der Job ist
+  # dann rot und GitHub meldet den fehlgeschlagenen Lauf (nicht still).
+  # build_functions (ohne Secret) baut lib/ und schreibt die Funktionsliste functions.yaml. Mit ihr liest
+  # `firebase deploy` die Funktionen aus der Datei, statt Projektcode auszufuehren - deploy_functions mit dem
+  # Schluessel installiert nur die gelockte Firebase-CLI (tests/rules, SCRUM-90/229) und laedt hoch (wie SCRUM-57).
+  build_functions:
+    needs: verify
+    runs-on: ubuntu-24.04 # SCRUM-391 feste Runner-Version, ubuntu-latest (26.04) kann Playwright-Chromium nicht installieren
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          check-latest: true
+      - name: Install functions dependencies (ohne Install-Skripte)
+        run: npm ci --ignore-scripts --prefix functions
+      - name: Build functions and write functions.yaml
+        run: npm --prefix functions run build && npm --prefix functions run manifest
+      - uses: actions/upload-artifact@v7
+        with:
+          name: functions-dist
+          path: |
+            functions/lib
+            functions/functions.yaml
+          if-no-files-found: error
+          retention-days: 1
+  # Bewusst ohne --force: Funktionen, die nur noch in der Cloud existieren, werden nicht still geloescht, und
+  # Einstellungen, die Mindestkosten erhoehen, brechen den Deploy ab (FIREBASE_SETUP.md §14).
+  deploy_functions:
+    needs: build_functions
+    runs-on: ubuntu-24.04 # SCRUM-391 feste Runner-Version, ubuntu-latest (26.04) kann Playwright-Chromium nicht installieren
+    permissions:
+      contents: read
+    concurrency:
+      group: functions-deploy
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          check-latest: true
+      - uses: actions/download-artifact@v8
+        with:
+          name: functions-dist
+          path: functions
+      - name: Install pinned Firebase CLI (ohne Install-Skripte)
+        run: npm ci --ignore-scripts --prefix tests/rules
+      - name: Write service account key
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TEAMKOMPASS_B8AAC }}
+        run: printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-sa.json"
+      # Beim allerersten Deploy gibt es noch keine Aufraeumregel fuer die Container-Images (Artifact Registry). Die CLI
+      # meldet dann nach erfolgreichem Deploy einen Fehler; nur genau dieser Fall wird hier behoben (Regel setzen,
+      # Standard: Images nach 1 Tag loeschen). Jeder andere Fehler laesst den Schritt rot werden.
+      - name: Deploy Cloud Functions
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-sa.json
+          FIREBASE: tests/rules/node_modules/.bin/firebase
+        run: |
+          test -f functions/functions.yaml
+          set -o pipefail
+          if ! "$FIREBASE" deploy --only functions --project teamkompass-b8aac --non-interactive 2>&1 | tee "$RUNNER_TEMP/functions-deploy.log"; then
+            if grep -q "Functions successfully deployed but could not set up cleanup policy" "$RUNNER_TEMP/functions-deploy.log"; then
+              "$FIREBASE" functions:artifacts:setpolicy --location europe-west3 --project teamkompass-b8aac --non-interactive --force
+            else
+              exit 1
+            fi
+          fi
+      - name: Remove service account key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/firebase-sa.json"
