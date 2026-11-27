@@ -4,7 +4,7 @@ import { ListFilters } from '../../core/shell/list-filters';
 import { LayoutService, injectNarrowViewport } from '../../core/shell/layout.service';
 import { ageFromBirthdate, formatDate } from '../../core/shared/dates';
 import { CONSENT_LABELS, type Player, STANDARD_POSITIONS, positionText } from '../../core/player/player';
-import { SORT_OPTIONS, SQUAD_STATUSES, type SortKey, type StatusOf, filterPlayers, sortPlayers, statusCounts } from '../../core/player/squad-list';
+import { SORT_OPTIONS, SQUAD_STATUSES, type StatusOf, filterPlayers, sortPlayers, statusCounts } from '../../core/player/squad-list';
 import { SquadService } from '../../core/player/squad.service';
 import { activeAbsenceOn } from '../../core/records/absence';
 import { type EffectiveStatus, effectiveStatus } from '../../core/records/availability';

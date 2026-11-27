@@ -1,10 +1,9 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import {
   KNOWLEDGE_TYPES,
-  type KnowledgeEntry,
-  type KnowledgeFilter,
-  type KnowledgeType,
   NO_FILTER,
+  type KnowledgeEntry,
+  type KnowledgeType,
   filterEntries,
   knowledgeTypeLabel,
   urlHost,

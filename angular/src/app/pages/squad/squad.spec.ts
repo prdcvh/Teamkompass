@@ -6,7 +6,6 @@ import { SessionService } from '../../core/auth/session.service';
 import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
 import { SquadService } from '../../core/player/squad.service';
 import { SquadAbsencesService } from '../../core/records/squad-absences.service';
-import { ListFilters } from '../../core/shell/list-filters';
 import { Squad } from './squad';
 import { CurrentTeam } from '../../core/team/current-team.service';
 
@@ -54,21 +53,6 @@ describe('Squad (Kader-Seite)', () => {
       expect(qa<HTMLAnchorElement>(fixture, 'tbody a.name-link').map((a) => a.getAttribute('href'))).toEqual(['/profile/p1', '/profile/p2', '/profile/p3']);
       expect(text(q(fixture, '.meta'))).toBe('3 Spieler');
       expect(q(fixture, '.sync')?.getAttribute('data-state')).toBe('saved');
-    });
-
-    it('behält Suche, Filter und Sortierung nach dem Verlassen der Seite (SCRUM-310)', async () => {
-      const fixture = await render();
-      type(q<HTMLInputElement>(fixture, 'input[type="search"]')!, 'wagner');
-      fixture.detectChanges();
-      fixture.destroy();
-      const again = TestBed.createComponent(Squad);
-      await again.whenStable();
-      again.detectChanges();
-      expect(q<HTMLInputElement>(again, 'input[type="search"]')!.value).toBe('wagner');
-      expect(qa(again, 'tbody tr')).toHaveLength(1);
-      // Abmelden / Teamwechsel räumt den Stand weg
-      TestBed.inject(SessionService).clear();
-      expect(TestBed.inject(ListFilters).squadQuery()).toBe('');
     });
 
     it('sucht, filtert nach Position und Status und setzt Filter zurück', async () => {

@@ -7,8 +7,6 @@ import {
   EVENT_SORT_OPTIONS,
   EVENT_TYPES,
   exertionLabel,
-  type EventSort,
-  type EventTypeFilter,
   type TeamEvent,
   filterEvents,
   formatDate,
