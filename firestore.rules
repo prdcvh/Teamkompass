@@ -775,6 +775,8 @@ service cloud.firestore {
         // - Widerruf (SCRUM-252, wie SCRUM-245): Ist die Einwilligung des Spielers nach dem Schreiben "widerrufen",
         //   duerfen keine Groessen der Eltern mehr gespeichert werden (keine neue Berechnung). Was schon gespeichert
         //   ist, bleibt bis der Trainer es loescht - geloescht wird nie automatisch.
+        // - Herkunft der Elterngroesse (SCRUM-303): motherHeightSource / fatherHeightSource = 'measured' | 'reported';
+        //   fehlt = nicht angegeben. Gleiche Rollen und gleiche Loesch-/Widerrufslogik wie die Groessen.
         // Neue Felder (z. B. SCRUM-253): Rohmesswerte wie Sitzhoehe gehoeren in measurements (dort gelten Lesen/
         // Schreiben/Widerruf schon fuer jedes Feld). Weitere Reife-Angaben in DIESEM Dokument muessen unten in hasOnly
         // aufgenommen werden; gespeicherte Ableitungen sind nicht vorgesehen.
@@ -783,8 +785,15 @@ service cloud.firestore {
           function parentHeightOk(value) {
             return value == null || ((value is int || value is float) && value >= 100 && value <= 250);
           }
+          // Herkunft der Groesse (SCRUM-303): 'measured' (gemessen) oder 'reported' (angegeben); fehlt oder null =
+          // nicht angegeben. Nur zusammen mit einer Groesse erlaubt; gehoert wie die Groesse zu den Elterndaten
+          // (ohne Haekchen und nach Widerruf nur leer).
+          function parentSourceOk(source, height) {
+            return source == null || ((source == 'measured' || source == 'reported') && height != null);
+          }
           function noParentHeights(data) {
-            return data.get('motherHeight', null) == null && data.get('fatherHeight', null) == null;
+            return data.get('motherHeight', null) == null && data.get('fatherHeight', null) == null
+              && data.get('motherHeightSource', null) == null && data.get('fatherHeightSource', null) == null;
           }
           function revokedAfterWrite() {
             return existsAfter(playerPath(playerId))
@@ -810,13 +819,15 @@ service cloud.firestore {
           allow create, update: if isTrainer()
             && docId == 'parents'
             && mayStoreHealth(playerId)
-            && request.resource.data.keys().hasOnly(['playerId', 'sex', 'parentsConsent', 'motherHeight', 'fatherHeight', 'parentsConsentDate', 'parentsConsentBy', 'parentsConsentByUid', 'updatedAt'])
+            && request.resource.data.keys().hasOnly(['playerId', 'sex', 'parentsConsent', 'motherHeight', 'fatherHeight', 'motherHeightSource', 'fatherHeightSource', 'parentsConsentDate', 'parentsConsentBy', 'parentsConsentByUid', 'updatedAt'])
             && request.resource.data.playerId == playerId
             && request.resource.data.get('sex', '') in ['', 'm', 'f']
             && request.resource.data.parentsConsent is bool
             && request.resource.data.get('updatedAt', '') is string
             && parentHeightOk(request.resource.data.get('motherHeight', null))
             && parentHeightOk(request.resource.data.get('fatherHeight', null))
+            && parentSourceOk(request.resource.data.get('motherHeightSource', null), request.resource.data.get('motherHeight', null))
+            && parentSourceOk(request.resource.data.get('fatherHeightSource', null), request.resource.data.get('fatherHeight', null))
             && (request.resource.data.parentsConsent == true || noParentHeights(request.resource.data))
             && parentsConsentRecordOk(request.resource.data)
             && (!revokedAfterWrite() || noParentHeights(request.resource.data));

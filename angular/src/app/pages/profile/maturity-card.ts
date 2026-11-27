@@ -12,6 +12,8 @@ import {
   inMaturityAgeRange,
   maturityInputsForCalculation,
   maturityStopped,
+  parentHeightBasisText,
+  type ParentHeightSource,
   parseParentHeight,
 } from '../../core/records/maturity';
 import { assessMaturity } from '../../core/records/maturity-assessment';
@@ -28,6 +30,8 @@ interface Draft {
   readonly parentsConsent: boolean;
   readonly motherHeight: string;
   readonly fatherHeight: string;
+  readonly motherSource: ParentHeightSource | '';
+  readonly fatherSource: ParentHeightSource | '';
 }
 
 /**
@@ -68,6 +72,9 @@ interface Draft {
             <p class="muted maturity-source">
               Methode: Khamis &amp; Roche (1994) aus Größe, Gewicht und Größe beider Eltern. Einordnung: unter 85 % spät entwickelt, 85–95 % im Schnitt, über 95 % früh entwickelt.
             </p>
+            @if (parentBasis()) {
+              <p class="muted" data-test="maturity-parent-basis">Größe der Eltern – {{ parentBasis() }}.</p>
+            }
             <details class="maturity-help" data-test="maturity-help">
               <summary>So liest du den Reife-Kompass</summary>
               <ul>
@@ -104,10 +111,27 @@ interface Draft {
                     <input class="tk-input" name="motherHeight" inputmode="decimal" autocomplete="off" [value]="draft().motherHeight" [disabled]="locked() || !draft().parentsConsent" (input)="patch({ motherHeight: value($event) })" />
                   </label>
                   <label class="tk-label">
+                    Größe Mutter beruht auf
+                    <select class="tk-input" name="motherSource" [value]="draft().motherSource" [disabled]="locked() || !draft().parentsConsent" (change)="patch({ motherSource: sourceOf($event) })">
+                      <option value="">nicht angegeben</option>
+                      <option value="measured">gemessen</option>
+                      <option value="reported">angegeben (Selbstauskunft)</option>
+                    </select>
+                  </label>
+                  <label class="tk-label">
                     Größe Vater (cm)
                     <input class="tk-input" name="fatherHeight" inputmode="decimal" autocomplete="off" [value]="draft().fatherHeight" [disabled]="locked() || !draft().parentsConsent" (input)="patch({ fatherHeight: value($event) })" />
                   </label>
+                  <label class="tk-label">
+                    Größe Vater beruht auf
+                    <select class="tk-input" name="fatherSource" [value]="draft().fatherSource" [disabled]="locked() || !draft().parentsConsent" (change)="patch({ fatherSource: sourceOf($event) })">
+                      <option value="">nicht angegeben</option>
+                      <option value="measured">gemessen</option>
+                      <option value="reported">angegeben (Selbstauskunft)</option>
+                    </select>
+                  </label>
                 </div>
+                <p class="muted" data-test="maturity-parent-note">Die Herkunft wird nur angezeigt. Selbst angegebene Größen sind oft zu hoch; die App rechnet sie nicht um.</p>
                 @if (!draft().parentsConsent && (service.inputs().motherHeight || service.inputs().fatherHeight)) {
                   <p class="muted">Ohne Häkchen werden die gespeicherten Größen der Eltern beim Speichern gelöscht.</p>
                 }
@@ -153,6 +177,8 @@ export class MaturityCard {
   protected readonly hasInputs = computed(() => hasMaturityData(this.calculationInputs()));
   /** Nur für Spieler, die heute 12 bis 15 Jahre alt sind (PO, 02.11.2026). */
   protected readonly ageInRange = computed(() => inMaturityAgeRange(decimalAge(this.birthdate(), todayIso())));
+  /** Datengrundlage der Elterngrößen (SCRUM-303); leer bei Widerruf oder ohne Größen. */
+  protected readonly parentBasis = computed(() => parentHeightBasisText(this.calculationInputs()));
   protected readonly helpLines = MATURITY_HELP_LINES;
   /** Nachweis des Einverständnisses der Eltern (SCRUM-252). */
   protected readonly consentRecord = computed(() => {
@@ -163,7 +189,7 @@ export class MaturityCard {
   protected readonly canEdit = computed(() => this.editable() && this.service.canWrite());
   protected readonly locked = computed(() => !!this.healthLocked());
 
-  protected readonly draft = signal<Draft>({ sex: '', parentsConsent: false, motherHeight: '', fatherHeight: '' });
+  protected readonly draft = signal<Draft>({ sex: '', parentsConsent: false, motherHeight: '', fatherHeight: '', motherSource: '', fatherSource: '' });
   protected readonly formError = signal('');
   protected readonly busy = signal(false);
   protected readonly saved = signal(false);
@@ -190,6 +216,8 @@ export class MaturityCard {
           parentsConsent: inputs.parentsConsent,
           motherHeight: inputs.motherHeight === null ? '' : String(inputs.motherHeight),
           fatherHeight: inputs.fatherHeight === null ? '' : String(inputs.fatherHeight),
+          motherSource: inputs.motherHeightSource ?? '',
+          fatherSource: inputs.fatherHeightSource ?? '',
         });
         this.formError.set('');
       });
@@ -209,6 +237,11 @@ export class MaturityCard {
     return (event.target as HTMLInputElement).checked;
   }
 
+  protected sourceOf(event: Event): ParentHeightSource | '' {
+    const value = (event.target as HTMLSelectElement).value;
+    return value === 'measured' || value === 'reported' ? value : '';
+  }
+
   protected sexOf(event: Event): MaturitySex | '' {
     const value = (event.target as HTMLSelectElement).value;
     return value === 'm' || value === 'f' ? value : '';
@@ -224,7 +257,11 @@ export class MaturityCard {
       this.formError.set(`Bitte die Größe der Eltern in cm eingeben (${MIN_PARENT_HEIGHT_CM} bis ${MAX_PARENT_HEIGHT_CM}).`);
       return;
     }
-    const inputs: MaturityInputs = { sex: draft.sex || null, parentsConsent: draft.parentsConsent, motherHeight: mother, fatherHeight: father };
+    const inputs: MaturityInputs = { sex: draft.sex || null, parentsConsent: draft.parentsConsent, motherHeight: mother,
+      fatherHeight: father,
+      motherHeightSource: mother !== null && draft.motherSource ? draft.motherSource : null,
+      fatherHeightSource: father !== null && draft.fatherSource ? draft.fatherSource : null,
+    };
     this.formError.set('');
     this.busy.set(true);
     try {

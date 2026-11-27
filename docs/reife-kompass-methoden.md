@@ -225,8 +225,8 @@ Mindestabstand 90 Tage, Vergleichsmessung 90 bis 365 Tage vor der jüngsten, jü
 - **Früh-/Spätreifende:** gerade für sie sind die Verfahren am ungenauesten (Offset-Formeln ziehen Richtung
   Durchschnitt; Khamis–Roche mit großem Fehler). Eine Einordnung am Rand ist am unsichersten.
 - **Elterngrößen:** Das Verfahren braucht die leiblichen Eltern. Selbst angegebene Größen sind oft zu groß;
-  Studien korrigieren sie (Epstein et al. 1995, angewandt bei Hill et al. 2020). Die App unterscheidet heute
-  nicht zwischen gemessen und angegeben und korrigiert nicht → als offener Punkt vermerkt.
+  Studien korrigieren sie (Epstein et al. 1995, angewandt bei Hill et al. 2020). Die App hält seit SCRUM-303
+  je Elternteil fest, ob die Größe gemessen oder angegeben ist, und zeigt das an (§7b); sie korrigiert nicht.
 - **Kein medizinisches Urteil:** keine Knochenalter-, Trainingssperre-, Verletzungs- oder Talentaussage.
 
 ## 7a. Anzeige der Einordnung (SCRUM-256)
@@ -248,6 +248,16 @@ Größenmessung ohne Gewicht. Fehlerbreite: Bereich des %PAH bei ±5,3 cm (Junge
 (§3.5), ausdrücklich keine Sicherheitsangabe. Keine automatische PHV-Einordnung, kein Moore-Modell. Eine manuelle
 Einordnung der Wachstumsspitze (mit Autor, Datum, Begründung) gibt es noch nicht – sie bräuchte neue Felder in
 `maturity/parents` und damit eine Regeländerung (SCRUM-388). Bio-Banding nutzt diese Prüfung noch nicht (SCRUM-389).
+
+## 7b. Datengrundlage der Elterngrößen (SCRUM-303)
+
+Je Elternteil kann der Trainer festhalten, ob die Größe **gemessen** oder **angegeben** (Selbstauskunft) ist
+(`motherHeightSource` / `fatherHeightSource` = `measured` | `reported` in `maturity/parents`). Fehlt das Feld
+(Bestandswerte), gilt „Herkunft nicht angegeben“. Die Reife-Karte zeigt die Herkunft an. **Die Rechnung ändert sich
+nicht:** es wird keine Korrektur angegebener Größen eingerechnet, deshalb bleibt die Methodenversion **1.0**.
+Ob und wie korrigiert wird (Epstein et al. 1995), entscheidet der PO erst, wenn die Formel aus der Originalquelle
+geprüft ist; das wäre eine neue Methodenversion. Die Herkunft ist Teil der Elterndaten: gleiche Rollen, gleiche
+Einwilligung und dieselbe Lösch- und Widerrufslogik wie die Größen (ohne Häkchen und nach Widerruf nur leer).
 
 ## 8. Quellen
 

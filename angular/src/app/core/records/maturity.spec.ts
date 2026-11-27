@@ -12,6 +12,7 @@ import {
   maturityBand,
   maturityHistory,
   maturityInputsFromDoc,
+  parentHeightBasisText,
   midParentHeight,
   missingMaturityInputs,
   parseParentHeight,
@@ -163,6 +164,29 @@ describe('Reife-Kompass: Khamis-Roche (SCRUM-190)', () => {
         fatherHeight: null,
       });
       expect(maturityInputsFromDoc(null).parentsConsent).toBe(false);
+    });
+
+    it('Herkunft der Elterngröße (SCRUM-303): Bestand = nicht angegeben, ungültige Werte gelten als nicht angegeben, ohne Häkchen/Größe weg', () => {
+      const legacy = maturityInputsFromDoc({ sex: 'm', parentsConsent: true, motherHeight: 168, fatherHeight: 180 });
+      expect(legacy.motherHeightSource ?? null).toBeNull();
+      expect(parentHeightBasisText(legacy)).toBe('Mutter: Herkunft nicht angegeben · Vater: Herkunft nicht angegeben');
+      const doc = { sex: 'm', parentsConsent: true, motherHeight: 168, fatherHeight: 180, motherHeightSource: 'measured', fatherHeightSource: 'reported' };
+      const read = maturityInputsFromDoc(doc);
+      expect(read).toMatchObject({ motherHeightSource: 'measured', fatherHeightSource: 'reported' });
+      expect(parentHeightBasisText(read)).toBe('Mutter: gemessen · Vater: angegeben');
+      expect(maturityInputsFromDoc({ ...doc, motherHeightSource: 'geraten' }).motherHeightSource).toBeNull();
+      expect(maturityInputsFromDoc({ ...doc, parentsConsent: false })).toMatchObject({ motherHeightSource: null, fatherHeightSource: null });
+      expect(maturityInputsFromDoc({ ...doc, fatherHeight: null }).fatherHeightSource).toBeNull();
+      expect(docFromMaturityInputs('p1', read, 'x')).toMatchObject({ motherHeightSource: 'measured', fatherHeightSource: 'reported' });
+      const bare = docFromMaturityInputs('p1', inputs({ motherHeightSource: null }), 'x');
+      expect('motherHeightSource' in bare).toBe(false);
+      const revoked = docFromMaturityInputs('p1', { ...read, parentsConsent: false }, 'x');
+      expect('motherHeightSource' in revoked || 'fatherHeightSource' in revoked).toBe(false);
+      expect(docFromMaturityInputs('p1', { ...read, motherHeight: null }, 'x')).not.toHaveProperty('motherHeightSource');
+    });
+
+    it('Herkunft ändert die Rechnung nicht (keine Korrektur)', () => {
+      expect(midParentHeight(inputs({ motherHeightSource: 'reported', fatherHeightSource: 'reported' }))).toBe(midParentHeight(inputs({ motherHeightSource: 'measured' })));
     });
 
     it('prüft die eingegebene Größe (100–250 cm, Komma erlaubt)', () => {

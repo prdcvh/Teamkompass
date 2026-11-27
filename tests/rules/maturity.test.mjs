@@ -108,6 +108,32 @@ test("Format: nur erlaubte Felder, gueltige Werte, passende playerId", async () 
   await assertSucceeds(setDoc(coach, valid("p1", { sex: "", motherHeight: null })));
 });
 
+test("Herkunft der Elterngroesse (SCRUM-303): nur measured/reported, nur mit Groesse, weg ohne Haekchen", async () => {
+  const coach = doc(as("coach"), path(OWN, "p1"));
+  await assertSucceeds(setDoc(coach, valid("p1", { motherHeightSource: "measured", fatherHeightSource: "reported" })));
+  await assertSucceeds(setDoc(coach, valid("p1", { motherHeightSource: null })));
+  await assertSucceeds(setDoc(coach, valid("p1"))); // Bestand ohne Felder
+  await assertFails(setDoc(coach, valid("p1", { motherHeightSource: "geraten" })));
+  await assertFails(setDoc(coach, valid("p1", { fatherHeightSource: 1 })));
+  await assertFails(setDoc(coach, valid("p1", { motherHeight: null, motherHeightSource: "measured" })));
+  // Haekchen weg: Herkunft muss mit den Groessen verschwinden.
+  await assertFails(setDoc(coach, valid("p1", { parentsConsent: false, motherHeight: null, fatherHeight: null, motherHeightSource: "measured" })));
+  await assertSucceeds(setDoc(coach, valid("p1", { parentsConsent: false, motherHeight: null, fatherHeight: null })));
+  // Nur Trainer.
+  for (const uid of ["medic", "pl1", "parent1", "scout"]) {
+    await assertFails(setDoc(doc(as(uid), path(OWN, "p1")), valid("p1", { motherHeightSource: "measured" })));
+  }
+  // Fremder Verein: nur mit dokumentierter Einwilligung.
+  await assertFails(setDoc(doc(as("coach"), path(FOREIGN, "p1")), valid("p1", { motherHeightSource: "measured" })));
+  await assertSucceeds(setDoc(doc(as("coach"), path(FOREIGN, "p3")), valid("p3", { motherHeightSource: "measured" })));
+});
+
+test("Widerruf: Herkunft der Elterngroesse darf nicht neu geschrieben werden, nur leeren (SCRUM-303)", async () => {
+  const ref = doc(as("coach"), path(OWN, "p2"));
+  await assertFails(setDoc(ref, valid("p2", { motherHeight: null, fatherHeight: null, motherHeightSource: "measured" })));
+  await assertSucceeds(setDoc(ref, valid("p2", { motherHeight: null, fatherHeight: null })));
+});
+
 test("Fremder Verein: speichern nur mit dokumentierter Einwilligung", async () => {
   await assertFails(setDoc(doc(as("coach"), path(FOREIGN, "p1")), valid("p1")));
   await assertSucceeds(setDoc(doc(as("coach"), path(FOREIGN, "p3")), valid("p3")));
