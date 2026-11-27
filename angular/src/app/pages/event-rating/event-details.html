@@ -93,6 +93,21 @@
             }
           </div>
         }
+        @if (bio.suggestion.unclassified.length > 0) {
+          <div class="bio-group bio-unclassified" data-test="bio-unclassified">
+            <strong>Nicht eingeordnet</strong>
+            <ul>
+              @for (member of bio.suggestion.unclassified; track member.id) {
+                <li>
+                  {{ member.name }} <span class="hint">{{ member.statusText }}</span>
+                  @for (cause of member.causes; track $index) {
+                    <span class="hint bio-cause">{{ cause }}</span>
+                  }
+                </li>
+              }
+            </ul>
+          </div>
+        }
         @if (bio.suggestion.withoutValue > 0) {
           <p class="hint" data-test="bio-without">
             Für {{ bio.suggestion.withoutValue }} Spieler gibt es keinen Vorschlag (kein Reifestand oder nicht 12 bis 15 Jahre alt).
