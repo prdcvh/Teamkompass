@@ -31,6 +31,7 @@ export const newTicket = (key: string): RunTicket => ({
   draft: false,
   reason: null,
   ci: null,
+  checkPassed: null,
   tokensActual: 0,
 })
 
@@ -113,6 +114,33 @@ export function waitingForPo(t: RunTicket): string | null {
   if (t.draft && t.pr !== null && t.status !== 'Erledigt') return t.reason ?? 'Draft-PR, Grund steht im Ticket'
 
   return null
+}
+
+/** Jira-Adresse eines Tickets (Knopf der Freigabe-Leiste, SCRUM-241). */
+export const jiraUrl = (key: string) => `https://pascalrdcvh.atlassian.net/browse/${key}`
+
+export type Approval = {
+  /** Kontrolle bestanden, kein Draft: wartet auf „Genehmigt“ des PO in Jira. */
+  ready: RunTicket[]
+  /** Wartet auf eine Entscheidung des PO (Draft-PR oder Frage), mit Grund. */
+  decide: { ticket: RunTicket; reason: string }[]
+}
+
+/**
+ * Was am Ende eines Runs auf den PO wartet (SCRUM-241): PRs, die die Kontrolle bestanden haben
+ * (Ticket „In Überprüfung“, kein Draft, CI nicht rot, Kontrolle nicht durchgefallen), und getrennt
+ * davon Tickets, die eine Entscheidung brauchen. Nichts davon wird über die Leiste gemergt.
+ */
+export function approvalOf(run: RunState | null): Approval {
+  const ready: RunTicket[] = []
+  const decide: Approval['decide'] = []
+  for (const t of run?.tickets ?? []) {
+    const reason = waitingForPo(t)
+    if (reason !== null) decide.push({ ticket: t, reason })
+    else if (t.status === 'In Überprüfung' && t.pr !== null && t.ci !== 'rot' && t.checkPassed === true) ready.push(t)
+  }
+
+  return { ready, decide }
 }
 
 export type Summary = { slotsBusy: number; done: number; open: number; planned: number; actual: number }
