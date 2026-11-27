@@ -161,6 +161,68 @@ test('Keine Seite scrollt seitlich (alle Breiten, alle Seiten)', { skip: playwri
   assert.deepEqual(failures, [], `Seitliches Scrollen bzw. Überstand gefunden:\n${failures.join('\n')}`);
 });
 
+/** Läuft im Browser: prüft jede Zeile der Kaderliste auf überlappende Texte (SCRUM-309). */
+function measureSquadRows() {
+  const problems = [];
+  const boxes = (el) => {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    return [...range.getClientRects()].filter((r) => r.width > 0 && r.height > 0);
+  };
+  const overlap = (a, b) => a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
+  const rows = document.querySelectorAll('.cards li');
+  if (rows.length === 0) problems.push('keine Kaderzeilen gefunden');
+  for (const row of rows) {
+    const label = row.querySelector('strong')?.textContent?.trim();
+    const parts = [
+      ['Name', row.querySelector('.who strong')],
+      ...[...row.querySelectorAll('.who .meta-part')].map((el) => ['Angabe', el]),
+      ['Status', row.querySelector('tk-status')],
+      ['Nummer', row.querySelector('.number')],
+      ['Bearbeiten', row.querySelector('.edit-btn')],
+    ].filter(([, el]) => el).flatMap(([kind, el]) => (kind === 'Angabe' ? boxes(el) : [el.getBoundingClientRect()]).map((rect) => ({ kind, rect })));
+    for (let i = 0; i < parts.length; i++) {
+      for (let j = i + 1; j < parts.length; j++) {
+        if (overlap(parts[i].rect, parts[j].rect)) problems.push(`„${label}“: ${parts[i].kind} und ${parts[j].kind} überlappen`);
+      }
+    }
+    const name = row.querySelector('.who strong');
+    if (name.clientHeight > parseFloat(getComputedStyle(name).lineHeight) * 2 + 1) problems.push(`„${label}“: Name länger als 2 Zeilen`);
+    for (const part of row.querySelectorAll('.who .meta-part')) {
+      if (boxes(part).length > 1) problems.push(`„${label}“: „${part.textContent.trim()}“ bricht um`);
+    }
+    const status = row.querySelector('tk-status');
+    if (status.getBoundingClientRect().height > parseFloat(getComputedStyle(status).fontSize) * 2) problems.push(`„${label}“: Status bricht um`);
+    const button = row.querySelector('.edit-btn')?.getBoundingClientRect();
+    if (button && (button.width < 44 || button.height < 44)) problems.push(`„${label}“: Bearbeiten-Knopf kleiner als 44 px (${Math.round(button.width)}×${Math.round(button.height)})`);
+    const card = row.getBoundingClientRect();
+    for (const { kind, rect } of parts) {
+      if (rect.right > card.right + 0.5) problems.push(`„${label}“: ${kind} ragt aus der Zeile`);
+    }
+  }
+  return problems.slice(0, 8);
+}
+
+test('Kaderliste: keine überlappenden Texte, Name höchstens 2 Zeilen (320/360/390 px, SCRUM-309)', { skip: playwright ? false : 'Playwright nicht installiert', timeout: 600_000 }, async () => {
+  buildOnce();
+  const failures = [];
+  await withCleanup(async (cleanup) => {
+    const { base, browser } = await startServerAndBrowser(cleanup);
+    for (const width of [320, 360, 390]) {
+      const context = await browser.newContext({ viewport: { width, height: 900 }, hasTouch: true, isMobile: true });
+      cleanup.add(`Context ${width}px`, () => context.close());
+      const page = await openPage(context);
+      await page.goto(`${base}/kader`);
+      await page.waitForSelector('.cards li', { timeout: 15_000 });
+      await page.waitForTimeout(400);
+      const problems = await page.evaluate(measureSquadRows);
+      if (problems.length) failures.push(`${width}px /kader: ${problems.join('; ')}`);
+      await context.close();
+    }
+  });
+  assert.deepEqual(failures, [], `Kaderliste mit überlappenden oder umbrechenden Texten:\n${failures.join('\n')}`);
+});
+
 // SCRUM-119/121: Mit `style-src 'self'` (ohne 'unsafe-inline') darf die App keine Inline-Styles brauchen. Gemessen mit der
 // CSP aus firebase.json, nur ohne 'unsafe-inline'. Gestaltung per CSSOM ([style.x]-Bindungen, konstruierte Stylesheets)
 // ist erlaubt. Einzige verbleibende Ausnahme: Angular legt die Komponenten-Styles als <style>-Elemente in <head> an –
