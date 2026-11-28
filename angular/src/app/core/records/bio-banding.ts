@@ -15,9 +15,15 @@
  *
  * Der Vorschlag ist nur eine Hilfe, der Trainer entscheidet. Er nutzt die jüngste Messung je Spieler (nur Spieler
  * von 12 bis 15 Jahren mit Reifestand); alle anderen bekommen keinen Vorschlag.
+ *
+ * GLEICHE PRÜFUNG WIE IM PROFIL (SCRUM-389): Ob ein Spieler eingeordnet wird, entscheidet `assessMaturity`
+ * (maturity-assessment.ts), dieselbe Funktion wie in der Reife-Karte im Profil. Ist der jüngste Wert veraltet (älter
+ * als 90 Tage) oder widersprüchlich (z. B. zur Prüfung markierte Messung), kommt der Spieler in keine Gruppe, sondern
+ * in die Zeile „nicht eingeordnet“ mit dem Grund.
  */
 import type { ConsentStatus } from '../player/player';
-import { type MaturityInputs, type MaturityPoint, decimalAge, inMaturityAgeRange, maturityHistory, maturityInputsForCalculation, roundPercent } from './maturity';
+import { type MaturityInputs, type MaturityPoint, decimalAge, inMaturityAgeRange, maturityInputsForCalculation, roundPercent } from './maturity';
+import { type MaturityAssessmentStatus, assessMaturity } from './maturity-assessment';
 import type { Measurement } from './measurement';
 
 export type BioBand = 1 | 2 | 3 | 4;
@@ -71,9 +77,21 @@ export interface BioBandingGroup extends BioBandInfo {
   readonly players: readonly BioBandingMember[];
 }
 
+/** Spieler mit Reifewert, der nicht belastbar ist: keine Gruppe, stattdessen Status und Ursachen aus `assessMaturity`. */
+export interface BioBandingUnclassified {
+  readonly id: string;
+  readonly name: string;
+  readonly status: Extract<MaturityAssessmentStatus, 'stale' | 'uncertain'>;
+  /** Wie im Profil: „nicht eingeordnet – Messung veraltet“ bzw. „Einordnung unsicher – prüfen“. */
+  readonly statusText: string;
+  readonly causes: readonly string[];
+}
+
 export interface BioBandingSuggestion {
   /** Immer alle vier Bänder, auch leere. */
   readonly groups: readonly BioBandingGroup[];
+  /** Spieler mit veraltetem oder unsicherem Reifewert (SCRUM-389), nach Name sortiert. */
+  readonly unclassified: readonly BioBandingUnclassified[];
   /** Spieler ohne Vorschlag (kein Reifestand, außerhalb 12–15 Jahren oder Daten nicht geladen). */
   readonly withoutValue: number;
 }
@@ -85,19 +103,25 @@ export interface BioBandingSuggestion {
  */
 export function suggestBioBanding(players: readonly BioBandingPlayer[], data: ReadonlyMap<string, BioBandingData | null>, today: string): BioBandingSuggestion {
   const members: Record<BioBand, BioBandingMember[]> = { 1: [], 2: [], 3: [], 4: [] };
+  const unclassified: BioBandingUnclassified[] = [];
   let withoutValue = 0;
   for (const player of players) {
     const entry = data.get(player.id);
-    const point = entry && inMaturityAgeRange(decimalAge(player.birthdate, today)) ? maturityHistory(entry.measurements, player.birthdate, maturityInputsForCalculation(entry.inputs, player)).at(-1) : undefined;
-    if (!point) {
+    const assessment = entry && inMaturityAgeRange(decimalAge(player.birthdate, today)) ? assessMaturity(entry.measurements, player.birthdate, maturityInputsForCalculation(entry.inputs, player), today) : null;
+    if (!assessment || assessment.status === 'not-calculated' || !assessment.latest) {
       withoutValue += 1;
       continue;
     }
-    members[bioBand(point.percent)].push({ id: player.id, name: player.name, point });
+    if (assessment.status === 'classified') {
+      members[bioBand(assessment.latest.percent)].push({ id: player.id, name: player.name, point: assessment.latest });
+    } else {
+      unclassified.push({ id: player.id, name: player.name, status: assessment.status, statusText: assessment.statusText, causes: assessment.causes });
+    }
   }
   const groups = BIO_BANDS.map((info) => ({
     ...info,
     players: members[info.band].sort((a, b) => a.point.percent - b.point.percent || a.name.localeCompare(b.name, 'de')),
   }));
-  return { groups, withoutValue };
+  unclassified.sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  return { groups, unclassified, withoutValue };
 }
