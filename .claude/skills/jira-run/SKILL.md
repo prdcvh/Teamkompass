@@ -107,11 +107,12 @@ flüchtig und wird nicht anderswo gespeichert. Du nutzt es so:
    Server noch verbindet, mehrmals nachfassen statt sofort aufzugeben. Ist
    Jira nach einigen Minuten immer noch nicht da: nichts bauen, dem PO hier
    Bescheid geben.
-2a. **Genehmigte Tickets zuerst mergen.** Suche in Jira ausdrücklich nach
-   `status = Genehmigt` (der Status zählt als „fertig“, eine Suche nach
-   offenen Tickets findet ihn nicht) und merge diese PRs sofort, siehe
-   „Mergen“ unten. Das geschieht vor dem Plan und auch später im Run, sobald
-   ein Ticket in „Genehmigt“ auftaucht.
+2a. **Jeder Run beginnt damit, alles aus „Genehmigt“ zu mergen** (PO,
+   2026-11-24). Suche in Jira ausdrücklich nach `status = Genehmigt` (der
+   Status zählt als „fertig“, eine Suche nach offenen Tickets findet ihn
+   nicht) und merge alle diese PRs sofort, siehe „Mergen“ unten. Das
+   geschieht vor dem Plan und vor jeder Ticketarbeit, und auch später im Run,
+   sobald ein Ticket in „Genehmigt“ auftaucht.
 3. **Plan hier ins Fenster.** Den Nachtplan (Tickets, Schätzung, Modell,
    Reihenfolge, was parallel läuft, was nicht reinpasst oder auf den PO
    wartet) schreibst du direkt hier in den Chat. **Keine Push-Nachricht**:
@@ -135,7 +136,7 @@ flüchtig und wird nicht anderswo gespeichert. Du nutzt es so:
 Uhrzeiten nennst du dem PO immer in deutscher Zeit (Europe/Berlin), nicht in
 UTC.
 
-## Mergen: sofort bei „Genehmigt“ (PO, 2026-11-23)
+## Mergen: sofort bei „Genehmigt“ (PO, 2026-11-23, ergänzt 2026-11-24)
 
 Ein Ticket im Status „Genehmigt“ hat der PO freigegeben. Sein PR wird sofort
 gemergt, egal zu welcher Tageszeit und ohne Rückfrage, einen nach dem anderen:
@@ -144,9 +145,14 @@ prüfen, dass CI grün ist; dann mergen und das Ticket in Jira auf „Erledigt�
 setzen. Eine Zeile hier im Fenster dazu („SCRUM-258 → Erledigt, PR #339
 gemergt“).
 
+Ein Draft ist kein Hinderungsgrund: „Genehmigt“ ist die Freigabe des PO, auch
+für PRs, die wegen einer Regel-/Login-Änderung oder einer anderen
+PO-Entscheidung Draft geblieben sind. Solche PRs auf „Ready for review“ stellen
+und dann mergen.
+
 Nicht mergen, sondern dem PO sagen, was fehlt: Konflikt, der sich nicht sauber
-lösen lässt, rotes `npm run verify` oder rote CI, PR noch Draft oder mit
-offenen blockierenden Review-Kommentaren, PR gehört nicht zu diesem Ticket.
+lösen lässt, rotes `npm run verify` oder rote CI, offene blockierende
+Review-Kommentare, PR gehört nicht zu diesem Ticket.
 
 Tickets, die nicht auf „Genehmigt“ stehen (z. B. „In Überprüfung“), werden nie
 gemergt; der PO gibt sie in Jira frei.
