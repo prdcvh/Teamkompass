@@ -30,6 +30,7 @@
  * E-Mail (später über den Erinnerungsdienst, SCRUM-101): {@link ALERT_EMAIL_TEXT} ist der einzige Text, den eine E-Mail
  * je enthalten darf – ohne Namen, Regel oder Werte, nur „bitte in die App schauen“.
  */
+import { type MaturityInputs, hasMaturityData } from '../records/maturity';
 import type { TeamEvent } from '../events/event';
 import { type InjuryRisk, injuryRisk } from '../analysis/risk';
 import type { Player } from '../player/player';
@@ -141,6 +142,8 @@ export interface AlertPlayerData extends GrowthLoadData {
   readonly absences: readonly Absence[];
   readonly measurements: readonly Measurement[];
   readonly wellness: readonly WellnessEntry[] | null;
+  /** Angaben für den Reife-Kompass (SCRUM-304); nur für Spieler mit widerrufener Einwilligung geladen, `null`/fehlt = keine bekannt. */
+  readonly maturity?: MaturityInputs | null;
 }
 
 /** Ein Treffer an einem Tag. `key` ist je Regel und Spieler (bzw. Termin) eindeutig. */
@@ -182,7 +185,7 @@ export function loadSpikeMatch(data: AlertPlayerData, day: string): InjuryRisk |
   return risk.spike ? risk : null;
 }
 
-/** Einwilligung widerrufen und noch Gesundheitsdaten da (Status, Abwesenheiten, Messwerte oder Befinden). */
+/** Einwilligung widerrufen und noch Gesundheitsdaten da (Status, Abwesenheiten, Messwerte, Befinden, Prüfungen oder Reife-Kompass-Angaben). */
 export function consentRevokedMatch(data: AlertPlayerData): boolean {
   const { player } = data;
   if (player.consentStatus !== 'revoked') return false;
@@ -192,7 +195,8 @@ export function consentRevokedMatch(data: AlertPlayerData): boolean {
     data.absences.length > 0 ||
     data.measurements.length > 0 ||
     (data.wellness ?? []).some(hasWellnessAnswer) ||
-    (data.growthReviews ?? []).length > 0
+    (data.growthReviews ?? []).length > 0 ||
+    (!!data.maturity && hasMaturityData(data.maturity))
   );
 }
 

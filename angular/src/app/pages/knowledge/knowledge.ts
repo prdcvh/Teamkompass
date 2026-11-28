@@ -1,15 +1,15 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import {
   KNOWLEDGE_TYPES,
-  type KnowledgeEntry,
-  type KnowledgeFilter,
-  type KnowledgeType,
   NO_FILTER,
+  type KnowledgeEntry,
+  type KnowledgeType,
   filterEntries,
   knowledgeTypeLabel,
   urlHost,
 } from '../../core/knowledge/knowledge';
 import { KnowledgeService } from '../../core/knowledge/knowledge.service';
+import { ListFilters } from '../../core/shell/list-filters';
 import { SyncService } from '../../core/shell/sync.service';
 import { Button } from '../../ui/button/button';
 import { Card } from '../../ui/card/card';
@@ -36,7 +36,8 @@ export class Knowledge implements OnInit {
   protected readonly typeLabel = knowledgeTypeLabel;
   protected readonly host = urlHost;
 
-  protected readonly filter = signal<KnowledgeFilter>(NO_FILTER);
+  // Der Filterstand liegt im ListFilters-Dienst und übersteht den Seitenwechsel (SCRUM-310).
+  protected readonly filter = inject(ListFilters).knowledge;
   protected readonly visible = computed(() => filterEntries(this.knowledge.entries(), this.filter()));
   protected readonly filtered = computed(() => {
     const { type, category, query } = this.filter();

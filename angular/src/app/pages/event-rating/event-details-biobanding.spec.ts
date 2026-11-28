@@ -16,7 +16,7 @@ describe('EventDetails: Bio-Banding-Vorschlag (SCRUM-191)', () => {
 
   const parents = { playerId: 'p1', sex: 'm', parentsConsent: true, motherHeight: 168, fatherHeight: 182, updatedAt: '2026-11-01T10:00:00.000Z' };
 
-  async function render(role: 'trainer' | 'physio' | 'player' | 'scout', type: 'Training' | 'Spiel' = 'Training') {
+  async function render(role: 'trainer' | 'physio' | 'player' | 'scout', type: 'Training' | 'Spiel' = 'Training', staleElias = false) {
     const firebase = new FakeFirebase();
     firebase.players.players.set('p1', { name: 'Jonas Keller', positions: ['TW'], number: 1, birthdate: '2012-05-05', status: 'Fit', consentStatus: 'granted' });
     firebase.players.players.set('p2', { name: 'Elias Wagner', positions: ['RV'], number: 2, birthdate: '2012-06-06', status: 'Fit', consentStatus: 'granted' });
@@ -25,6 +25,10 @@ describe('EventDetails: Bio-Banding-Vorschlag (SCRUM-191)', () => {
     firebase.maturity.docs.set('p1', parents);
     firebase.maturity.docs.set('p3', { ...parents, playerId: 'p3' });
     for (const id of ['p1', 'p3']) firebase.records.playerRecords.set(`${id}/measurements`, new Map([['me1', { date: '2026-10-01', height: '178', weight: '60' }]]));
+    if (staleElias) {
+      firebase.maturity.docs.set('p2', { ...parents, playerId: 'p2' });
+      firebase.records.playerRecords.set('p2/measurements', new Map([['me2', { date: '2025-09-01', height: '160', weight: '48' }]]));
+    }
     TestBed.configureTestingModule({ providers: [...provideFakeFirebase(firebase)] });
     TestBed.inject(SessionService).role.set(role);
     const events = TestBed.inject(EventsService);
@@ -75,6 +79,21 @@ describe('EventDetails: Bio-Banding-Vorschlag (SCRUM-191)', () => {
     expect(content).not.toContain('Elias');
     expect(content).not.toContain('Widerruf');
     expect(text(section(fixture)!.querySelector('[data-test="bio-without"]'))).toContain('Für 2 Spieler');
+  });
+
+  it('zeigt einen Spieler mit veraltetem Wert in „Nicht eingeordnet“ mit Grund statt in einer Gruppe (SCRUM-389)', async () => {
+    const { fixture } = await render('trainer', 'Training', true);
+    await showBio(fixture);
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(section(fixture)?.querySelector('[data-test="bio-unclassified"]')).not.toBeNull();
+    });
+    const box = section(fixture)!.querySelector('[data-test="bio-unclassified"]');
+    expect(text(box)).toContain('Elias Wagner');
+    expect(text(box)).toContain('nicht eingeordnet – Messung veraltet');
+    expect(text(box)).toContain('Tage alt');
+    expect([...section(fixture)!.querySelectorAll('.bio-group[data-band] li')].map((li) => text(li)).join(' ')).not.toContain('Elias');
+    expect(text(section(fixture)!.querySelector('[data-test="bio-without"]'))).toContain('Für 1 Spieler');
   });
 
   it('der Medizin-Rolle wird er ebenfalls gezeigt, Spielern und Scouts nicht (und es wird nichts geladen)', async () => {

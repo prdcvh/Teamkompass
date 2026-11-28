@@ -175,3 +175,7 @@ input,
 select {
   touch-action: manipulation;
 }
+
+.bio-cause {
+  display: block;
+}
