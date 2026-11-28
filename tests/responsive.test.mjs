@@ -26,7 +26,7 @@ function loadPlaywright() {
   return null;
 }
 
-export const WIDTHS = [360, 390, 768, 1024, 1280, 1440, 1920];
+export const WIDTHS = [320, 360, 390, 768, 1024, 1280, 1440, 1920];
 export const ROUTES = [
   '/start', '/kader', '/events', '/events/e1', '/events/e1/live', '/events/e2', '/events/e3', '/events/e4', '/planung', '/wissen', '/profile', '/profile/p1', '/teamanalyse',
   '/gegneranalyse', '/aufstellung', '/suche', '/zugaenge', '/trainer-konto', '/scout-zugang', '/medizin-zugang', '/export', '/einstellungen', '/styleguide',
@@ -145,12 +145,15 @@ test('Keine Seite scrollt seitlich (alle Breiten, alle Seiten)', { skip: playwri
       const context = await browser.newContext({ viewport: { width, height: 900 }, hasTouch: width < 768, isMobile: width < 768 });
       cleanup.add(`Context ${width}px`, () => context.close());
       const page = await openPage(context);
-      for (const route of routes) {
+      // 320 px prüft vorerst nur die Startseite (SCRUM-308); auf /export und /einstellungen läuft es dort noch über den Rand (eigenes Ticket).
+      for (const route of width < 360 ? routes.filter((r) => r === '/start') : routes) {
         await withTimeout(async () => {
           await page.goto(base + route);
           await page.waitForSelector('main, form, h1', { timeout: 15_000 });
           await page.waitForTimeout(400);
           const problems = await page.evaluate(measure);
+          // SCRUM-308: Das Training „heute“ mit langem Titel muss auf der Startseite wirklich da sein, sonst misst der Test den Fall nicht.
+          if (route === '/start' && !(await page.locator('.live-start').count())) problems.push('Knopf „Live-Modus“ fehlt (Beispiel-Training heute)');
           if (shots) await page.screenshot({ path: join(shots, `${route.replace(/[/?=]/g, '_')}-${width}.png`), fullPage: true });
           if (problems.length) failures.push(`${width}px ${route}: ${problems.join('; ')}`);
         }, STEP_TIMEOUT_MS * 2, `${width}px ${route}`);

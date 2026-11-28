@@ -1,9 +1,10 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ListFilters } from '../../core/shell/list-filters';
 import { LayoutService, injectNarrowViewport } from '../../core/shell/layout.service';
 import { ageFromBirthdate, formatDate } from '../../core/shared/dates';
 import { CONSENT_LABELS, type Player, STANDARD_POSITIONS, positionText } from '../../core/player/player';
-import { SORT_OPTIONS, SQUAD_STATUSES, type SortKey, type StatusOf, filterPlayers, sortPlayers, statusCounts } from '../../core/player/squad-list';
+import { SORT_OPTIONS, SQUAD_STATUSES, type StatusOf, filterPlayers, sortPlayers, statusCounts } from '../../core/player/squad-list';
 import { SquadService } from '../../core/player/squad.service';
 import { activeAbsenceOn } from '../../core/records/absence';
 import { type EffectiveStatus, effectiveStatus } from '../../core/records/availability';
@@ -47,10 +48,12 @@ export class Squad implements OnInit {
   protected readonly statusOptions = SQUAD_STATUSES;
   protected readonly sortOptions = SORT_OPTIONS;
 
-  protected readonly query = signal('');
-  protected readonly position = signal('all');
-  protected readonly status = signal('all');
-  protected readonly sort = signal<SortKey>('number');
+  // Suche/Filter/Sortierung liegen im ListFilters-Dienst und überstehen den Seitenwechsel (SCRUM-310).
+  private readonly filters = inject(ListFilters);
+  protected readonly query = this.filters.squadQuery;
+  protected readonly position = this.filters.squadPosition;
+  protected readonly status = this.filters.squadStatus;
+  protected readonly sort = this.filters.squadSort;
 
   /** Dialog-Zustand: `editing` = null und `dialogOpen` = true bedeutet „neuer Spieler“. */
   protected readonly dialogOpen = signal(false);

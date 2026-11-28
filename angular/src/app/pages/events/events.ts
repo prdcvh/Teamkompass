@@ -1,13 +1,12 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ListFilters } from '../../core/shell/list-filters';
 import { LayoutService, injectNarrowViewport } from '../../core/shell/layout.service';
 import {
   EVENT_SORT_OPTIONS,
   EVENT_TYPES,
   exertionLabel,
-  type EventSort,
-  type EventTypeFilter,
   type TeamEvent,
   filterEvents,
   formatDate,
@@ -64,9 +63,11 @@ export class Events implements OnInit {
   protected readonly typeOptions = EVENT_TYPES;
   protected readonly sortOptions = EVENT_SORT_OPTIONS;
 
-  protected readonly query = signal('');
-  protected readonly type = signal<EventTypeFilter>('all');
-  protected readonly sort = signal<EventSort>('chronological');
+  // Suche/Filter/Sortierung liegen im ListFilters-Dienst und überstehen den Seitenwechsel (SCRUM-310).
+  private readonly filters = inject(ListFilters);
+  protected readonly query = this.filters.eventsQuery;
+  protected readonly type = this.filters.eventsType;
+  protected readonly sort = this.filters.eventsSort;
 
   /** „Event anlegen“; bestehende Events werden auf der Bewertungsseite bearbeitet (SCRUM-285). */
   protected readonly dialogOpen = signal(false);
