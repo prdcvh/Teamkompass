@@ -4,7 +4,7 @@ import { formatDate } from '../../core/events/event';
 import { HEALTH_HIDDEN_TEXT } from '../../core/player/consent';
 import { todayIso } from '../../core/shared/dates';
 import { type Absence, absencePeriodText, absenceTitle, isInjuryAbsence } from '../../core/records/absence';
-import { type Measurement, measurementQuality, measurementText, readingsText } from '../../core/records/measurement';
+import { type Measurement, REVIEW_REASON_MAX, measurementQuality, measurementText, readingsText } from '../../core/records/measurement';
 import { FLAG_TEXT, QUALITY_TEXT, decimalAgeAt, decimalText, legLengthCm } from '../../core/records/measurement-protocol';
 import { measurementChart } from '../../core/records/measurement-chart';
 import type { DevelopmentPlan } from '../../core/records/plan';
@@ -109,6 +109,60 @@ export class ProfileExtras {
   protected readonly qualityText = QUALITY_TEXT;
   protected readonly flagText = FLAG_TEXT;
   protected quality = measurementQuality;
+
+  /** „Messung stimmt“ (SCRUM-387): Trainer und Medizin, nicht bei gesperrten Gesundheitsdaten. */
+  protected readonly canReview = computed(() => this.measurementsService.canReview() && !this.healthLocked());
+  protected readonly reviewMax = REVIEW_REASON_MAX;
+  protected readonly reviewing = signal<{ id: string; text: string } | null>(null);
+  protected readonly reviewReason = signal('');
+  protected readonly reviewBusy = signal(false);
+  protected readonly reviewFailed = signal('');
+
+  protected isFlagged(measurement: Measurement): boolean {
+    return measurementQuality(measurement) === 'flagged';
+  }
+
+  /** „Geprüft am 27.11.2026 von Name: Begründung“. */
+  protected reviewText(measurement: Measurement): string {
+    const review = measurement.review;
+    if (!review) return '';
+    const at = new Date(review.at);
+    const day = Number.isNaN(at.getTime()) ? review.at : formatDate(`${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, '0')}-${String(at.getDate()).padStart(2, '0')}`);
+    return `Geprüft am ${day}${review.by ? ` von ${review.by}` : ''}${review.reason ? `: ${review.reason}` : ''}`;
+  }
+
+  protected askReview(measurement: Measurement): void {
+    this.reviewFailed.set('');
+    this.reviewReason.set('');
+    this.reviewing.set({ id: measurement.id, text: `die Messung vom ${formatDate(measurement.date)}` });
+  }
+
+  protected cancelReview(): void {
+    this.reviewing.set(null);
+  }
+
+  protected async confirmReview(): Promise<void> {
+    const target = this.reviewing();
+    if (!target || this.reviewBusy()) return;
+    this.reviewBusy.set(true);
+    this.reviewFailed.set('');
+    try {
+      if (await this.measurementsService.confirmMeasurement(target.id, this.reviewReason())) this.reviewing.set(null);
+      else this.reviewFailed.set('Das Bestätigen hat nicht geklappt. Bitte Verbindung prüfen und erneut versuchen.');
+    } finally {
+      this.reviewBusy.set(false);
+    }
+  }
+
+  protected async withdrawReview(measurement: Measurement): Promise<void> {
+    if (this.reviewBusy()) return;
+    this.reviewBusy.set(true);
+    try {
+      await this.measurementsService.withdrawReview(measurement.id);
+    } finally {
+      this.reviewBusy.set(false);
+    }
+  }
 
   /** Zeile unter den Werten: Qualität, Uhrzeit, Messstation. */
   protected measurementMeta(measurement: Measurement): string {

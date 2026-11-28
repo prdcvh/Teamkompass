@@ -96,6 +96,16 @@ export class PlayerRecordsApi {
     await setDoc(doc(db, 'teams', this.team.id(), 'players', playerId, name, id), { ...data, playerId });
   }
 
+  /**
+   * Bestätigung einer markierten Messung setzen (`review`) oder zurücknehmen (`null`) – ändert nur dieses eine Feld
+   * (SCRUM-387); so erlauben es die Regeln auch der Medizin.
+   */
+  async saveMeasurementReview(playerId: string, id: string, review: Readonly<Record<string, unknown>> | null): Promise<void> {
+    const { db } = await this.connection.get();
+    const { deleteField, doc, updateDoc } = await import('firebase/firestore');
+    await updateDoc(doc(db, 'teams', this.team.id(), 'players', playerId, 'measurements', id), { review: review ?? deleteField() });
+  }
+
   async deletePlayerRecord(playerId: string, name: PlayerRecordKind, id: string): Promise<void> {
     const { db } = await this.connection.get();
     const { deleteDoc, doc } = await import('firebase/firestore');

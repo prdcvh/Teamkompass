@@ -222,3 +222,14 @@ h2 {
   border-radius: 50%;
   background: var(--tk-amber);
 }
+
+/* Messung bestätigen (SCRUM-387). */
+.items .measurement-review {
+  color: var(--tk-ink);
+}
+
+.review-field {
+  display: grid;
+  gap: var(--tk-space-1);
+  margin: var(--tk-space-3) 0;
+}

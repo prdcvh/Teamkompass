@@ -8,6 +8,7 @@
  * Formular und Prüfung: measurement-draft.ts; Regeln und Grenzwerte: measurement-protocol.ts.
  */
 import { isFieldTestDoc } from './field-test';
+import { effectiveQuality } from './growth-velocity';
 import { MAX_READINGS, type MeasurementFlag, type MeasurementQuality, STATION_MAX, decimalText } from './measurement-protocol';
 
 export { MAX_HEIGHT_CM, MAX_WEIGHT_KG } from './measurement-protocol';
@@ -20,6 +21,21 @@ export interface MeasurementChange {
   readonly reason: string;
   readonly before: { readonly height: number | null; readonly weight: number | null; readonly sittingHeight: number | null };
 }
+
+/** Bestätigung einer markierten Messung „stimmt so“ (SCRUM-387): Wert bleibt unverändert, nur die Markierung entfällt. */
+export interface MeasurementReview {
+  /** Zeitpunkt (ISO, UTC). */
+  readonly at: string;
+  /** Anzeigename des bestätigenden Kontos (keine E-Mail-Adresse). */
+  readonly by: string;
+  /** Kennung des Kontos (Firebase Auth); Regeln verlangen das eigene Konto. */
+  readonly byUid: string;
+  /** Kurze Begründung; optional. */
+  readonly reason?: string;
+}
+
+export const REVIEW_REASON_MAX = 200;
+export const REVIEW_BY_MAX = 80;
 
 export interface Measurement {
   readonly id: string;
@@ -48,6 +64,8 @@ export interface Measurement {
   readonly quality?: MeasurementQuality;
   readonly flags?: readonly MeasurementFlag[];
   readonly changes?: readonly MeasurementChange[];
+  /** Bestätigung der Markierung „Messung prüfen“; fehlt = nicht bestätigt. */
+  readonly review?: MeasurementReview;
 }
 
 const QUALITIES: readonly MeasurementQuality[] = ['verified', 'flagged'];
@@ -86,6 +104,14 @@ function changesFromDoc(value: unknown): MeasurementChange[] | undefined {
   return list;
 }
 
+function reviewFromDoc(value: unknown): MeasurementReview | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const data = value as Record<string, unknown>;
+  if (typeof data['at'] !== 'string' || !data['at']) return undefined;
+  const reason = text(data['reason'], REVIEW_REASON_MAX);
+  return { at: data['at'], by: text(data['by'], REVIEW_BY_MAX) ?? '', byUid: typeof data['byUid'] === 'string' ? data['byUid'] : '', ...(reason ? { reason } : {}) };
+}
+
 /** Dokument → Messung; Größe/Gewicht stehen wie in der bisherigen App als Text ('' = nicht erfasst). */
 export function measurementFromDoc(id: string, data: Readonly<Record<string, unknown>>, today: string): Measurement {
   const measurement: Record<string, unknown> = {
@@ -112,6 +138,8 @@ export function measurementFromDoc(id: string, data: Readonly<Record<string, unk
   if (Array.isArray(data['flags'])) measurement['flags'] = (data['flags'] as unknown[]).filter((flag): flag is MeasurementFlag => FLAGS.includes(flag as MeasurementFlag));
   const changes = changesFromDoc(data['changes']);
   if (changes) measurement['changes'] = changes;
+  const review = reviewFromDoc(data['review']);
+  if (review) measurement['review'] = review;
   return measurement as unknown as Measurement;
 }
 
@@ -142,12 +170,25 @@ export function docFromMeasurement(measurement: Measurement): Record<string, unk
   if (measurement.quality && measurement.quality !== 'undocumented') doc['quality'] = measurement.quality;
   if (measurement.flags?.length) doc['flags'] = [...measurement.flags];
   if (measurement.changes?.length) doc['changes'] = measurement.changes.map((change) => ({ at: change.at, reason: change.reason, before: { ...change.before } }));
+  if (measurement.review) doc['review'] = reviewDoc(measurement.review);
   return doc;
 }
 
-/** Messqualität; ohne Kennzeichen (Bestandsmessung) `undocumented`. */
+/** Kopie ohne Bestätigung (`review`); Messwerte bleiben unverändert. */
+export function withoutReview<T extends { readonly review?: unknown }>(value: T): Omit<T, 'review'> {
+  const copy: Record<string, unknown> = { ...value };
+  delete copy['review'];
+  return copy as Omit<T, 'review'>;
+}
+
+/** Bestätigung als Dokumentfeld; Begründung nur, wenn vorhanden. */
+export function reviewDoc(review: MeasurementReview): Record<string, unknown> {
+  return { at: review.at, by: review.by, byUid: review.byUid, ...(review.reason ? { reason: review.reason } : {}) };
+}
+
+/** Wirksame Messqualität; ohne Kennzeichen (Bestandsmessung) `undocumented`, bestätigte Markierung zählt als `verified`. */
 export function measurementQuality(measurement: Measurement): MeasurementQuality {
-  return measurement.quality ?? 'undocumented';
+  return effectiveQuality(measurement);
 }
 
 /** BMI; ohne Größe oder Gewicht null. */

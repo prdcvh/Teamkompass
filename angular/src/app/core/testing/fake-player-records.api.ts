@@ -105,6 +105,20 @@ export class FakePlayerRecordsApi implements Pick<PlayerRecordsApi, keyof Player
     this.emitRecords(key);
   }
 
+  saveMeasurementReviewError: unknown = null;
+
+  async saveMeasurementReview(playerId: string, id: string, review: Readonly<Record<string, unknown>> | null): Promise<void> {
+    this.calls.push(`saveMeasurementReview:${playerId}:${id}`);
+    if (this.saveMeasurementReviewError) throw this.saveMeasurementReviewError;
+    const key = `${playerId}/measurements`;
+    const current = this.playerRecords.get(key)?.get(id);
+    if (!current) throw new Error('not-found');
+    const rest = { ...current };
+    delete rest['review'];
+    this.playerRecords.get(key)!.set(id, review ? { ...rest, review } : rest);
+    this.emitRecords(key);
+  }
+
   async deletePlayerRecord(playerId: string, name: string, id: string): Promise<void> {
     this.calls.push(`deletePlayerRecord:${playerId}:${name}:${id}`);
     if (this.deletePlayerRecordError) throw this.deletePlayerRecordError;
