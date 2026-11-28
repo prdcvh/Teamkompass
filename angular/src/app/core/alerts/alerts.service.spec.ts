@@ -54,6 +54,33 @@ describe('AlertsService (Wenn-dann-Regeln)', () => {
     expect(firebase.calls).toContain('watchPlayerRecords:p1:growthReviews');
   });
 
+  it('Reife-Kompass-Angaben (SCRUM-304): nur bei widerrufener Einwilligung und nur für Trainer geladen; Hinweis erscheint und verschwindet nach dem Löschen', async () => {
+    const { session, firebase } = setup();
+    firebase.players.players.set('p2', { name: 'Ben Bär', positions: ['IV'], number: 4, birthdate: '2012-06-06', status: 'Fit', consentStatus: 'revoked' });
+    firebase.maturity.set('p2', { playerId: 'p2', sex: 'm', parentsConsent: false });
+    firebase.maturity.set('p1', { playerId: 'p1', sex: 'm', parentsConsent: false });
+    session.role.set('trainer');
+    const service = TestBed.inject(AlertsService);
+    service.start();
+    await vi.waitFor(() => expect(service.ready()).toBe(true));
+    expect(firebase.maturity.calls).toContain('watchMaturity:p2');
+    expect(firebase.maturity.calls).not.toContain('watchMaturity:p1');
+    const revokedHints = () => service.result().hints.filter((hint) => hint.ruleId === 'consentRevoked' && hint.playerId === 'p2');
+    expect(revokedHints().length).toBe(1);
+    firebase.maturity.set('p2', null);
+    await vi.waitFor(() => expect(revokedHints().length).toBe(0));
+  });
+
+  it('Medizin lädt keine Reife-Kompass-Angaben (SCRUM-304)', async () => {
+    const { session, firebase } = setup();
+    firebase.maturity.set('p1', { playerId: 'p1', sex: 'm', parentsConsent: false });
+    session.role.set('physio');
+    const service = TestBed.inject(AlertsService);
+    service.start();
+    await vi.waitFor(() => expect(service.ready()).toBe(true));
+    expect(firebase.maturity.calls.some((call) => call.startsWith('watchMaturity'))).toBe(false);
+  });
+
   it('startet für Spieler, Eltern und Scouts nichts', () => {
     const { session, firebase } = setup();
     for (const role of ['player', 'parent', 'scout'] as const) {
