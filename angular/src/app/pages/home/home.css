@@ -5,7 +5,6 @@
 .page {
   display: grid;
   gap: var(--tk-space-4);
-  max-width: 1100px;
   padding: var(--tk-space-5);
 }
 
@@ -47,7 +46,7 @@ h2 {
 
 .stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: var(--tk-space-3);
 }
 
@@ -75,19 +74,12 @@ h2 {
 
 .columns {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
   gap: var(--tk-space-4);
 }
 
 [data-variant='mobile'] .columns {
   grid-template-columns: minmax(0, 1fr);
-}
-
-/* Mit Seitenmenü reicht die Breite unter 1100 px nicht für zwei Spalten (SCRUM-134). */
-@media (max-width: 1099px) {
-  .columns {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 .panel {

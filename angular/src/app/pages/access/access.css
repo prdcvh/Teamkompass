@@ -5,7 +5,6 @@
 .page {
   display: grid;
   gap: var(--tk-space-4);
-  max-width: 1100px;
   padding: var(--tk-space-5);
 }
 
@@ -52,6 +51,8 @@ h1 {
 .list {
   display: grid;
   gap: var(--tk-space-3);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr));
+  align-items: start;
 }
 
 .row {

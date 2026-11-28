@@ -5,7 +5,6 @@
 .page {
   display: grid;
   gap: var(--tk-space-4);
-  max-width: 720px;
   padding: var(--tk-space-5);
 }
 
@@ -64,4 +63,19 @@ h2 {
 
 .empty {
   color: var(--tk-muted);
+}
+
+/* Breite Fenster: Karten fließen in mehrere Spalten statt rechts leer zu bleiben; Kopf und Hinweise bleiben volle Breite. */
+.page {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr));
+  align-items: start;
+}
+
+.page > * {
+  grid-column: 1 / -1;
+}
+
+.page > tk-card,
+.page > tk-rating-scale-card {
+  grid-column: auto;
 }
