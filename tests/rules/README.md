@@ -19,6 +19,10 @@ Bewertungen, interne Notizen, Förderpläne, Abwesenheiten, Messwerte, Gegner, A
 Mitgliedschaften, Einladungen), inklusive der Listenabfragen mit `playerId`-Filter. Seit SCRUM-234 auch der gezielte Abruf eines noch **nicht vorhandenen** Bewertungsdokuments
 (eigenes erlaubt, fremdes nicht; Scout, Medizin, abgelaufene Zugänge weiter gesperrt).
 
+`measurement-review.test.mjs`: Messung bestätigen „stimmt so“ (SCRUM-387) – Trainer und Medizin setzen/entfernen das Feld `review`
+an markierten Messungen (Medizin nur dieses Feld, eigenes Konto, nicht bei Feldtests/widerrufener Einwilligung); Spieler, Eltern,
+Scouts und abgelaufene Trainer nie.
+
 `competence.test.mjs`: Entwicklungsraster (SCRUM-266, `docs/bewertungsmodell.md`) – Beobachtungen
 `players/{p}/competenceObservations` und Team-Konfiguration `competenceConfigs/v{n}` lesen und anlegen nur Trainer
 (eigenes Konto, nur erlaubte Felder/Werte, Beobachtungen nicht bei widerrufener Einwilligung); Beobachtungen nie ändern,

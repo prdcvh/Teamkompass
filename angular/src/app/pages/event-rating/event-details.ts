@@ -4,6 +4,7 @@ import { DEFAULT_WARMUP_PROGRAM, WARMUP_INFO_URL, WARMUP_PROGRAMS, type WarmupPr
 import { EventsService } from '../../core/events/events.service';
 import { opponentForEvent, opponentRecord, recordText } from '../../core/opponents/opponent';
 import { OpponentsService } from '../../core/opponents/opponents.service';
+import { MATURITY_BAND_NOTE } from '../../core/records/maturity-note';
 import { BIO_BANDING_HINT } from '../../core/records/bio-banding';
 import { BioBandingService } from '../../core/records/bio-banding.service';
 import { percentText } from '../../core/records/maturity';
@@ -35,6 +36,7 @@ export class EventDetails {
   protected readonly warmupPrograms = WARMUP_PROGRAMS;
   protected readonly warmupUrl = WARMUP_INFO_URL;
   protected readonly bioHint = BIO_BANDING_HINT;
+  protected readonly bandNote = MATURITY_BAND_NOTE;
   protected readonly percentText = percentText;
 
   /** Nur gefüllte Felder, in fester Reihenfolge; Notizen getrennt, damit sie Zeilenumbrüche behalten. */

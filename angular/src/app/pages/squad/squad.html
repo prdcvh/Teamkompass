@@ -104,12 +104,12 @@
                 <span class="number">{{ player.number }}</span>
                 <span class="who">
                   <strong>{{ player.name }}</strong>
-                  <small>{{ positionText(player) }} · {{ age(player) }} J.@if (injuryNote(player); as note) { · {{ note }}}</small>
+                  <small><span class="meta-part">{{ positionText(player) }}</span> · <span class="meta-part">{{ age(player) }} J.</span>@if (injuryNote(player); as note) { · <span class="meta-part">{{ note }}</span>}</small>
+                  <tk-status [label]="statusOf(player)" />
                 </span>
-                <tk-status [label]="statusOf(player)" />
               </a>
               @if (squad.canWrite()) {
-                <button tkButton size="sm" type="button" class="edit-btn" (click)="openEdit(player)" [attr.aria-label]="'Bearbeiten: ' + player.name">Bearbeiten</button>
+                <button type="button" class="edit-btn" (click)="openEdit(player)" [attr.aria-label]="'Bearbeiten: ' + player.name"><tk-icon name="edit" /></button>
               }
             </li>
           }

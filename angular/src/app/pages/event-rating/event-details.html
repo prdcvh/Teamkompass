@@ -73,6 +73,7 @@
     <section class="bio-banding" id="event-bio-banding" aria-label="Bio-Banding" data-test="bio-banding">
       <h3>Gruppen nach Reifestand (Vorschlag)</h3>
       <p class="hint">{{ bioHint }}</p>
+      <p class="hint" data-test="bio-band-note">{{ bandNote }}</p>
       @if (bio.state === 'error') {
         <p class="error" role="alert">Der Vorschlag konnte nicht geladen werden.</p>
         <button tkButton size="sm" type="button" (click)="retryBio()">Erneut versuchen</button>
@@ -91,6 +92,21 @@
                 }
               </ul>
             }
+          </div>
+        }
+        @if (bio.suggestion.unclassified.length > 0) {
+          <div class="bio-group bio-unclassified" data-test="bio-unclassified">
+            <strong>Nicht eingeordnet</strong>
+            <ul>
+              @for (member of bio.suggestion.unclassified; track member.id) {
+                <li>
+                  {{ member.name }} <span class="hint">{{ member.statusText }}</span>
+                  @for (cause of member.causes; track $index) {
+                    <span class="hint bio-cause">{{ cause }}</span>
+                  }
+                </li>
+              }
+            </ul>
           </div>
         }
         @if (bio.suggestion.withoutValue > 0) {

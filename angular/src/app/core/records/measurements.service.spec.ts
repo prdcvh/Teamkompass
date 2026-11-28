@@ -1,3 +1,6 @@
+import { TestBed } from '@angular/core/testing';
+import { SessionService } from '../auth/session.service';
+import { analyzeGrowth } from './growth-velocity';
 import type { FakeFirebase } from '../testing/fake-firebase';
 import { setupRecords } from '../testing/records-setup';
 import { draftFromMeasurement, emptyMeasurementDraft } from './measurement-draft';
@@ -57,5 +60,83 @@ describe('MeasurementsService', () => {
     expect(measurements.saveMeasurement({ ...emptyMeasurementDraft('2026-10-10', '17:30'), height: ['149', '149', ''] })).toEqual({});
     await vi.waitFor(() => expect(stored()).toHaveLength(2));
     expect(stored().find(([, data]) => data['date'] === '2026-10-10')![1]).toMatchObject({ quality: 'flagged', flags: ['height-drop'], height: '149' });
+  });
+
+  describe('Bestätigung einer markierten Messung (SCRUM-387)', () => {
+    async function withFlagged(role: 'trainer' | 'player' | 'physio' = 'trainer') {
+      const context = await setup(role);
+      await firebase.records.savePlayerRecord('p1', 'measurements', 'me2', { date: '2026-10-10', height: '153', weight: '', quality: 'flagged', flags: ['height-jump'], heightReadings: [153, 153] });
+      await vi.waitFor(() => expect(context.measurements.measurements()).toHaveLength(2));
+      return context;
+    }
+
+    it('bestätigt: speichert Datum, Konto und Grund; Wert unverändert, Markierung zählt nicht mehr', async () => {
+      const { measurements, state } = await withFlagged();
+      TestBed.inject(SessionService).uid.set('coach1');
+      TestBed.inject(SessionService).displayName.set('Trainer Test');
+      expect(measurements.isFlagged(measurements.measurements()[1])).toBe(true);
+      expect(analyzeGrowth(measurements.measurements(), '2026-11-10').currentRate).toBeNull();
+      expect(await measurements.confirmMeasurement('me2', ' Nachgemessen ', new Date('2026-11-10T18:00:00Z'))).toBe(true);
+      expect(stored().find(([id]) => id === 'me2')![1]).toMatchObject({ height: '153', quality: 'flagged', review: { at: '2026-11-10T18:00:00.000Z', by: 'Trainer Test', byUid: 'coach1', reason: 'Nachgemessen' } });
+      const entry = measurements.measurements()[1];
+      expect(entry.height).toBe(153);
+      expect(measurements.isFlagged(entry)).toBe(false);
+      // Wachstumsrate: die bestätigte Messung zählt wieder (vorher keine Rate wegen Markierung)
+      expect(analyzeGrowth(measurements.measurements(), '2026-11-10').currentRate).not.toBeNull();
+      expect(state.measurementList()).toHaveLength(2);
+    });
+
+    it('ohne Begründung und ohne Anzeigename: kein E-Mail-Fallback', async () => {
+      const { measurements } = await withFlagged();
+      const session = TestBed.inject(SessionService);
+      session.uid.set('coach1');
+      session.email.set('geheim@example.com');
+      await measurements.confirmMeasurement('me2');
+      const review = stored().find(([id]) => id === 'me2')![1]['review'] as Record<string, unknown>;
+      expect(review['by']).toBe('Trainer');
+      expect(review).not.toHaveProperty('reason');
+      expect(JSON.stringify(review)).not.toContain('geheim');
+    });
+
+    it('nimmt die Bestätigung zurück: Markierung und Rate wie zuvor', async () => {
+      const { measurements } = await withFlagged();
+      TestBed.inject(SessionService).uid.set('coach1');
+      const before = analyzeGrowth(measurements.measurements(), '2026-11-10');
+      await measurements.confirmMeasurement('me2');
+      expect(await measurements.withdrawReview('me2')).toBe(true);
+      expect(stored().find(([id]) => id === 'me2')![1]).not.toHaveProperty('review');
+      expect(measurements.isFlagged(measurements.measurements()[1])).toBe(true);
+      expect(analyzeGrowth(measurements.measurements(), '2026-11-10')).toEqual(before);
+    });
+
+    it('Medizin darf bestätigen, Spieler nicht; unmarkierte Messungen lassen sich nicht bestätigen', async () => {
+      const physio = await withFlagged('physio');
+      TestBed.inject(SessionService).uid.set('medic1');
+      expect(await physio.measurements.confirmMeasurement('me1')).toBe(false);
+      expect(await physio.measurements.confirmMeasurement('me2')).toBe(true);
+      TestBed.resetTestingModule();
+      const player = await withFlagged('player');
+      TestBed.inject(SessionService).uid.set('pl1');
+      expect(await player.measurements.confirmMeasurement('me2')).toBe(false);
+      expect(stored().find(([id]) => id === 'me2')![1]).not.toHaveProperty('review');
+    });
+
+    it('eine Korrektur des Werts entfernt die Bestätigung (neuer Wert, neue Prüfung)', async () => {
+      const { measurements } = await withFlagged();
+      TestBed.inject(SessionService).uid.set('coach1');
+      await measurements.confirmMeasurement('me2');
+      const edit = { ...draftFromMeasurement(measurements.measurements()[1]), height: ['148', '148', ''], reason: 'Neu gemessen' };
+      expect(measurements.saveMeasurement(edit, new Date('2026-11-11T18:00:00Z'))).toEqual({});
+      await vi.waitFor(() => expect(stored().find(([id]) => id === 'me2')![1]['height']).toBe('148'));
+      expect(stored().find(([id]) => id === 'me2')![1]).not.toHaveProperty('review');
+    });
+
+    it('meldet einen Schreibfehler und lässt den Zustand unverändert', async () => {
+      const { measurements } = await withFlagged();
+      TestBed.inject(SessionService).uid.set('coach1');
+      firebase.records.saveMeasurementReviewError = new Error('offline');
+      expect(await measurements.confirmMeasurement('me2')).toBe(false);
+      expect(measurements.isFlagged(measurements.measurements()[1])).toBe(true);
+    });
   });
 });

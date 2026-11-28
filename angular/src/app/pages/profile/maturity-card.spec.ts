@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { SessionService } from '../../core/auth/session.service';
+import { MATURITY_BAND_NOTE } from '../../core/records/maturity-note';
 import { maturityAt, percentText } from '../../core/records/maturity';
 import { MaturityService } from '../../core/records/maturity.service';
 import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
@@ -40,6 +41,7 @@ describe('Profil: Reife-Kompass', () => {
     const content = text(card(fixture));
     expect(text(q(fixture, '.maturity-percent'))).toBe(percentText(latest.percent));
     expect(content).toContain('der geschätzten Erwachsenengröße');
+    expect(text(q(fixture, '[data-test="maturity-band-note"]'))).toBe(MATURITY_BAND_NOTE); // SCRUM-385: kein Vergleich mit Gleichaltrigen
     expect(text(q(fixture, '[data-test="maturity-sentence"]'))).toBe(
       `Stand 01.10.2026 · etwa ${percentText(latest.percent)} der geschätzten Erwachsenengröße (heute 165 cm, geschätzt ca. ${Math.round(latest.predictedAdultCm)} cm erwachsen)`,
     );

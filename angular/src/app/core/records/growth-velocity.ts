@@ -48,6 +48,17 @@ export interface GrowthMeasurement {
   readonly height: number | null;
   /** Optional; fehlt es (heute immer), gilt `undocumented`. */
   readonly quality?: MeasurementQuality;
+  /** Bestätigung einer markierten Messung (SCRUM-387): gesetzt = die Markierung zählt nicht mehr. */
+  readonly review?: unknown;
+}
+
+/**
+ * Wirksame Messqualität: Eine als auffällig markierte Messung, die ein Trainer oder die Medizin als stimmig bestätigt
+ * hat (`review`), zählt wieder als geprüft (SCRUM-387). Der gespeicherte Wert bleibt dabei unverändert.
+ */
+export function effectiveQuality(item: { readonly quality?: MeasurementQuality; readonly review?: unknown }): MeasurementQuality {
+  const quality = item.quality ?? 'undocumented';
+  return quality === 'flagged' && item.review ? 'verified' : quality;
 }
 
 export interface GrowthPoint {
@@ -186,7 +197,7 @@ export function validGrowthPoints(measurements: readonly GrowthMeasurement[]): G
 export function growthPoints(measurements: readonly GrowthMeasurement[]): GrowthPoint[] {
   return measurements
     .filter((item): item is GrowthMeasurement & { height: number } => item.height !== null && item.height > 0 && isIsoDate(item.date))
-    .map((item) => ({ id: item.id, date: item.date, height: item.height, quality: item.quality ?? 'undocumented' }))
+    .map((item) => ({ id: item.id, date: item.date, height: item.height, quality: effectiveQuality(item) }))
     .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
 }
 
