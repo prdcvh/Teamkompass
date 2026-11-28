@@ -182,6 +182,14 @@ export function maturityBand(percent: number): MaturityBand {
   return 'average';
 }
 
+/** Worauf eine Elterngröße beruht (SCRUM-303): gemessen oder nur angegeben. Fehlt die Angabe, ist sie nicht bekannt. */
+export type ParentHeightSource = 'measured' | 'reported';
+
+export const PARENT_HEIGHT_SOURCE_LABELS: Readonly<Record<ParentHeightSource, string>> = {
+  measured: 'gemessen',
+  reported: 'angegeben',
+};
+
 /** Angaben für die Berechnung (Dokument `players/{id}/maturity/parents`). */
 export interface MaturityInputs {
   /** Geschlecht für die Koeffizienten; null = nicht angegeben (dann kein Wert). */
@@ -191,6 +199,9 @@ export interface MaturityInputs {
   /** cm; null = nicht erfasst. */
   readonly motherHeight: number | null;
   readonly fatherHeight: number | null;
+  /** Herkunft der Größe (SCRUM-303); null/fehlt = nicht angegeben. Hat keinen Einfluss auf die Rechnung. */
+  readonly motherHeightSource?: ParentHeightSource | null;
+  readonly fatherHeightSource?: ParentHeightSource | null;
   /**
    * Nachweis des Einverständnisses der Eltern (SCRUM-252): Tag (JJJJ-MM-TT), an dem ein Trainer das Häkchen gesetzt
    * hat, und wer (E-Mail zur Anzeige, Konto-ID für die Regeln). Leer = nicht dokumentiert (ältere Einträge von vor
@@ -301,12 +312,18 @@ export function maturityInputsFromDoc(data: Readonly<Record<string, unknown>> | 
   const parentsConsent = data['parentsConsent'] === true;
   const height = (value: unknown): number | null =>
     parentsConsent && typeof value === 'number' && value >= MIN_PARENT_HEIGHT_CM && value <= MAX_PARENT_HEIGHT_CM ? value : null;
+  const source = (value: unknown, height: number | null): ParentHeightSource | null =>
+    height !== null && (value === 'measured' || value === 'reported') ? value : null;
   const text = (value: unknown): string => (parentsConsent && typeof value === 'string' ? value : '');
+  const motherHeight = height(data['motherHeight']);
+  const fatherHeight = height(data['fatherHeight']);
   return {
     sex,
     parentsConsent,
-    motherHeight: height(data['motherHeight']),
-    fatherHeight: height(data['fatherHeight']),
+    motherHeight,
+    fatherHeight,
+    motherHeightSource: source(data['motherHeightSource'], motherHeight),
+    fatherHeightSource: source(data['fatherHeightSource'], fatherHeight),
     parentsConsentDate: isIsoDate(text(data['parentsConsentDate'])) ? text(data['parentsConsentDate']) : '',
     parentsConsentBy: text(data['parentsConsentBy']),
     parentsConsentByUid: text(data['parentsConsentByUid']),
@@ -345,6 +362,9 @@ export function docFromMaturityInputs(playerId: string, inputs: MaturityInputs, 
     fatherHeight: inputs.parentsConsent ? inputs.fatherHeight : null,
     updatedAt,
   };
+  // Herkunft der Größe (SCRUM-303): nur mit Größe; fehlt sie, fehlt das Feld ganz (Bestand = nicht angegeben).
+  if (inputs.parentsConsent && inputs.motherHeight !== null && inputs.motherHeightSource) doc['motherHeightSource'] = inputs.motherHeightSource;
+  if (inputs.parentsConsent && inputs.fatherHeight !== null && inputs.fatherHeightSource) doc['fatherHeightSource'] = inputs.fatherHeightSource;
   // Nachweis des Einverständnisses (SCRUM-252) nur mit Häkchen und nur, wenn vorhanden. Fehlt er, fehlt das Feld
   // ganz (das Dokument wird vollständig überschrieben, ein alter Nachweis verschwindet damit).
   if (inputs.parentsConsent) {
@@ -358,4 +378,13 @@ export function docFromMaturityInputs(playerId: string, inputs: MaturityInputs, 
 /** „93,4 %“ */
 export function percentText(percent: number): string {
   return `${String(roundPercent(percent)).replace('.', ',')} %`;
+}
+
+/** „Mutter: gemessen · Vater: Herkunft nicht angegeben“ – worauf die Größen der Eltern beruhen (SCRUM-303); leer ohne Größen. */
+export function parentHeightBasisText(inputs: MaturityInputs): string {
+  const part = (label: string, height: number | null, source: ParentHeightSource | null | undefined): string | null =>
+    height === null ? null : `${label}: ${source ? PARENT_HEIGHT_SOURCE_LABELS[source] : 'Herkunft nicht angegeben'}`;
+  return [part('Mutter', inputs.motherHeight, inputs.motherHeightSource), part('Vater', inputs.fatherHeight, inputs.fatherHeightSource)]
+    .filter((text): text is string => text !== null)
+    .join(' · ');
 }

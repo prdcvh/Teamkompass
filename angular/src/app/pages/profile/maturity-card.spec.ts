@@ -118,6 +118,29 @@ describe('Profil: Reife-Kompass', () => {
     });
   });
 
+  it('Herkunft der Elterngröße: speichern und in der Karte anzeigen, Bestand = nicht angegeben (SCRUM-303)', async () => {
+    const { fixture, firebase } = await renderProfile({
+      setup: (fb) => {
+        measurements(fb);
+        fb.maturity.docs.set('p1', parents);
+      },
+    });
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(q(fixture, '[data-test="maturity-parent-basis"]')).not.toBeNull();
+    });
+    expect(text(q(fixture, '[data-test="maturity-parent-basis"]'))).toContain('Mutter: Herkunft nicht angegeben · Vater: Herkunft nicht angegeben');
+    typeInto(q<HTMLSelectElement>(fixture, 'select[name="motherSource"]')!, 'measured', 'change');
+    typeInto(q<HTMLSelectElement>(fixture, 'select[name="fatherSource"]')!, 'reported', 'change');
+    q<HTMLFormElement>(fixture, 'tk-maturity-card form')!.dispatchEvent(new Event('submit'));
+    await vi.waitFor(() => expect(firebase.maturity.docs.get('p1')?.['motherHeightSource']).toBe('measured'));
+    expect(firebase.maturity.docs.get('p1')).toMatchObject({ fatherHeightSource: 'reported' });
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(text(q(fixture, '[data-test="maturity-parent-basis"]'))).toContain('Mutter: gemessen · Vater: angegeben');
+    });
+  });
+
   it('prüft die Größe der Eltern', async () => {
     const { fixture, firebase } = await renderProfile({ setup: (fb) => fb.maturity.docs.set('p1', { ...parents, motherHeight: null, fatherHeight: null }) });
     await vi.waitFor(() => {
