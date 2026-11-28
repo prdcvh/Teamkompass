@@ -1,4 +1,4 @@
-import type { PlayerRecordsApi } from '../firebase/player-records.api';
+import type { MeasurementFlagUpdate, PlayerRecordsApi } from '../firebase/player-records.api';
 import type { RawDoc, SnapshotMeta } from '../firebase/types';
 
 /** Ersatz für {@link PlayerRecordsApi} in Tests: Förderpläne, Abwesenheiten und Messwerte je Spieler. */
@@ -116,6 +116,25 @@ export class FakePlayerRecordsApi implements Pick<PlayerRecordsApi, keyof Player
     const rest = { ...current };
     delete rest['review'];
     this.playerRecords.get(key)!.set(id, review ? { ...rest, review } : rest);
+    this.emitRecords(key);
+  }
+
+  saveMeasurementFlagsError: unknown = null;
+
+  async saveMeasurementFlags(playerId: string, updates: readonly MeasurementFlagUpdate[]): Promise<void> {
+    if (updates.length === 0) return;
+    this.calls.push(`saveMeasurementFlags:${playerId}:${updates.map((update) => update.id).join(',')}`);
+    if (this.saveMeasurementFlagsError) throw this.saveMeasurementFlagsError;
+    const key = `${playerId}/measurements`;
+    const store = this.playerRecords.get(key);
+    if (!updates.every((update) => store?.has(update.id))) throw new Error('not-found');
+    for (const update of updates) {
+      const rest: Record<string, unknown> = { ...store!.get(update.id), quality: update.quality };
+      delete rest['flags'];
+      if (update.flags.length) rest['flags'] = [...update.flags];
+      if (update.dropReview) delete rest['review'];
+      store!.set(update.id, rest);
+    }
     this.emitRecords(key);
   }
 

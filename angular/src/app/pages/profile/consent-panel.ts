@@ -265,7 +265,7 @@ export class ConsentPanel {
     }
     if (kind === 'maturity') return this.maturity.remove(player.id);
     if (kind === 'growthReviews') return this.reviews.removeAll();
-    for (const measurement of [...this.records.measurementList()]) if (!(await this.measurements.deleteMeasurement(measurement.id))) return false;
+    for (const measurement of [...this.records.measurementList()]) if (!(await this.measurements.deleteMeasurement(measurement.id, { recalculate: false }))) return false;
     for (const result of [...this.records.fieldTests()]) if (!(await this.fieldTests.deleteResult(result.id))) return false;
     return true;
   }

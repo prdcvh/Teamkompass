@@ -59,6 +59,9 @@
               <span>Belastung</span>
               <strong class="risk-level">{{ r.level }}</strong>
             </div>
+            @if (r.flaggedMeasurementDates.length) {
+              <strong class="risk-check" data-test="risk-measurement-check">Einordnung unsicher – Messung prüfen</strong>
+            }
             <small>{{ r.reason }}</small>
             <div class="risk-compare">
               <div><span>Belastung letzte 7 Tage</span><strong>{{ numberLabel(r.load) }}</strong></div>

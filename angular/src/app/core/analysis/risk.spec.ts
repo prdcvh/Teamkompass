@@ -150,9 +150,46 @@ describe('risk (Belastungsampel)', () => {
     expect(risk([], player(), [], [measurement('m1', '2026-07-01', 150), measurement('m2', '2026-10-01', 156)]).reasons).toEqual([]);
     // Als auffällig markierte jüngste Messung zählt nicht; dann gibt es keine frische gültige Messung mit Partner.
     const flagged: Measurement = { ...measurement('m2', '2026-10-01', 154), quality: 'flagged' };
-    expect(risk([], player(), [], [measurement('m1', '2026-07-01', 150), flagged]).reasons).toEqual([]);
+    const marked = risk([], player(), [], [measurement('m1', '2026-07-01', 150), flagged]);
+    expect(marked.tier).toBe('unauffaellig');
+    // SCRUM-306: kein Hinweis, aber gekennzeichnet (siehe eigener Test unten).
+    expect(marked.reasons).toEqual(['Einordnung unsicher – Messung prüfen (Messung vom 01.10.2026 zur Prüfung markiert)']);
     // Messung nach dem Auswertungstag zählt nicht (Ampel für einen früheren Tag).
     expect(risk([], player(), [], [measurement('m1', '2026-07-20', 150), measurement('m2', '2026-10-20', 154)]).reasons).toEqual([]);
+  });
+
+  describe('markierte Messungen (SCRUM-306, PO-Entscheidung „B“: rechnen wie bisher, aber kennzeichnen)', () => {
+    const base = [measurement('m1', '2026-04-01', 148), measurement('m2', '2026-07-01', 150)];
+    const flaggedAt = (date: string, height: number): Measurement => ({ ...measurement('mf', date, height), quality: 'flagged', flags: ['height-spread'] });
+
+    it('eine markierte, unbestätigte Messung, die den Wachstumshinweis ändern würde: Stufe gleich, Ampel gekennzeichnet', () => {
+      const plain = risk([], player(), [], base);
+      const marked = risk([], player(), [], [...base, flaggedAt('2026-10-01', 154)]);
+      expect(marked.tier).toBe(plain.tier);
+      expect(marked.flaggedMeasurementDates).toEqual(['2026-10-01']);
+      expect(marked.reasons).toContain('Einordnung unsicher – Messung prüfen (Messung vom 01.10.2026 zur Prüfung markiert)');
+      expect(plain.flaggedMeasurementDates).toEqual([]);
+    });
+
+    it('neben einem gültigen Wachstumshinweis: Hinweis und Stufe bleiben, Kennzeichnung kommt dazu', () => {
+      const valid = [measurement('m1', '2026-07-01', 150), measurement('m2', '2026-10-01', 154)];
+      // Jüngere markierte Messung: würde sie zählen, wäre sie die jüngste Messung (dann Ausreißer, kein Hinweis).
+      const marked = risk([], player(), [], [...valid, flaggedAt('2026-10-10', 160)]);
+      expect(marked.tier).toBe('anpassen');
+      expect(marked.reasons[0]).toBe('Starker Wachstumsschub (1,3 cm/Monat)');
+      expect(marked.reasons).toContain('Einordnung unsicher – Messung prüfen (Messung vom 10.10.2026 zur Prüfung markiert)');
+    });
+
+    it('bestätigt („Messung stimmt“) oder ohne Einfluss auf den Hinweis: keine Kennzeichnung', () => {
+      const confirmed = { ...flaggedAt('2026-10-01', 154), review: { at: '2026-10-02T10:00:00Z', by: 'Trainer', byUid: 'c1' } };
+      const withConfirmed = risk([], player(), [], [...base, confirmed]);
+      expect(withConfirmed.flaggedMeasurementDates).toEqual([]);
+      expect(withConfirmed.reasons).toEqual(['Starker Wachstumsschub (1,3 cm/Monat)']);
+      // Zwei Jahre alte markierte Messung verändert nichts mehr.
+      const ancient = risk([], player(), [], [flaggedAt('2024-06-01', 140), measurement('m1', '2026-07-01', 150), measurement('m2', '2026-10-01', 151)]);
+      expect(ancient.flaggedMeasurementDates).toEqual([]);
+      expect(ancient.reasons).toEqual([]);
+    });
   });
 
   it('Messung nur mit Gewicht zählt nicht als 0 cm Größe (SCRUM-302)', () => {

@@ -7,6 +7,15 @@ import type { RawDoc, SnapshotMeta } from './types';
 /** `behaviorObservations`: Trainerbeobachtungen mit Verhaltensankern (SCRUM-268), nur Trainer. */
 export type PlayerRecordKind = 'developmentPlans' | 'absences' | 'measurements' | 'growthReviews' | 'behaviorObservations';
 
+/** Neue Markierung einer Messung nach einer Neuberechnung (SCRUM-306). */
+export interface MeasurementFlagUpdate {
+  readonly id: string;
+  readonly quality: 'verified' | 'flagged';
+  readonly flags: readonly string[];
+  /** Bestätigung entfernen, weil ein neuer Prüfgrund dazugekommen ist. */
+  readonly dropReview: boolean;
+}
+
 /** Unterdaten eines Spielers: Förderpläne (mit Selbstreflexion), Abwesenheiten und Messwerte. */
 @Injectable({ providedIn: 'root' })
 export class PlayerRecordsApi {
@@ -104,6 +113,26 @@ export class PlayerRecordsApi {
     const { db } = await this.connection.get();
     const { deleteField, doc, updateDoc } = await import('firebase/firestore');
     await updateDoc(doc(db, 'teams', this.team.id(), 'players', playerId, 'measurements', id), { review: review ?? deleteField() });
+  }
+
+  /**
+   * Neu berechnete Markierungen anderer Messungen speichern (SCRUM-306): nur `quality`, `flags` und – wenn die
+   * Bestätigung nicht mehr passt – `review` entfernen; Messwerte und übrige Felder bleiben unberührt. Alles in einem
+   * Schreibvorgang, damit nie nur ein Teil der Messungen neu markiert ist.
+   */
+  async saveMeasurementFlags(playerId: string, updates: readonly MeasurementFlagUpdate[]): Promise<void> {
+    if (updates.length === 0) return;
+    const { db } = await this.connection.get();
+    const { deleteField, doc, writeBatch } = await import('firebase/firestore');
+    const batch = writeBatch(db);
+    for (const update of updates) {
+      batch.update(doc(db, 'teams', this.team.id(), 'players', playerId, 'measurements', update.id), {
+        quality: update.quality,
+        flags: update.flags.length ? [...update.flags] : deleteField(),
+        ...(update.dropReview ? { review: deleteField() } : {}),
+      });
+    }
+    await batch.commit();
   }
 
   async deletePlayerRecord(playerId: string, name: PlayerRecordKind, id: string): Promise<void> {

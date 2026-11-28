@@ -8,13 +8,13 @@
  * einsetzen“ oder eine Sperre und ändert nichts an Belastung, Teilnahme oder Verfügbarkeit.
  */
 import { type WellnessSummary, wellnessSummary } from '../analysis/growth-load-overview';
-import { HARD_SESSIONS_REASON, injuryRisk } from '../analysis/risk';
+import { HARD_SESSIONS_REASON, injuryRisk, measurementCheckText } from '../analysis/risk';
 import type { Player } from '../player/player';
 import { isConsentRevoked } from '../player/player';
 import type { EventRating } from '../profile/profile';
 import type { Absence } from '../records/absence';
 import { type GrowthReview, reviewFor } from '../records/growth-review';
-import { FRESH_DAYS, type GrowthPoint, analyzeGrowth, growthHintLevel, hintRateAt, perMonth } from '../records/growth-velocity';
+import { FRESH_DAYS, type GrowthPoint, analyzeGrowth, flaggedDatesAffectingRate, growthHintLevel, hintRateAt, perMonth } from '../records/growth-velocity';
 import type { Measurement } from '../records/measurement';
 import { type WellnessEntry, wellnessSum } from '../self-report/self-report';
 import { addDays } from '../shared/dates';
@@ -53,6 +53,11 @@ export interface GrowthLoadStatus {
   readonly expires: string;
   /** Messtage ohne dokumentierte Messqualität (dann zuerst „Messung prüfen“). */
   readonly uncheckedDates: readonly string[];
+  /**
+   * Zur Prüfung markierte, nicht bestätigte Messungen, die die Wachstumsrate verändern würden (SCRUM-306): nur Kennzeichnung,
+   * Auslöser und Kennung bleiben gleich.
+   */
+  readonly flaggedDates: readonly string[];
   /** Befinden der letzten 28 Tage: „keine Angaben“ bzw. „nicht lesbar“ bleiben sichtbar. */
   readonly wellness: WellnessSummary;
   /** Dokumentierte Prüfung zu genau diesem Hinweis bis zum Tag (dann kein offener Hinweis mehr). */
@@ -121,6 +126,7 @@ export function growthLoadStatus(data: GrowthLoadData, day: string): GrowthLoadS
     loadReasons,
     expires: addDays(newest.date, FRESH_DAYS),
     uncheckedDates,
+    flaggedDates: flaggedDatesAffectingRate(data.measurements, day),
     wellness: wellnessSummary(wellness, addDays(day, -GROWTH_LOAD_WELLNESS_DAYS), day),
     review: reviewFor(data.growthReviews, key, day),
   };
@@ -145,8 +151,9 @@ export function wellnessText(summary: WellnessSummary): string {
 export function growthLoadDetail(status: GrowthLoadStatus): string {
   const growth = `Wachstum ${comma(status.cmPerMonth)} cm/Monat (${german(status.partner.date)} bis ${german(status.newest.date)})`;
   const load = `${status.loadReasons.join(' und ')} am ${german(status.loadDay)}`;
+  const check = status.flaggedDates.length ? ` ${measurementCheckText(status.flaggedDates)}.` : '';
   if (status.state === 'check-measurement') {
-    return `Messung prüfen: Messqualität vom ${status.uncheckedDates.map(german).join(' und ')} nicht dokumentiert. Danach gemeinsam ansehen: ${growth}, ${load}.`;
+    return `Messung prüfen: Messqualität vom ${status.uncheckedDates.map(german).join(' und ')} nicht dokumentiert. Danach gemeinsam ansehen: ${growth}, ${load}.${check}`;
   }
-  return `${growth}, ${load}; ${wellnessText(status.wellness)}. Bitte gemeinsam ansehen und die Prüfung im Profil dokumentieren (läuft ab am ${german(status.expires)}).`;
+  return `${growth}, ${load}; ${wellnessText(status.wellness)}. Bitte gemeinsam ansehen und die Prüfung im Profil dokumentieren (läuft ab am ${german(status.expires)}).${check}`;
 }

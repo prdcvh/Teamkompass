@@ -67,6 +67,19 @@ describe('growth-load-rule (Wachstum und Belastung gemeinsam ansehen)', () => {
       expect(growthLoadStatus(data(), TODAY)?.state).toBe('review');
     });
 
+    it('markierte, unbestätigte Messung, die das Wachstum verändern würde: gleicher Hinweis, aber gekennzeichnet (SCRUM-306)', () => {
+      const flagged: Measurement = { ...measure('mf', ago(3), 170, 'flagged'), flags: ['height-jump'] };
+      const plain = growthLoadStatus(data(), TODAY)!;
+      const status = growthLoadStatus(data({ measurements: [...growing(), flagged] }), TODAY)!;
+      expect(status.key).toBe(plain.key);
+      expect(status.state).toBe('review');
+      expect(status.flaggedDates).toEqual([ago(3)]);
+      expect(plain.flaggedDates).toEqual([]);
+      const detail = matches(data({ measurements: [...growing(), flagged] }))[0].detail;
+      expect(detail).toContain(`Einordnung unsicher – Messung prüfen (Messung vom ${ago(3).split('-').reverse().join('.')} zur Prüfung markiert).`);
+      expect(matches(data())[0].detail).not.toContain('Einordnung unsicher');
+    });
+
     it('Befinden fehlt: „keine Angaben“ bzw. „nicht lesbar“, nie „unauffällig“', () => {
       expect(matches(data({ wellness: [] }))[0].detail).toContain('Befinden: keine Angaben');
       expect(matches(data({ wellness: null }))[0].detail).toContain('Befinden nicht freigegeben oder nicht lesbar');

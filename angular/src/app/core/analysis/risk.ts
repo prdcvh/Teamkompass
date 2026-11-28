@@ -33,7 +33,8 @@ import type { Player } from '../player/player';
 import { type EventRating } from '../profile/profile';
 import { type Absence, activeAbsenceOn, isInjuryAbsence } from '../records/absence';
 import { type Measurement } from '../records/measurement';
-import { FRESH_DAYS, MAX_HINT_INTERVAL_DAYS, analyzeGrowth, growthHintLevel, perMonth } from '../records/growth-velocity';
+import { FRESH_DAYS, MAX_HINT_INTERVAL_DAYS, analyzeGrowth, flaggedDatesAffectingRate, growthHintLevel, perMonth } from '../records/growth-velocity';
+import { formatDate } from '../shared/dates';
 import { type Rating, roundGrade } from '../ratings/rating';
 import { type LoadCurvePoint, loadCurve, workloadRatio } from './load-curve';
 
@@ -86,6 +87,11 @@ export interface InjuryRisk {
   /** Einsätze der letzten 4 Wochen. */
   readonly recentEvents: number;
   readonly availability: LoadAvailability;
+  /**
+   * Messtage zur Prüfung markierter, nicht bestätigter Messungen, die den Wachstumshinweis verändern würden (SCRUM-306).
+   * Leer = keine. Die Stufe bleibt davon unberührt; die Ampel zeigt dann „Einordnung unsicher – Messung prüfen“.
+   */
+  readonly flaggedMeasurementDates: readonly string[];
 }
 
 /**
@@ -221,6 +227,10 @@ export function injuryRisk(
   // Gewicht zählt nicht (SCRUM-302); Messungen nach dem Stichtag zählen nicht.
   const growth = growthHint(measurements, todayStr);
   if (growth) hints.push(growth);
+  // Markierte Messungen (SCRUM-306, PO 28.11.2026 „B“): Die Rechnung bleibt wie oben (markierte zählen für die Rate nicht),
+  // aber die Ampel sagt, wenn eine markierte, nicht bestätigte Messung den Wachstumshinweis verändern würde.
+  const flaggedMeasurementDates = flaggedDatesAffectingRate(measurements, todayStr);
+  if (flaggedMeasurementDates.length) infos.push(measurementCheckText(flaggedMeasurementDates));
 
   // Rückkehr nach Verletzung: das Statusfeld („ca. verletzt bis“) und eine eingetragene Verletzung beschreiben oft dieselbe
   // Rückkehr; deshalb zählt nur die jüngste der beiden.
@@ -265,5 +275,15 @@ export function injuryRisk(
     spike: spikeHint,
     recentEvents: past.filter((item) => item.ago <= 27).length,
     availability,
+    flaggedMeasurementDates,
   };
+}
+
+/** Kurzform der Kennzeichnung (gleicher Wortlaut wie im Reife-Kompass). */
+export const MEASUREMENT_CHECK_LABEL = 'Einordnung unsicher – Messung prüfen';
+
+/** „Einordnung unsicher – Messung prüfen (Messung vom 01.10.2026 zur Prüfung markiert)“ */
+export function measurementCheckText(dates: readonly string[]): string {
+  const days = dates.map(formatDate).join(' und ');
+  return `${MEASUREMENT_CHECK_LABEL} (${dates.length === 1 ? 'Messung' : 'Messungen'} vom ${days} zur Prüfung markiert)`;
 }

@@ -258,6 +258,27 @@ export function analyzeGrowth(measurements: readonly GrowthMeasurement[], today:
   };
 }
 
+/**
+ * Zur Prüfung markierte, nicht bestätigte Größenmessungen, die die aktuelle Rate für Hinweise verändern würden, wenn
+ * sie mitzählten (SCRUM-306, PO-Entscheidung 28.11.2026 „B“: weiter rechnen wie bisher, aber kennzeichnen). Die Rate
+ * selbst lässt markierte Messungen weiter aus (SCRUM-254); diese Funktion ändert keine Zahl, sie sagt nur, ob eine
+ * markierte Messung beteiligt ist. Ergebnis: Messtage, aufsteigend; leer, wenn keine markierte Messung etwas ändert.
+ */
+export function flaggedDatesAffectingRate(measurements: readonly GrowthMeasurement[], today: string): string[] {
+  const relevant = measurements.filter((item) => item.date <= today);
+  const flagged = growthPoints(relevant).filter((point) => point.quality === 'flagged');
+  if (flagged.length === 0) return [];
+  const rate = analyzeGrowth(relevant, today).currentRate;
+  const dates = flagged
+    .filter((point) => {
+      // Nur diese eine markierte Messung zählt probeweise mit; ihr gespeicherter Wert bleibt unverändert.
+      const trial = relevant.map((item) => (item.id === point.id ? { ...item, quality: 'verified' as const, review: undefined } : item));
+      return analyzeGrowth(trial, today).currentRate !== rate;
+    })
+    .map((point) => point.date);
+  return [...new Set(dates)];
+}
+
 export interface GrowthBar {
   readonly x: number;
   readonly width: number;
