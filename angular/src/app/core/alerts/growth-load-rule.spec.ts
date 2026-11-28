@@ -166,5 +166,15 @@ describe('growth-load-rule (Wachstum und Belastung gemeinsam ansehen)', () => {
       expect(consentRevokedMatch(data({ player: revoked, items: [], measurements: [], wellness: [], growthReviews: [review('k', ago(3))] }))).toBe(true);
       expect(consentRevokedMatch(data({ player: revoked, items: [], measurements: [], wellness: [], growthReviews: [] }))).toBe(false);
     });
+
+    it('Reife-Kompass-Angaben zählen bei Widerruf als noch gespeicherte Gesundheitsdaten (SCRUM-304)', () => {
+      const base = { items: [], measurements: [], wellness: [], growthReviews: [] };
+      const stored = { sex: 'm' as const, parentsConsent: false, motherHeight: null, fatherHeight: null };
+      const revoked = player({ consentStatus: 'revoked' });
+      expect(consentRevokedMatch(data({ ...base, player: revoked, maturity: stored }))).toBe(true);
+      expect(consentRevokedMatch(data({ ...base, player: revoked, maturity: { ...stored, sex: null } }))).toBe(false);
+      expect(consentRevokedMatch(data({ ...base, player: revoked, maturity: null }))).toBe(false);
+      expect(consentRevokedMatch(data({ ...base, player: player({ consentStatus: 'granted' }), maturity: stored }))).toBe(false);
+    });
   });
 });

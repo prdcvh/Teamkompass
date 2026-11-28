@@ -30,6 +30,8 @@ const MATURITY_PATH = /'maturity'/;
 
 // Erlaubte Stellen und warum (das Rechen-Modul core/records/maturity.ts selbst bindet sich nicht ein).
 const ALLOWED = {
+  "core/alerts/alert-rules.ts": "Hinweis Einwilligung widerrufen (SCRUM-304): zaehlt uebrig gebliebene Reife-Angaben nur als Loeschaufgabe, kein Inhalt im Hinweis",
+  "core/alerts/alerts.service.ts": "laedt maturity/parents nur fuer Trainer und nur fuer Spieler mit widerrufener Einwilligung (SCRUM-304)",
   "core/firebase/maturity.api.ts": "Lesen/Schreiben/Loeschen des Dokuments maturity/parents",
   "core/analysis/development-view.ts": "Entwicklungsansicht (SCRUM-258), rechnet ueber maturityInputsForCalculation, nur Zaehlungen, keine Namen",
   "core/analysis/development-view.service.ts": "nur Trainer, ohne widerrufene Spieler",
@@ -88,4 +90,9 @@ test("Entwicklungsansicht (SCRUM-258): nur Trainer, Widerruf und Rechenweg ueber
   assert.match(service, /role\(\) === 'trainer'/);
   assert.ok(!/physio/.test(service), "Medizin bekommt die Teamauswertung nicht");
   assert.match(service, /\.filter\(\(player\) => !isConsentRevoked\(player\)\)/);
+});
+
+test("Hinweise (SCRUM-304): Reife-Angaben nur fuer Trainer und nur bei widerrufener Einwilligung laden", async () => {
+  const service = await read("angular/src/app/core/alerts/alerts.service.ts");
+  assert.match(service, /this\.audience\(\) === 'trainer' \? this\.squad\.players\(\)\.filter\(\(player\) => player\.consentStatus === 'revoked'\)/);
 });

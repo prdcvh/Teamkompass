@@ -54,6 +54,7 @@ export const MORE_GROUPS: readonly MoreGroup[] = [
       { path: '/wissen', label: 'Wissen', icon: 'book', hint: 'Videos, Dokumente, Glossar' },
       { path: '/gegneranalyse', label: 'Gegneranalyse', icon: 'target', hint: 'Matchplan & Gegnerprofile' },
       { path: '/teamanalyse', label: 'Teamanalyse', icon: 'chart', hint: 'Form, Kennzahlen, Positionen' },
+      { path: '/aufstellung', label: 'Aufstellung', icon: 'diamond', hint: 'Startelf & Formation planen' },
       { path: '/messplan', label: 'Messplan', icon: 'calendar', hint: 'Wer wann wieder gemessen wird' },
       { path: '/feldtests', label: 'Feldtests', icon: 'chart', hint: 'Sprint, Sprung, Ausdauer, Technik' },
     ],
