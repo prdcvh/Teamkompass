@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { SessionService } from '../auth/session.service';
 import { SyncService } from '../shell/sync.service';
+import { SquadService } from '../player/squad.service';
 import { analyzeGrowth } from './growth-velocity';
 import type { FakeFirebase } from '../testing/fake-firebase';
 import { setupRecords } from '../testing/records-setup';
@@ -106,6 +107,18 @@ describe('MeasurementsService', () => {
       expect(measurements.saveMeasurement({ ...emptyMeasurementDraft('2026-10-10', '17:30'), height: ['155', '155', ''] }, NOW)).toEqual({});
       await vi.waitFor(() => expect(stored()).toHaveLength(2));
       expect(firebase.records.calls.some((call) => call.startsWith('saveMeasurementFlags'))).toBe(false);
+    });
+
+    it('widerrufene Einwilligung: Löschen einer einzelnen Messung ohne Neuberechnung, keine Fehlermeldung', async () => {
+      const { measurements } = await withSeries();
+      await firebase.players.savePlayer('p1', { ...firebase.players.players.get('p1'), consentStatus: 'revoked' });
+      await vi.waitFor(() => expect(TestBed.inject(SquadService).players()[0]?.consentStatus).toBe('revoked'));
+      firebase.records.calls.length = 0;
+      expect(await measurements.deleteMeasurement('me2')).toBe(true);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(firebase.records.calls.some((call) => call.startsWith('saveMeasurementFlags'))).toBe(false);
+      expect(TestBed.inject(SyncService).detail()).toBe('');
+      expect(doc('me3')).toMatchObject({ quality: 'flagged', flags: ['height-drop'] });
     });
 
     it('Schreibfehler bei der Neuberechnung wird gemeldet', async () => {

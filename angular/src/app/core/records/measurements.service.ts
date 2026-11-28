@@ -1,6 +1,8 @@
 import { Injectable, computed, inject } from '@angular/core';
 import { PlayerRecordsApi } from '../firebase/player-records.api';
 import { SquadService } from '../player/squad.service';
+import { mayStoreHealth } from '../player/consent';
+import { CurrentTeam } from '../team/current-team.service';
 import { todayIso } from '../shared/dates';
 import { SessionService } from '../auth/session.service';
 import { type Measurement, REVIEW_BY_MAX, REVIEW_REASON_MAX, docFromMeasurement, measurementQuality, reviewDoc, withoutReview, sortedMeasurements } from './measurement';
@@ -16,6 +18,7 @@ export class MeasurementsService {
   private readonly state = inject(RecordsStateService);
   private readonly squad = inject(SquadService);
   private readonly session = inject(SessionService);
+  private readonly team = inject(CurrentTeam);
 
   /** Messungen, älteste zuerst. */
   readonly measurements = computed(() => sortedMeasurements(this.state.measurementList()));
@@ -42,11 +45,21 @@ export class MeasurementsService {
     const list = [...this.state.measurementList().filter((item) => item.id !== id), measurement];
     // Nachgetragene oder korrigierte ältere Messung: Markierungen „kleiner/größer als vorige Messung“ der übrigen neu (SCRUM-306).
     // Die gespeicherte Messung selbst wurde gerade mit derselben Regel geprüft; sie bleibt, wie sie ist.
-    const changes = recomputeTrendFlags(list).filter((change) => change.measurement.id !== id);
+    const changes = this.mayRecalculate(playerId) ? recomputeTrendFlags(list).filter((change) => change.measurement.id !== id) : [];
     this.state.measurementList.set(this.withChanges(list, changes));
     this.state.write('Messung konnte nicht gespeichert werden.', () => this.playerRecordsApi.savePlayerRecord(playerId, 'measurements', id, docFromMeasurement(measurement)));
     if (changes.length) this.state.write(RECALCULATION_ERROR, () => this.saveFlagChanges(playerId, changes));
     return {};
+  }
+
+  /**
+   * Dürfen Markierungen anderer Messungen neu gespeichert werden? Wie bei neuen Feldtests: nicht nach widerrufener
+   * Einwilligung (dann werden keine neuen Gesundheitsdaten erfasst) und bei fremden Vereinen nur mit dokumentierter
+   * Einwilligung – sonst lehnen die Regeln das Schreiben ab. Unbekannter Spieler: lieber nicht.
+   */
+  private mayRecalculate(playerId: string): boolean {
+    const player = this.squad.players().find((entry) => entry.id === playerId);
+    return !!player && player.consentStatus !== 'revoked' && mayStoreHealth(player, this.team.id());
   }
 
   private withChanges(list: readonly Measurement[], changes: readonly TrendFlagChange[]): Measurement[] {
@@ -130,7 +143,7 @@ export class MeasurementsService {
   async deleteMeasurement(id: string, options: { readonly recalculate?: boolean } = {}): Promise<boolean> {
     const playerId = this.state.writablePlayer();
     const removed = await this.state.remove('measurements', id, 'Messung konnte nicht gelöscht werden.', (list) => this.state.measurementList.set(list as Measurement[]), this.state.measurementList());
-    if (!removed || !playerId || options.recalculate === false) return removed;
+    if (!removed || !playerId || options.recalculate === false || !this.mayRecalculate(playerId)) return removed;
     const changes = recomputeTrendFlags(this.state.measurementList());
     if (changes.length === 0) return true;
     this.state.measurementList.update((list) => this.withChanges(list, changes));
