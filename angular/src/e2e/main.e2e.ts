@@ -19,6 +19,12 @@ class SampleWeatherProvider extends WeatherProvider {
   }
 }
 
+/** Heute (lokal) als `YYYY-MM-DD`: ein Training „heute“ zeigt auf der Startseite den Knopf „Live-Modus: …“ (SCRUM-308). */
+function today(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 /** Morgen (lokal) als `YYYY-MM-DD`: ein kommendes Training innerhalb des Vorhersagehorizonts. */
 function tomorrow(): string {
   const d = new Date(Date.now() + 24 * 3600 * 1000);
@@ -52,6 +58,8 @@ function seed(): FakeFirebase {
   fake.events.events.set('e3', { type: 'Training', title: 'Training', date: '2026-11-20', intensity: 2 });
   // Ohne gewählten Ort: Wetter für den Standardort Königstein (SCRUM-153).
   fake.events.events.set('e4', { type: 'Training', title: 'Abschlusstraining vor dem Derby', date: tomorrow(), intensity: 2, location: 'Kunstrasen - heim', startTime: '17:30', durationMinutes: 90 });
+  // Training heute mit langem Titel (SCRUM-308), unabhängig vom Tagesdatum: der Live-Knopf auf der Startseite darf nicht über den Rand laufen.
+  fake.events.events.set('e5', { type: 'Training', title: 'Torwart- und Athletiktraining im Wechsel', date: today(), intensity: 2, location: 'Kunstrasen - heim', startTime: '18:00', durationMinutes: 75 });
   // Künftige Termine der Serie s1 (SCRUM-147): einer bewertet, einer von Hand geändert.
   for (const date of ['2026-10-20', '2026-10-27', '2026-11-03']) {
     fake.events.events.set(`serie-s1-${date}`, { type: 'Training', title: 'Training', date, intensity: 2, location: 'Kunstrasen - heim', trainingFocus: 'Eigener Ballbesitz', startTime: '17:30', durationMinutes: 90, ...(date === '2026-11-03' ? { seriesEdited: true } : {}) });

@@ -1,7 +1,9 @@
 import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { SessionService } from '../auth/session.service';
+import { MaturityApi } from '../firebase/maturity.api';
 import { PlayerRecordsApi } from '../firebase/player-records.api';
 import { SelfReportsApi } from '../firebase/self-reports.api';
+import { type MaturityInputs, maturityInputsFromDoc } from '../records/maturity';
 import { type GrowthReview, growthReviewFromDoc } from '../records/growth-review';
 import { SquadService } from '../player/squad.service';
 import { type WellnessEntry, wellnessFromDoc } from '../self-report/self-report';
@@ -38,6 +40,7 @@ export class AlertsService {
   private readonly settings = inject(TeamSettingsService);
   private readonly api = inject(SelfReportsApi);
   private readonly recordsApi = inject(PlayerRecordsApi);
+  private readonly maturityApi = inject(MaturityApi);
 
   readonly active = signal(false);
   readonly audience = computed<AlertAudience | null>(() => {
@@ -50,6 +53,12 @@ export class AlertsService {
   /** Trainerprüfungen je Spieler (nur Trainer); ein Eintrag (auch leer) heißt: Antwort da oder nicht lesbar. */
   private readonly reviews = signal<ReadonlyMap<string, readonly GrowthReview[]>>(new Map());
 
+  /**
+   * Reife-Kompass-Angaben je Spieler mit widerrufener Einwilligung (SCRUM-304, nur Trainer; Medizin darf das Dokument
+   * nicht lesen). Ein Eintrag (auch leer) heißt: Antwort da oder nicht lesbar.
+   */
+  private readonly maturity = signal<ReadonlyMap<string, MaturityInputs | null>>(new Map());
+
   readonly ready = computed(() => {
     if (!this.active()) return false;
     const audience = this.audience();
@@ -59,9 +68,16 @@ export class AlertsService {
     const wellness = this.wellness();
     const failed = this.failed();
     const reviews = this.reviews();
+    const maturity = this.maturity();
     return (
       base &&
-      this.squad.players().every((player) => (wellness.has(player.id) || failed.has(player.id)) && (audience !== 'trainer' || reviews.has(player.id)))
+      this.squad
+        .players()
+        .every(
+          (player) =>
+            (wellness.has(player.id) || failed.has(player.id)) &&
+            (audience !== 'trainer' || (reviews.has(player.id) && (player.consentStatus !== 'revoked' || maturity.has(player.id)))),
+        )
     );
   });
   /** Befinden mindestens eines Spielers nicht lesbar (Hinweis in der Anzeige). */
@@ -74,9 +90,13 @@ export class AlertsService {
     const today = todayIso();
     if (audience === 'trainer') {
       const reviews = this.reviews();
-      const players: AlertPlayerData[] = this.team
-        .data()
-        .map((entry) => ({ ...entry, wellness: wellness.get(entry.player.id) ?? null, growthReviews: reviews.get(entry.player.id) ?? null }));
+      const maturity = this.maturity();
+      const players: AlertPlayerData[] = this.team.data().map((entry) => ({
+        ...entry,
+        wellness: wellness.get(entry.player.id) ?? null,
+        growthReviews: reviews.get(entry.player.id) ?? null,
+        maturity: maturity.get(entry.player.id) ?? null,
+      }));
       return evaluateAlerts(players, this.team.events(), this.settings.alertSwitches(), 'trainer', today);
     }
     const players: AlertPlayerData[] = this.squad.players().map((player) => ({ player, items: null, absences: [], measurements: [], wellness: wellness.get(player.id) ?? null }));
@@ -88,6 +108,8 @@ export class AlertsService {
   private readonly opening = new Set<string>();
   private readonly reviewUnsubscribers = new Map<string, () => void>();
   private readonly reviewOpening = new Set<string>();
+  private readonly maturityUnsubscribers = new Map<string, () => void>();
+  private readonly maturityOpening = new Set<string>();
   private generation = 0;
   private lastAudience: AlertAudience | null = null;
 
@@ -99,6 +121,11 @@ export class AlertsService {
     effect(() => {
       const ids = this.active() && this.audience() === 'trainer' ? this.squad.players().map((player) => player.id) : [];
       untracked(() => this.reconcileReviews(ids));
+    });
+    effect(() => {
+      const ids =
+        this.active() && this.audience() === 'trainer' ? this.squad.players().filter((player) => player.consentStatus === 'revoked').map((player) => player.id) : [];
+      untracked(() => this.reconcileMaturity(ids));
     });
     // Abmelden oder Rollenwechsel (anderes Team): nichts darf im Speicher bleiben.
     effect(() => {
@@ -131,10 +158,56 @@ export class AlertsService {
     this.reviewUnsubscribers.forEach((unsubscribe) => unsubscribe());
     this.reviewUnsubscribers.clear();
     this.reviewOpening.clear();
+    this.maturityUnsubscribers.forEach((unsubscribe) => unsubscribe());
+    this.maturityUnsubscribers.clear();
+    this.maturityOpening.clear();
     this.active.set(false);
     this.wellness.set(new Map());
     this.failed.set(new Set());
     this.reviews.set(new Map());
+    this.maturity.set(new Map());
+  }
+
+  /** Reife-Kompass-Angaben der Spieler mit widerrufener Einwilligung abonnieren (nur Trainer). Fehler: als „keine Angaben bekannt“ behandeln. */
+  private reconcileMaturity(ids: readonly string[]): void {
+    const keep = new Set(ids);
+    for (const [id, unsubscribe] of this.maturityUnsubscribers) {
+      if (keep.has(id)) continue;
+      unsubscribe();
+      this.maturityUnsubscribers.delete(id);
+    }
+    this.maturity.update((map) => {
+      const stale = [...map.keys()].filter((id) => !keep.has(id));
+      return stale.length === 0 ? map : new Map([...map].filter(([id]) => keep.has(id)));
+    });
+    const generation = this.generation;
+    for (const playerId of ids) {
+      if (this.maturityUnsubscribers.has(playerId) || this.maturityOpening.has(playerId)) continue;
+      this.maturityOpening.add(playerId);
+      const fail = (error: unknown) => {
+        if (generation !== this.generation) return;
+        console.warn('Reife-Kompass-Angaben für die Hinweise nicht lesbar', error);
+        this.maturity.update((map) => new Map(map).set(playerId, null));
+      };
+      this.maturityApi
+        .watchMaturity(
+          playerId,
+          (data) => {
+            if (generation !== this.generation) return;
+            this.maturity.update((map) => new Map(map).set(playerId, data ? maturityInputsFromDoc(data) : null));
+          },
+          fail,
+        )
+        .then((unsubscribe) => {
+          if (generation === this.generation) this.maturityOpening.delete(playerId);
+          if (generation !== this.generation || !keepNow(this.squad.players().filter((player) => player.consentStatus === 'revoked'), playerId)) unsubscribe();
+          else this.maturityUnsubscribers.set(playerId, unsubscribe);
+        })
+        .catch((error) => {
+          if (generation === this.generation) this.maturityOpening.delete(playerId);
+          fail(error);
+        });
+    }
   }
 
   /** Trainerprüfungen je Spieler abonnieren (nur Trainer). Fehler: als „keine Prüfung bekannt“ behandeln. */

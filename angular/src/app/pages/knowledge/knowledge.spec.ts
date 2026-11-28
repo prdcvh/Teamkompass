@@ -79,6 +79,18 @@ describe('Wissen (Seite, SCRUM-106)', () => {
     expect(titles(fixture)).toHaveLength(3);
   });
 
+  it('behält Typ-, Kategorie- und Suchfilter nach dem Verlassen der Seite (SCRUM-310)', async () => {
+    const fixture = await render();
+    type(field(fixture, 'type'), 'glossary', 'change');
+    await fixture.whenStable();
+    fixture.destroy();
+    const again = TestBed.createComponent(Knowledge);
+    await again.whenStable();
+    again.detectChanges();
+    expect(field(again, 'type').value).toBe('glossary');
+    expect(titles(again)).toEqual(['Abseits']);
+  });
+
   it('legt einen Link an und lehnt javascript:/http: im Formular ab', async () => {
     const fixture = await render(null);
     (root(fixture).querySelector('.head button') as HTMLButtonElement).click();
