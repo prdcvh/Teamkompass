@@ -81,6 +81,20 @@ describe('Reife-Kompass: Erklärung der Einordnung (SCRUM-256)', () => {
       expect(result.causes[0]).toContain('Auch nach der 3. Messung');
     });
 
+    it('markierte Messung zählt weiter mit, ist aber gekennzeichnet; bestätigt („Messung stimmt“) normal eingeordnet (SCRUM-306)', () => {
+      const flagged = m('b', '2026-10-01', 165, 51, { quality: 'flagged', flags: ['height-spread'] });
+      const marked = assessMaturity([normal[0], flagged], born, inputs, today);
+      // Mitgezählt: der Reifewert kommt aus der markierten Messung, nur die Einordnung ist „unsicher“.
+      expect(marked.latest?.date).toBe('2026-10-01');
+      expect(marked.basis.usableCount).toBe(2);
+      expect(marked.basis.quality.flagged).toBe(1);
+      expect(marked.status).toBe('uncertain');
+      const confirmed = assessMaturity([normal[0], { ...flagged, review: { at: '2026-10-02T10:00:00Z', by: 'Trainer', byUid: 'c1' } }], born, inputs, today);
+      expect(confirmed.status).toBe('classified');
+      expect(confirmed.latest).toEqual(marked.latest);
+      expect(confirmed.basis.quality.flagged).toBe(0);
+    });
+
     it('Größe gesunken (ab 0,4 cm) gegenüber der vorigen Messung', () => {
       const series = [m('a', '2026-04-01', 166, 47), m('b', '2026-10-01', 165, 51)];
       const result = assessMaturity(series, born, inputs, today);

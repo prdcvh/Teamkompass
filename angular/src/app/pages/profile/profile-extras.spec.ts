@@ -59,6 +59,24 @@ describe('Profile: Zusatzdaten', () => {
     expect(q(fixture, '.risk')?.getAttribute('data-tier')).toBe('unauffaellig');
   });
 
+  it('Belastungsampel: markierte Messung, die den Wachstumshinweis ändern würde, ist gekennzeichnet (SCRUM-306)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-02T12:00:00') });
+    const flaggedNewest = (fb: FakeFirebase) => {
+      fb.records.playerRecords.set('p1/measurements', new Map([
+        ['me1', { date: '2026-07-01', height: '150', weight: '40' }],
+        ['me2', { date: '2026-10-01', height: '154', weight: '43', quality: 'flagged', flags: ['height-spread'] }],
+      ]));
+    };
+    const fixture = await renderExtras('trainer', flaggedNewest);
+    expect(text(q(fixture, '[data-test="risk-measurement-check"]'))).toBe('Einordnung unsicher – Messung prüfen');
+    expect(text(q(fixture, '.risk'))).toContain('Messung vom 01.10.2026 zur Prüfung markiert');
+    // Die Stufe bleibt: die markierte Messung zählt für die Rate weiterhin nicht.
+    expect(q(fixture, '.risk')?.getAttribute('data-tier')).toBe('unauffaellig');
+    TestBed.resetTestingModule();
+    const plain = await renderExtras();
+    expect(q(plain, '[data-test="risk-measurement-check"]')).toBeNull();
+  });
+
   it('legt einen Förderplan an und prüft Pflichtfelder', async () => {
     const fixture = await renderExtras();
     clickByText(fixture, 'tk-profile-extras .block-head button', '+ Förderplan');

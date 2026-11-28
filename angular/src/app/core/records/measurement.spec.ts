@@ -1,5 +1,5 @@
 import { type Measurement, calculateBmi, docFromMeasurement, measurementFromDoc, measurementQuality, measurementText } from './measurement';
-import { type MeasurementContext, type MeasurementDraft, draftFromMeasurement, emptyMeasurementDraft, evaluateMeasurement, measurementFromDraft, validateMeasurement } from './measurement-draft';
+import { type MeasurementContext, type MeasurementDraft, draftFromMeasurement, emptyMeasurementDraft, evaluateMeasurement, measurementFromDraft, recomputeTrendFlags, validateMeasurement } from './measurement-draft';
 
 const context: MeasurementContext = { today: '2026-11-10', birthdate: '2012-05-05', others: [] };
 const NOW = '2026-11-10T18:00:00.000Z';
@@ -180,5 +180,59 @@ describe('Messwerte', () => {
     expect(calculateBmi(150, null)).toBeNull();
     expect(measurementText({ id: 'm', date: '2026-10-10', height: 150, weight: 40 })).toBe('150 cm · 40 kg · BMI 17,8');
     expect(measurementText({ id: 'm', date: '2026-10-10', height: 150, weight: null })).toBe('150 cm · – kg');
+  });
+});
+
+describe('Markierungen „kleiner/größer als vorige Messung“ neu berechnen (SCRUM-306)', () => {
+  const m = (id: string, date: string, height: number, extra: Partial<Measurement> = {}): Measurement => ({ id, date, height, weight: 45, time: '17:00', protocol: '1.0', quality: 'verified', ...extra });
+  const review = { at: '2026-10-02T10:00:00Z', by: 'Trainer', byUid: 'c1' };
+  const byId = (changes: ReturnType<typeof recomputeTrendFlags>) => Object.fromEntries(changes.map((change) => [change.measurement.id, change]));
+
+  it('ältere Messung korrigiert: „kleiner als vorige“ der späteren entfällt, Messung gilt wieder als geprüft', () => {
+    // Vorher Tippfehler 160 statt 150: die spätere Messung (151) war „kleiner als vorige“.
+    const corrected = [m('a', '2026-04-01', 150), m('b', '2026-10-01', 151, { quality: 'flagged', flags: ['height-drop'] })];
+    const changes = recomputeTrendFlags(corrected);
+    expect(changes).toHaveLength(1);
+    expect(changes[0]!.measurement).toMatchObject({ id: 'b', quality: 'verified', height: 151 });
+    expect(changes[0]!.measurement.flags).toBeUndefined();
+    expect(changes[0]!.reviewDropped).toBe(false);
+  });
+
+  it('ältere Messung korrigiert: spätere wird neu „kleiner als vorige“; andere Kennzeichen bleiben', () => {
+    const corrected = [m('a', '2026-04-01', 160), m('b', '2026-10-01', 151, { quality: 'flagged', flags: ['weight-spread'] })];
+    expect(recomputeTrendFlags(corrected)[0]!.measurement).toMatchObject({ id: 'b', quality: 'flagged', flags: ['weight-spread', 'height-drop'] });
+  });
+
+  it('Kette: eine dadurch markierte Messung ist nicht mehr Vergleich für die nächste', () => {
+    // a korrigiert auf 160 → b (150) wird „kleiner“ und zählt nicht mehr als Vergleich; c (161) wird gegen a geprüft (ok)
+    // statt gegen b (11 cm in 3 Monaten = „größer“).
+    const list = [m('a', '2026-01-01', 160), m('b', '2026-04-01', 150), m('c', '2026-07-01', 161, { quality: 'flagged', flags: ['height-jump'] })];
+    const changes = byId(recomputeTrendFlags(list));
+    expect(changes['b']!.measurement).toMatchObject({ quality: 'flagged', flags: ['height-drop'] });
+    expect(changes['c']!.measurement).toMatchObject({ quality: 'verified' });
+  });
+
+  it('Bestätigung „Messung stimmt“: bleibt, wenn ein Grund wegfällt; entfällt, wenn ein neuer Grund dazukommt', () => {
+    const gone = recomputeTrendFlags([m('a', '2026-04-01', 150), m('b', '2026-10-01', 151, { quality: 'flagged', flags: ['height-spread', 'height-drop'], review })]);
+    expect(gone[0]!.measurement).toMatchObject({ quality: 'flagged', flags: ['height-spread'], review });
+    expect(gone[0]!.reviewDropped).toBe(false);
+    const added = recomputeTrendFlags([m('a', '2026-04-01', 160), m('b', '2026-10-01', 151, { quality: 'flagged', flags: ['height-spread'], review })]);
+    expect(added[0]!.measurement).toMatchObject({ quality: 'flagged', flags: ['height-spread', 'height-drop'] });
+    expect(added[0]!.measurement.review).toBeUndefined();
+    expect(added[0]!.reviewDropped).toBe(true);
+    expect(measurementQuality(added[0]!.measurement)).toBe('flagged');
+  });
+
+  it('nichts ändert sich: keine Änderung; Bestandsmessungen und Messungen ohne Größe bleiben unberührt', () => {
+    const legacy: Measurement = { id: 'l', date: '2026-07-01', height: 151, weight: 40 };
+    const weightOnly = m('w', '2026-08-01', 0, { height: null });
+    expect(recomputeTrendFlags([m('a', '2026-04-01', 150), legacy, weightOnly, m('b', '2026-10-01', 152)])).toEqual([]);
+  });
+
+  it('gleiche Regel wie beim Speichern: neu berechnet = was das Formular jetzt ergäbe', () => {
+    const list = [m('a', '2026-04-01', 150), m('b', '2026-10-01', 149.5)];
+    const draft = { ...draftFromMeasurement(list[1]!), height: ['149,5', '149,5', ''], reason: 'x' };
+    const evaluation = evaluateMeasurement(draft, { today: '2026-11-01', birthdate: '2012-01-01', others: [list[0]!] });
+    expect(recomputeTrendFlags(list)[0]!.measurement.flags).toEqual(evaluation.flags);
   });
 });

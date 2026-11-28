@@ -4,7 +4,7 @@
  */
 import { isIsoDate } from '../shared/dates';
 import { effectiveQuality } from './growth-velocity';
-import type { Measurement } from './measurement';
+import { type Measurement, sortedMeasurements, withoutReview } from './measurement';
 import {
   HEIGHT_MIN_READINGS,
   HEIGHT_TOLERANCE_TENTHS,
@@ -283,4 +283,58 @@ export function measurementFromDraft(draft: MeasurementDraft, id: string, evalua
     ...(evaluation.flags.length ? { flags: [...evaluation.flags] } : {}),
     ...history,
   };
+}
+
+/** Kennzeichen, die vom Vergleich mit der vorigen Messung abhängen (alle übrigen hängen nur an der Messung selbst). */
+export const TREND_FLAGS: readonly MeasurementFlag[] = ['height-drop', 'height-jump'];
+
+/** Eine Messung, deren Markierung sich durch die Neuberechnung ändert (neue Fassung). */
+export interface TrendFlagChange {
+  readonly measurement: Measurement;
+  /** Die Bestätigung „Messung stimmt“ wurde entfernt, weil ein neuer Prüfgrund dazugekommen ist. */
+  readonly reviewDropped: boolean;
+}
+
+/**
+ * Markierungen „kleiner/größer als die vorige Messung“ aller Messungen neu berechnen (SCRUM-306, PO 28.11.2026), z. B.
+ * nachdem eine ältere Messung korrigiert, nachgetragen oder gelöscht wurde. Gleiche Regel wie beim Speichern
+ * ({@link evaluateMeasurement}): Vergleich mit der jüngsten früheren Messung mit Größe, die selbst nicht (unbestätigt)
+ * markiert ist – deshalb der Reihe nach, älteste zuerst, mit den schon neu berechneten Markierungen.
+ *
+ * - Nur Messungen aus dem Messassistenten (mit Messqualität); Bestandsmessungen bekommen nie Kennzeichen.
+ * - Übrige Kennzeichen (Streuung, unplausible Werte) bleiben, Messwerte bleiben unverändert.
+ * - Bestätigung („Messung stimmt“, SCRUM-387): bleibt, solange kein neuer Prüfgrund dazukommt (auch wenn ein Grund
+ *   wegfällt; sie bleibt als Protokoll stehen). Kommt ein neuer Grund dazu, wird sie entfernt – bestätigt wurde ja
+ *   etwas anderes; die Messung ist dann wieder zur Prüfung markiert.
+ *
+ * Ergebnis: nur die Messungen, deren Markierung sich ändert.
+ */
+export function recomputeTrendFlags(measurements: readonly Measurement[]): TrendFlagChange[] {
+  const done: Measurement[] = [];
+  const changes: TrendFlagChange[] = [];
+  for (const measurement of sortedMeasurements(measurements)) {
+    let next = measurement;
+    if (measurement.quality !== undefined && measurement.quality !== 'undocumented' && isIsoDate(measurement.date)) {
+      const before = measurement.flags ?? [];
+      const kept = before.filter((flag) => !TREND_FLAGS.includes(flag));
+      const trend = measurement.height !== null ? heightTrendFlag(measurement.date, measurement.height, previousHeight(done, measurement.date)) : null;
+      const flags = trend ? [...kept, trend] : kept;
+      const same = flags.length === before.length && flags.every((flag) => before.includes(flag));
+      if (!same) {
+        const added = flags.some((flag) => !before.includes(flag));
+        const reviewDropped = added && !!measurement.review;
+        const base = withoutFlags(reviewDropped ? withoutReview(measurement) : measurement);
+        next = { ...base, quality: flags.length ? 'flagged' : 'verified', ...(flags.length ? { flags } : {}) } as Measurement;
+        changes.push({ measurement: next, reviewDropped });
+      }
+    }
+    done.push(next);
+  }
+  return changes;
+}
+
+function withoutFlags(measurement: Omit<Measurement, 'review'> | Measurement): Measurement {
+  const copy: Record<string, unknown> = { ...measurement };
+  delete copy['flags'];
+  return copy as unknown as Measurement;
 }

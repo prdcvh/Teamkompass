@@ -33,6 +33,15 @@
   color: var(--tk-amber);
 }
 
+.risk-check {
+  justify-self: start;
+  padding: 2px var(--tk-space-3);
+  font-size: var(--tk-text-sm);
+  color: var(--tk-amber);
+  border: 1px solid currentColor;
+  border-radius: var(--tk-radius-pill);
+}
+
 .risk-compare {
   display: grid;
   grid-template-columns: 1fr 1fr;

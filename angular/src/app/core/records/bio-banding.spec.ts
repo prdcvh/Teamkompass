@@ -132,6 +132,13 @@ describe('Bio-Banding: veraltete oder unsichere Werte (SCRUM-389)', () => {
     expect(result.unclassified[0]!.causes[0]).toContain('zur Prüfung markiert');
   });
 
+  it('bestätigte Markierung („Messung stimmt“, SCRUM-387/306): Spieler kommt wieder in seine Gruppe', () => {
+    const confirmed: BioBandingData = { inputs, measurements: [{ ...flagged.measurements[0]!, review: { at: '2026-10-02T10:00:00Z', by: 'Trainer', byUid: 'c1' } }] };
+    const result = suggestBioBanding([player('f', 'Flo')], new Map([['f', confirmed]]), today);
+    expect(result.unclassified).toEqual([]);
+    expect(result.groups.flatMap((group) => group.players).map((entry) => entry.id)).toEqual(['f']);
+  });
+
   it('gleiche Daten, gleiche Aussage wie im Profil (assessMaturity): Status und Ursachen stimmen überein', () => {
     for (const data of [fresh, old, flagged]) {
       const assessment = assessMaturity(data.measurements, birthdate, data.inputs, today);

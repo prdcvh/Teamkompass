@@ -1,11 +1,15 @@
 import { Injectable, computed, inject } from '@angular/core';
 import { PlayerRecordsApi } from '../firebase/player-records.api';
 import { SquadService } from '../player/squad.service';
+import { mayStoreHealth } from '../player/consent';
+import { CurrentTeam } from '../team/current-team.service';
 import { todayIso } from '../shared/dates';
 import { SessionService } from '../auth/session.service';
 import { type Measurement, REVIEW_BY_MAX, REVIEW_REASON_MAX, docFromMeasurement, measurementQuality, reviewDoc, withoutReview, sortedMeasurements } from './measurement';
-import { type MeasurementContext, type MeasurementDraft, type MeasurementErrors, evaluateMeasurement, measurementFromDraft } from './measurement-draft';
+import { type MeasurementContext, type MeasurementDraft, type MeasurementErrors, evaluateMeasurement, measurementFromDraft, recomputeTrendFlags, type TrendFlagChange } from './measurement-draft';
 import { RecordsStateService } from './records-state.service';
+
+const RECALCULATION_ERROR = 'Die Markierungen der übrigen Messungen konnten nicht neu gespeichert werden.';
 
 /** Messwerte (Größe, Gewicht, Sitzhöhe) des geladenen Spielers lesen und schreiben (nur Trainer). */
 @Injectable({ providedIn: 'root' })
@@ -14,6 +18,7 @@ export class MeasurementsService {
   private readonly state = inject(RecordsStateService);
   private readonly squad = inject(SquadService);
   private readonly session = inject(SessionService);
+  private readonly team = inject(CurrentTeam);
 
   /** Messungen, älteste zuerst. */
   readonly measurements = computed(() => sortedMeasurements(this.state.measurementList()));
@@ -37,9 +42,41 @@ export class MeasurementsService {
     const id = draft.id ?? `me${crypto.randomUUID()}`;
     const previous = draft.id ? (this.state.measurementList().find((entry) => entry.id === draft.id) ?? null) : null;
     const measurement = measurementFromDraft(draft, id, evaluation, previous, now.toISOString());
-    this.state.measurementList.update((list) => [...list.filter((item) => item.id !== id), measurement]);
+    const list = [...this.state.measurementList().filter((item) => item.id !== id), measurement];
+    // Nachgetragene oder korrigierte ältere Messung: Markierungen „kleiner/größer als vorige Messung“ der übrigen neu (SCRUM-306).
+    // Die gespeicherte Messung selbst wurde gerade mit derselben Regel geprüft; sie bleibt, wie sie ist.
+    const changes = this.mayRecalculate(playerId) ? recomputeTrendFlags(list).filter((change) => change.measurement.id !== id) : [];
+    this.state.measurementList.set(this.withChanges(list, changes));
     this.state.write('Messung konnte nicht gespeichert werden.', () => this.playerRecordsApi.savePlayerRecord(playerId, 'measurements', id, docFromMeasurement(measurement)));
+    if (changes.length) this.state.write(RECALCULATION_ERROR, () => this.saveFlagChanges(playerId, changes));
     return {};
+  }
+
+  /**
+   * Dürfen Markierungen anderer Messungen neu gespeichert werden? Wie bei neuen Feldtests: nicht nach widerrufener
+   * Einwilligung (dann werden keine neuen Gesundheitsdaten erfasst) und bei fremden Vereinen nur mit dokumentierter
+   * Einwilligung – sonst lehnen die Regeln das Schreiben ab. Unbekannter Spieler: lieber nicht.
+   */
+  private mayRecalculate(playerId: string): boolean {
+    const player = this.squad.players().find((entry) => entry.id === playerId);
+    return !!player && player.consentStatus !== 'revoked' && mayStoreHealth(player, this.team.id());
+  }
+
+  private withChanges(list: readonly Measurement[], changes: readonly TrendFlagChange[]): Measurement[] {
+    const byId = new Map(changes.map((change) => [change.measurement.id, change.measurement]));
+    return list.map((entry) => byId.get(entry.id) ?? entry);
+  }
+
+  private saveFlagChanges(playerId: string, changes: readonly TrendFlagChange[]): Promise<void> {
+    return this.playerRecordsApi.saveMeasurementFlags(
+      playerId,
+      changes.map(({ measurement, reviewDropped }) => ({
+        id: measurement.id,
+        quality: measurement.quality === 'flagged' ? 'flagged' : 'verified',
+        flags: measurement.flags ?? [],
+        dropReview: reviewDropped,
+      })),
+    );
   }
 
   /** Trainer und Medizin dürfen eine markierte Messung bestätigen oder die Bestätigung zurücknehmen (SCRUM-387). */
@@ -99,7 +136,18 @@ export class MeasurementsService {
     return measurementQuality(measurement) === 'flagged';
   }
 
-  async deleteMeasurement(id: string): Promise<boolean> {
-    return this.state.remove('measurements', id, 'Messung konnte nicht gelöscht werden.', (list) => this.state.measurementList.set(list as Measurement[]), this.state.measurementList());
+  /**
+   * Löscht eine Messung. Danach werden die Markierungen „kleiner/größer als vorige Messung“ der übrigen Messungen neu
+   * berechnet (SCRUM-306) – außer `recalculate: false`, z. B. wenn ohnehin alle Messungen gelöscht werden.
+   */
+  async deleteMeasurement(id: string, options: { readonly recalculate?: boolean } = {}): Promise<boolean> {
+    const playerId = this.state.writablePlayer();
+    const removed = await this.state.remove('measurements', id, 'Messung konnte nicht gelöscht werden.', (list) => this.state.measurementList.set(list as Measurement[]), this.state.measurementList());
+    if (!removed || !playerId || options.recalculate === false || !this.mayRecalculate(playerId)) return removed;
+    const changes = recomputeTrendFlags(this.state.measurementList());
+    if (changes.length === 0) return true;
+    this.state.measurementList.update((list) => this.withChanges(list, changes));
+    this.state.write(RECALCULATION_ERROR, () => this.saveFlagChanges(playerId, changes));
+    return true;
   }
 }
