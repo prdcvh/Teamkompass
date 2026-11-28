@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { LayoutService } from '../../core/shell/layout.service';
+import { ListFilters } from '../../core/shell/list-filters';
 import { EventsService } from '../../core/events/events.service';
 import { type Opponent, detailsOf, filterOpponents, formatDate, opponentRecord, recordText } from '../../core/opponents/opponent';
 import { OpponentsService } from '../../core/opponents/opponents.service';
@@ -29,7 +30,8 @@ export class Opponents implements OnInit {
   private readonly route = inject(ActivatedRoute);
   protected readonly isTrainer = computed(() => this.session.role() === 'trainer');
 
-  protected readonly query = signal('');
+  // Die Suche liegt im ListFilters-Dienst und übersteht den Seitenwechsel (SCRUM-310).
+  protected readonly query = inject(ListFilters).opponentsQuery;
   protected readonly dialogOpen = signal(false);
   protected readonly editing = signal<Opponent | null>(null);
   protected readonly deleting = signal<Opponent | null>(null);
@@ -50,7 +52,8 @@ export class Opponents implements OnInit {
 
   ngOnInit(): void {
     // Aus der globalen Suche: ?suche=<Gegnername> filtert die Liste vor.
-    this.query.set(this.route.snapshot.queryParamMap.get('suche') ?? '');
+    const search = this.route.snapshot.queryParamMap.get('suche');
+    if (search !== null) this.query.set(search);
     this.opponents.start();
     this.eventsService.start();
   }

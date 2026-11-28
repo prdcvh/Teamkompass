@@ -8,6 +8,8 @@
         und ändert keine Noten, Rangfolge oder Aufstellung.
       </p>
 
+      <p class="muted" data-testid="development-band-note">{{ bandNote }}</p>
+
       @if (!open()) {
         <button tkButton type="button" (click)="toggle()" data-testid="development-open">Entwicklungsansicht öffnen</button>
       } @else {

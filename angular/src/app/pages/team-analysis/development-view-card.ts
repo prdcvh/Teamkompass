@@ -11,6 +11,7 @@ import {
 } from '../../core/analysis/development-view';
 import { DevelopmentViewService } from '../../core/analysis/development-view.service';
 import { SessionService } from '../../core/auth/session.service';
+import { MATURITY_BAND_NOTE } from '../../core/records/maturity-note';
 import { SquadService } from '../../core/player/squad.service';
 import { addDays, formatDate, isIsoDate, todayIso } from '../../core/shared/dates';
 import { TeamService } from '../../core/team/team.service';
@@ -44,6 +45,7 @@ export class DevelopmentViewCard {
 
   protected readonly groups = DEVELOPMENT_GROUPS;
   protected readonly groupLabels = GROUP_LABELS;
+  protected readonly bandNote = MATURITY_BAND_NOTE;
   protected readonly quarterLabels = QUARTER_LABELS;
   protected readonly smallBelow = SMALL_GROUP_BELOW;
 

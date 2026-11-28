@@ -62,6 +62,17 @@ describe('Opponents (Gegneranalyse)', () => {
     expect((q(fixture, '.search input') as HTMLInputElement).value).toBe('Taunus');
   });
 
+  it('behält die Suche nach dem Verlassen der Seite, auch ohne ?suche= (SCRUM-310)', async () => {
+    const fixture = await render();
+    type(q<HTMLInputElement>(fixture, 'input[type="search"]')!, 'Taunus');
+    await flush(fixture);
+    fixture.destroy();
+    const again = TestBed.createComponent(Opponents);
+    await flush(again);
+    expect(q<HTMLInputElement>(again, 'input[type="search"]')!.value).toBe('Taunus');
+    expect(qa(again, 'article.opponent')).toHaveLength(1);
+  });
+
   it('gibt alle Texte als Text aus (kein HTML aus Namen oder Notizen)', async () => {
     const fixture = await render();
     expect(root(fixture).querySelector('img')).toBeNull();

@@ -1,5 +1,6 @@
 import { type BioBandingData, bioBand, suggestBioBanding } from './bio-banding';
 import { maturityAt } from './maturity';
+import { assessMaturity } from './maturity-assessment';
 
 describe('Bio-Banding: Zuordnung zu den Bändern (SCRUM-191)', () => {
   it('ordnet die Prozentwerte den vier Bändern zu, Grenzen am gerundeten Wert', () => {
@@ -77,7 +78,7 @@ describe('Bio-Banding: Vorschlag für den Kader (SCRUM-191)', () => {
     const data: BioBandingData = {
       inputs,
       measurements: [
-        { id: 'a', date: '2026-04-01', height: 150, weight: 40 },
+        { id: 'a', date: '2026-04-01', height: 172, weight: 55 },
         { id: 'b', date: '2026-10-01', height: 178, weight: 60 },
       ],
     };
@@ -103,5 +104,64 @@ describe('Bio-Banding: Vorschlag für den Kader (SCRUM-191)', () => {
     const withoutConsent: BioBandingData = { ...measure(165, 51), inputs: { ...inputs, parentsConsent: false } };
     const result = suggestBioBanding([player('p', 'Pia')], new Map([['p', withoutConsent]]), today);
     expect(result.withoutValue).toBe(1);
+  });
+});
+
+describe('Bio-Banding: veraltete oder unsichere Werte (SCRUM-389)', () => {
+  const today = '2026-11-03';
+  const inputs = { sex: 'm', parentsConsent: true, motherHeight: 168, fatherHeight: 182 } as const;
+  const birthdate = '2012-05-05';
+  const player = (id: string, name: string) => ({ id, name, birthdate });
+  const fresh: BioBandingData = { inputs, measurements: [{ id: 'm', date: '2026-10-01', height: 165, weight: 51 }] };
+  const old: BioBandingData = { inputs, measurements: [{ id: 'm', date: '2025-11-01', height: 165, weight: 51 }] };
+  const flagged: BioBandingData = { inputs, measurements: [{ id: 'm', date: '2026-10-01', height: 165, weight: 51, quality: 'flagged', flags: ['height-spread'] }] };
+
+  it('ordnet einen Spieler mit veraltetem Wert in keine Gruppe ein, sondern in „nicht eingeordnet“ mit Grund', () => {
+    const result = suggestBioBanding([player('o', 'Olli')], new Map([['o', old]]), today);
+    expect(result.groups.flatMap((group) => group.players)).toEqual([]);
+    expect(result.withoutValue).toBe(0);
+    expect(result.unclassified).toHaveLength(1);
+    expect(result.unclassified[0]).toMatchObject({ id: 'o', status: 'stale', statusText: 'nicht eingeordnet – Messung veraltet' });
+    expect(result.unclassified[0]!.causes.join(' ')).toContain('Tage alt');
+  });
+
+  it('ordnet einen Spieler mit zur Prüfung markierter Messung nicht ein', () => {
+    const result = suggestBioBanding([player('f', 'Flo')], new Map([['f', flagged]]), today);
+    expect(result.groups.flatMap((group) => group.players)).toEqual([]);
+    expect(result.unclassified[0]).toMatchObject({ id: 'f', status: 'uncertain', statusText: 'Einordnung unsicher – prüfen' });
+    expect(result.unclassified[0]!.causes[0]).toContain('zur Prüfung markiert');
+  });
+
+  it('gleiche Daten, gleiche Aussage wie im Profil (assessMaturity): Status und Ursachen stimmen überein', () => {
+    for (const data of [fresh, old, flagged]) {
+      const assessment = assessMaturity(data.measurements, birthdate, data.inputs, today);
+      const result = suggestBioBanding([player('p', 'Pia')], new Map([['p', data]]), today);
+      const entry = result.unclassified[0];
+      if (assessment.status === 'classified') {
+        expect(entry).toBeUndefined();
+        expect(result.groups.flatMap((group) => group.players.map((member) => member.id))).toEqual(['p']);
+      } else {
+        expect(entry?.status).toBe(assessment.status);
+        expect(entry?.statusText).toBe(assessment.statusText);
+        expect(entry?.causes).toEqual(assessment.causes);
+        expect(result.groups.flatMap((group) => group.players)).toEqual([]);
+      }
+    }
+  });
+
+  it('sortiert nach Name und mischt sich nicht mit Spielern ohne Wert', () => {
+    const result = suggestBioBanding(
+      [player('b', 'Berta'), player('a', 'Anton'), player('n', 'Nobody'), player('g', 'Gina')],
+      new Map<string, BioBandingData | null>([
+        ['b', old],
+        ['a', flagged],
+        ['n', { inputs, measurements: [] }],
+        ['g', fresh],
+      ]),
+      today,
+    );
+    expect(result.unclassified.map((entry) => entry.name)).toEqual(['Anton', 'Berta']);
+    expect(result.withoutValue).toBe(1);
+    expect(result.groups.flatMap((group) => group.players.map((member) => member.id))).toEqual(['g']);
   });
 });

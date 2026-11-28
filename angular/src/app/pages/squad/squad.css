@@ -154,7 +154,16 @@ td {
 }
 
 .cards .edit-btn {
+  display: grid;
   flex: none;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  color: var(--tk-ink);
+  background: var(--tk-surface);
+  border: 1px solid var(--tk-line);
+  border-radius: var(--tk-radius-md);
+  cursor: pointer;
 }
 
 .cards li + li {
@@ -163,7 +172,7 @@ td {
 
 .player-card {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: var(--tk-space-3);
   align-items: center;
   flex: 1;
@@ -211,7 +220,22 @@ td {
 }
 
 .who strong {
+  display: -webkit-box;
+  overflow: hidden;
   font-size: var(--tk-text-lg);
+  overflow-wrap: break-word;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+/* Position, Alter und Hinweis brechen nur zwischen den Angaben um, nie mitten im Wert (SCRUM-309). */
+.who .meta-part {
+  white-space: nowrap;
+}
+
+.who tk-status {
+  justify-self: start;
 }
 
 .who small,
