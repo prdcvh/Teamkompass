@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { SessionService } from '../../core/auth/session.service';
+import { MATURITY_BAND_NOTE } from '../../core/records/maturity-note';
 import { SquadService } from '../../core/player/squad.service';
 import { addDays, todayIso } from '../../core/shared/dates';
 import { TeamService } from '../../core/team/team.service';
@@ -55,6 +56,7 @@ describe('DevelopmentViewCard (Entwicklungsansicht, SCRUM-258)', () => {
   it('lädt nichts, solange die Ansicht nicht geöffnet ist (kein Zugriff auf Reifedaten)', async () => {
     const { fixture, firebase } = await render('trainer');
     expect(text(fixture)).toContain('Entwicklungsansicht öffnen');
+    expect(root(fixture).querySelector('[data-testid="development-band-note"]')?.textContent?.trim()).toBe(MATURITY_BAND_NOTE); // SCRUM-385
     expect(firebase.maturity.calls.filter((call) => call.startsWith('readMaturity'))).toEqual([]);
   });
 

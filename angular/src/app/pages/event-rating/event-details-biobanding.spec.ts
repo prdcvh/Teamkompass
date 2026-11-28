@@ -3,6 +3,7 @@ import { SessionService } from '../../core/auth/session.service';
 import type { TeamEvent } from '../../core/events/event';
 import { EventsService } from '../../core/events/events.service';
 import { SquadService } from '../../core/player/squad.service';
+import { MATURITY_BAND_NOTE } from '../../core/records/maturity-note';
 import { BIO_BANDING_HINT } from '../../core/records/bio-banding';
 import { BioBandingService } from '../../core/records/bio-banding.service';
 import { FakeFirebase, provideFakeFirebase } from '../../core/testing/fake-firebase';
@@ -69,6 +70,7 @@ describe('EventDetails: Bio-Banding-Vorschlag (SCRUM-191)', () => {
     });
     const content = text(section(fixture));
     expect(content).toContain(BIO_BANDING_HINT);
+    expect(text(section(fixture)!.querySelector('[data-test="bio-band-note"]'))).toBe(MATURITY_BAND_NOTE); // SCRUM-385
     const names = [...section(fixture)!.querySelectorAll('.bio-group li')].map((li) => text(li));
     expect(names).toHaveLength(1);
     expect(names[0]).toContain('Jonas Keller');
